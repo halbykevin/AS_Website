@@ -61,7 +61,7 @@ export default function AdminLogin() {
         </form>
 
         <p className="mt-4 text-center text-xs text-as-charcoal/45">
-          Uses your PocketBase superuser account.
+          For AS Company staff only.
         </p>
       </div>
     </div>
