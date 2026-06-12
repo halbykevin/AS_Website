@@ -26,7 +26,7 @@ const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-const fmtDate = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '')
+const fmtDate = (d) => (d ? String(d).slice(0, 10) : '')
 
 // ---- Response mappers (DB snake_case -> API camelCase) ----
 const settingsJson = (r) => ({
