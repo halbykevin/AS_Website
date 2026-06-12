@@ -28,7 +28,10 @@ Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag),
-`services`, `events`, `reservations`. Created by [server/src/migrate.js](server/src/migrate.js);
+`services`, `events` (each has a `ticket_url`; no price/category — cards & "Buy tickets" open
+that link), `banners` (homepage slideshow: image/title/subtitle/link/active), `sections`
+(admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
+`reservations`. Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
@@ -68,11 +71,11 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
-  components/               # Layout, Navbar, Footer, Icon, EventCard
+  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider
   pages/                    # ComingSoon, Home, Events, EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, ServicesAdmin, EventsAdmin, ReservationsAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -85,7 +88,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/services`, `/admin/events`, `/admin/reservations`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`
 
 ## Brand
 

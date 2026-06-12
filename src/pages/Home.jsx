@@ -1,14 +1,18 @@
 import { Link } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import EventCard from '../components/EventCard.jsx'
+import BannerSlider from '../components/BannerSlider.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Home() {
-  const { hero, services, store, about, ticketing, events } = useContent()
+  const { hero, services, eventsSection, store, about, ticketing, events, banners, sections } = useContent()
   const upcoming = events.slice(0, 3)
 
   return (
     <>
+      {/* ---------------- Banner slideshow (admin-managed) ---------------- */}
+      <BannerSlider banners={banners} />
+
       {/* ---------------- Hero ---------------- */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-as-red/5 blur-3xl" />
@@ -77,7 +81,7 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-                  Upcoming Events
+                  {eventsSection.heading}
                 </h2>
               </div>
               <p className="mt-3 flex items-center gap-2 text-sm text-as-charcoal/55">
@@ -131,7 +135,74 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ---------------- Custom sections (admin-created) ---------------- */}
+      {sections.map((section) => (
+        <CustomSection key={section.id} section={section} />
+      ))}
     </>
+  )
+}
+
+// Renders a section created from the admin dashboard: optional eyebrow,
+// heading, paragraphs, image and button, on a light or dark background.
+function CustomSection({ section }) {
+  const dark = section.theme === 'dark'
+  const paragraphs = section.body.split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean)
+  const isExternal = /^https?:\/\//i.test(section.buttonUrl)
+
+  const button = section.buttonLabel && section.buttonUrl && (
+    <a
+      href={section.buttonUrl}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noreferrer' : undefined}
+      className="mt-7 inline-flex items-center rounded-full bg-as-red px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+    >
+      {section.buttonLabel}
+    </a>
+  )
+
+  return (
+    <section className={`py-20 sm:py-24 ${dark ? 'bg-as-charcoal' : 'bg-as-charcoal/[0.02]'}`}>
+      <div
+        className={`mx-auto max-w-7xl items-center gap-12 px-5 sm:px-8 ${
+          section.image ? 'grid lg:grid-cols-2' : 'flex flex-col text-center'
+        }`}
+      >
+        <div className={section.image ? '' : 'mx-auto max-w-2xl'}>
+          {section.eyebrow && (
+            <span
+              className={`inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest ${
+                dark ? 'bg-white/10 text-white/80' : 'border border-as-red/20 bg-as-red/5 text-as-red'
+              }`}
+            >
+              {section.eyebrow}
+            </span>
+          )}
+          <h2
+            className={`mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl ${
+              dark ? 'text-white' : 'text-as-charcoal'
+            }`}
+          >
+            {section.heading}
+          </h2>
+          {paragraphs.map((p, i) => (
+            <p
+              key={i}
+              className={`mt-4 text-base leading-relaxed ${dark ? 'text-white/70' : 'text-as-charcoal/60'}`}
+            >
+              {p}
+            </p>
+          ))}
+          {button}
+        </div>
+        {section.image && (
+          <div className="overflow-hidden rounded-3xl shadow-md">
+            <img src={section.image} alt={section.heading} className="h-full w-full object-cover" loading="lazy" />
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 

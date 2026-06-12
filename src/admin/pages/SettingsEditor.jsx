@@ -5,7 +5,11 @@ import { Card, Field, TextInput, TextArea, Toggle, Button, Banner } from '../ui.
 const empty = {
   brandName: '', legalName: '', tagline: '', logoUrl: '',
   heroEyebrow: '', heroTitle: '', heroSubtitle: '',
+  heroPrimaryLabel: '', heroSecondaryLabel: '',
+  servicesHeading: '', servicesSubheading: '',
+  eventsHeading: '', eventsIntro: '',
   aboutHeading: '', aboutBody: '',
+  contactHeading: '', contactSubheading: '',
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
   published: false,
@@ -30,8 +34,12 @@ export default function SettingsEditor() {
           brandName: s.brandName || '', legalName: s.legalName || '', tagline: s.tagline || '',
           logoUrl: s.logoUrl || '',
           heroEyebrow: s.heroEyebrow || '', heroTitle: s.heroTitle || '', heroSubtitle: s.heroSubtitle || '',
+          heroPrimaryLabel: s.heroPrimaryLabel || '', heroSecondaryLabel: s.heroSecondaryLabel || '',
+          servicesHeading: s.servicesHeading || '', servicesSubheading: s.servicesSubheading || '',
+          eventsHeading: s.eventsHeading || '', eventsIntro: s.eventsIntro || '',
           aboutHeading: s.aboutHeading || '',
           aboutBody: Array.isArray(s.aboutBody) ? s.aboutBody.join('\n\n') : '',
+          contactHeading: s.contactHeading || '', contactSubheading: s.contactSubheading || '',
           contactEmail: s.contactEmail || '', contactWhatsapp: s.contactWhatsapp || '',
           contactInstagram: s.contactInstagram || '', contactInstagramHandle: s.contactInstagramHandle || '',
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
@@ -132,6 +140,30 @@ export default function SettingsEditor() {
           <Field label="Eyebrow"><TextInput value={form.heroEyebrow} onChange={set('heroEyebrow')} /></Field>
           <Field label="Title"><TextInput value={form.heroTitle} onChange={set('heroTitle')} /></Field>
           <Field label="Subtitle"><TextArea value={form.heroSubtitle} onChange={set('heroSubtitle')} /></Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Primary button label" hint="Links to the events page.">
+              <TextInput value={form.heroPrimaryLabel} onChange={set('heroPrimaryLabel')} placeholder="Browse Events" />
+            </Field>
+            <Field label="Secondary button label" hint="Links to the services section.">
+              <TextInput value={form.heroSecondaryLabel} onChange={set('heroSecondaryLabel')} placeholder="What We Do" />
+            </Field>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Services section">
+        <div className="space-y-4">
+          <Field label="Heading"><TextInput value={form.servicesHeading} onChange={set('servicesHeading')} placeholder="What We Do" /></Field>
+          <Field label="Subheading"><TextArea value={form.servicesSubheading} onChange={set('servicesSubheading')} /></Field>
+        </div>
+      </Card>
+
+      <Card title="Events section">
+        <div className="space-y-4">
+          <Field label="Heading"><TextInput value={form.eventsHeading} onChange={set('eventsHeading')} placeholder="Upcoming Events" /></Field>
+          <Field label="Intro" hint="Shown under the heading on the events page.">
+            <TextArea value={form.eventsIntro} onChange={set('eventsIntro')} />
+          </Field>
         </div>
       </Card>
 
@@ -162,6 +194,8 @@ export default function SettingsEditor() {
 
       <Card title="Contact">
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Heading"><TextInput value={form.contactHeading} onChange={set('contactHeading')} placeholder="Get in touch" /></Field>
+          <Field label="Subheading"><TextInput value={form.contactSubheading} onChange={set('contactSubheading')} /></Field>
           <Field label="Email"><TextInput type="email" value={form.contactEmail} onChange={set('contactEmail')} /></Field>
           <Field label="WhatsApp link"><TextInput value={form.contactWhatsapp} onChange={set('contactWhatsapp')} /></Field>
           <Field label="Instagram link"><TextInput value={form.contactInstagram} onChange={set('contactInstagram')} /></Field>

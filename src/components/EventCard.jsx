@@ -17,11 +17,11 @@ export function formatDate(date) {
 
 export default function EventCard({ event }) {
   const status = statusStyles[event.status] ?? statusStyles.open
-  return (
-    <Link
-      to={`/events/${event.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-    >
+  const cardCls =
+    'group flex flex-col overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg'
+
+  const body = (
+    <>
       <div className="relative aspect-[16/10] overflow-hidden bg-as-gray/10">
         <img
           src={event.image}
@@ -29,9 +29,6 @@ export default function EventCard({ event }) {
           loading="lazy"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
-        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-as-charcoal backdrop-blur">
-          {event.category}
-        </span>
         <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${status.className}`}>
           {status.label}
         </span>
@@ -54,14 +51,27 @@ export default function EventCard({ event }) {
           </p>
         </div>
 
-        <div className="mt-5 flex items-center justify-between border-t border-black/5 pt-4">
-          <span className="text-sm font-semibold text-as-charcoal">{event.price}</span>
+        <div className="mt-5 flex items-center justify-end border-t border-black/5 pt-4">
           <span className="flex items-center gap-1 text-sm font-semibold text-as-red">
-            Details
+            {event.ticketUrl ? 'Buy tickets' : 'Details'}
             <Icon name="arrow" className="h-4 w-4 transition group-hover:translate-x-1" />
           </span>
         </div>
       </div>
+    </>
+  )
+
+  // With a ticket link the whole card opens it; otherwise go to the detail page.
+  if (event.ticketUrl) {
+    return (
+      <a href={event.ticketUrl} target="_blank" rel="noreferrer" className={cardCls}>
+        {body}
+      </a>
+    )
+  }
+  return (
+    <Link to={`/events/${event.id}`} className={cardCls}>
+      {body}
     </Link>
   )
 }

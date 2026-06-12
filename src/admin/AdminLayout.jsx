@@ -4,6 +4,8 @@ import { useAuth } from './useAuth.js'
 
 const links = [
   { to: '/admin', label: 'Site Settings', end: true },
+  { to: '/admin/banners', label: 'Banners' },
+  { to: '/admin/sections', label: 'Custom Sections' },
   { to: '/admin/services', label: 'Services' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/reservations', label: 'Reservations' },

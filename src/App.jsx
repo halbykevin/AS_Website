@@ -13,6 +13,8 @@ import SettingsEditor from './admin/pages/SettingsEditor.jsx'
 import ServicesAdmin from './admin/pages/ServicesAdmin.jsx'
 import EventsAdmin from './admin/pages/EventsAdmin.jsx'
 import ReservationsAdmin from './admin/pages/ReservationsAdmin.jsx'
+import BannersAdmin from './admin/pages/BannersAdmin.jsx'
+import SectionsAdmin from './admin/pages/SectionsAdmin.jsx'
 
 function Splash() {
   return (
@@ -57,6 +59,8 @@ export default function App() {
             }
           >
             <Route index element={<SettingsEditor />} />
+            <Route path="banners" element={<BannersAdmin />} />
+            <Route path="sections" element={<SectionsAdmin />} />
             <Route path="services" element={<ServicesAdmin />} />
             <Route path="events" element={<EventsAdmin />} />
             <Route path="reservations" element={<ReservationsAdmin />} />

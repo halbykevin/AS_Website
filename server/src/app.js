@@ -32,7 +32,11 @@ const fmtDate = (d) => (d ? String(d).slice(0, 10) : '')
 const settingsJson = (r) => ({
   brandName: r.brand_name, legalName: r.legal_name, tagline: r.tagline, logoUrl: r.logo_url,
   heroEyebrow: r.hero_eyebrow, heroTitle: r.hero_title, heroSubtitle: r.hero_subtitle,
+  heroPrimaryLabel: r.hero_primary_label, heroSecondaryLabel: r.hero_secondary_label,
+  servicesHeading: r.services_heading, servicesSubheading: r.services_subheading,
+  eventsHeading: r.events_heading, eventsIntro: r.events_intro,
   aboutHeading: r.about_heading, aboutBody: r.about_body, aboutStats: r.about_stats,
+  contactHeading: r.contact_heading, contactSubheading: r.contact_subheading,
   contactEmail: r.contact_email, contactWhatsapp: r.contact_whatsapp,
   contactInstagram: r.contact_instagram, contactInstagramHandle: r.contact_instagram_handle,
   storeTitle: r.store_title, storeEyebrow: r.store_eyebrow,
@@ -41,9 +45,17 @@ const settingsJson = (r) => ({
 })
 const serviceJson = (r) => ({ id: r.id, title: r.title, description: r.description, icon: r.icon, sort: r.sort })
 const eventJson = (r) => ({
-  id: r.id, title: r.title, slug: r.slug, category: r.category, date: fmtDate(r.date),
-  time: r.time, venue: r.venue, city: r.city, imageUrl: r.image_url, price: r.price,
+  id: r.id, title: r.title, slug: r.slug, date: fmtDate(r.date),
+  time: r.time, venue: r.venue, city: r.city, imageUrl: r.image_url, ticketUrl: r.ticket_url,
   status: r.status, excerpt: r.excerpt, description: r.description, sort: r.sort,
+})
+const bannerJson = (r) => ({
+  id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,
+  linkUrl: r.link_url, sort: r.sort, active: r.active,
+})
+const sectionJson = (r) => ({
+  id: r.id, eyebrow: r.eyebrow, heading: r.heading, body: r.body, imageUrl: r.image_url,
+  buttonLabel: r.button_label, buttonUrl: r.button_url, theme: r.theme, sort: r.sort, visible: r.visible,
 })
 const reservationJson = (r) => ({
   id: r.id, eventId: r.event_id, eventTitle: r.event_title, name: r.name, email: r.email,
@@ -74,15 +86,23 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
     `UPDATE settings SET
        brand_name=$1, legal_name=$2, tagline=$3, logo_url=$4,
        hero_eyebrow=$5, hero_title=$6, hero_subtitle=$7,
-       about_heading=$8, about_body=$9, about_stats=$10,
-       contact_email=$11, contact_whatsapp=$12, contact_instagram=$13, contact_instagram_handle=$14,
-       store_title=$15, store_eyebrow=$16, store_description=$17, store_url=$18,
-       published=$19, updated_at=now()
+       hero_primary_label=$8, hero_secondary_label=$9,
+       services_heading=$10, services_subheading=$11,
+       events_heading=$12, events_intro=$13,
+       about_heading=$14, about_body=$15, about_stats=$16,
+       contact_heading=$17, contact_subheading=$18,
+       contact_email=$19, contact_whatsapp=$20, contact_instagram=$21, contact_instagram_handle=$22,
+       store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
+       published=$27, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
       b.heroEyebrow || '', b.heroTitle || '', b.heroSubtitle || '',
+      b.heroPrimaryLabel || '', b.heroSecondaryLabel || '',
+      b.servicesHeading || '', b.servicesSubheading || '',
+      b.eventsHeading || '', b.eventsIntro || '',
       b.aboutHeading || '', JSON.stringify(b.aboutBody || []), JSON.stringify(b.aboutStats || []),
+      b.contactHeading || '', b.contactSubheading || '',
       b.contactEmail || '', b.contactWhatsapp || '', b.contactInstagram || '', b.contactInstagramHandle || '',
       b.storeTitle || '', b.storeEyebrow || '', b.storeDescription || '', b.storeUrl || '',
       Boolean(b.published),
@@ -134,15 +154,15 @@ app.get('/api/events/:slug', ah(async (req, res) => {
 }))
 
 const eventParams = (b) => [
-  b.title || '', b.slug ? slugify(b.slug) : slugify(b.title || ''), b.category || '',
+  b.title || '', b.slug ? slugify(b.slug) : slugify(b.title || ''),
   b.date || null, b.time || '', b.venue || '', b.city || '', b.imageUrl || '',
-  b.price || '', b.status || 'open', b.excerpt || '', b.description || '', Number(b.sort) || 0,
+  b.ticketUrl || '', b.status || 'open', b.excerpt || '', b.description || '', Number(b.sort) || 0,
 ]
 
 app.post('/api/events', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO events (title, slug, category, date, time, venue, city, image_url, price, status, excerpt, description, sort)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     eventParams(req.body || {})
   )
   res.status(201).json(eventJson(rows[0]))
@@ -151,9 +171,9 @@ app.post('/api/events', requireAuth, ah(async (req, res) => {
 app.put('/api/events/:id', requireAuth, ah(async (req, res) => {
   const p = eventParams(req.body || {})
   const { rows } = await query(
-    `UPDATE events SET title=$1, slug=$2, category=$3, date=$4, time=$5, venue=$6, city=$7,
-       image_url=$8, price=$9, status=$10, excerpt=$11, description=$12, sort=$13
-     WHERE id=$14 RETURNING *`,
+    `UPDATE events SET title=$1, slug=$2, date=$3, time=$4, venue=$5, city=$6,
+       image_url=$7, ticket_url=$8, status=$9, excerpt=$10, description=$11, sort=$12
+     WHERE id=$13 RETURNING *`,
     [...p, req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
@@ -162,6 +182,80 @@ app.put('/api/events/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/events/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM events WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Banners =========================
+// Public read (the frontend filters on `active`); admin manages all.
+app.get('/api/banners', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM banners ORDER BY sort ASC, id ASC')
+  res.json(rows.map(bannerJson))
+}))
+
+const bannerParams = (b) => [
+  b.title || '', b.subtitle || '', b.imageUrl || '', b.linkUrl || '',
+  Number(b.sort) || 0, b.active === undefined ? true : Boolean(b.active),
+]
+
+app.post('/api/banners', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO banners (title, subtitle, image_url, link_url, sort, active)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    bannerParams(req.body || {})
+  )
+  res.status(201).json(bannerJson(rows[0]))
+}))
+
+app.put('/api/banners/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, sort=$5, active=$6
+     WHERE id=$7 RETURNING *`,
+    [...bannerParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(bannerJson(rows[0]))
+}))
+
+app.delete('/api/banners/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM banners WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Custom sections =========================
+// Public read (the frontend filters on `visible`); admin manages all.
+app.get('/api/sections', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM sections ORDER BY sort ASC, id ASC')
+  res.json(rows.map(sectionJson))
+}))
+
+const sectionParams = (b) => [
+  b.eyebrow || '', b.heading || '', b.body || '', b.imageUrl || '',
+  b.buttonLabel || '', b.buttonUrl || '', b.theme === 'dark' ? 'dark' : 'light',
+  Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/sections', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO sections (eyebrow, heading, body, image_url, button_label, button_url, theme, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    sectionParams(req.body || {})
+  )
+  res.status(201).json(sectionJson(rows[0]))
+}))
+
+app.put('/api/sections/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE sections SET eyebrow=$1, heading=$2, body=$3, image_url=$4,
+       button_label=$5, button_url=$6, theme=$7, sort=$8, visible=$9
+     WHERE id=$10 RETURNING *`,
+    [...sectionParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(sectionJson(rows[0]))
+}))
+
+app.delete('/api/sections/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM sections WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

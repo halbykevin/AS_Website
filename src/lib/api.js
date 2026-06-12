@@ -59,10 +59,13 @@ export const defaultContent = {
   nav: defaults.nav,
   hero: defaults.hero,
   services: defaults.services,
+  eventsSection: defaults.eventsSection,
   store: defaults.store,
   ticketing: defaults.ticketing,
   about: defaults.about,
   contact: defaults.contact,
+  banners: [],
+  sections: [],
   published: false,
 }
 
@@ -86,6 +89,18 @@ function mergeSettings(s) {
       eyebrow: pick(s.heroEyebrow, d.hero.eyebrow),
       title: pick(s.heroTitle, d.hero.title),
       subtitle: pick(s.heroSubtitle, d.hero.subtitle),
+      primaryCta: { ...d.hero.primaryCta, label: pick(s.heroPrimaryLabel, d.hero.primaryCta.label) },
+      secondaryCta: { ...d.hero.secondaryCta, label: pick(s.heroSecondaryLabel, d.hero.secondaryCta.label) },
+    },
+    services: {
+      ...d.services,
+      heading: pick(s.servicesHeading, d.services.heading),
+      subheading: pick(s.servicesSubheading, d.services.subheading),
+    },
+    eventsSection: {
+      ...d.eventsSection,
+      heading: pick(s.eventsHeading, d.eventsSection.heading),
+      intro: pick(s.eventsIntro, d.eventsSection.intro),
     },
     about: {
       ...d.about,
@@ -95,6 +110,8 @@ function mergeSettings(s) {
     },
     contact: {
       ...d.contact,
+      heading: pick(s.contactHeading, d.contact.heading),
+      subheading: pick(s.contactSubheading, d.contact.subheading),
       email: pick(s.contactEmail, d.contact.email),
       whatsapp: pick(s.contactWhatsapp, d.contact.whatsapp),
       instagram: pick(s.contactInstagram, d.contact.instagram),
@@ -115,25 +132,51 @@ export function mapEvent(e) {
     id: e.slug, // used in the URL
     recordId: e.id, // used to link reservations
     title: e.title,
-    category: e.category,
     date: e.date,
     time: e.time,
     venue: e.venue,
     city: e.city,
     image: e.imageUrl,
-    price: e.price,
+    ticketUrl: e.ticketUrl || '',
     status: e.status || 'open',
     excerpt: e.excerpt,
     description: e.description,
   }
 }
 
+export function mapBanner(b) {
+  return {
+    id: b.id,
+    title: b.title,
+    subtitle: b.subtitle,
+    image: b.imageUrl,
+    link: b.linkUrl || '',
+    active: b.active !== false,
+  }
+}
+
+export function mapSection(s) {
+  return {
+    id: s.id,
+    eyebrow: s.eyebrow,
+    heading: s.heading,
+    body: s.body || '',
+    image: s.imageUrl || '',
+    buttonLabel: s.buttonLabel || '',
+    buttonUrl: s.buttonUrl || '',
+    theme: s.theme === 'dark' ? 'dark' : 'light',
+    visible: s.visible !== false,
+  }
+}
+
 export async function loadSite() {
   try {
-    const [settings, services, events] = await Promise.all([
+    const [settings, services, events, banners, sections] = await Promise.all([
       request('/api/settings'),
       request('/api/services'),
       request('/api/events'),
+      request('/api/banners').catch(() => []),
+      request('/api/sections').catch(() => []),
     ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -142,6 +185,8 @@ export async function loadSite() {
         items: services.map((s) => ({ title: s.title, description: s.description, icon: s.icon || 'chip' })),
       }
     }
+    content.banners = Array.isArray(banners) ? banners.map(mapBanner).filter((b) => b.active && b.image) : []
+    content.sections = Array.isArray(sections) ? sections.map(mapSection).filter((s) => s.visible) : []
     return {
       content,
       events: Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents,
@@ -181,6 +226,16 @@ export const adminApi = {
   createEvent: (data) => request('/api/events', { method: 'POST', body: data, authed: true }),
   updateEvent: (id, data) => request(`/api/events/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteEvent: (id) => request(`/api/events/${id}`, { method: 'DELETE', authed: true }),
+
+  listBanners: () => request('/api/banners'),
+  createBanner: (data) => request('/api/banners', { method: 'POST', body: data, authed: true }),
+  updateBanner: (id, data) => request(`/api/banners/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteBanner: (id) => request(`/api/banners/${id}`, { method: 'DELETE', authed: true }),
+
+  listSections: () => request('/api/sections'),
+  createSection: (data) => request('/api/sections', { method: 'POST', body: data, authed: true }),
+  updateSection: (id, data) => request(`/api/sections/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteSection: (id) => request(`/api/sections/${id}`, { method: 'DELETE', authed: true }),
 
   listReservations: () => request('/api/reservations', { authed: true }),
   updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),

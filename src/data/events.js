@@ -10,14 +10,13 @@ export const events = [
   {
     id: 'summer-tech-expo-2026',
     title: 'Summer Tech Expo 2026',
-    category: 'Expo',
     date: '2026-07-18',
     time: '16:00',
     venue: 'Beirut Forum',
     city: 'Beirut',
     image:
       'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
-    price: 'Free entry',
+    ticketUrl: '',
     status: 'open', // open | sold-out | coming-soon
     excerpt:
       'A full day of the latest gadgets, live demos and exclusive launches from AS Company.',
@@ -27,14 +26,13 @@ export const events = [
   {
     id: 'live-music-night',
     title: 'Live Music Night',
-    category: 'Concert',
     date: '2026-08-02',
     time: '20:30',
     venue: 'Zaitunay Bay',
     city: 'Beirut',
     image:
       'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1200&q=80',
-    price: 'From $25',
+    ticketUrl: '',
     status: 'open',
     excerpt:
       'An unforgettable evening of live performances under the stars by the waterfront.',
@@ -44,14 +42,13 @@ export const events = [
   {
     id: 'gaming-championship',
     title: 'Gaming Championship Finals',
-    category: 'eSports',
     date: '2026-09-14',
     time: '14:00',
     venue: 'BIEL',
     city: 'Beirut',
     image:
       'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
-    price: 'From $15',
+    ticketUrl: '',
     status: 'coming-soon',
     excerpt:
       'The region’s top players go head-to-head for the championship title.',

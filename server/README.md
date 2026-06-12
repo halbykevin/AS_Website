@@ -21,6 +21,10 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | GET | `/api/events` | — | List events |
 | GET | `/api/events/:slug` | — | One event |
 | POST/PUT/DELETE | `/api/events[/:id]` | admin | Manage events |
+| GET | `/api/banners` | — | List homepage banners (slideshow) |
+| POST/PUT/DELETE | `/api/banners[/:id]` | admin | Manage banners |
+| GET | `/api/sections` | — | List custom homepage sections |
+| POST/PUT/DELETE | `/api/sections[/:id]` | admin | Manage custom sections |
 | POST | `/api/reservations` | — | Visitor submits a reservation |
 | GET | `/api/reservations` | admin | List reservations |
 | PATCH/DELETE | `/api/reservations/:id` | admin | Update status / delete |

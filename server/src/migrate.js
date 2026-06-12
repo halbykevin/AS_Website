@@ -41,19 +41,56 @@ CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
-  category TEXT DEFAULT '',
   date DATE,
   time TEXT DEFAULT '',
   venue TEXT DEFAULT '',
   city TEXT DEFAULT '',
   image_url TEXT DEFAULT '',
-  price TEXT DEFAULT '',
+  ticket_url TEXT DEFAULT '',
   status TEXT DEFAULT 'open',
   excerpt TEXT DEFAULT '',
   description TEXT DEFAULT '',
   sort INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS banners (
+  id SERIAL PRIMARY KEY,
+  title TEXT DEFAULT '',
+  subtitle TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  link_url TEXT DEFAULT '',
+  sort INTEGER DEFAULT 0,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sections (
+  id SERIAL PRIMARY KEY,
+  eyebrow TEXT DEFAULT '',
+  heading TEXT DEFAULT '',
+  body TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  button_label TEXT DEFAULT '',
+  button_url TEXT DEFAULT '',
+  theme TEXT DEFAULT 'light',
+  sort INTEGER DEFAULT 0,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Upgrades for existing databases (idempotent).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
+ALTER TABLE events DROP COLUMN IF EXISTS price;
+ALTER TABLE events DROP COLUMN IF EXISTS category;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS hero_primary_label TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS hero_secondary_label TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS services_heading TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS services_subheading TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS events_heading TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS events_intro TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_heading TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS reservations (
   id SERIAL PRIMARY KEY,

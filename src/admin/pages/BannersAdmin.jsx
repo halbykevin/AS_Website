@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Select, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, Toggle, Button, Banner } from '../ui.jsx'
 
-const STATUS = ['open', 'sold-out', 'coming-soon']
-const blank = {
-  title: '', slug: '', date: '', time: '', venue: '', city: '',
-  imageUrl: '', ticketUrl: '', status: 'open', excerpt: '', description: '', sort: 0,
-}
+const blank = { title: '', subtitle: '', imageUrl: '', linkUrl: '', sort: 0, active: true }
 
-export default function EventsAdmin() {
+export default function BannersAdmin() {
   const [items, setItems] = useState([])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(blank)
@@ -20,9 +16,9 @@ export default function EventsAdmin() {
 
   async function load() {
     try {
-      setItems(await adminApi.listEvents())
+      setItems(await adminApi.listBanners())
     } catch {
-      setMsg({ kind: 'error', text: 'Could not load events.' })
+      setMsg({ kind: 'error', text: 'Could not load banners.' })
     }
   }
   useEffect(() => {
@@ -36,10 +32,8 @@ export default function EventsAdmin() {
   }
   const startEdit = (r) => {
     setForm({
-      title: r.title || '', slug: r.slug || '',
-      date: r.date || '', time: r.time || '', venue: r.venue || '', city: r.city || '',
-      imageUrl: r.imageUrl || '', ticketUrl: r.ticketUrl || '', status: r.status || 'open',
-      excerpt: r.excerpt || '', description: r.description || '', sort: r.sort || 0,
+      title: r.title || '', subtitle: r.subtitle || '', imageUrl: r.imageUrl || '',
+      linkUrl: r.linkUrl || '', sort: r.sort || 0, active: r.active !== false,
     })
     setImageFile(null)
     setEditing(r.id)
@@ -56,9 +50,10 @@ export default function EventsAdmin() {
         const up = await adminApi.upload(imageFile)
         imageUrl = up.url
       }
+      if (!imageUrl) throw new Error('A banner image is required')
       const payload = { ...form, imageUrl, sort: Number(form.sort) }
-      if (editing === 'new') await adminApi.createEvent(payload)
-      else await adminApi.updateEvent(editing, payload)
+      if (editing === 'new') await adminApi.createBanner(payload)
+      else await adminApi.updateBanner(editing, payload)
       setEditing(null)
       await load()
       setMsg({ kind: 'success', text: 'Saved.' })
@@ -70,61 +65,58 @@ export default function EventsAdmin() {
   }
 
   async function remove(r) {
-    if (!confirm(`Delete event “${r.title}”? This also removes its reservations.`)) return
-    await adminApi.deleteEvent(r.id)
+    if (!confirm(`Delete banner “${r.title || 'untitled'}”?`)) return
+    await adminApi.deleteBanner(r.id)
     await load()
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Events</h1>
-        {!editing && <Button onClick={startNew}>+ New event</Button>}
+        <h1 className="text-2xl font-extrabold text-as-charcoal">Banners</h1>
+        {!editing && <Button onClick={startNew}>+ New banner</Button>}
       </div>
+
+      <Banner kind="info">
+        Banners appear as a slideshow at the top of the homepage. Clicking a banner (or its
+        “Buy tickets” button) opens the link you set here.
+      </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
       {editing && (
-        <Card title={editing === 'new' ? 'New event' : 'Edit event'}>
+        <Card title={editing === 'new' ? 'New banner' : 'Edit banner'}>
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Title"><TextInput value={form.title} onChange={set('title')} required /></Field>
-              <Field label="Slug (URL)" hint="Auto-generated from title if left empty.">
-                <TextInput value={form.slug} onChange={set('slug')} placeholder="summer-tech-expo-2026" />
+              <Field label="Title" hint="Shown under the banner (e.g. the event name).">
+                <TextInput value={form.title} onChange={set('title')} />
               </Field>
-              <Field label="Date"><TextInput type="date" value={form.date} onChange={set('date')} /></Field>
-              <Field label="Time"><TextInput value={form.time} onChange={set('time')} placeholder="20:30" /></Field>
-              <Field label="Venue"><TextInput value={form.venue} onChange={set('venue')} /></Field>
-              <Field label="City"><TextInput value={form.city} onChange={set('city')} /></Field>
-              <Field label="Status">
-                <Select value={form.status} onChange={set('status')}>
-                  {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
-                </Select>
+              <Field label="Subtitle" hint="E.g. “Friday 12 Jun 2026 · Château Rweiss”.">
+                <TextInput value={form.subtitle} onChange={set('subtitle')} />
+              </Field>
+              <Field label="Link (URL)" hint="Opened when visitors click the banner or “Buy tickets”.">
+                <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
             </div>
-            <Field
-              label="Ticket link (URL)"
-              hint="Where the event card and the “Buy tickets” button send visitors (e.g. the Ticketing Box Office page). Leave empty to use the built-in reservation form."
-            >
-              <TextInput value={form.ticketUrl} onChange={set('ticketUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
-            </Field>
-            <Field label="Image" hint="Leave empty to keep the current image.">
+            <Field label="Image" hint="Wide image recommended (e.g. 1920×800). Leave empty to keep the current one.">
               <div className="flex items-center gap-4">
                 {(imageFile || form.imageUrl) && (
                   <img
                     src={imageFile ? URL.createObjectURL(imageFile) : form.imageUrl}
                     alt="preview"
-                    className="h-16 w-24 rounded object-cover ring-1 ring-black/5"
+                    className="h-16 w-32 rounded object-cover ring-1 ring-black/5"
                   />
                 )}
                 <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
               </div>
             </Field>
-            <Field label="Excerpt" hint="Short one-line summary shown on cards.">
-              <TextInput value={form.excerpt} onChange={set('excerpt')} />
-            </Field>
-            <Field label="Description"><TextArea value={form.description} onChange={set('description')} className="min-h-[120px]" /></Field>
+            <Toggle
+              checked={form.active}
+              onChange={(v) => setForm((f) => ({ ...f, active: v }))}
+              label={form.active ? 'Visible on the site' : 'Hidden'}
+              description="Turn off to remove this banner from the slideshow without deleting it."
+            />
             <div className="flex gap-3">
               <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
               <Button type="button" variant="ghost" onClick={cancel}>Cancel</Button>
@@ -135,17 +127,17 @@ export default function EventsAdmin() {
 
       <Card>
         {items.length === 0 ? (
-          <p className="text-sm text-as-charcoal/50">No events yet.</p>
+          <p className="text-sm text-as-charcoal/50">No banners yet.</p>
         ) : (
           <ul className="divide-y divide-black/5">
             {items.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-16 shrink-0 rounded object-cover ring-1 ring-black/5" />}
+                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />}
                   <div className="min-w-0">
-                    <p className="font-semibold text-as-charcoal">{r.title}</p>
+                    <p className="font-semibold text-as-charcoal">{r.title || 'Untitled banner'}</p>
                     <p className="truncate text-sm text-as-charcoal/55">
-                      {(r.date || 'no date')} · {r.venue} · {r.status}
+                      {r.active === false ? 'hidden' : 'visible'}{r.linkUrl ? ` · ${r.linkUrl}` : ''}
                     </p>
                   </div>
                 </div>

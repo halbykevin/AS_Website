@@ -32,6 +32,9 @@ export default function Footer() {
           {/* Contact */}
           <div>
             <p className="text-sm font-bold uppercase tracking-wider text-as-charcoal">{contact.heading}</p>
+            {contact.subheading && (
+              <p className="mt-2 text-xs text-as-charcoal/50">{contact.subheading}</p>
+            )}
             <ul className="mt-4 space-y-2.5 text-sm text-as-charcoal/65">
               <li>
                 <a href={`mailto:${contact.email}`} className="transition hover:text-as-red">

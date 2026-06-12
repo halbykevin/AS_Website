@@ -61,6 +61,11 @@ export const services = {
   ],
 }
 
+export const eventsSection = {
+  heading: 'Upcoming Events',
+  intro: 'Discover and reserve your spot at our upcoming events.',
+}
+
 export const store = {
   eyebrow: 'Coming soon',
   title: 'AS Store',

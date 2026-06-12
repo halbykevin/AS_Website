@@ -42,10 +42,7 @@ export default function EventDetail() {
             <Icon name="arrow" className="h-4 w-4 rotate-180" />
             All events
           </Link>
-          <span className="mt-3 inline-block rounded-full bg-as-red px-3 py-1 text-xs font-semibold text-white">
-            {event.category}
-          </span>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
             {event.title}
           </h1>
         </div>
@@ -67,11 +64,18 @@ export default function EventDetail() {
         {/* Reservation panel */}
         <div className="lg:col-span-1">
           <div className="sticky top-24 rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-as-charcoal/55">Price</span>
-              <span className="text-lg font-bold text-as-charcoal">{event.price}</span>
-            </div>
-            <ReservationForm event={event} />
+            {event.ticketUrl ? (
+              <a
+                href={event.ticketUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block w-full rounded-full bg-as-red px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+              >
+                Buy tickets
+              </a>
+            ) : (
+              <ReservationForm event={event} />
+            )}
             <div className="mt-4 flex items-center justify-center gap-2 border-t border-black/5 pt-4">
               <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
               <span className="text-xs text-as-charcoal/45">{ticketing.note}</span>

@@ -13,28 +13,28 @@ const services = [
 
 const events = [
   {
-    title: 'Summer Tech Expo 2026', slug: 'summer-tech-expo-2026', category: 'Expo',
+    title: 'Summer Tech Expo 2026', slug: 'summer-tech-expo-2026',
     date: '2026-07-18', time: '16:00', venue: 'Beirut Forum', city: 'Beirut',
     image_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
-    price: 'Free entry', status: 'open',
+    ticket_url: '', status: 'open',
     excerpt: 'A full day of the latest gadgets, live demos and exclusive launches from AS Company.',
     description: 'Join us for the biggest tech showcase of the summer. Explore the newest electronics, meet the brands, and be the first to experience exclusive product launches.',
     sort: 0,
   },
   {
-    title: 'Live Music Night', slug: 'live-music-night', category: 'Concert',
+    title: 'Live Music Night', slug: 'live-music-night',
     date: '2026-08-02', time: '20:30', venue: 'Zaitunay Bay', city: 'Beirut',
     image_url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1200&q=80',
-    price: 'From $25', status: 'open',
+    ticket_url: '', status: 'open',
     excerpt: 'An unforgettable evening of live performances under the stars by the waterfront.',
     description: 'AS Company presents a night of live music featuring local and regional artists. Limited seating — reserve early to secure your place.',
     sort: 1,
   },
   {
-    title: 'Gaming Championship Finals', slug: 'gaming-championship', category: 'eSports',
+    title: 'Gaming Championship Finals', slug: 'gaming-championship',
     date: '2026-09-14', time: '14:00', venue: 'BIEL', city: 'Beirut',
     image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
-    price: 'From $15', status: 'coming-soon',
+    ticket_url: '', status: 'coming-soon',
     excerpt: 'The region’s top players go head-to-head for the championship title.',
     description: 'Witness the grand finals of the regional gaming championship, powered by AS Company. Reservations open soon.',
     sort: 2,
@@ -59,9 +59,9 @@ async function run() {
   if (ev.rows[0].n === 0) {
     for (const e of events) {
       await pool.query(
-        `INSERT INTO events (title, slug, category, date, time, venue, city, image_url, price, status, excerpt, description, sort)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [e.title, e.slug, e.category, e.date, e.time, e.venue, e.city, e.image_url, e.price, e.status, e.excerpt, e.description, e.sort]
+        `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [e.title, e.slug, e.date, e.time, e.venue, e.city, e.image_url, e.ticket_url, e.status, e.excerpt, e.description, e.sort]
       )
     }
     console.log(`✓ Seeded ${events.length} events`)
