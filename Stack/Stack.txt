@@ -1,0 +1,13 @@
+Front End:
+	1. e store
+	2. basic website
+	3. front end for backend 
+
+Back End:
+	1. backend for website (Ads, SEO, ticketing...)
+	2. backend for e commerce
+	3. dashboard
+
+Tools: 
+	1. WebScarping (Python) 
+	2. Ai for web scraping
