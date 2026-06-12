@@ -1,0 +1,178 @@
+import { Link } from 'react-router-dom'
+import Icon from '../components/Icon.jsx'
+import EventCard from '../components/EventCard.jsx'
+import { hero, services, store, about, ticketing } from '../content/site.js'
+import { events } from '../data/events.js'
+
+export default function Home() {
+  const upcoming = events.slice(0, 3)
+
+  return (
+    <>
+      {/* ---------------- Hero ---------------- */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-as-red/5 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-as-charcoal/5 blur-3xl" />
+
+        <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:py-32">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="inline-flex items-center rounded-full border border-as-red/20 bg-as-red/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-as-red">
+              {hero.eyebrow}
+            </p>
+            <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-as-charcoal sm:text-5xl lg:text-6xl">
+              {hero.title}
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-as-charcoal/60 sm:text-lg">
+              {hero.subtitle}
+            </p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                to={hero.primaryCta.href}
+                className="w-full rounded-full bg-as-red px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md sm:w-auto"
+              >
+                {hero.primaryCta.label}
+              </Link>
+              <a
+                href={hero.secondaryCta.href}
+                className="w-full rounded-full border border-black/10 bg-white px-8 py-3.5 text-sm font-semibold text-as-charcoal transition hover:border-as-red/30 hover:text-as-red sm:w-auto"
+              >
+                {hero.secondaryCta.label}
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------- Services ---------------- */}
+      <section id="services" className="scroll-mt-24 bg-as-charcoal/[0.02] py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+              {services.heading}
+            </h2>
+            <p className="mt-4 text-base text-as-charcoal/60">{services.subheading}</p>
+          </div>
+
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {services.items.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red">
+                  <Icon name={item.icon} className="h-6 w-6" />
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-as-charcoal">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-as-charcoal/60">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------- Upcoming events preview ---------------- */}
+      <section className="py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+                  Upcoming Events
+                </h2>
+              </div>
+              <p className="mt-3 flex items-center gap-2 text-sm text-as-charcoal/55">
+                <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
+                {ticketing.note}
+              </p>
+            </div>
+            <Link
+              to="/events"
+              className="flex items-center gap-1 text-sm font-semibold text-as-red transition hover:gap-2"
+            >
+              View all events
+              <Icon name="arrow" className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {upcoming.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------- AS Store callout ---------------- */}
+      <StoreCallout />
+
+      {/* ---------------- About ---------------- */}
+      <section id="about" className="scroll-mt-24 py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+              {about.heading}
+            </h2>
+            {about.body.map((p, i) => (
+              <p key={i} className="mt-4 text-base leading-relaxed text-as-charcoal/60">
+                {p}
+              </p>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {about.stats.map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl border border-black/5 bg-white p-5 text-center shadow-sm"
+              >
+                <p className="text-2xl font-extrabold text-as-red sm:text-3xl">{s.value}</p>
+                <p className="mt-1 text-xs font-medium text-as-charcoal/55">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+function StoreCallout() {
+  const isLive = Boolean(store.url)
+  return (
+    <section className="py-8">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        <div className="relative overflow-hidden rounded-3xl bg-as-charcoal px-6 py-12 sm:px-12 sm:py-16">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-as-red/20 blur-3xl" />
+          <div className="relative flex flex-col items-center gap-8 text-center lg:flex-row lg:justify-between lg:text-left">
+            <div className="max-w-xl">
+              {store.eyebrow && (
+                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
+                  {store.eyebrow}
+                </span>
+              )}
+              <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                {store.title}
+              </h2>
+              <p className="mt-3 text-base leading-relaxed text-white/70">{store.description}</p>
+            </div>
+
+            <a
+              href={isLive ? store.url : undefined}
+              target={isLive ? '_blank' : undefined}
+              rel={isLive ? 'noreferrer' : undefined}
+              aria-disabled={!isLive}
+              onClick={(e) => !isLive && e.preventDefault()}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-8 py-4 text-sm font-semibold shadow-sm transition ${
+                isLive
+                  ? 'bg-as-red text-white hover:bg-as-red-light hover:shadow-md'
+                  : 'cursor-not-allowed bg-white/15 text-white/60'
+              }`}
+            >
+              <Icon name="store" className="h-5 w-5" />
+              {isLive ? store.cta : 'Coming soon'}
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
