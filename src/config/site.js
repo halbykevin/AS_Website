@@ -12,13 +12,16 @@
 // by adding ?preview=1 to the URL, e.g. http://localhost:5173/?preview=1
 // ---------------------------------------------------------------------------
 
+// Whether the full site is publicly visible is now controlled by the
+// `published` flag on the settings record in PocketBase (editable from the
+// admin dashboard). This static flag is only a fallback used when the backend
+// is unreachable.
 export const siteConfig = {
-  published: false,
+  fallbackPublished: false,
 }
 
-// Returns true when the full site should be shown.
-export function isSiteVisible() {
-  if (siteConfig.published) return true
+// While building, append ?preview=1 to view the full site even when unpublished.
+export function isPreview() {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).has('preview')
 }

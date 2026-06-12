@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import { formatDate } from '../components/EventCard.jsx'
-import { ticketing } from '../content/site.js'
-import { getEventById } from '../data/events.js'
+import { useContent } from '../store/content.jsx'
+import { createReservation } from '../lib/api.js'
 
 export default function EventDetail() {
   const { id } = useParams()
-  const event = getEventById(id)
+  const { ticketing, getEvent } = useContent()
+  const event = getEvent(id)
 
   if (!event) {
     return (
@@ -98,6 +99,8 @@ function InfoCard({ icon, label, value }) {
 
 function ReservationForm({ event }) {
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({ name: '', email: '', phone: '', quantity: 1 })
 
   const isOpen = event.status === 'open'
@@ -105,11 +108,18 @@ function ReservationForm({ event }) {
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: POST to the backend reservation API (VPS) once it's built, e.g.
-    //   await fetch('/api/reservations', { method: 'POST', body: JSON.stringify({ eventId: event.id, ...form }) })
-    setSubmitted(true)
+    setError('')
+    setSubmitting(true)
+    try {
+      await createReservation({ eventRecordId: event.recordId, ...form })
+      setSubmitted(true)
+    } catch (err) {
+      setError('Sorry, we could not submit your reservation. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (!isOpen) {
@@ -156,11 +166,13 @@ function ReservationForm({ event }) {
           ))}
         </select>
       </div>
+      {error && <p className="text-xs font-medium text-as-red">{error}</p>}
       <button
         type="submit"
-        className="w-full rounded-full bg-as-red px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+        disabled={submitting}
+        className="w-full rounded-full bg-as-red px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Reserve now
+        {submitting ? 'Reserving…' : 'Reserve now'}
       </button>
     </form>
   )

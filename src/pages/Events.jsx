@@ -1,8 +1,8 @@
 import EventCard from '../components/EventCard.jsx'
-import { ticketing } from '../content/site.js'
-import { events } from '../data/events.js'
+import { useContent } from '../store/content.jsx'
 
 export default function Events() {
+  const { ticketing, events } = useContent()
   return (
     <section className="py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">

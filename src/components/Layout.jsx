@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import Navbar from './Navbar.jsx'
 import Footer from './Footer.jsx'
 
@@ -12,14 +12,12 @@ function ScrollToTop() {
   return null
 }
 
-export default function Layout() {
+export default function Layout({ children }) {
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-white">
       <ScrollToTop />
       <Navbar />
-      <main className="flex-1">
-        <Outlet />
-      </main>
+      <main className="flex-1">{children}</main>
       <Footer />
     </div>
   )

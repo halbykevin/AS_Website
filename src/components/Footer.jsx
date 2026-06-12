@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { brand, contact, ticketing } from '../content/site.js'
+import { useContent } from '../store/content.jsx'
 
 export default function Footer() {
+  const { brand, contact, ticketing } = useContent()
   return (
     <footer id="contact" className="border-t border-black/5 bg-white">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">

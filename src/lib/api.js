@@ -1,0 +1,194 @@
+import * as defaults from '../content/site.js'
+import { events as defaultEvents } from '../data/events.js'
+
+// ---------------------------------------------------------------------------
+// Frontend data layer — talks to the AS Company API (Express + PostgreSQL).
+// Public reads fall back to the static defaults in src/content + src/data so
+// the site still renders if the backend is unreachable.
+// ---------------------------------------------------------------------------
+
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '')
+const TOKEN_KEY = 'as_admin_token'
+const EMAIL_KEY = 'as_admin_email'
+
+export const auth = {
+  token: () => localStorage.getItem(TOKEN_KEY),
+  email: () => localStorage.getItem(EMAIL_KEY),
+  isAuthed: () => Boolean(localStorage.getItem(TOKEN_KEY)),
+  set: (token, email) => {
+    localStorage.setItem(TOKEN_KEY, token)
+    if (email) localStorage.setItem(EMAIL_KEY, email)
+  },
+  clear: () => {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(EMAIL_KEY)
+  },
+}
+
+async function request(path, { method = 'GET', body, form, authed = false } = {}) {
+  const headers = {}
+  if (authed) headers.Authorization = `Bearer ${auth.token()}`
+  let payload
+  if (form) {
+    payload = form // FormData — let the browser set the content type
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    payload = JSON.stringify(body)
+  }
+
+  const res = await fetch(`${API_URL}${path}`, { method, headers, body: payload })
+
+  if (res.status === 401 && authed) auth.clear()
+  if (!res.ok) {
+    let message = 'Request failed'
+    try {
+      message = (await res.json()).error || message
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message)
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+
+// ---------------- Public site ----------------
+
+export const defaultContent = {
+  brand: defaults.brand,
+  nav: defaults.nav,
+  hero: defaults.hero,
+  services: defaults.services,
+  store: defaults.store,
+  ticketing: defaults.ticketing,
+  about: defaults.about,
+  contact: defaults.contact,
+  published: false,
+}
+
+const pick = (value, fallback) =>
+  value === undefined || value === null || value === '' ? fallback : value
+
+function mergeSettings(s) {
+  const d = defaultContent
+  return {
+    ...d,
+    published: Boolean(s.published),
+    brand: {
+      ...d.brand,
+      name: pick(s.brandName, d.brand.name),
+      legalName: pick(s.legalName, d.brand.legalName),
+      tagline: pick(s.tagline, d.brand.tagline),
+      logo: pick(s.logoUrl, d.brand.logo),
+    },
+    hero: {
+      ...d.hero,
+      eyebrow: pick(s.heroEyebrow, d.hero.eyebrow),
+      title: pick(s.heroTitle, d.hero.title),
+      subtitle: pick(s.heroSubtitle, d.hero.subtitle),
+    },
+    about: {
+      ...d.about,
+      heading: pick(s.aboutHeading, d.about.heading),
+      body: Array.isArray(s.aboutBody) && s.aboutBody.length ? s.aboutBody : d.about.body,
+      stats: Array.isArray(s.aboutStats) && s.aboutStats.length ? s.aboutStats : d.about.stats,
+    },
+    contact: {
+      ...d.contact,
+      email: pick(s.contactEmail, d.contact.email),
+      whatsapp: pick(s.contactWhatsapp, d.contact.whatsapp),
+      instagram: pick(s.contactInstagram, d.contact.instagram),
+      instagramHandle: pick(s.contactInstagramHandle, d.contact.instagramHandle),
+    },
+    store: {
+      ...d.store,
+      title: pick(s.storeTitle, d.store.title),
+      eyebrow: pick(s.storeEyebrow, d.store.eyebrow),
+      description: pick(s.storeDescription, d.store.description),
+      url: pick(s.storeUrl, d.store.url),
+    },
+  }
+}
+
+export function mapEvent(e) {
+  return {
+    id: e.slug, // used in the URL
+    recordId: e.id, // used to link reservations
+    title: e.title,
+    category: e.category,
+    date: e.date,
+    time: e.time,
+    venue: e.venue,
+    city: e.city,
+    image: e.imageUrl,
+    price: e.price,
+    status: e.status || 'open',
+    excerpt: e.excerpt,
+    description: e.description,
+  }
+}
+
+export async function loadSite() {
+  try {
+    const [settings, services, events] = await Promise.all([
+      request('/api/settings'),
+      request('/api/services'),
+      request('/api/events'),
+    ])
+    const content = settings ? mergeSettings(settings) : { ...defaultContent }
+    if (Array.isArray(services) && services.length) {
+      content.services = {
+        ...content.services,
+        items: services.map((s) => ({ title: s.title, description: s.description, icon: s.icon || 'chip' })),
+      }
+    }
+    return {
+      content,
+      events: Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function createReservation({ eventRecordId, name, email, phone, quantity }) {
+  return request('/api/reservations', {
+    method: 'POST',
+    body: { eventId: eventRecordId, name, email, phone, quantity: Number(quantity) },
+  })
+}
+
+// ---------------- Admin auth ----------------
+
+export async function adminLogin(email, password) {
+  const { token } = await request('/api/auth/login', { method: 'POST', body: { email, password } })
+  auth.set(token, email)
+  return token
+}
+
+// ---------------- Admin CRUD ----------------
+
+export const adminApi = {
+  getSettings: () => request('/api/settings'),
+  saveSettings: (data) => request('/api/settings', { method: 'PUT', body: data, authed: true }),
+
+  listServices: () => request('/api/services'),
+  createService: (data) => request('/api/services', { method: 'POST', body: data, authed: true }),
+  updateService: (id, data) => request(`/api/services/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteService: (id) => request(`/api/services/${id}`, { method: 'DELETE', authed: true }),
+
+  listEvents: () => request('/api/events'),
+  createEvent: (data) => request('/api/events', { method: 'POST', body: data, authed: true }),
+  updateEvent: (id, data) => request(`/api/events/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteEvent: (id) => request(`/api/events/${id}`, { method: 'DELETE', authed: true }),
+
+  listReservations: () => request('/api/reservations', { authed: true }),
+  updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),
+  deleteReservation: (id) => request(`/api/reservations/${id}`, { method: 'DELETE', authed: true }),
+
+  upload: async (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request('/api/uploads', { method: 'POST', form, authed: true })
+  },
+}

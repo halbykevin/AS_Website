@@ -1,98 +1,100 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and lets visitors **reserve spots at upcoming events** (reservations powered by *Ticketing Box Office*).
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and lets visitors **reserve spots at upcoming events** (reservations powered by *Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content and manage events/reservations.
 
-## Stack
+## Architecture
 
-- **React 18** + **Vite 5** (`type: module`)
-- **React Router 7** (`react-router-dom`) for client-side routing
-- **Tailwind CSS 3** (utility-first, brand theme in `tailwind.config.js`)
-- PostCSS + Autoprefixer
+```
+Browser ──► Vercel (React static site, this repo root)
+                │
+                └─► https://api.yourdomain.com  (Node/Express API in /server, on the VPS)
+                          ├── PostgreSQL          (data)
+                          └── /uploads            (logo & event images on disk)
+```
+
+- **Frontend** — React 18 + Vite 5 + Tailwind 3 + React Router 7. Hosted on **Vercel**.
+- **Backend** — Express + PostgreSQL (`pg`) in [server/](server/). Runs on the **VPS** under PM2, exposed at an `api.` subdomain with SSL. JWT-based single-admin auth. Images stored on disk.
+- The two talk over HTTP; the frontend's API base is `VITE_API_URL`.
+
+> History: an earlier iteration used PocketBase — fully removed. Don't reintroduce PocketBase concepts.
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build locally |
+Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
+Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
+
+## Backend
+
+See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
+
+Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag),
+`services`, `events`, `reservations`. Created by [server/src/migrate.js](server/src/migrate.js);
+optional sample content via [server/src/seed.js](server/src/seed.js).
+
+API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
+Public can read content + POST a reservation; everything else needs a Bearer token.
+
+## Content flow (frontend)
+
+The site never hard-depends on the backend:
+
+1. [src/content/site.js](src/content/site.js) + [src/data/events.js](src/data/events.js) — **static defaults** (also the fallback if the API is down/empty).
+2. [src/lib/api.js](src/lib/api.js) — HTTP client: public loaders (`loadSite`, `createReservation`), `auth` (token in localStorage), and `adminApi` (CRUD + `upload`). Maps API JSON → component shapes.
+3. [src/store/content.jsx](src/store/content.jsx) — `ContentProvider` / `useContent()` loads everything once on startup.
+4. Components call `useContent()`; they don't import the static files directly.
+
+To add an editable field: add the column (migrate) → map it in `app.js` → surface it in the admin editor → consume it via `useContent()`.
 
 ## Publish gate (Coming Soon)
 
-The site stays behind a **Coming Soon** page until it is published.
-
-- Controlled by `published` in [src/config/site.js](src/config/site.js).
-  - `false` → all routes render the Coming Soon page.
-  - `true` → the full website is shown.
-- **Preview while unpublished:** add `?preview=1` to the URL (e.g. `http://localhost:5173/?preview=1`). This is how you view/build the real site before it's live.
-- Later, the **admin backend (on the VPS) will flip `published`** — likely by serving this config from an API instead of a static file.
+- Driven by `settings.published` (toggled in the admin dashboard).
+- `false` → public routes render Coming Soon; `true` → full site.
+- `siteConfig.fallbackPublished` in [src/config/site.js](src/config/site.js) is only used if the API is unreachable.
+- Preview while unpublished: `?preview=1`.
+- `/admin/*` is **never** gated, so you can always log in to publish.
 
 ## Structure
 
 ```
-index.html                 # HTML shell, fonts, favicon, meta
+vercel.json                # SPA rewrite (all paths -> index.html)
+server/                    # Express + Postgres API (deployed to the VPS)
+  src/{index,app,db,auth,migrate,seed}.js
+  README.md                # endpoints + deploy guide
+  .env.example             # DATABASE_URL, ADMIN_*, JWT_SECRET, CORS_ORIGIN, PUBLIC_URL
 src/
-  main.jsx                 # React entry — mounts <App />
-  App.jsx                  # Publish gate + React Router routes
-  index.css                # Tailwind directives + base styles
-  config/
-    site.js                # publish flag + isSiteVisible() helper
-  content/
-    site.js                # ALL editable copy/images (brand, hero, services, store, about, contact)
-  data/
-    events.js              # Events list + getEventById()  (admin-editable later)
-  components/
-    Layout.jsx             # Navbar + <Outlet/> + Footer + scroll-to-top
-    Navbar.jsx             # Sticky responsive nav w/ mobile menu + hash scrolling
-    Footer.jsx             # Contact + explore links + ticketing credit
-    Icon.jsx               # Inline SVG icon set
-    EventCard.jsx          # Event grid card + formatDate() helper
-  pages/
-    ComingSoon.jsx         # Pre-launch page (logo + contact list)
-    Home.jsx               # Hero, What We Do, events preview, AS Store CTA, About
-    Events.jsx             # All events grid
-    EventDetail.jsx        # Event details + reservation form
-public/
-  ASCompanyLogo.jpg        # Main brand logo
-  as-store-logo.png        # AS Store logo (used in store CTA)
-  ticketing-box-office.png # Ticketing Box Office logo (events/reservations)
-tailwind.config.js         # Brand colors, Inter font, animations
+  App.jsx                  # routes: /admin/* (auth) + public site (gated)
+  config/site.js           # publish fallback + isPreview()
+  content/site.js          # static default copy (+ nav, CTA labels)
+  data/events.js           # static default events
+  lib/api.js               # HTTP client + mappers + auth + adminApi
+  store/content.jsx        # ContentProvider + useContent()
+  components/               # Layout, Navbar, Footer, Icon, EventCard
+  pages/                    # ComingSoon, Home, Events, EventDetail
+  admin/
+    useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
+    pages/                  # SettingsEditor, ServicesAdmin, EventsAdmin, ReservationsAdmin
+public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
+tailwind.config.js          # brand colors, Inter font, animations
 ```
+
+## Env
+
+- Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir.
 
 ## Routes
 
-- `/` — Home (showcase)
-- `/events` — all upcoming events
-- `/events/:id` — event detail + reservation form
-- unknown paths redirect to `/`
-
-> Production hosting note: this is an SPA using `BrowserRouter`. The VPS web server must **fall back to `index.html`** for unknown paths so deep links like `/events/foo` work on refresh.
-
-## Content & data: editing model
-
-This frontend is built so the **admin panel can change everything** with minimal component changes:
-
-- All copy/images live in [src/content/site.js](src/content/site.js).
-- Events live in [src/data/events.js](src/data/events.js).
-- Components only *read* from these files. When the backend is ready, swap these static exports for API responses (e.g. fetch on load) — the components stay the same.
-
-## Backend (planned, on the VPS — not built yet)
-
-- Admin auth + dashboard to edit logo, texts, services, events, and the publish flag.
-- Reservations API. The reservation form in [src/pages/EventDetail.jsx](src/pages/EventDetail.jsx) currently fakes success; there's a `// TODO` marking where to `POST /api/reservations`.
+Public (gated): `/`, `/events`, `/events/:id`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/services`, `/admin/events`, `/admin/reservations`
 
 ## Brand
 
-Defined in `tailwind.config.js`:
-
-- `as-red` — `#A41E22` (`.dark` `#82161A`, `.light` `#C53A3F`)
-- `as-charcoal` — `#383F41`
-- `as-gray` — `#B6B7B8`
-- Font: **Inter** (Google Fonts, loaded in `index.html`)
+`tailwind.config.js`: `as-red` `#A41E22` (`.dark` `#82161A`, `.light` `#C53A3F`), `as-charcoal` `#383F41`, `as-gray` `#B6B7B8`. Font **Inter**.
 
 ## Conventions
 
-- **Responsive first** — mobile-first Tailwind breakpoints (`sm:`, `lg:`); verify from ~320px up to desktop.
-- Logos that are JPGs on white use `mix-blend-multiply` to blend into the page.
-- External links use `target="_blank" rel="noreferrer"`; keep `alt` text meaningful.
-- The **AS Store** button is intentionally a placeholder: `store.url` is empty in `content/site.js`, so the button renders as "Coming soon". Set `store.url` once that site exists and it becomes a live link.
+- **Responsive first** — mobile-first Tailwind; verify ~320px → desktop.
+- JPG logos on white use `mix-blend-multiply`.
+- External links: `target="_blank" rel="noreferrer"`.
+- The **AS Store** button is a placeholder until `settings.storeUrl` is set (renders "Coming soon" while empty).
+- Event images & logo are absolute URLs returned by the API (`/uploads/...` on the VPS).

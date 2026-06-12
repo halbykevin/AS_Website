@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import EventCard from '../components/EventCard.jsx'
-import { hero, services, store, about, ticketing } from '../content/site.js'
-import { events } from '../data/events.js'
+import { useContent } from '../store/content.jsx'
 
 export default function Home() {
+  const { hero, services, store, about, ticketing, events } = useContent()
   const upcoming = events.slice(0, 3)
 
   return (
@@ -103,7 +103,7 @@ export default function Home() {
       </section>
 
       {/* ---------------- AS Store callout ---------------- */}
-      <StoreCallout />
+      <StoreCallout store={store} />
 
       {/* ---------------- About ---------------- */}
       <section id="about" className="scroll-mt-24 py-20 sm:py-24">
@@ -135,7 +135,7 @@ export default function Home() {
   )
 }
 
-function StoreCallout() {
+function StoreCallout({ store }) {
   const isLive = Boolean(store.url)
   return (
     <section className="py-8">

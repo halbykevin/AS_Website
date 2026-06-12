@@ -1,6 +1,7 @@
-import { brand, contact } from '../content/site.js'
+import { useContent } from '../store/content.jsx'
 
 export default function ComingSoon() {
+  const { brand, contact } = useContent()
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white px-5 py-12 text-center sm:px-8">
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-as-red/5 blur-3xl sm:h-96 sm:w-96" />
