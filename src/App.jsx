@@ -6,6 +6,7 @@ import Home from './pages/Home.jsx'
 import Events from './pages/Events.jsx'
 import EventDetail from './pages/EventDetail.jsx'
 import ComingSoon from './pages/ComingSoon.jsx'
+import SiteSkeleton from './components/SiteSkeleton.jsx'
 import AdminLogin from './admin/Login.jsx'
 import AdminLayout from './admin/AdminLayout.jsx'
 import RequireAuth from './admin/RequireAuth.jsx'
@@ -19,19 +20,11 @@ import CategoriesAdmin from './admin/pages/CategoriesAdmin.jsx'
 import ScraperAdmin from './admin/pages/ScraperAdmin.jsx'
 import PopupAdmin from './admin/pages/PopupAdmin.jsx'
 
-function Splash() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-white">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-as-red/20 border-t-as-red" />
-    </div>
-  )
-}
-
 // The public website, gated behind the publish flag.
 function PublicSite() {
   const { loading, published } = useContent()
 
-  if (loading) return <Splash />
+  if (loading) return <SiteSkeleton />
   if (!published && !isPreview()) return <ComingSoon />
 
   return (

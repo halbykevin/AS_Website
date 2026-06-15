@@ -3,6 +3,7 @@ import Icon from '../components/Icon.jsx'
 import EventCard from '../components/EventCard.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
 import CategoryTiles from '../components/CategoryTiles.jsx'
+import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Home() {
@@ -20,7 +21,7 @@ export default function Home() {
         <div className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-as-charcoal/5 blur-3xl" />
 
         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:py-32">
-          <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto max-w-3xl text-center animate-fade-up">
             <p className="inline-flex items-center rounded-full border border-as-red/20 bg-as-red/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-as-red">
               {hero.eyebrow}
             </p>
@@ -59,9 +60,10 @@ export default function Home() {
           </div>
 
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {services.items.map((item) => (
-              <div
+            {services.items.map((item, i) => (
+              <Reveal
                 key={item.title}
+                delay={i * 70}
                 className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red">
@@ -69,7 +71,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-5 text-lg font-bold text-as-charcoal">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-as-charcoal/60">{item.description}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -84,9 +86,9 @@ export default function Home() {
               <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
                 Browse by category
               </h2>
-              <div className="mt-8">
+              <Reveal className="mt-8">
                 <CategoryTiles categories={categories} />
-              </div>
+              </Reveal>
             </div>
           )}
 
@@ -111,8 +113,10 @@ export default function Home() {
           </div>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {upcoming.map((event) => (
-              <EventCard key={event.id} event={event} />
+            {upcoming.map((event, i) => (
+              <Reveal key={event.id} delay={i * 80}>
+                <EventCard event={event} />
+              </Reveal>
             ))}
           </div>
         </div>
@@ -124,7 +128,7 @@ export default function Home() {
       {/* ---------------- About ---------------- */}
       <section id="about" className="scroll-mt-24 py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
-          <div>
+          <Reveal>
             <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
               {about.heading}
             </h2>
@@ -133,18 +137,20 @@ export default function Home() {
                 {p}
               </p>
             ))}
-          </div>
-          <div className="grid grid-cols-3 gap-4">
+          </Reveal>
+          <Reveal delay={120} className="grid grid-cols-3 gap-3 sm:gap-4">
             {about.stats.map((s) => (
               <div
                 key={s.label}
-                className="rounded-2xl border border-black/5 bg-white p-5 text-center shadow-sm"
+                className="rounded-2xl border border-black/5 bg-white p-3 text-center shadow-sm sm:p-5"
               >
-                <p className="text-2xl font-extrabold text-as-red sm:text-3xl">{s.value}</p>
+                <p className="text-lg font-extrabold leading-tight text-as-red [overflow-wrap:anywhere] sm:text-2xl lg:text-3xl">
+                  {s.value}
+                </p>
                 <p className="mt-1 text-xs font-medium text-as-charcoal/55">{s.label}</p>
               </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 

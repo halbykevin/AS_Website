@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import EventCard from '../components/EventCard.jsx'
 import CategoryTiles from '../components/CategoryTiles.jsx'
+import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Events() {
@@ -39,8 +40,10 @@ export default function Events() {
           </p>
         ) : (
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((event) => (
-              <EventCard key={event.id} event={event} />
+            {filtered.map((event, i) => (
+              <Reveal key={event.id} delay={(i % 3) * 80}>
+                <EventCard event={event} />
+              </Reveal>
             ))}
           </div>
         )}

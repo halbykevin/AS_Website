@@ -9,16 +9,46 @@ const INTERVAL = 5000
 export default function BannerSlider({ banners }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [drag, setDrag] = useState(0)
+  const [dragging, setDragging] = useState(false)
   const timer = useRef(null)
+  const startX = useRef(0)
+  const moved = useRef(false)
 
   const count = banners.length
   const go = (i) => setIndex(((i % count) + count) % count)
 
   useEffect(() => {
-    if (paused || count < 2) return
+    if (paused || dragging || count < 2) return
     timer.current = setInterval(() => setIndex((i) => (i + 1) % count), INTERVAL)
     return () => clearInterval(timer.current)
-  }, [paused, count])
+  }, [paused, dragging, count])
+
+  // ---- Touch / drag to slide ----
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    moved.current = false
+    setDragging(true)
+  }
+  const onTouchMove = (e) => {
+    if (!dragging) return
+    const dx = e.touches[0].clientX - startX.current
+    if (Math.abs(dx) > 8) moved.current = true
+    setDrag(dx)
+  }
+  const onTouchEnd = () => {
+    setDragging(false)
+    if (Math.abs(drag) > 50) go(drag < 0 ? index + 1 : index - 1)
+    setDrag(0)
+  }
+  // A swipe shouldn't also trigger the slide's link.
+  const onClickCapture = (e) => {
+    if (moved.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      moved.current = false
+    }
+  }
 
   if (!count) return null
   const current = banners[index]
@@ -32,16 +62,21 @@ export default function BannerSlider({ banners }) {
       {/* Slides */}
       <div className="relative overflow-hidden bg-as-charcoal">
         <div
-          className="flex transition-transform duration-700 ease-out"
-          style={{ transform: `translateX(-${index * 100}%)` }}
+          className={`flex touch-pan-y ${dragging ? '' : 'transition-transform duration-700 ease-out'}`}
+          style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onClickCapture={onClickCapture}
         >
           {banners.map((b) => (
             <SlideLink key={b.id} banner={b}>
               <img
                 src={b.image}
                 alt={b.title || 'Banner'}
-                className="h-52 w-full object-cover sm:h-80 lg:h-[28rem]"
+                className="h-52 w-full select-none object-cover sm:h-80 lg:h-[28rem]"
                 loading="lazy"
+                draggable={false}
               />
             </SlideLink>
           ))}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 
@@ -6,13 +6,22 @@ export default function Navbar() {
   const { brand, nav } = useContent()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [hidden, setHidden] = useState(false)
+  const lastY = useRef(0)
   const location = useLocation()
   const navigate = useNavigate()
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => {
+      const y = window.scrollY
+      setScrolled(y > 8)
+      // Hide when scrolling down (past a small threshold); reveal on scroll up.
+      if (y > 80 && y > lastY.current) setHidden(true)
+      else setHidden(false)
+      lastY.current = y
+    }
     onScroll()
-    window.addEventListener('scroll', onScroll)
+    window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
@@ -39,9 +48,11 @@ export default function Navbar() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all ${
+      className={`sticky top-0 z-50 transition-all duration-300 ${
+        hidden && !open ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+      } ${
         scrolled
-          ? 'border-b border-black/5 bg-white/90 backdrop-blur'
+          ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
           : 'bg-white/0'
       }`}
     >
@@ -50,7 +61,7 @@ export default function Navbar() {
           <img
             src={brand.logo}
             alt={brand.name}
-            className="h-10 w-auto mix-blend-multiply sm:h-12"
+            className="h-12 w-auto mix-blend-multiply sm:h-12"
           />
         </Link>
 
