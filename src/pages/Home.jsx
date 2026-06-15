@@ -75,16 +75,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------------- Upcoming events preview ---------------- */}
+      {/* ---------------- Browse by category + Upcoming events ---------------- */}
       <section className="py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          {/* Browse by category (comes first) */}
+          {categories.length > 0 && (
+            <div className="mb-14">
+              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+                Browse by category
+              </h2>
+              <div className="mt-8">
+                <CategoryTiles categories={categories} />
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming events */}
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-                  {eventsSection.heading}
-                </h2>
-              </div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+                {eventsSection.heading}
+              </h2>
               <p className="mt-3 flex items-center gap-2 text-sm text-as-charcoal/55">
                 <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
                 {ticketing.note}
@@ -106,27 +117,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* ---------------- Event categories ---------------- */}
-      {categories.length > 0 && (
-        <section className="bg-as-charcoal/[0.02] py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl px-5 sm:px-8">
-            <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-                Browse by category
-              </h2>
-              <Link
-                to="/events"
-                className="flex items-center gap-1 text-sm font-semibold text-as-red transition hover:gap-2"
-              >
-                View all events
-                <Icon name="arrow" className="h-4 w-4" />
-              </Link>
-            </div>
-            <CategoryTiles categories={categories} />
-          </div>
-        </section>
-      )}
 
       {/* ---------------- AS Store callout ---------------- */}
       <StoreCallout store={store} />
