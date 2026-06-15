@@ -6,3 +6,6 @@ dist-ssr
 .env
 .vscode/*
 !.vscode/extensions.json
+
+# Web scraper run output (per-job folders created at runtime)
+server/scrapes/

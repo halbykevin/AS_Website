@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
+import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -316,6 +317,10 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image file provided' })
   res.status(201).json({ url: `${PUBLIC_URL}/uploads/${req.file.filename}` })
 })
+
+// ========================= Web scraper =========================
+// Admin-only: run the Python e-commerce scraper and download its output.
+app.use('/api/scrape', scraperRouter)
 
 // ========================= Errors =========================
 app.use((err, req, res, next) => {

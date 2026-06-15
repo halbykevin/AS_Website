@@ -241,9 +241,36 @@ export const adminApi = {
   updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),
   deleteReservation: (id) => request(`/api/reservations/${id}`, { method: 'DELETE', authed: true }),
 
+  startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
+  getScrape: (id) => request(`/api/scrape/${id}`, { authed: true }),
+
   upload: async (file) => {
     const form = new FormData()
     form.append('file', file)
     return request('/api/uploads', { method: 'POST', form, authed: true })
   },
 }
+
+// Download an authed file (the API requires a Bearer token, so we can't use a
+// plain <a href>): fetch it as a blob and trigger a browser download.
+async function downloadAuthed(path, filename) {
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${auth.token()}` },
+  })
+  if (!res.ok) throw new Error('Download failed')
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export const downloadScrapeFile = (id, name) =>
+  downloadAuthed(`/api/scrape/${id}/files/${encodeURIComponent(name)}`, name)
+
+export const downloadScrapeZip = (id) =>
+  downloadAuthed(`/api/scrape/${id}/zip`, `scrape-${id}.zip`)

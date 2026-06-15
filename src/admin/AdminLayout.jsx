@@ -9,6 +9,7 @@ const links = [
   { to: '/admin/services', label: 'Services' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/reservations', label: 'Reservations' },
+  { to: '/admin/scraper', label: 'Web Scraper' },
 ]
 
 export default function AdminLayout() {

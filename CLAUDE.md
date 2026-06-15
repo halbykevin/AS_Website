@@ -1,6 +1,6 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and lets visitors **reserve spots at upcoming events** (reservations powered by *Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content and manage events/reservations.
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and lets visitors **reserve spots at upcoming events** (reservations powered by *Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events/reservations, and run a **web scraper** that pulls product data from e-commerce pages and downloads it (JSON/CSV/Excel/HTML).
 
 ## Architecture
 
@@ -9,7 +9,9 @@ Browser ──► Vercel (React static site, this repo root)
                 │
                 └─► https://api.yourdomain.com  (Node/Express API in /server, on the VPS)
                           ├── PostgreSQL          (data)
-                          └── /uploads            (logo & event images on disk)
+                          ├── /uploads            (logo & event images on disk)
+                          ├── /scrapes            (per-run scraper output, runtime-only)
+                          └── WebScarping/         (Python scraper, spawned per scrape job)
 ```
 
 - **Frontend** — React 18 + Vite 5 + Tailwind 3 + React Router 7. Hosted on **Vercel**.
@@ -37,6 +39,28 @@ optional sample content via [server/src/seed.js](server/src/seed.js).
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
 Public can read content + POST a reservation; everything else needs a Bearer token.
 
+## Web scraper
+
+The Python e-commerce scraper in [WebScarping/](WebScarping/) (`scrape.py` + `ecom_scraper/`) is
+driven from the admin dashboard, **not** rewritten in Node. [server/src/scraper.js](server/src/scraper.js)
+mounts an admin-only `/api/scrape` router that **spawns `scrape.py` as a subprocess** (no shell —
+args are passed as an array), writes each run to its own folder under `SCRAPE_DIR`, and serves the
+output back for download (`archiver` zips the whole folder, images included).
+
+- Endpoints (all Bearer-auth): `POST /api/scrape` starts a job → `{ id, status, log, files, ... }`;
+  `GET /api/scrape/:id` polls status/log; `GET /api/scrape/:id/files/:name` downloads one export
+  file; `GET /api/scrape/:id/zip` downloads everything. Jobs are tracked **in memory** (lost on
+  restart); only the most recent ~20 run folders are kept.
+- The admin UI ([src/admin/pages/ScraperAdmin.jsx](src/admin/pages/ScraperAdmin.jsx)) mirrors the
+  desktop GUI's options and polls the job while it runs. Downloads need the token, so the client
+  fetches them as authed blobs (`downloadScrapeFile` / `downloadScrapeZip` in `lib/api.js`).
+- `scrape.py` gained an `--auto <url>` mode (probe → single product vs. crawl) used by the backend;
+  the existing `--url/--urls/--crawl` modes are unchanged.
+- **VPS prereq:** Python 3 + `pip install -r WebScarping/requirements.txt` (and
+  `playwright install chromium` only if the "JavaScript site" / `--render` option is used). Env:
+  `PYTHON_BIN` (default `python3`), `SCRAPER_DIR` (default `../WebScarping`), `SCRAPE_DIR`
+  (default `server/scrapes`).
+
 ## Content flow (frontend)
 
 The site never hard-depends on the backend:
@@ -60,8 +84,10 @@ To add an editable field: add the column (migrate) → map it in `app.js` → su
 
 ```
 vercel.json                # SPA rewrite (all paths -> index.html)
+WebScarping/               # Python e-commerce scraper (scrape.py + ecom_scraper/), spawned by the API
 server/                    # Express + Postgres API (deployed to the VPS)
   src/{index,app,db,auth,migrate,seed}.js
+  src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output
   README.md                # endpoints + deploy guide
   .env.example             # DATABASE_URL, ADMIN_*, JWT_SECRET, CORS_ORIGIN, PUBLIC_URL
 src/
@@ -75,7 +101,7 @@ src/
   pages/                    # ComingSoon, Home, Events, EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -83,12 +109,12 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Env
 
 - Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`, `/admin/scraper`
 
 ## Brand
 
