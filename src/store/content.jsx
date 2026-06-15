@@ -11,6 +11,27 @@ export function ContentProvider({ children }) {
     events: defaultEvents,
   })
 
+  // Keep the browser tab title + meta description in sync with the publish gate.
+  useEffect(() => {
+    if (state.loading) return
+    const brand = state.content?.brand
+    const published = state.content?.published
+    document.title =
+      published && brand
+        ? `${brand.name} — ${brand.legalName}`
+        : 'AS Company — Coming Soon'
+
+    const meta = document.querySelector('meta[name="description"]')
+    if (meta) {
+      meta.setAttribute(
+        'content',
+        published && brand
+          ? `${brand.name} (${brand.legalName}) — ${brand.tagline}`
+          : 'AS Company (Absolute Solutions SAL) — market leader in telecommunication and electronics since 2008. New website coming soon.'
+      )
+    }
+  }, [state.loading, state.content])
+
   useEffect(() => {
     let active = true
     loadSite().then((data) => {

@@ -6,18 +6,29 @@ export default function Navbar() {
   const { brand, nav } = useContent()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [hidden, setHidden] = useState(false)
+  // 0 = fully hidden, 1 = fully shown. Ramps up as the user scrolls up.
+  const [reveal, setReveal] = useState(1)
   const lastY = useRef(0)
   const location = useLocation()
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Pixels of upward scrolling needed to fully reveal the navbar.
+    const REVEAL_DISTANCE = 120
     const onScroll = () => {
       const y = window.scrollY
       setScrolled(y > 8)
-      // Hide when scrolling down (past a small threshold); reveal on scroll up.
-      if (y > 80 && y > lastY.current) setHidden(true)
-      else setHidden(false)
+      const delta = y - lastY.current
+      if (y <= 80) {
+        // Near the top: always fully visible.
+        setReveal(1)
+      } else if (delta > 0) {
+        // Scrolling down: hide.
+        setReveal(0)
+      } else if (delta < 0) {
+        // Scrolling up: reveal gradually in proportion to the distance scrolled up.
+        setReveal((r) => Math.min(1, r + -delta / REVEAL_DISTANCE))
+      }
       lastY.current = y
     }
     onScroll()
@@ -48,9 +59,16 @@ export default function Navbar() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-300 ${
-        hidden && !open ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
-      } ${
+      style={
+        open
+          ? undefined
+          : {
+              opacity: reveal,
+              transform: `translateY(${(reveal - 1) * 100}%)`,
+              pointerEvents: reveal === 0 ? 'none' : undefined,
+            }
+      }
+      className={`sticky top-0 z-50 transition-[background-color,box-shadow] duration-300 ${
         scrolled
           ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
           : 'bg-white/0'

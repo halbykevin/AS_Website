@@ -227,21 +227,28 @@ function CustomSection({ section }) {
 function StoreCallout({ store }) {
   const isLive = Boolean(store.url)
   return (
-    <section className="py-8">
+    <section className="py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="relative overflow-hidden rounded-3xl bg-as-charcoal px-6 py-12 sm:px-12 sm:py-16">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-as-red/20 blur-3xl" />
-          <div className="relative flex flex-col items-center gap-8 text-center lg:flex-row lg:justify-between lg:text-left">
+        <div className="relative overflow-hidden rounded-3xl border border-black/5 bg-gradient-to-br from-white to-as-charcoal/[0.04] px-6 py-12 shadow-sm sm:px-12 sm:py-16">
+          {/* soft brand glows */}
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-as-red/5 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-as-charcoal/5 blur-3xl" />
+
+          <div className="relative flex flex-col items-center gap-10 text-center lg:flex-row lg:justify-between lg:gap-12 lg:text-left">
             <div className="max-w-xl">
               {store.eyebrow && (
-                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
+                <span className="inline-flex items-center rounded-full border border-as-red/20 bg-as-red/5 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-as-red">
                   {store.eyebrow}
                 </span>
               )}
-              <span className="mt-4 inline-flex rounded-xl bg-white px-4 py-3 shadow-sm">
-                <img src="/as-store-logo.png" alt={store.title} className="h-9 w-auto sm:h-11" />
-              </span>
-              <p className="mt-4 text-base leading-relaxed text-white/70">{store.description}</p>
+              <img
+                src="/asStorelogoClear.png"
+                alt={store.title}
+                className="mx-auto mt-6 h-16 w-auto sm:h-20 lg:mx-0"
+              />
+              <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-as-charcoal/60 lg:mx-0">
+                {store.description}
+              </p>
             </div>
 
             <a
@@ -253,7 +260,7 @@ function StoreCallout({ store }) {
               className={`inline-flex shrink-0 items-center gap-2 rounded-full px-8 py-4 text-sm font-semibold shadow-sm transition ${
                 isLive
                   ? 'bg-as-red text-white hover:bg-as-red-light hover:shadow-md'
-                  : 'cursor-not-allowed bg-white/15 text-white/60'
+                  : 'cursor-not-allowed border border-black/10 bg-white text-as-charcoal/50'
               }`}
             >
               <Icon name="store" className="h-5 w-5" />
