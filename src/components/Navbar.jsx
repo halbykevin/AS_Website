@@ -56,12 +56,12 @@ export default function Navbar() {
           : 'bg-white/0'
       }`}
     >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 sm:px-8">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 sm:py-4">
         <Link to="/" className="flex items-center gap-2" aria-label={brand.name}>
           <img
             src={brand.logo}
             alt={brand.name}
-            className="h-12 w-auto mix-blend-multiply sm:h-12"
+            className="h-14 w-auto mix-blend-multiply sm:h-12"
           />
         </Link>
 

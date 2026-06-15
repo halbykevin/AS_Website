@@ -238,10 +238,12 @@ function StoreCallout({ store }) {
                   {store.eyebrow}
                 </span>
               )}
-              <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                {store.title}
-              </h2>
-              <p className="mt-3 text-base leading-relaxed text-white/70">{store.description}</p>
+              <img
+                src="/as-store-logo.png"
+                alt={store.title}
+                className="mt-4 h-12 w-auto sm:h-16"
+              />
+              <p className="mt-4 text-base leading-relaxed text-white/70">{store.description}</p>
             </div>
 
             <a
