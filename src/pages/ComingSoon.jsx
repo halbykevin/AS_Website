@@ -11,6 +11,10 @@ export default function ComingSoon() {
         <img
           src={brand.logo}
           alt={`${brand.name} — ${brand.legalName}`}
+          width="192"
+          height="128"
+          fetchpriority="high"
+          decoding="async"
           className="h-24 w-auto mix-blend-multiply sm:h-32"
         />
 

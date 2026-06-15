@@ -1,24 +1,29 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { isPreview } from './config/site.js'
 import { ContentProvider, useContent } from './store/content.jsx'
 import Layout from './components/Layout.jsx'
-import Home from './pages/Home.jsx'
-import Events from './pages/Events.jsx'
-import EventDetail from './pages/EventDetail.jsx'
 import ComingSoon from './pages/ComingSoon.jsx'
 import SiteSkeleton from './components/SiteSkeleton.jsx'
-import AdminLogin from './admin/Login.jsx'
-import AdminLayout from './admin/AdminLayout.jsx'
 import RequireAuth from './admin/RequireAuth.jsx'
-import SettingsEditor from './admin/pages/SettingsEditor.jsx'
-import ServicesAdmin from './admin/pages/ServicesAdmin.jsx'
-import EventsAdmin from './admin/pages/EventsAdmin.jsx'
-import ReservationsAdmin from './admin/pages/ReservationsAdmin.jsx'
-import BannersAdmin from './admin/pages/BannersAdmin.jsx'
-import SectionsAdmin from './admin/pages/SectionsAdmin.jsx'
-import CategoriesAdmin from './admin/pages/CategoriesAdmin.jsx'
-import ScraperAdmin from './admin/pages/ScraperAdmin.jsx'
-import PopupAdmin from './admin/pages/PopupAdmin.jsx'
+
+// Public pages — split so the homepage doesn't ship the events/detail code up front.
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Events = lazy(() => import('./pages/Events.jsx'))
+const EventDetail = lazy(() => import('./pages/EventDetail.jsx'))
+
+// Admin area — split so public visitors never download the dashboard bundle.
+const AdminLogin = lazy(() => import('./admin/Login.jsx'))
+const AdminLayout = lazy(() => import('./admin/AdminLayout.jsx'))
+const SettingsEditor = lazy(() => import('./admin/pages/SettingsEditor.jsx'))
+const ServicesAdmin = lazy(() => import('./admin/pages/ServicesAdmin.jsx'))
+const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
+const ReservationsAdmin = lazy(() => import('./admin/pages/ReservationsAdmin.jsx'))
+const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
+const SectionsAdmin = lazy(() => import('./admin/pages/SectionsAdmin.jsx'))
+const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
+const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
+const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 
 // The public website, gated behind the publish flag.
 function PublicSite() {
@@ -29,12 +34,14 @@ function PublicSite() {
 
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/events" element={<Events />} />
-        <Route path="/events/:id" element={<EventDetail />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<SiteSkeleton />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }
@@ -43,31 +50,33 @@ export default function App() {
   return (
     <ContentProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Admin area — always reachable (not behind the publish gate) */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin"
-            element={
-              <RequireAuth>
-                <AdminLayout />
-              </RequireAuth>
-            }
-          >
-            <Route index element={<SettingsEditor />} />
-            <Route path="banners" element={<BannersAdmin />} />
-            <Route path="sections" element={<SectionsAdmin />} />
-            <Route path="services" element={<ServicesAdmin />} />
-            <Route path="events" element={<EventsAdmin />} />
-            <Route path="categories" element={<CategoriesAdmin />} />
-            <Route path="reservations" element={<ReservationsAdmin />} />
-            <Route path="popup" element={<PopupAdmin />} />
-            <Route path="scraper" element={<ScraperAdmin />} />
-          </Route>
+        <Suspense fallback={<SiteSkeleton />}>
+          <Routes>
+            {/* Admin area — always reachable (not behind the publish gate) */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth>
+                  <AdminLayout />
+                </RequireAuth>
+              }
+            >
+              <Route index element={<SettingsEditor />} />
+              <Route path="banners" element={<BannersAdmin />} />
+              <Route path="sections" element={<SectionsAdmin />} />
+              <Route path="services" element={<ServicesAdmin />} />
+              <Route path="events" element={<EventsAdmin />} />
+              <Route path="categories" element={<CategoriesAdmin />} />
+              <Route path="reservations" element={<ReservationsAdmin />} />
+              <Route path="popup" element={<PopupAdmin />} />
+              <Route path="scraper" element={<ScraperAdmin />} />
+            </Route>
 
-          {/* Public website */}
-          <Route path="/*" element={<PublicSite />} />
-        </Routes>
+            {/* Public website */}
+            <Route path="/*" element={<PublicSite />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </ContentProvider>
   )

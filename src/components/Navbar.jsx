@@ -79,6 +79,10 @@ export default function Navbar() {
           <img
             src={brand.logo}
             alt={brand.name}
+            width="84"
+            height="56"
+            fetchpriority="high"
+            decoding="async"
             className="h-14 w-auto mix-blend-multiply sm:h-12"
           />
         </Link>
