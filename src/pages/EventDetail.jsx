@@ -52,10 +52,46 @@ export default function EventDetail() {
         {/* Details */}
         <div className="lg:col-span-2">
           <div className="grid gap-4 sm:grid-cols-3">
-            <InfoCard icon="calendar" label="Date" value={`${formatDate(event.date)}`} />
+            <InfoCard
+              icon="calendar"
+              label="Date"
+              value={event.dates?.length > 1 ? `${event.dates.length} dates` : formatDate(event.date)}
+            />
             <InfoCard icon="clock" label="Time" value={event.time} />
-            <InfoCard icon="pin" label="Venue" value={`${event.venue}, ${event.city}`} />
+            <InfoCard icon="pin" label="Venue" value={[event.venue, event.city].filter(Boolean).join(', ')} />
           </div>
+
+          {event.dates?.length > 1 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold text-as-charcoal">All dates</h2>
+              <ul className="mt-3 divide-y divide-black/5 overflow-hidden rounded-2xl border border-black/5 bg-white">
+                {event.dates.map((d, i) => (
+                  <li key={i} className="flex items-center justify-between gap-4 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-as-charcoal">
+                        {formatDate(d.date)}{d.time ? ` · ${d.time}` : ''}
+                      </p>
+                      {(d.label || d.venue) && (
+                        <p className="truncate text-xs text-as-charcoal/55">
+                          {[d.label, d.venue].filter(Boolean).join(' — ')}
+                        </p>
+                      )}
+                    </div>
+                    {d.url && (
+                      <a
+                        href={d.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 rounded-full bg-as-red px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-as-red-light"
+                      >
+                        Book
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <h2 className="mt-10 text-xl font-bold text-as-charcoal">About this event</h2>
           <p className="mt-3 leading-relaxed text-as-charcoal/70">{event.description}</p>

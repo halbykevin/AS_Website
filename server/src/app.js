@@ -50,6 +50,7 @@ const eventJson = (r) => ({
   time: r.time, venue: r.venue, city: r.city, imageUrl: r.image_url, ticketUrl: r.ticket_url,
   status: r.status, excerpt: r.excerpt, description: r.description, sort: r.sort,
   categoryId: r.category_id, categorySlug: r.category_slug || '', categoryName: r.category_name || '',
+  dates: Array.isArray(r.dates) ? r.dates : [],
 })
 const bannerJson = (r) => ({
   id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,

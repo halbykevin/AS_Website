@@ -43,11 +43,16 @@ export default function EventCard({ event }) {
         <div className="mt-4 space-y-1.5 text-sm text-as-charcoal/70">
           <p className="flex items-center gap-2">
             <Icon name="calendar" className="h-4 w-4 text-as-red" />
-            {formatDate(event.date)} · {event.time}
+            {formatDate(event.date)}{event.time ? ` · ${event.time}` : ''}
+            {event.dates?.length > 1 && (
+              <span className="rounded-full bg-as-red/10 px-2 py-0.5 text-xs font-semibold text-as-red">
+                +{event.dates.length - 1} more {event.dates.length - 1 === 1 ? 'date' : 'dates'}
+              </span>
+            )}
           </p>
           <p className="flex items-center gap-2">
             <Icon name="pin" className="h-4 w-4 text-as-red" />
-            {event.venue}, {event.city}
+            {[event.venue, event.city].filter(Boolean).join(', ')}
           </p>
         </div>
 

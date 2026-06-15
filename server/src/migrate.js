@@ -119,6 +119,11 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT ''
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;
+-- Multi-date events + provenance for the Ticketing Box Office sync (idempotent upsert).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS events_source_ext ON events(source, external_id) WHERE source <> '';
 
 CREATE TABLE IF NOT EXISTS reservations (
   id SERIAL PRIMARY KEY,

@@ -31,7 +31,9 @@ See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy 
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag),
 `services`, `events` (each has a `ticket_url` — cards & "Buy tickets" open that link — plus an
-optional `category_id` → `categories`), `categories` (event categories shown as image tiles:
+optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
+Ticketing-Box-Office-synced rows have `source`/`external_id` for idempotent re-sync),
+`categories` (event categories shown as image tiles:
 name/slug/image/sort/visible; events filter by them on the site),
 `banners` (homepage slideshow: image/title/subtitle/link/active, plus an optional `event_id` →
 the banner then borrows that event's image/title/link, resolved client-side in `lib/api.js`),
@@ -63,6 +65,16 @@ output back for download (`archiver` zips the whole folder, images included).
   fetches them as authed blobs (`downloadScrapeFile` / `downloadScrapeZip` in `lib/api.js`).
 - `scrape.py` gained an `--auto <url>` mode (probe → single product vs. crawl) used by the backend;
   the existing `--url/--urls/--crawl` modes are unchanged.
+- **Events sync** (second tool in the same admin page): `POST /api/scrape/events` runs
+  [WebScarping/tbo_events.py](WebScarping/tbo_events.py), which scrapes **ticketingboxoffice.com**
+  (homepage = full current event list + category mapping via isotope CSS classes; each event/group
+  page for details) and writes `events.json`. `scraper.js` then **ingests** it into Postgres:
+  upserts `categories` (by slug, with tile images) and `events` (upsert keyed on
+  `source='ticketingboxoffice'` + `external_id`, so re-runs update rather than duplicate; manual
+  events are untouched). A **group** (one event, many shows/days — a play's nights or a tournament's
+  matches) becomes one event with a multi-entry `dates` array, each entry keeping its own booking
+  link. Returns a `{ created, updated, events, categories }` summary in the job. This is the basis
+  for the planned daily auto-sync.
 - **VPS prereq:** Python 3 + `pip install -r WebScarping/requirements.txt` (and
   `playwright install chromium` only if the "JavaScript site" / `--render` option is used). Env:
   `PYTHON_BIN` (default `python3`), `SCRAPER_DIR` (default `../WebScarping`), `SCRAPE_DIR`
@@ -91,7 +103,9 @@ To add an editable field: add the column (migrate) → map it in `app.js` → su
 
 ```
 vercel.json                # SPA rewrite (all paths -> index.html)
-WebScarping/               # Python e-commerce scraper (scrape.py + ecom_scraper/), spawned by the API
+WebScarping/               # Python scrapers, spawned by the API:
+                           #   scrape.py + ecom_scraper/  (e-commerce products)
+                           #   tbo_events.py              (Ticketing Box Office events → DB)
 server/                    # Express + Postgres API (deployed to the VPS)
   src/{index,app,db,auth,migrate,seed}.js
   src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output

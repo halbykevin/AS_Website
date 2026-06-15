@@ -146,6 +146,7 @@ export function mapEvent(e) {
     categoryId: e.categoryId || null,
     categorySlug: e.categorySlug || '',
     categoryName: e.categoryName || '',
+    dates: Array.isArray(e.dates) ? e.dates : [],
   }
 }
 
@@ -303,6 +304,7 @@ export const adminApi = {
   savePopup: (data) => request('/api/popup', { method: 'PUT', body: data, authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
+  startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),
   getScrape: (id) => request(`/api/scrape/${id}`, { authed: true }),
 
   upload: async (file) => {
