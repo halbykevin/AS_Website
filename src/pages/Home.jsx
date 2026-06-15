@@ -238,11 +238,9 @@ function StoreCallout({ store }) {
                   {store.eyebrow}
                 </span>
               )}
-              <img
-                src="/as-store-logo.png"
-                alt={store.title}
-                className="mt-4 h-12 w-auto sm:h-16"
-              />
+              <span className="mt-4 inline-flex rounded-xl bg-white px-4 py-3 shadow-sm">
+                <img src="/as-store-logo.png" alt={store.title} className="h-9 w-auto sm:h-11" />
+              </span>
               <p className="mt-4 text-base leading-relaxed text-white/70">{store.description}</p>
             </div>
 
