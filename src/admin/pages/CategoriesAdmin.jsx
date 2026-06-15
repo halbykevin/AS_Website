@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, Select, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, Toggle, Button, Banner } from '../ui.jsx'
 
-const blank = { title: '', subtitle: '', imageUrl: '', linkUrl: '', sort: 0, active: true, eventId: '' }
+const blank = { name: '', slug: '', imageUrl: '', sort: 0, visible: true }
 
-export default function BannersAdmin() {
+export default function CategoriesAdmin() {
   const [items, setItems] = useState([])
-  const [events, setEvents] = useState([])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(blank)
   const [imageFile, setImageFile] = useState(null)
@@ -17,11 +16,9 @@ export default function BannersAdmin() {
 
   async function load() {
     try {
-      const [banners, evs] = await Promise.all([adminApi.listBanners(), adminApi.listEvents()])
-      setItems(banners)
-      setEvents(evs)
+      setItems(await adminApi.listCategories())
     } catch {
-      setMsg({ kind: 'error', text: 'Could not load banners.' })
+      setMsg({ kind: 'error', text: 'Could not load categories.' })
     }
   }
   useEffect(() => {
@@ -35,9 +32,8 @@ export default function BannersAdmin() {
   }
   const startEdit = (r) => {
     setForm({
-      title: r.title || '', subtitle: r.subtitle || '', imageUrl: r.imageUrl || '',
-      linkUrl: r.linkUrl || '', sort: r.sort || 0, active: r.active !== false,
-      eventId: r.eventId ? String(r.eventId) : '',
+      name: r.name || '', slug: r.slug || '', imageUrl: r.imageUrl || '',
+      sort: r.sort || 0, visible: r.visible !== false,
     })
     setImageFile(null)
     setEditing(r.id)
@@ -54,10 +50,9 @@ export default function BannersAdmin() {
         const up = await adminApi.upload(imageFile)
         imageUrl = up.url
       }
-      if (!imageUrl && !form.eventId) throw new Error('Add an image, or pick an event to use its image')
       const payload = { ...form, imageUrl, sort: Number(form.sort) }
-      if (editing === 'new') await adminApi.createBanner(payload)
-      else await adminApi.updateBanner(editing, payload)
+      if (editing === 'new') await adminApi.createCategory(payload)
+      else await adminApi.updateCategory(editing, payload)
       setEditing(null)
       await load()
       setMsg({ kind: 'success', text: 'Saved.' })
@@ -69,69 +64,52 @@ export default function BannersAdmin() {
   }
 
   async function remove(r) {
-    if (!confirm(`Delete banner “${r.title || 'untitled'}”?`)) return
-    await adminApi.deleteBanner(r.id)
+    if (!confirm(`Delete category “${r.name}”? Events in it keep existing, just uncategorised.`)) return
+    await adminApi.deleteCategory(r.id)
     await load()
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Banners</h1>
-        {!editing && <Button onClick={startNew}>+ New banner</Button>}
+        <h1 className="text-2xl font-extrabold text-as-charcoal">Categories</h1>
+        {!editing && <Button onClick={startNew}>+ New category</Button>}
       </div>
 
       <Banner kind="info">
-        Banners appear as a slideshow at the top of the homepage. Pick an event to fill the banner
-        from it automatically (image, title and link), or build one manually. Anything you type
-        below overrides the event’s values.
+        Categories appear as image tiles on the homepage and the Events page. Assign events to a
+        category in the Events editor; visitors can then filter events by category.
       </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
       {editing && (
-        <Card title={editing === 'new' ? 'New banner' : 'Edit banner'}>
+        <Card title={editing === 'new' ? 'New category' : 'Edit category'}>
           <form onSubmit={save} className="space-y-4">
-            <Field
-              label="Driven by event"
-              hint="Optional. The banner borrows this event’s image, title and link. Leave on “None” for a fully manual banner."
-            >
-              <Select value={form.eventId} onChange={set('eventId')}>
-                <option value="">— None (manual banner) —</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
-                ))}
-              </Select>
-            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Title" hint="Optional override. Defaults to the event’s title.">
-                <TextInput value={form.title} onChange={set('title')} />
-              </Field>
-              <Field label="Subtitle" hint="E.g. “Friday 12 Jun 2026 · Château Rweiss”.">
-                <TextInput value={form.subtitle} onChange={set('subtitle')} />
-              </Field>
-              <Field label="Link (URL)" hint="Opened when visitors click the banner or “Buy tickets”.">
-                <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
+              <Field label="Name"><TextInput value={form.name} onChange={set('name')} required placeholder="Concerts" /></Field>
+              <Field label="Slug (URL)" hint="Auto-generated from the name if left empty.">
+                <TextInput value={form.slug} onChange={set('slug')} placeholder="concerts" />
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
             </div>
-            <Field label="Image" hint="Wide image recommended (e.g. 1920×800). Leave empty to keep the current one.">
+            <Field label="Tile image" hint="Square or landscape works well. Leave empty to keep the current one.">
               <div className="flex items-center gap-4">
                 {(imageFile || form.imageUrl) && (
                   <img
                     src={imageFile ? URL.createObjectURL(imageFile) : form.imageUrl}
                     alt="preview"
-                    className="h-16 w-32 rounded object-cover ring-1 ring-black/5"
+                    className="h-16 w-28 rounded object-cover ring-1 ring-black/5"
                   />
                 )}
                 <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
               </div>
             </Field>
             <Toggle
-              checked={form.active}
-              onChange={(v) => setForm((f) => ({ ...f, active: v }))}
-              label={form.active ? 'Visible on the site' : 'Hidden'}
-              description="Turn off to remove this banner from the slideshow without deleting it."
+              checked={form.visible}
+              onChange={(v) => setForm((f) => ({ ...f, visible: v }))}
+              label={form.visible ? 'Visible on the site' : 'Hidden'}
+              description="Turn off to hide this category tile without deleting it."
             />
             <div className="flex gap-3">
               <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
@@ -143,17 +121,17 @@ export default function BannersAdmin() {
 
       <Card>
         {items.length === 0 ? (
-          <p className="text-sm text-as-charcoal/50">No banners yet.</p>
+          <p className="text-sm text-as-charcoal/50">No categories yet.</p>
         ) : (
           <ul className="divide-y divide-black/5">
             {items.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />}
+                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-20 shrink-0 rounded object-cover ring-1 ring-black/5" />}
                   <div className="min-w-0">
-                    <p className="font-semibold text-as-charcoal">{r.title || 'Untitled banner'}</p>
+                    <p className="font-semibold text-as-charcoal">{r.name}</p>
                     <p className="truncate text-sm text-as-charcoal/55">
-                      {r.active === false ? 'hidden' : 'visible'}{r.linkUrl ? ` · ${r.linkUrl}` : ''}
+                      /{r.slug}{r.visible === false ? ' · hidden' : ''}
                     </p>
                   </div>
                 </div>

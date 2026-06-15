@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import EventCard from '../components/EventCard.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
+import CategoryTiles from '../components/CategoryTiles.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Home() {
-  const { hero, services, eventsSection, store, about, ticketing, events, banners, sections } = useContent()
+  const { hero, services, eventsSection, store, about, ticketing, events, banners, sections, categories } = useContent()
   const upcoming = events.slice(0, 3)
 
   return (
@@ -105,6 +106,27 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ---------------- Event categories ---------------- */}
+      {categories.length > 0 && (
+        <section className="bg-as-charcoal/[0.02] py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
+                Browse by category
+              </h2>
+              <Link
+                to="/events"
+                className="flex items-center gap-1 text-sm font-semibold text-as-red transition hover:gap-2"
+              >
+                View all events
+                <Icon name="arrow" className="h-4 w-4" />
+              </Link>
+            </div>
+            <CategoryTiles categories={categories} />
+          </div>
+        </section>
+      )}
 
       {/* ---------------- AS Store callout ---------------- */}
       <StoreCallout store={store} />

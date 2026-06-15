@@ -30,9 +30,12 @@ Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag),
-`services`, `events` (each has a `ticket_url`; no price/category — cards & "Buy tickets" open
-that link), `banners` (homepage slideshow: image/title/subtitle/link/active), `sections`
-(admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
+`services`, `events` (each has a `ticket_url` — cards & "Buy tickets" open that link — plus an
+optional `category_id` → `categories`), `categories` (event categories shown as image tiles:
+name/slug/image/sort/visible; events filter by them on the site),
+`banners` (homepage slideshow: image/title/subtitle/link/active, plus an optional `event_id` →
+the banner then borrows that event's image/title/link, resolved client-side in `lib/api.js`),
+`sections` (admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
 `popup` (single row, id=1: a one-time announcement/ad popup —
 enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
 `delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
@@ -101,11 +104,11 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
-  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, SitePopup
-  pages/                    # ComingSoon, Home, Events, EventDetail
+  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, SitePopup
+  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin, PopupAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, ReservationsAdmin, PopupAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -118,7 +121,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`, `/admin/popup`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/reservations`, `/admin/popup`, `/admin/scraper`
 
 ## Brand
 

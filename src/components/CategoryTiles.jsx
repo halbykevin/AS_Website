@@ -1,0 +1,44 @@
+import { Link } from 'react-router-dom'
+
+// Row of event-category tiles (image + label), like a box-office "browse by
+// category" strip. Clicking a tile filters the Events page; the first "All
+// events" tile clears the filter.
+export default function CategoryTiles({ categories, activeSlug = '', includeAll = true }) {
+  if (!categories?.length) return null
+
+  const tiles = includeAll
+    ? [{ id: '__all__', name: 'All events', slug: '', image: '' }, ...categories]
+    : categories
+
+  return (
+    <div className="flex flex-wrap gap-4">
+      {tiles.map((c) => {
+        const active = (c.slug || '') === (activeSlug || '')
+        return (
+          <Link
+            key={c.id}
+            to={c.slug ? `/events?category=${c.slug}` : '/events'}
+            className={`group relative h-28 w-44 shrink-0 overflow-hidden rounded-xl ring-1 transition ${
+              active ? 'ring-2 ring-as-red' : 'ring-black/5 hover:ring-as-red/40'
+            }`}
+          >
+            {c.image ? (
+              <img
+                src={c.image}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-as-charcoal" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+            <span className="absolute inset-x-0 bottom-0 p-3 text-left text-sm font-bold uppercase tracking-wide text-white drop-shadow">
+              {c.name}
+            </span>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}

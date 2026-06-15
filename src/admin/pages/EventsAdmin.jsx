@@ -5,11 +5,12 @@ import { Card, Field, TextInput, TextArea, Select, Button, Banner } from '../ui.
 const STATUS = ['open', 'sold-out', 'coming-soon']
 const blank = {
   title: '', slug: '', date: '', time: '', venue: '', city: '',
-  imageUrl: '', ticketUrl: '', status: 'open', excerpt: '', description: '', sort: 0,
+  imageUrl: '', ticketUrl: '', status: 'open', excerpt: '', description: '', sort: 0, categoryId: '',
 }
 
 export default function EventsAdmin() {
   const [items, setItems] = useState([])
+  const [categories, setCategories] = useState([])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(blank)
   const [imageFile, setImageFile] = useState(null)
@@ -20,7 +21,9 @@ export default function EventsAdmin() {
 
   async function load() {
     try {
-      setItems(await adminApi.listEvents())
+      const [events, cats] = await Promise.all([adminApi.listEvents(), adminApi.listCategories()])
+      setItems(events)
+      setCategories(cats)
     } catch {
       setMsg({ kind: 'error', text: 'Could not load events.' })
     }
@@ -40,6 +43,7 @@ export default function EventsAdmin() {
       date: r.date || '', time: r.time || '', venue: r.venue || '', city: r.city || '',
       imageUrl: r.imageUrl || '', ticketUrl: r.ticketUrl || '', status: r.status || 'open',
       excerpt: r.excerpt || '', description: r.description || '', sort: r.sort || 0,
+      categoryId: r.categoryId ? String(r.categoryId) : '',
     })
     setImageFile(null)
     setEditing(r.id)
@@ -102,6 +106,14 @@ export default function EventsAdmin() {
                 </Select>
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
+              <Field label="Category" hint="Used for the category tiles & filtering on the site.">
+                <Select value={form.categoryId} onChange={set('categoryId')}>
+                  <option value="">— None —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
+              </Field>
             </div>
             <Field
               label="Ticket link (URL)"

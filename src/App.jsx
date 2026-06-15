@@ -15,6 +15,7 @@ import EventsAdmin from './admin/pages/EventsAdmin.jsx'
 import ReservationsAdmin from './admin/pages/ReservationsAdmin.jsx'
 import BannersAdmin from './admin/pages/BannersAdmin.jsx'
 import SectionsAdmin from './admin/pages/SectionsAdmin.jsx'
+import CategoriesAdmin from './admin/pages/CategoriesAdmin.jsx'
 import ScraperAdmin from './admin/pages/ScraperAdmin.jsx'
 import PopupAdmin from './admin/pages/PopupAdmin.jsx'
 
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="sections" element={<SectionsAdmin />} />
             <Route path="services" element={<ServicesAdmin />} />
             <Route path="events" element={<EventsAdmin />} />
+            <Route path="categories" element={<CategoriesAdmin />} />
             <Route path="reservations" element={<ReservationsAdmin />} />
             <Route path="popup" element={<PopupAdmin />} />
             <Route path="scraper" element={<ScraperAdmin />} />

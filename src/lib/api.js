@@ -66,6 +66,7 @@ export const defaultContent = {
   contact: defaults.contact,
   banners: [],
   sections: [],
+  categories: [],
   popup: null,
   published: false,
 }
@@ -142,6 +143,9 @@ export function mapEvent(e) {
     status: e.status || 'open',
     excerpt: e.excerpt,
     description: e.description,
+    categoryId: e.categoryId || null,
+    categorySlug: e.categorySlug || '',
+    categoryName: e.categoryName || '',
   }
 }
 
@@ -153,6 +157,33 @@ export function mapBanner(b) {
     image: b.imageUrl,
     link: b.linkUrl || '',
     active: b.active !== false,
+    eventId: b.eventId || null,
+  }
+}
+
+export function mapCategory(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    image: c.imageUrl || '',
+    visible: c.visible !== false,
+  }
+}
+
+// A banner can be "driven" by an event: it then borrows the event's image,
+// title and link, so updating the event updates the banner automatically.
+// Any field the admin typed on the banner still wins.
+function resolveBanner(banner, events) {
+  if (!banner.eventId) return banner
+  const ev = events.find((e) => e.recordId === banner.eventId)
+  if (!ev) return banner
+  return {
+    ...banner,
+    image: banner.image || ev.image,
+    title: banner.title || ev.title,
+    subtitle: banner.subtitle || ev.excerpt || [ev.venue, ev.city].filter(Boolean).join(', '),
+    link: banner.link || ev.ticketUrl || `/events/${ev.id}`,
   }
 }
 
@@ -189,12 +220,13 @@ export function mapPopup(p) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, popup] = await Promise.all([
+    const [settings, services, events, banners, sections, categories, popup] = await Promise.all([
       request('/api/settings'),
       request('/api/services'),
       request('/api/events'),
       request('/api/banners').catch(() => []),
       request('/api/sections').catch(() => []),
+      request('/api/categories').catch(() => []),
       request('/api/popup').catch(() => null),
     ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
@@ -204,13 +236,14 @@ export async function loadSite() {
         items: services.map((s) => ({ title: s.title, description: s.description, icon: s.icon || 'chip' })),
       }
     }
-    content.banners = Array.isArray(banners) ? banners.map(mapBanner).filter((b) => b.active && b.image) : []
+    const mappedEvents = Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents
+    content.banners = Array.isArray(banners)
+      ? banners.map(mapBanner).map((b) => resolveBanner(b, mappedEvents)).filter((b) => b.active && b.image)
+      : []
     content.sections = Array.isArray(sections) ? sections.map(mapSection).filter((s) => s.visible) : []
+    content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter((c) => c.visible) : []
     content.popup = mapPopup(popup)
-    return {
-      content,
-      events: Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents,
-    }
+    return { content, events: mappedEvents }
   } catch {
     return null
   }
@@ -256,6 +289,11 @@ export const adminApi = {
   createSection: (data) => request('/api/sections', { method: 'POST', body: data, authed: true }),
   updateSection: (id, data) => request(`/api/sections/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteSection: (id) => request(`/api/sections/${id}`, { method: 'DELETE', authed: true }),
+
+  listCategories: () => request('/api/categories'),
+  createCategory: (data) => request('/api/categories', { method: 'POST', body: data, authed: true }),
+  updateCategory: (id, data) => request(`/api/categories/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteCategory: (id) => request(`/api/categories/${id}`, { method: 'DELETE', authed: true }),
 
   listReservations: () => request('/api/reservations', { authed: true }),
   updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),

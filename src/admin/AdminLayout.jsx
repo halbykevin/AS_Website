@@ -8,6 +8,7 @@ const links = [
   { to: '/admin/sections', label: 'Custom Sections' },
   { to: '/admin/services', label: 'Services' },
   { to: '/admin/events', label: 'Events' },
+  { to: '/admin/categories', label: 'Categories' },
   { to: '/admin/reservations', label: 'Reservations' },
   { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/scraper', label: 'Web Scraper' },

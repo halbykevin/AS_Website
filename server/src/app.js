@@ -49,10 +49,14 @@ const eventJson = (r) => ({
   id: r.id, title: r.title, slug: r.slug, date: fmtDate(r.date),
   time: r.time, venue: r.venue, city: r.city, imageUrl: r.image_url, ticketUrl: r.ticket_url,
   status: r.status, excerpt: r.excerpt, description: r.description, sort: r.sort,
+  categoryId: r.category_id, categorySlug: r.category_slug || '', categoryName: r.category_name || '',
 })
 const bannerJson = (r) => ({
   id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,
-  linkUrl: r.link_url, sort: r.sort, active: r.active,
+  linkUrl: r.link_url, sort: r.sort, active: r.active, eventId: r.event_id,
+})
+const categoryJson = (r) => ({
+  id: r.id, name: r.name, slug: r.slug, imageUrl: r.image_url, sort: r.sort, visible: r.visible,
 })
 const sectionJson = (r) => ({
   id: r.id, eyebrow: r.eyebrow, heading: r.heading, body: r.body, imageUrl: r.image_url,
@@ -148,13 +152,17 @@ app.delete('/api/services/:id', requireAuth, ah(async (req, res) => {
 }))
 
 // ========================= Events =========================
+// Join the category so the public list/detail carry its slug + name.
+const EVENTS_SELECT = `SELECT e.*, c.slug AS category_slug, c.name AS category_name
+  FROM events e LEFT JOIN categories c ON c.id = e.category_id`
+
 app.get('/api/events', ah(async (req, res) => {
-  const { rows } = await query('SELECT * FROM events ORDER BY sort ASC, date ASC, id ASC')
+  const { rows } = await query(`${EVENTS_SELECT} ORDER BY e.sort ASC, e.date ASC, e.id ASC`)
   res.json(rows.map(eventJson))
 }))
 
 app.get('/api/events/:slug', ah(async (req, res) => {
-  const { rows } = await query('SELECT * FROM events WHERE slug=$1', [req.params.slug])
+  const { rows } = await query(`${EVENTS_SELECT} WHERE e.slug=$1`, [req.params.slug])
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
   res.json(eventJson(rows[0]))
 }))
@@ -163,12 +171,13 @@ const eventParams = (b) => [
   b.title || '', b.slug ? slugify(b.slug) : slugify(b.title || ''),
   b.date || null, b.time || '', b.venue || '', b.city || '', b.imageUrl || '',
   b.ticketUrl || '', b.status || 'open', b.excerpt || '', b.description || '', Number(b.sort) || 0,
+  b.categoryId ? Number(b.categoryId) : null,
 ]
 
 app.post('/api/events', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort, category_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
     eventParams(req.body || {})
   )
   res.status(201).json(eventJson(rows[0]))
@@ -178,8 +187,8 @@ app.put('/api/events/:id', requireAuth, ah(async (req, res) => {
   const p = eventParams(req.body || {})
   const { rows } = await query(
     `UPDATE events SET title=$1, slug=$2, date=$3, time=$4, venue=$5, city=$6,
-       image_url=$7, ticket_url=$8, status=$9, excerpt=$10, description=$11, sort=$12
-     WHERE id=$13 RETURNING *`,
+       image_url=$7, ticket_url=$8, status=$9, excerpt=$10, description=$11, sort=$12, category_id=$13
+     WHERE id=$14 RETURNING *`,
     [...p, req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
@@ -201,12 +210,13 @@ app.get('/api/banners', ah(async (req, res) => {
 const bannerParams = (b) => [
   b.title || '', b.subtitle || '', b.imageUrl || '', b.linkUrl || '',
   Number(b.sort) || 0, b.active === undefined ? true : Boolean(b.active),
+  b.eventId ? Number(b.eventId) : null,
 ]
 
 app.post('/api/banners', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO banners (title, subtitle, image_url, link_url, sort, active)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    `INSERT INTO banners (title, subtitle, image_url, link_url, sort, active, event_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
     bannerParams(req.body || {})
   )
   res.status(201).json(bannerJson(rows[0]))
@@ -214,8 +224,8 @@ app.post('/api/banners', requireAuth, ah(async (req, res) => {
 
 app.put('/api/banners/:id', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `UPDATE banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, sort=$5, active=$6
-     WHERE id=$7 RETURNING *`,
+    `UPDATE banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, sort=$5, active=$6, event_id=$7
+     WHERE id=$8 RETURNING *`,
     [...bannerParams(req.body || {}), req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
@@ -262,6 +272,42 @@ app.put('/api/sections/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/sections/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM sections WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Categories =========================
+// Public read (the frontend filters on `visible`); admin manages all.
+app.get('/api/categories', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM categories ORDER BY sort ASC, id ASC')
+  res.json(rows.map(categoryJson))
+}))
+
+const categoryParams = (b) => [
+  b.name || '', b.slug ? slugify(b.slug) : slugify(b.name || ''),
+  b.imageUrl || '', Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/categories', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO categories (name, slug, image_url, sort, visible)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    categoryParams(req.body || {})
+  )
+  res.status(201).json(categoryJson(rows[0]))
+}))
+
+app.put('/api/categories/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE categories SET name=$1, slug=$2, image_url=$3, sort=$4, visible=$5
+     WHERE id=$6 RETURNING *`,
+    [...categoryParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(categoryJson(rows[0]))
+}))
+
+app.delete('/api/categories/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM categories WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 
