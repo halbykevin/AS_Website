@@ -79,6 +79,21 @@ CREATE TABLE IF NOT EXISTS sections (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS popup (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT false,
+  title TEXT DEFAULT '',
+  body TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  link_url TEXT DEFAULT '',
+  link_label TEXT DEFAULT '',
+  trigger_type TEXT DEFAULT 'load',
+  delay_seconds INTEGER DEFAULT 3,
+  scroll_percent INTEGER DEFAULT 40,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT popup_singleton CHECK (id = 1)
+);
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;
@@ -124,6 +139,9 @@ VALUES (1,
   'Our dedicated online store where you buy the latest tech. Launching soon — stay tuned.',
   '', false)
 ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton popup row exists (disabled by default).
+INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 `
 
 async function run() {

@@ -62,6 +62,11 @@ const reservationJson = (r) => ({
   id: r.id, eventId: r.event_id, eventTitle: r.event_title, name: r.name, email: r.email,
   phone: r.phone, quantity: r.quantity, status: r.status, created: r.created_at,
 })
+const popupJson = (r) => ({
+  enabled: r.enabled, title: r.title, body: r.body, imageUrl: r.image_url,
+  linkUrl: r.link_url, linkLabel: r.link_label, trigger: r.trigger_type,
+  delaySeconds: r.delay_seconds, scrollPercent: r.scroll_percent, updatedAt: r.updated_at,
+})
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
@@ -258,6 +263,30 @@ app.put('/api/sections/:id', requireAuth, ah(async (req, res) => {
 app.delete('/api/sections/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM sections WHERE id=$1', [req.params.id])
   res.status(204).end()
+}))
+
+// ========================= Popup =========================
+// Public read (the frontend decides whether/when to show); admin edits the single row.
+app.get('/api/popup', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM popup WHERE id = 1')
+  res.json(rows[0] ? popupJson(rows[0]) : null)
+}))
+
+app.put('/api/popup', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const trigger = b.trigger === 'scroll' ? 'scroll' : 'load'
+  const { rows } = await query(
+    `UPDATE popup SET
+       enabled=$1, title=$2, body=$3, image_url=$4, link_url=$5, link_label=$6,
+       trigger_type=$7, delay_seconds=$8, scroll_percent=$9, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [
+      Boolean(b.enabled), b.title || '', b.body || '', b.imageUrl || '',
+      b.linkUrl || '', b.linkLabel || '', trigger,
+      Math.max(0, Number(b.delaySeconds) || 0), Math.min(100, Math.max(0, Number(b.scrollPercent) || 0)),
+    ]
+  )
+  res.json(popupJson(rows[0]))
 }))
 
 // ========================= Reservations =========================

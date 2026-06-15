@@ -33,6 +33,10 @@ Postgres tables: `settings` (single row, id=1, holds global content + the `publi
 `services`, `events` (each has a `ticket_url`; no price/category — cards & "Buy tickets" open
 that link), `banners` (homepage slideshow: image/title/subtitle/link/active), `sections`
 (admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
+`popup` (single row, id=1: a one-time announcement/ad popup —
+enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
+`delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
+frontend stores in localStorage to show it once),
 `reservations`. Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -97,11 +101,11 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
-  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider
+  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, SitePopup
   pages/                    # ComingSoon, Home, Events, EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, ReservationsAdmin, PopupAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -114,7 +118,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/reservations`, `/admin/popup`, `/admin/scraper`
 
 ## Brand
 

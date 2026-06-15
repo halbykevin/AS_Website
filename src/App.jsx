@@ -16,6 +16,7 @@ import ReservationsAdmin from './admin/pages/ReservationsAdmin.jsx'
 import BannersAdmin from './admin/pages/BannersAdmin.jsx'
 import SectionsAdmin from './admin/pages/SectionsAdmin.jsx'
 import ScraperAdmin from './admin/pages/ScraperAdmin.jsx'
+import PopupAdmin from './admin/pages/PopupAdmin.jsx'
 
 function Splash() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="services" element={<ServicesAdmin />} />
             <Route path="events" element={<EventsAdmin />} />
             <Route path="reservations" element={<ReservationsAdmin />} />
+            <Route path="popup" element={<PopupAdmin />} />
             <Route path="scraper" element={<ScraperAdmin />} />
           </Route>
 

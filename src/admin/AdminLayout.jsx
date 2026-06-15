@@ -9,6 +9,7 @@ const links = [
   { to: '/admin/services', label: 'Services' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/reservations', label: 'Reservations' },
+  { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/scraper', label: 'Web Scraper' },
 ]
 

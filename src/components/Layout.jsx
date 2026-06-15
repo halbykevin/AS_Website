@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import Navbar from './Navbar.jsx'
 import Footer from './Footer.jsx'
+import SitePopup from './SitePopup.jsx'
 
 // Scrolls to top on route change (unless navigating to a hash).
 function ScrollToTop() {
@@ -19,6 +20,7 @@ export default function Layout({ children }) {
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <SitePopup />
     </div>
   )
 }

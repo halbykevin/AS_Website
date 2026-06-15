@@ -66,6 +66,7 @@ export const defaultContent = {
   contact: defaults.contact,
   banners: [],
   sections: [],
+  popup: null,
   published: false,
 }
 
@@ -169,14 +170,32 @@ export function mapSection(s) {
   }
 }
 
+export function mapPopup(p) {
+  if (!p) return null
+  return {
+    enabled: p.enabled === true,
+    title: p.title || '',
+    body: p.body || '',
+    image: p.imageUrl || '',
+    link: p.linkUrl || '',
+    linkLabel: p.linkLabel || '',
+    trigger: p.trigger === 'scroll' ? 'scroll' : 'load',
+    delaySeconds: Number(p.delaySeconds) || 0,
+    scrollPercent: Number(p.scrollPercent) || 0,
+    // Changes whenever the admin saves — used to re-show a "seen" popup.
+    version: p.updatedAt ? String(p.updatedAt) : '1',
+  }
+}
+
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections] = await Promise.all([
+    const [settings, services, events, banners, sections, popup] = await Promise.all([
       request('/api/settings'),
       request('/api/services'),
       request('/api/events'),
       request('/api/banners').catch(() => []),
       request('/api/sections').catch(() => []),
+      request('/api/popup').catch(() => null),
     ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -187,6 +206,7 @@ export async function loadSite() {
     }
     content.banners = Array.isArray(banners) ? banners.map(mapBanner).filter((b) => b.active && b.image) : []
     content.sections = Array.isArray(sections) ? sections.map(mapSection).filter((s) => s.visible) : []
+    content.popup = mapPopup(popup)
     return {
       content,
       events: Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents,
@@ -240,6 +260,9 @@ export const adminApi = {
   listReservations: () => request('/api/reservations', { authed: true }),
   updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),
   deleteReservation: (id) => request(`/api/reservations/${id}`, { method: 'DELETE', authed: true }),
+
+  getPopup: () => request('/api/popup'),
+  savePopup: (data) => request('/api/popup', { method: 'PUT', body: data, authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   getScrape: (id) => request(`/api/scrape/${id}`, { authed: true }),
