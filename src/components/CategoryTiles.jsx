@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 
-// Row of event-category tiles (image + label), like a box-office "browse by
-// category" strip. Clicking a tile filters the Events page; the first "All
-// events" tile clears the filter.
+// Responsive grid of event-category tiles (image + label), like a box-office
+// "browse by category" strip. Clicking a tile filters the Events page; the first
+// "All events" tile clears the filter.
 export default function CategoryTiles({ categories, activeSlug = '', includeAll = true }) {
   if (!categories?.length) return null
 
@@ -11,14 +11,15 @@ export default function CategoryTiles({ categories, activeSlug = '', includeAll 
     : categories
 
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
       {tiles.map((c) => {
         const active = (c.slug || '') === (activeSlug || '')
+        const isAll = c.id === '__all__'
         return (
           <Link
             key={c.id}
             to={c.slug ? `/events?category=${c.slug}` : '/events'}
-            className={`group relative h-28 w-44 shrink-0 overflow-hidden rounded-xl ring-1 transition ${
+            className={`group relative h-24 overflow-hidden rounded-xl ring-1 transition sm:h-28 ${
               active ? 'ring-2 ring-as-red' : 'ring-black/5 hover:ring-as-red/40'
             }`}
           >
@@ -30,7 +31,11 @@ export default function CategoryTiles({ categories, activeSlug = '', includeAll 
                 className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
               />
             ) : (
-              <div className="absolute inset-0 bg-as-charcoal" />
+              <div
+                className={`absolute inset-0 ${
+                  isAll ? 'bg-gradient-to-br from-as-red to-as-charcoal' : 'bg-as-charcoal'
+                }`}
+              />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
             <span className="absolute inset-x-0 bottom-0 p-3 text-left text-sm font-bold uppercase tracking-wide text-white drop-shadow">

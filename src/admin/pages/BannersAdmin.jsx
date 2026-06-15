@@ -7,6 +7,7 @@ const blank = { title: '', subtitle: '', imageUrl: '', linkUrl: '', sort: 0, act
 export default function BannersAdmin() {
   const [items, setItems] = useState([])
   const [events, setEvents] = useState([])
+  const [picked, setPicked] = useState([])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(blank)
   const [imageFile, setImageFile] = useState(null)
@@ -14,6 +15,7 @@ export default function BannersAdmin() {
   const [saving, setSaving] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const evMap = new Map(events.map((e) => [e.id, e]))
 
   async function load() {
     try {
@@ -69,9 +71,53 @@ export default function BannersAdmin() {
   }
 
   async function remove(r) {
-    if (!confirm(`Delete banner “${r.title || 'untitled'}”?`)) return
+    if (!confirm(`Delete banner “${r.title || evMap.get(r.eventId)?.title || 'untitled'}”?`)) return
     await adminApi.deleteBanner(r.id)
     await load()
+  }
+
+  // ---- Build banners straight from events ----
+  const togglePick = (id) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
+
+  async function addFromEvents() {
+    if (!picked.length) return
+    setSaving(true)
+    setMsg(null)
+    try {
+      let sort = items.length
+      // Keep the order the admin picked them in.
+      for (const id of picked) {
+        await adminApi.createBanner({ eventId: Number(id), sort: sort++, active: true })
+      }
+      const n = picked.length
+      setPicked([])
+      await load()
+      setMsg({ kind: 'success', text: `Added ${n} banner${n === 1 ? '' : 's'} from events.` })
+    } catch (err) {
+      setMsg({ kind: 'error', text: 'Could not add: ' + (err?.message || 'error') })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ---- Reorder the slideshow ----
+  const payloadOf = (b, sort) => ({
+    title: b.title || '', subtitle: b.subtitle || '', imageUrl: b.imageUrl || '',
+    linkUrl: b.linkUrl || '', sort, active: b.active !== false, eventId: b.eventId || '',
+  })
+  async function move(index, dir) {
+    const j = index + dir
+    if (j < 0 || j >= items.length) return
+    const arr = [...items]
+    ;[arr[index], arr[j]] = [arr[j], arr[index]]
+    setItems(arr) // optimistic
+    try {
+      await Promise.all(arr.map((b, i) => adminApi.updateBanner(b.id, payloadOf(b, i))))
+    } catch {
+      setMsg({ kind: 'error', text: 'Could not save the new order.' })
+      load()
+    }
   }
 
   return (
@@ -82,12 +128,42 @@ export default function BannersAdmin() {
       </div>
 
       <Banner kind="info">
-        Banners appear as a slideshow at the top of the homepage. Pick an event to fill the banner
-        from it automatically (image, title and link), or build one manually. Anything you type
-        below overrides the event’s values.
+        Banners are the homepage slideshow. Add them straight from your events below (each uses the
+        event’s image, title and link), or build one manually. Use the ↑ ↓ arrows to set the order.
       </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
+
+      {!editing && events.length > 0 && (
+        <Card title="Add banners from events">
+          <p className="mb-3 text-sm text-as-charcoal/55">
+            Tick the events you want in the slideshow, then add them. They’re populated dynamically
+            from each event — reorder them in the list below.
+          </p>
+          <div className="max-h-64 divide-y divide-black/5 overflow-auto rounded-xl border border-black/10">
+            {events.map((ev) => (
+              <label key={ev.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-black/[0.02]">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-as-red"
+                  checked={picked.includes(String(ev.id))}
+                  onChange={() => togglePick(String(ev.id))}
+                />
+                {ev.imageUrl
+                  ? <img src={ev.imageUrl} alt="" className="h-8 w-12 shrink-0 rounded object-cover ring-1 ring-black/5" />
+                  : <span className="h-8 w-12 shrink-0 rounded bg-as-gray/20" />}
+                <span className="min-w-0 flex-1 truncate text-as-charcoal">{ev.title}</span>
+                <span className="shrink-0 text-xs text-as-charcoal/45">{ev.date}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-4">
+            <Button onClick={addFromEvents} disabled={!picked.length || saving}>
+              {saving ? 'Adding…' : `Add ${picked.length || ''} as banner${picked.length === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {editing && (
         <Card title={editing === 'new' ? 'New banner' : 'Edit banner'}>
@@ -141,28 +217,51 @@ export default function BannersAdmin() {
         </Card>
       )}
 
-      <Card>
+      <Card title="Slideshow order">
         {items.length === 0 ? (
           <p className="text-sm text-as-charcoal/50">No banners yet.</p>
         ) : (
           <ul className="divide-y divide-black/5">
-            {items.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-4 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />}
-                  <div className="min-w-0">
-                    <p className="font-semibold text-as-charcoal">{r.title || 'Untitled banner'}</p>
-                    <p className="truncate text-sm text-as-charcoal/55">
-                      {r.active === false ? 'hidden' : 'visible'}{r.linkUrl ? ` · ${r.linkUrl}` : ''}
-                    </p>
+            {items.map((r, i) => {
+              const ev = r.eventId ? evMap.get(r.eventId) : null
+              const img = r.imageUrl || ev?.imageUrl || ''
+              const title = r.title || ev?.title || 'Untitled banner'
+              return (
+                <li key={r.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="flex shrink-0 flex-col">
+                    <button
+                      type="button"
+                      onClick={() => move(i, -1)}
+                      disabled={i === 0}
+                      aria-label="Move up"
+                      className="flex h-6 w-6 items-center justify-center rounded text-as-charcoal/60 transition hover:bg-black/5 disabled:opacity-25"
+                    >↑</button>
+                    <button
+                      type="button"
+                      onClick={() => move(i, 1)}
+                      disabled={i === items.length - 1}
+                      aria-label="Move down"
+                      className="flex h-6 w-6 items-center justify-center rounded text-as-charcoal/60 transition hover:bg-black/5 disabled:opacity-25"
+                    >↓</button>
                   </div>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="ghost" onClick={() => startEdit(r)} className="px-3 py-1.5">Edit</Button>
-                  <Button variant="danger" onClick={() => remove(r)} className="px-3 py-1.5">Delete</Button>
-                </div>
-              </li>
-            ))}
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {img
+                      ? <img src={img} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />
+                      : <span className="h-12 w-24 shrink-0 rounded bg-as-gray/20" />}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-as-charcoal">{title}</p>
+                      <p className="truncate text-sm text-as-charcoal/55">
+                        {ev ? 'from event' : 'manual'}{r.active === false ? ' · hidden' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="ghost" onClick={() => startEdit(r)} className="px-3 py-1.5">Edit</Button>
+                    <Button variant="danger" onClick={() => remove(r)} className="px-3 py-1.5">Delete</Button>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </Card>
