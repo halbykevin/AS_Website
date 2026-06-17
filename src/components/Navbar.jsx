@@ -1,40 +1,41 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
+import { useScrollEl } from '../store/scroll.jsx'
 
 export default function Navbar() {
   const { brand, nav } = useContent()
+  const scrollRef = useScrollEl()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  // 0 = fully hidden, 1 = fully shown. Ramps up as the user scrolls up.
-  const [reveal, setReveal] = useState(1)
+  const [hidden, setHidden] = useState(false)
   const lastY = useRef(0)
   const location = useLocation()
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Pixels of upward scrolling needed to fully reveal the navbar.
-    const REVEAL_DISTANCE = 120
+    const el = scrollRef?.current
+    if (!el) return
     const onScroll = () => {
-      const y = window.scrollY
+      const y = el.scrollTop
       setScrolled(y > 8)
       const delta = y - lastY.current
       if (y <= 80) {
-        // Near the top: always fully visible.
-        setReveal(1)
-      } else if (delta > 0) {
+        // Near the top: always show.
+        setHidden(false)
+      } else if (delta > 4) {
         // Scrolling down: hide.
-        setReveal(0)
-      } else if (delta < 0) {
-        // Scrolling up: reveal gradually in proportion to the distance scrolled up.
-        setReveal((r) => Math.min(1, r + -delta / REVEAL_DISTANCE))
+        setHidden(true)
+      } else if (delta < -4) {
+        // Scrolling up: show.
+        setHidden(false)
       }
       lastY.current = y
     }
     onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [scrollRef])
 
   // Close the mobile menu whenever the route changes.
   useEffect(() => setOpen(false), [location.pathname])
@@ -57,23 +58,23 @@ export default function Navbar() {
     setOpen(false)
   }
 
+  // Hide by collapsing the header's row to zero height, so the content area
+  // below (and its scrollbar) expands right up to the top edge.
+  const collapsed = hidden && !open
+
   return (
-    <header
-      style={
-        open
-          ? undefined
-          : {
-              opacity: reveal,
-              transform: `translateY(${(reveal - 1) * 100}%)`,
-              pointerEvents: reveal === 0 ? 'none' : undefined,
-            }
-      }
-      className={`sticky top-0 z-50 transition-[background-color,box-shadow] duration-300 ${
-        scrolled
-          ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
-          : 'bg-white/0'
+    <div
+      className={`relative z-50 grid transition-[grid-template-rows] duration-300 ease-out ${
+        collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
       }`}
     >
+      <header
+        className={`min-h-0 overflow-hidden transition-[background-color,box-shadow] duration-300 ${
+          scrolled
+            ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
+            : 'bg-white'
+        }`}
+      >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 sm:py-4">
         <Link to="/" className="flex items-center gap-2" aria-label={brand.name}>
           <img
@@ -164,6 +165,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </header>
+      </header>
+    </div>
   )
 }

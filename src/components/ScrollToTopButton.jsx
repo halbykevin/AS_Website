@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react'
+import { useScrollEl } from '../store/scroll.jsx'
 
 // Small floating button that appears after scrolling down and smoothly returns
 // the visitor to the top.
 export default function ScrollToTopButton() {
+  const scrollRef = useScrollEl()
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 500)
+    const el = scrollRef?.current
+    if (!el) return
+    const onScroll = () => setShow(el.scrollTop > 500)
     onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [scrollRef])
 
   return (
     <button
       type="button"
       aria-label="Back to top"
-      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      onClick={() => scrollRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })}
       className={`fixed bottom-5 right-5 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-as-red text-white shadow-lg transition-all duration-300 hover:bg-as-red-light hover:shadow-xl ${
         show ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
       }`}

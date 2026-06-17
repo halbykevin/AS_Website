@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useContent } from '../store/content.jsx'
+import { useScrollEl } from '../store/scroll.jsx'
 
 // A one-time announcement / ad popup, configured in the admin panel. It shows
 // once per visitor per content version (the version changes when the admin
@@ -9,6 +10,7 @@ const SEEN_KEY = 'as_popup_seen'
 
 export default function SitePopup() {
   const { popup } = useContent()
+  const scrollRef = useScrollEl()
   const [open, setOpen] = useState(false)
   const [enter, setEnter] = useState(false)
   const firedRef = useRef(false)
@@ -24,11 +26,12 @@ export default function SitePopup() {
       /* localStorage blocked — still show, just won't persist "seen" */
     }
 
+    const el = scrollRef?.current
     let timer
     let onScroll
     const cleanup = () => {
       if (timer) clearTimeout(timer)
-      if (onScroll) window.removeEventListener('scroll', onScroll)
+      if (onScroll && el) el.removeEventListener('scroll', onScroll)
     }
     const reveal = () => {
       if (firedRef.current) return
@@ -37,14 +40,14 @@ export default function SitePopup() {
       setOpen(true)
     }
 
-    if (popup.trigger === 'scroll') {
+    if (popup.trigger === 'scroll' && el) {
       const pct = Math.min(100, Math.max(1, popup.scrollPercent || 40))
       onScroll = () => {
-        const reached = window.scrollY + window.innerHeight
-        const target = document.documentElement.scrollHeight * (pct / 100)
+        const reached = el.scrollTop + el.clientHeight
+        const target = el.scrollHeight * (pct / 100)
         if (reached >= target) reveal()
       }
-      window.addEventListener('scroll', onScroll, { passive: true })
+      el.addEventListener('scroll', onScroll, { passive: true })
       onScroll() // in case the page is already scrolled past the threshold
     } else {
       timer = setTimeout(reveal, Math.max(0, popup.delaySeconds || 0) * 1000)
@@ -55,14 +58,15 @@ export default function SitePopup() {
   // Mount transition + lock background scroll while open.
   useEffect(() => {
     if (!open) return
+    const el = scrollRef?.current
     const id = requestAnimationFrame(() => setEnter(true))
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const prev = el ? el.style.overflow : ''
+    if (el) el.style.overflow = 'hidden'
     return () => {
       cancelAnimationFrame(id)
-      document.body.style.overflow = prev
+      if (el) el.style.overflow = prev
     }
-  }, [open])
+  }, [open, scrollRef])
 
   if (!open || !popup) return null
 
