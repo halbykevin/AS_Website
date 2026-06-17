@@ -44,6 +44,8 @@ def parse_args(argv=None):
     src.add_argument("--crawl", help="A listing/category page; auto-discover product links.")
     src.add_argument("--auto", help="A URL to auto-detect: scrape it as a single product "
                      "page, or crawl it as a category page.")
+    src.add_argument("--site", help="A site domain/homepage; discover and scrape the ENTIRE "
+                     "catalog (all categories) via sitemap or product archive.")
 
     ap.add_argument("--config", help="YAML config with custom CSS selectors / settings.")
     ap.add_argument("--out", default="output", help="Output directory (default: output).")
@@ -84,6 +86,15 @@ def collect_urls(args, fetcher, link_pattern, selectors=None) -> list[str]:
             follow_pagination=not args.no_pagination,
             max_pages=args.max_pages,
             link_pattern=link_pattern,
+            limit=args.limit,
+        )
+    if args.site:
+        return runner.resolve_site_urls(
+            fetcher, args.site,
+            follow_pagination=not args.no_pagination,
+            max_pages=args.max_pages,
+            link_pattern=link_pattern,
+            limit=args.limit,
         )
     # --auto: probe the page and decide between single-product and crawl.
     url = args.auto

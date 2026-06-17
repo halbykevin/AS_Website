@@ -24,22 +24,37 @@ export default function BannerSlider({ banners }) {
     return () => clearInterval(timer.current)
   }, [paused, dragging, count])
 
-  // ---- Touch / drag to slide ----
-  const onTouchStart = (e) => {
-    startX.current = e.touches[0].clientX
+  // ---- Touch / mouse drag to slide (works on both mobile and desktop) ----
+  const dragStart = (clientX) => {
+    startX.current = clientX
     moved.current = false
     setDragging(true)
   }
-  const onTouchMove = (e) => {
-    if (!dragging) return
-    const dx = e.touches[0].clientX - startX.current
+  const dragMove = (clientX) => {
+    const dx = clientX - startX.current
     if (Math.abs(dx) > 8) moved.current = true
     setDrag(dx)
   }
-  const onTouchEnd = () => {
+  const dragEnd = () => {
     setDragging(false)
     if (Math.abs(drag) > 50) go(drag < 0 ? index + 1 : index - 1)
     setDrag(0)
+  }
+
+  const onTouchStart = (e) => dragStart(e.touches[0].clientX)
+  const onTouchMove = (e) => {
+    if (!dragging) return
+    dragMove(e.touches[0].clientX)
+  }
+
+  // Desktop: click-and-drag to swipe between slides.
+  const onMouseDown = (e) => {
+    e.preventDefault() // stop native image/link ghost-drag
+    dragStart(e.clientX)
+  }
+  const onMouseMove = (e) => {
+    if (!dragging) return
+    dragMove(e.clientX)
   }
   // A swipe shouldn't also trigger the slide's link.
   const onClickCapture = (e) => {
@@ -59,14 +74,20 @@ export default function BannerSlider({ banners }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Slides */}
-      <div className="relative overflow-hidden bg-as-charcoal">
+      {/* Slides — centered container so the full image fits (no cropping) */}
+      <div className="relative mx-auto max-w-7xl overflow-hidden bg-as-charcoal">
         <div
-          className={`flex touch-pan-y ${dragging ? '' : 'transition-transform duration-700 ease-out'}`}
+          className={`flex cursor-grab touch-pan-y select-none active:cursor-grabbing ${
+            dragging ? '' : 'transition-transform duration-700 ease-out'
+          }`}
           style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          onTouchEnd={dragEnd}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={dragEnd}
+          onMouseLeave={() => dragging && dragEnd()}
           onClickCapture={onClickCapture}
         >
           {banners.map((b) => (
@@ -74,7 +95,7 @@ export default function BannerSlider({ banners }) {
               <img
                 src={b.image}
                 alt={b.title || 'Banner'}
-                className="h-52 w-full select-none object-cover sm:h-80 lg:h-[28rem]"
+                className="h-52 w-full select-none object-contain sm:h-80 lg:h-[28rem]"
                 loading="lazy"
                 draggable={false}
               />

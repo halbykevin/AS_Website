@@ -4,8 +4,10 @@ pagination) and scrape them (optionally in parallel)."""
 from __future__ import annotations
 
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
+from urllib.parse import urljoin, urlparse
 
 from . import extract
 from .fetch import Fetcher
@@ -13,6 +15,129 @@ from .images import download_images
 from .models import Product
 
 Log = Callable[[str], None]
+
+# URLs that look like individual product pages (across common platforms).
+_PRODUCT_HINT = re.compile(r"[?&]product=|/product/|/products/|/p/|/item/", re.I)
+
+# Where a store's full product list typically lives, tried in order.
+_SITEMAP_CANDIDATES = [
+    "/product-sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml", "/sitemap.xml",
+]
+_ARCHIVE_CANDIDATES = [
+    "/?post_type=product",   # WooCommerce, plain permalinks
+    "/shop/", "/shop",       # WooCommerce, pretty permalinks
+    "/products", "/products/",
+    "/collections/all",      # Shopify
+    "/store", "/store/",
+]
+
+
+def _origin(url: str) -> str:
+    p = urlparse(url if "//" in url else "https://" + url)
+    return f"{p.scheme}://{p.netloc}"
+
+
+# Links that look like category/collection listing pages.
+_CATEGORY_HINT = re.compile(r"[?&]product_cat=|/product-category/|/collections/", re.I)
+
+
+def _category_urls(html: str, base_url: str) -> list[str]:
+    """Absolute category-listing URLs found on a page (e.g. the homepage)."""
+    cats: list[str] = []
+    for href in re.findall(r'href=["\']([^"\']+)["\']', html, re.I):
+        if _CATEGORY_HINT.search(href):
+            cats.append(urljoin(base_url, href.replace("&amp;", "&")))
+    return list(dict.fromkeys(cats))
+
+
+def _sitemap_product_urls(fetcher: Fetcher, origin: str, log: Log) -> list[str]:
+    """Pull product URLs from a sitemap (recursing a sitemap index if needed)."""
+    for path in _SITEMAP_CANDIDATES:
+        xml = fetcher.get(origin + path)
+        if not xml or "<loc" not in xml.lower():
+            continue
+        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml, re.I)
+        product_maps = [l for l in locs if "product" in l.lower() and l.lower().endswith(".xml")]
+        urls: list[str] = []
+        if product_maps:
+            for pm in product_maps:
+                xml2 = fetcher.get(pm)
+                if xml2:
+                    urls += [u for u in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml2, re.I)
+                             if _PRODUCT_HINT.search(u)]
+        else:
+            urls = [u for u in locs if _PRODUCT_HINT.search(u)]
+        urls = list(dict.fromkeys(urls))
+        if urls:
+            log(f"  found {len(urls)} product URL(s) via {path}")
+            return urls
+    return []
+
+
+def resolve_site_urls(
+    fetcher: Fetcher,
+    domain: str,
+    follow_pagination: bool = True,
+    max_pages: int = 200,
+    log: Log = print,
+    link_pattern: str | None = None,
+    limit: int = 0,
+) -> list[str]:
+    """Given a site's domain, discover every product URL across the whole catalog.
+
+    Strategy: sitemap → known product-archive paths (crawled with pagination) →
+    fall back to crawling the homepage. `limit` > 0 stops collection early.
+    """
+    origin = _origin(domain)
+    log(f"Scanning whole site: {origin}")
+
+    # 1) Sitemap is the cleanest source when available.
+    urls = _sitemap_product_urls(fetcher, origin, log)
+    if urls:
+        return urls[:limit] if limit else urls
+
+    # 2) Enumerate category pages from the homepage and crawl each — most reliable
+    #    for stores whose global archive paginates poorly.
+    home = fetcher.get(origin + "/")
+    if home:
+        cat_urls = _category_urls(home, origin + "/")
+        if len(cat_urls) >= 3:
+            log(f"  found {len(cat_urls)} category page(s); crawling each")
+            all_urls: list[str] = []
+            seen: set[str] = set()
+            for cat in cat_urls:
+                remaining = (limit - len(all_urls)) if limit else 0
+                for u in collect_product_urls(
+                    fetcher, cat, follow_pagination=follow_pagination,
+                    max_pages=max_pages, log=log, link_pattern=link_pattern,
+                    limit=remaining,
+                ):
+                    if u not in seen:
+                        seen.add(u)
+                        all_urls.append(u)
+                if limit and len(all_urls) >= limit:
+                    break
+            log(f"  total unique products across categories: {len(all_urls)}")
+            if all_urls:
+                return all_urls[:limit] if limit else all_urls
+
+    # 3) Fall back to a known product-archive path.
+    for path in _ARCHIVE_CANDIDATES:
+        seed = origin + path
+        html = fetcher.get(seed)
+        if html and extract.find_product_links(html, seed, link_pattern):
+            log(f"  product archive: {seed}")
+            return collect_product_urls(
+                fetcher, seed, follow_pagination=follow_pagination,
+                max_pages=max_pages, log=log, link_pattern=link_pattern,
+            )
+
+    # 4) Last resort: crawl the homepage itself.
+    log("  no archive found; crawling the homepage for links")
+    return collect_product_urls(
+        fetcher, origin + "/", follow_pagination=follow_pagination,
+        max_pages=max_pages, log=log, link_pattern=link_pattern,
+    )
 
 
 def collect_product_urls(
@@ -22,8 +147,12 @@ def collect_product_urls(
     max_pages: int = 50,
     log: Log = print,
     link_pattern: str | None = None,
+    limit: int = 0,
 ) -> list[str]:
-    """Find product links on a listing page, following 'Next' through all pages."""
+    """Find product links on a listing page, following 'Next' through all pages.
+
+    `limit` > 0 stops early once that many links are collected.
+    """
     links: list[str] = []
     seen_links: set[str] = set()
     seen_pages: set[str] = set()
@@ -42,6 +171,8 @@ def collect_product_urls(
         links.extend(new)
         log(f"  page {page_no}: +{len(new)} product(s) (total {len(links)})")
 
+        if limit and len(links) >= limit:
+            return links[:limit]
         if not follow_pagination:
             break
         nxt = extract.find_next_page(html, page_url)

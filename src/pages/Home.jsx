@@ -64,13 +64,15 @@ export default function Home() {
               <Reveal
                 key={item.title}
                 delay={i * 70}
-                className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="group relative overflow-hidden rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-as-red/20 hover:shadow-md"
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red transition group-hover:bg-as-red group-hover:text-white">
                   <Icon name={item.icon} className="h-6 w-6" />
                 </div>
-                <h3 className="mt-5 text-lg font-bold text-as-charcoal">{item.title}</h3>
+                <h3 className="mt-5 text-lg font-bold text-as-charcoal transition group-hover:text-as-red">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-as-charcoal/60">{item.description}</p>
+                {/* Red line that sweeps across on hover */}
+                <span className="absolute bottom-0 left-0 h-1 w-full origin-left scale-x-0 bg-as-red transition-transform duration-300 ease-out group-hover:scale-x-100" />
               </Reveal>
             ))}
           </div>
