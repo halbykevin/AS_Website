@@ -95,7 +95,7 @@ export default function BannerSlider({ banners }) {
               <img
                 src={b.image}
                 alt={b.title || 'Banner'}
-                className="h-52 w-full select-none object-contain sm:h-80 lg:h-[28rem]"
+                className="block h-auto w-full select-none object-cover"
                 loading="lazy"
                 draggable={false}
               />
