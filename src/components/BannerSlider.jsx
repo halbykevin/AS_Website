@@ -11,9 +11,11 @@ export default function BannerSlider({ banners }) {
   const [paused, setPaused] = useState(false)
   const [drag, setDrag] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [boxHeight, setBoxHeight] = useState(null)
   const timer = useRef(null)
   const startX = useRef(0)
   const moved = useRef(false)
+  const slideRefs = useRef([])
 
   const count = banners.length
   const go = (i) => setIndex(((i % count) + count) % count)
@@ -23,6 +25,18 @@ export default function BannerSlider({ banners }) {
     timer.current = setInterval(() => setIndex((i) => (i + 1) % count), INTERVAL)
     return () => clearInterval(timer.current)
   }, [paused, dragging, count])
+
+  // Banners can have different aspect ratios. Size the viewport to whichever
+  // slide is showing so the full image fits with no crop and no empty bars.
+  const syncHeight = () => {
+    const el = slideRefs.current[index]
+    if (el) setBoxHeight(el.offsetHeight)
+  }
+  useEffect(() => {
+    syncHeight()
+    window.addEventListener('resize', syncHeight)
+    return () => window.removeEventListener('resize', syncHeight)
+  }, [index, count])
 
   // ---- Touch / mouse drag to slide (works on both mobile and desktop) ----
   const dragStart = (clientX) => {
@@ -74,10 +88,13 @@ export default function BannerSlider({ banners }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Slides — centered container so the full image fits (no cropping) */}
-      <div className="relative mx-auto max-w-7xl overflow-hidden bg-as-charcoal">
+      {/* Slides — centered container; height follows the active slide */}
+      <div
+        className="relative mx-auto max-w-7xl overflow-hidden bg-as-charcoal transition-[height] duration-500 ease-out"
+        style={{ height: boxHeight ? `${boxHeight}px` : undefined }}
+      >
         <div
-          className={`flex cursor-grab touch-pan-y select-none active:cursor-grabbing ${
+          className={`flex cursor-grab touch-pan-y select-none items-start active:cursor-grabbing ${
             dragging ? '' : 'transition-transform duration-700 ease-out'
           }`}
           style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
@@ -90,13 +107,14 @@ export default function BannerSlider({ banners }) {
           onMouseLeave={() => dragging && dragEnd()}
           onClickCapture={onClickCapture}
         >
-          {banners.map((b) => (
+          {banners.map((b, i) => (
             <SlideLink key={b.id} banner={b}>
               <img
+                ref={(el) => (slideRefs.current[i] = el)}
                 src={b.image}
                 alt={b.title || 'Banner'}
                 className="block h-auto w-full select-none object-cover"
-                loading="lazy"
+                onLoad={syncHeight}
                 draggable={false}
               />
             </SlideLink>
