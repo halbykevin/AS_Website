@@ -126,22 +126,14 @@ function PinnedStory({ story }) {
           style={{ width: dims.w ? dims.w * n : '100%', x: trackX }}
         >
           {panels.map((p, i) => (
-            <StoryPanel
-              key={p.id ?? i}
-              panel={p}
-              width={dims.w}
-              index={i}
-              overflow={overflow}
-              progress={progress}
-              flip={i % 2 === 1}
-            />
+            <StoryPanel key={p.id ?? i} panel={p} width={dims.w} flip={i % 2 === 1} />
           ))}
         </motion.div>
 
         {/* Fixed section label */}
         <div className="pointer-events-none absolute left-5 top-5 sm:left-8 sm:top-8">
           {story.eyebrow && (
-            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80 backdrop-blur">
+            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
               {story.eyebrow}
             </span>
           )}
@@ -171,17 +163,12 @@ function panelColors(panel) {
   return { c1, hasGradient, gradient }
 }
 
-// One full-screen panel with parallaxing text + image. Memoised + driven by the
-// shared `progress` motion value, so scrolling never re-renders it in React.
-const StoryPanel = memo(function StoryPanel({ panel, width, index, overflow, progress, flip }) {
+// One full-screen panel. Fully static + memoised: it never re-renders while
+// scrolling, and has no per-frame transforms — only the parent track slides, as
+// a single composited layer. (Reveals/typewriter are IntersectionObserver-based,
+// not scroll-bound, so they don't cost anything per frame.)
+const StoryPanel = memo(function StoryPanel({ panel, width, flip }) {
   const { c1, hasGradient, gradient } = panelColors(panel)
-
-  // Parallax + dimming derived from scroll progress (compositor-driven, no
-  // React re-render). `delta` is 0 when this panel is centred.
-  const delta = (p) => (width ? index * width - p * overflow : 0)
-  const imgX = useTransform(progress, (p) => -delta(p) * 0.12)
-  const textX = useTransform(progress, (p) => delta(p) * 0.04)
-  const opacity = useTransform(progress, (p) => 1 - (width ? Math.min(1, Math.abs(delta(p)) / width) : 0) * 0.5)
 
   const image = panel.image ? (
     <img src={panel.image} alt={panel.heading || ''} draggable={false} className="h-full w-full object-cover" />
@@ -199,20 +186,14 @@ const StoryPanel = memo(function StoryPanel({ panel, width, index, overflow, pro
     : undefined
 
   return (
-    <motion.div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw', opacity }}>
+    <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
       <div
         className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-7 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
         }`}
       >
-        {/* Parallax (x) is on this motion wrapper; the reveal stagger is inside. */}
-        <motion.div className="w-full sm:flex-1" style={{ x: textX }}>
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: false, amount: 0.4 }}
-          >
+        <div className="w-full sm:flex-1">
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.4 }}>
             {panel.caption && (
               <motion.span
                 variants={riseItem}
@@ -239,19 +220,20 @@ const StoryPanel = memo(function StoryPanel({ panel, width, index, overflow, pro
               </motion.div>
             )}
           </motion.div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          className={`relative aspect-[4/5] shrink-0 ${SIZE[panel.size] || SIZE.md}`}
-          style={{ x: imgX }}
-        >
-          <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: gradient, opacity: 0.08 }} />
+        <div className={`relative aspect-[4/5] shrink-0 ${SIZE[panel.size] || SIZE.md}`}>
+          {/* Soft glow via a radial gradient — cheap, no expensive blur filter. */}
+          <div
+            className="pointer-events-none absolute -inset-8 rounded-[50%]"
+            style={{ background: `radial-gradient(closest-side, ${c1}, transparent)`, opacity: 0.18 }}
+          />
           <motion.div
             className="relative h-full w-full overflow-hidden rounded-3xl"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.7, ease: EASE }}
+            transition={{ duration: 0.6, ease: EASE }}
           >
             {panel.link ? (
               <PanelLink to={panel.link} className="block h-full w-full">
@@ -261,9 +243,9 @@ const StoryPanel = memo(function StoryPanel({ panel, width, index, overflow, pro
               image
             )}
           </motion.div>
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   )
 })
 
