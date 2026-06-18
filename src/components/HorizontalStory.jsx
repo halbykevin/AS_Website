@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion, useInView } from 'framer-motion'
 import { useScrollEl } from '../store/scroll.jsx'
 
 // Shared scroll-in reveal: text rises + fades as a panel enters view, staggered
@@ -191,12 +191,9 @@ function StoryPanel({ panel, width, delta, flip }) {
                 {panel.caption}
               </motion.span>
             )}
-            <motion.h3
-              variants={riseItem}
-              className="mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl"
-            >
-              {panel.heading}
-            </motion.h3>
+            <h3 className="mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
+              <Typewriter text={panel.heading} />
+            </h3>
             {panel.link && (
               <motion.div variants={riseItem}>
                 <PanelLink
@@ -305,6 +302,42 @@ function StoryCard({ panel }) {
     </PanelLink>
   ) : (
     card
+  )
+}
+
+// Types its text out character-by-character the first time it scrolls into
+// view, with a blinking caret. Reduced-motion users get the full text instantly.
+function Typewriter({ text = '', speed = 45, className = '' }) {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, amount: 0.6 })
+  const reduce = useReducedMotion()
+  const [count, setCount] = useState(0)
+  const done = count >= text.length
+
+  useEffect(() => {
+    if (reduce) return setCount(text.length)
+    if (!inView) return
+    setCount(0)
+    let i = 0
+    const id = setInterval(() => {
+      i += 1
+      setCount(i)
+      if (i >= text.length) clearInterval(id)
+    }, speed)
+    return () => clearInterval(id)
+  }, [inView, text, speed, reduce])
+
+  return (
+    <span ref={ref} aria-label={text} className={className}>
+      <span aria-hidden="true">{text.slice(0, count)}</span>
+      {!reduce && (
+        <span
+          aria-hidden="true"
+          className={`ml-[0.06em] inline-block w-[0.5ch] bg-current align-baseline ${done ? 'animate-blink' : ''}`}
+          style={{ height: '0.95em', transform: 'translateY(0.12em)' }}
+        />
+      )}
+    </span>
   )
 }
 

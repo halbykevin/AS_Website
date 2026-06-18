@@ -38,6 +38,11 @@ export default {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        // Blinking text caret for the typewriter headings.
+        blink: {
+          '0%, 49%': { opacity: '1' },
+          '50%, 100%': { opacity: '0' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.7s ease-out forwards',
@@ -45,6 +50,7 @@ export default {
         float: 'float 6s ease-in-out infinite',
         'pulse-ring': 'pulse-ring 2.5s ease-out infinite',
         marquee: 'marquee 40s linear infinite',
+        blink: 'blink 1s steps(1) infinite',
       },
     },
   },
