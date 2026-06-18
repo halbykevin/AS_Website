@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Select, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Select, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
-const STATUS = ['open', 'sold-out', 'coming-soon']
+const STATUS = [
+  { value: 'open', label: 'Open' },
+  { value: 'sold-out', label: 'Sold out' },
+  { value: 'coming-soon', label: 'Coming soon' },
+]
 const blank = {
   title: '', slug: '', date: '', time: '', venue: '', city: '',
   imageUrl: '', ticketUrl: '', status: 'open', excerpt: '', description: '', sort: 0, categoryId: '',
@@ -74,17 +78,17 @@ export default function EventsAdmin() {
   }
 
   async function remove(r) {
-    if (!confirm(`Delete event “${r.title}”? This also removes its reservations.`)) return
+    if (!confirm(`Delete event “${r.title}”? This cannot be undone.`)) return
     await adminApi.deleteEvent(r.id)
     await load()
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Events</h1>
-        {!editing && <Button onClick={startNew}>+ New event</Button>}
-      </div>
+      <PageHeader
+        title="Events"
+        actions={!editing && <Button onClick={startNew}>+ New event</Button>}
+      />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
@@ -101,9 +105,11 @@ export default function EventsAdmin() {
               <Field label="Venue"><TextInput value={form.venue} onChange={set('venue')} /></Field>
               <Field label="City"><TextInput value={form.city} onChange={set('city')} /></Field>
               <Field label="Status">
-                <Select value={form.status} onChange={set('status')}>
-                  {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
-                </Select>
+                <SegmentedControl
+                  value={form.status}
+                  onChange={(v) => setForm((f) => ({ ...f, status: v }))}
+                  options={STATUS}
+                />
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
               <Field label="Category" hint="Used for the category tiles & filtering on the site.">
@@ -117,7 +123,7 @@ export default function EventsAdmin() {
             </div>
             <Field
               label="Ticket link (URL)"
-              hint="Where the event card and the “Buy tickets” button send visitors (e.g. the Ticketing Box Office page). Leave empty to use the built-in reservation form."
+              hint="Included in the WhatsApp reservation message so customers have the original event page. Set the WhatsApp number in Site Settings → Contact."
             >
               <TextInput value={form.ticketUrl} onChange={set('ticketUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
             </Field>

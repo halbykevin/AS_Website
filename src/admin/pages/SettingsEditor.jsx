@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Toggle, Button, Banner } from '../ui.jsx'
+import {
+  Card, Field, TextInput, TextArea, Toggle, Button, Banner,
+  PageHeader, SegmentedControl, SaveBar,
+} from '../ui.jsx'
+
+const SECTIONS = [
+  { value: 'publish', label: 'Publish' },
+  { value: 'brand', label: 'Brand' },
+  { value: 'hero', label: 'Hero' },
+  { value: 'services', label: 'Services' },
+  { value: 'events', label: 'Events' },
+  { value: 'about', label: 'About' },
+  { value: 'contact', label: 'Contact' },
+  { value: 'store', label: 'AS Store' },
+]
 
 const empty = {
   brandName: '', legalName: '', tagline: '', logoUrl: '',
@@ -23,6 +37,7 @@ export default function SettingsEditor() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [section, setSection] = useState('publish')
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -97,13 +112,16 @@ export default function SettingsEditor() {
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Site Settings</h1>
-        <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
-      </div>
+      <PageHeader
+        title="Site Settings"
+        description="Manage the public content of the website. Changes go live as soon as you save."
+      />
+
+      <SegmentedControl value={section} onChange={setSection} options={SECTIONS} className="w-full" />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
+      {section === 'publish' && (
       <Card title="Publish">
         <Toggle
           checked={form.published}
@@ -112,7 +130,9 @@ export default function SettingsEditor() {
           description="When off, visitors see the Coming Soon page. Turn on to make the full site public."
         />
       </Card>
+      )}
 
+      {section === 'brand' && (
       <Card title="Brand">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Brand name"><TextInput value={form.brandName} onChange={set('brandName')} /></Field>
@@ -136,7 +156,9 @@ export default function SettingsEditor() {
           </Field>
         </div>
       </Card>
+      )}
 
+      {section === 'hero' && (
       <Card title="Hero (top of homepage)">
         <div className="space-y-4">
           <Field label="Eyebrow"><TextInput value={form.heroEyebrow} onChange={set('heroEyebrow')} /></Field>
@@ -152,14 +174,18 @@ export default function SettingsEditor() {
           </div>
         </div>
       </Card>
+      )}
 
+      {section === 'services' && (
       <Card title="Services section">
         <div className="space-y-4">
           <Field label="Heading"><TextInput value={form.servicesHeading} onChange={set('servicesHeading')} placeholder="What We Do" /></Field>
           <Field label="Subheading"><TextArea value={form.servicesSubheading} onChange={set('servicesSubheading')} /></Field>
         </div>
       </Card>
+      )}
 
+      {section === 'events' && (
       <Card title="Events section">
         <div className="space-y-4">
           <Field label="Heading"><TextInput value={form.eventsHeading} onChange={set('eventsHeading')} placeholder="Upcoming Events" /></Field>
@@ -168,7 +194,9 @@ export default function SettingsEditor() {
           </Field>
         </div>
       </Card>
+      )}
 
+      {section === 'about' && (
       <Card title="About">
         <div className="space-y-4">
           <Field label="Heading"><TextInput value={form.aboutHeading} onChange={set('aboutHeading')} /></Field>
@@ -193,7 +221,9 @@ export default function SettingsEditor() {
           </div>
         </div>
       </Card>
+      )}
 
+      {section === 'contact' && (
       <Card title="Contact">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Heading"><TextInput value={form.contactHeading} onChange={set('contactHeading')} placeholder="Get in touch" /></Field>
@@ -210,7 +240,9 @@ export default function SettingsEditor() {
           <Field label="Instagram handle"><TextInput value={form.contactInstagramHandle} onChange={set('contactInstagramHandle')} /></Field>
         </div>
       </Card>
+      )}
 
+      {section === 'store' && (
       <Card title="AS Store callout">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -223,10 +255,9 @@ export default function SettingsEditor() {
           </Field>
         </div>
       </Card>
+      )}
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
-      </div>
+      <SaveBar saving={saving} message="Edits across all tabs are saved together." />
     </form>
   )
 }

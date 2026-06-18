@@ -19,7 +19,6 @@ const AdminLayout = lazy(() => import('./admin/AdminLayout.jsx'))
 const SettingsEditor = lazy(() => import('./admin/pages/SettingsEditor.jsx'))
 const ServicesAdmin = lazy(() => import('./admin/pages/ServicesAdmin.jsx'))
 const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
-const ReservationsAdmin = lazy(() => import('./admin/pages/ReservationsAdmin.jsx'))
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
 const SectionsAdmin = lazy(() => import('./admin/pages/SectionsAdmin.jsx'))
 const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
@@ -72,7 +71,6 @@ export default function App() {
               <Route path="events" element={<EventsAdmin />} />
               <Route path="categories" element={<CategoriesAdmin />} />
               <Route path="store" element={<StoreAdmin />} />
-              <Route path="reservations" element={<ReservationsAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="scraper" element={<ScraperAdmin />} />
             </Route>

@@ -341,13 +341,6 @@ export async function loadSite() {
   }
 }
 
-export async function createReservation({ eventRecordId, name, email, phone, quantity }) {
-  return request('/api/reservations', {
-    method: 'POST',
-    body: { eventId: eventRecordId, name, email, phone, quantity: Number(quantity) },
-  })
-}
-
 // ---------------- Admin auth ----------------
 
 export async function adminLogin(email, password) {
@@ -386,10 +379,6 @@ export const adminApi = {
   createCategory: (data) => request('/api/categories', { method: 'POST', body: data, authed: true }),
   updateCategory: (id, data) => request(`/api/categories/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteCategory: (id) => request(`/api/categories/${id}`, { method: 'DELETE', authed: true }),
-
-  listReservations: () => request('/api/reservations', { authed: true }),
-  updateReservation: (id, data) => request(`/api/reservations/${id}`, { method: 'PATCH', body: data, authed: true }),
-  deleteReservation: (id) => request(`/api/reservations/${id}`, { method: 'DELETE', authed: true }),
 
   getPopup: () => request('/api/popup'),
   savePopup: (data) => request('/api/popup', { method: 'PUT', body: data, authed: true }),

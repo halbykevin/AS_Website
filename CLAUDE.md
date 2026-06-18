@@ -1,6 +1,8 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and lets visitors **reserve spots at upcoming events** (reservations powered by *Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events/reservations, and run a **web scraper** that pulls product data from e-commerce pages and downloads it (JSON/CSV/Excel/HTML).
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (*Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events, and run a **web scraper** that pulls product data from e-commerce pages and downloads it (JSON/CSV/Excel/HTML).
+
+> The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
 
 ## Architecture
 
@@ -29,8 +31,9 @@ Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` 
 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
 
-Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag),
-`services`, `events` (each has a `ticket_url` — cards & "Buy tickets" open that link — plus an
+Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag +
+`whatsapp_number` used to build the event reservation WhatsApp links),
+`services`, `events` (each has a `ticket_url` — included in the WhatsApp reservation message — plus an
 optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
 Ticketing-Box-Office-synced rows have `source`/`external_id` for idempotent re-sync),
 `categories` (event categories shown as image tiles:
@@ -42,11 +45,11 @@ the banner then borrows that event's image/title/link, resolved client-side in `
 enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
 `delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
 frontend stores in localStorage to show it once),
-`reservations`. Created by [server/src/migrate.js](server/src/migrate.js);
+`reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
-Public can read content + POST a reservation; everything else needs a Bearer token.
+Public can read content; everything else needs a Bearer token.
 
 ## Web scraper
 
@@ -85,7 +88,7 @@ output back for download (`archiver` zips the whole folder, images included).
 The site never hard-depends on the backend:
 
 1. [src/content/site.js](src/content/site.js) + [src/data/events.js](src/data/events.js) — **static defaults** (also the fallback if the API is down/empty).
-2. [src/lib/api.js](src/lib/api.js) — HTTP client: public loaders (`loadSite`, `createReservation`), `auth` (token in localStorage), and `adminApi` (CRUD + `upload`). Maps API JSON → component shapes.
+2. [src/lib/api.js](src/lib/api.js) — HTTP client: public loader (`loadSite`), `whatsappBookingUrl` (builds the pre-filled event reservation links), `auth` (token in localStorage), and `adminApi` (CRUD + `upload`). Maps API JSON → component shapes.
 3. [src/store/content.jsx](src/store/content.jsx) — `ContentProvider` / `useContent()` loads everything once on startup.
 4. Components call `useContent()`; they don't import the static files directly.
 
@@ -122,7 +125,7 @@ src/
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, ReservationsAdmin, PopupAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, PopupAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -135,7 +138,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/reservations`, `/admin/popup`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/popup`, `/admin/scraper`
 
 ## Brand
 

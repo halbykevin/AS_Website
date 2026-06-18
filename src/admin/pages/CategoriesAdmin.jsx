@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
 
 const blank = { name: '', slug: '', imageUrl: '', sort: 0, visible: true }
 
@@ -71,10 +71,10 @@ export default function CategoriesAdmin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Categories</h1>
-        {!editing && <Button onClick={startNew}>+ New category</Button>}
-      </div>
+      <PageHeader
+        title="Categories"
+        actions={!editing && <Button onClick={startNew}>+ New category</Button>}
+      />
 
       <Banner kind="info">
         Categories appear as image tiles on the homepage and the Events page. Assign events to a

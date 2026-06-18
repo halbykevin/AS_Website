@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminApi, downloadScrapeFile, downloadScrapeZip } from '../../lib/api.js'
-import { Card, Field, TextInput, Select, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, Select, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
 
 const FORMATS = [
   { key: 'json', label: 'JSON' },
@@ -106,13 +106,10 @@ export default function ScraperAdmin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Web Scraper</h1>
-        <p className="mt-1 text-sm text-as-charcoal/55">
-          Two tools: pull product data from any e-commerce page, or sync events from Ticketing Box
-          Office straight into your site.
-        </p>
-      </div>
+      <PageHeader
+        title="Web Scraper"
+        description="Two tools: pull product data from any e-commerce page, or sync events from Ticketing Box Office straight into your site."
+      />
 
       {/* Mode switch */}
       <div className="flex flex-wrap gap-2">

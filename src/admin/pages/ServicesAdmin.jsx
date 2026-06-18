@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Select, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Select, Button, Banner, PageHeader } from '../ui.jsx'
 
 const ICONS = ['signal', 'chip', 'ticket', 'support', 'store']
 const blank = { title: '', description: '', icon: 'chip', sort: 0 }
@@ -61,10 +61,10 @@ export default function ServicesAdmin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Services</h1>
-        {!editing && <Button onClick={startNew}>+ New service</Button>}
-      </div>
+      <PageHeader
+        title="Services"
+        actions={!editing && <Button onClick={startNew}>+ New service</Button>}
+      />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 

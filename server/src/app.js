@@ -65,10 +65,6 @@ const sectionJson = (r) => ({
   id: r.id, eyebrow: r.eyebrow, heading: r.heading, body: r.body, imageUrl: r.image_url,
   buttonLabel: r.button_label, buttonUrl: r.button_url, theme: r.theme, sort: r.sort, visible: r.visible,
 })
-const reservationJson = (r) => ({
-  id: r.id, eventId: r.event_id, eventTitle: r.event_title, name: r.name, email: r.email,
-  phone: r.phone, quantity: r.quantity, status: r.status, created: r.created_at,
-})
 const popupJson = (r) => ({
   enabled: r.enabled, title: r.title, body: r.body, imageUrl: r.image_url,
   linkUrl: r.link_url, linkLabel: r.link_label, trigger: r.trigger_type,
@@ -404,45 +400,6 @@ app.put('/api/store-products/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/store-products/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM store_products WHERE id=$1', [req.params.id])
-  res.status(204).end()
-}))
-
-// ========================= Reservations =========================
-// Public: submit a reservation.
-app.post('/api/reservations', ah(async (req, res) => {
-  const b = req.body || {}
-  if (!b.eventId || !b.name || !b.email) return res.status(400).json({ error: 'Missing required fields' })
-  const ev = await query('SELECT id FROM events WHERE id=$1', [b.eventId])
-  if (!ev.rows[0]) return res.status(400).json({ error: 'Unknown event' })
-  const { rows } = await query(
-    `INSERT INTO reservations (event_id, name, email, phone, quantity, status)
-     VALUES ($1,$2,$3,$4,$5,'new') RETURNING *`,
-    [b.eventId, b.name, b.email, b.phone || '', Number(b.quantity) || 1]
-  )
-  res.status(201).json(reservationJson(rows[0]))
-}))
-
-// Admin: list / update status / delete.
-app.get('/api/reservations', requireAuth, ah(async (req, res) => {
-  const { rows } = await query(
-    `SELECT r.*, e.title AS event_title
-       FROM reservations r LEFT JOIN events e ON e.id = r.event_id
-      ORDER BY r.created_at DESC`
-  )
-  res.json(rows.map(reservationJson))
-}))
-
-app.patch('/api/reservations/:id', requireAuth, ah(async (req, res) => {
-  const { rows } = await query(
-    'UPDATE reservations SET status=$1 WHERE id=$2 RETURNING *',
-    [req.body?.status || 'new', req.params.id]
-  )
-  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
-  res.json(reservationJson(rows[0]))
-}))
-
-app.delete('/api/reservations/:id', requireAuth, ah(async (req, res) => {
-  await query('DELETE FROM reservations WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

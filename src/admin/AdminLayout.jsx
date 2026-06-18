@@ -10,7 +10,6 @@ const links = [
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/categories', label: 'Categories' },
   { to: '/admin/store', label: 'AS Store Showcase' },
-  { to: '/admin/reservations', label: 'Reservations' },
   { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/scraper', label: 'Web Scraper' },
 ]

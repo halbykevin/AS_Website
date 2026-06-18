@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, Select, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, Select, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
 
 const blank = { title: '', subtitle: '', imageUrl: '', linkUrl: '', sort: 0, active: true, eventId: '', focalX: 50, focalY: 50 }
 
@@ -124,10 +124,10 @@ export default function BannersAdmin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Banners</h1>
-        {!editing && <Button onClick={startNew}>+ New banner</Button>}
-      </div>
+      <PageHeader
+        title="Banners"
+        actions={!editing && <Button onClick={startNew}>+ New banner</Button>}
+      />
 
       <Banner kind="info">
         Banners are the homepage slideshow. Add them straight from your events below (each uses the

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
 
 const blankProduct = { name: '', imageUrl: '', linkUrl: '', sort: 0, visible: true }
 const blankShowcase = { enabled: true, eyebrow: '', heading: '', subheading: '', visibleCount: 8 }
@@ -101,7 +101,7 @@ export default function StoreAdmin() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold text-as-charcoal">AS Store Showcase</h1>
+      <PageHeader title="AS Store Showcase" />
 
       <Banner kind="info">
         The product strip at the very top of the homepage. Edit the section heading below, then add

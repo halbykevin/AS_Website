@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Select, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
 const blank = {
   enabled: false,
@@ -80,12 +80,10 @@ export default function PopupAdmin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Popup</h1>
-        <p className="mt-1 text-sm text-as-charcoal/55">
-          A one-time popup (announcement or ad) shown to visitors on the live site.
-        </p>
-      </div>
+      <PageHeader
+        title="Popup"
+        description="A one-time popup (announcement or ad) shown to visitors on the live site."
+      />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
@@ -135,10 +133,11 @@ export default function PopupAdmin() {
         <Card title="When to show">
           <div className="space-y-4">
             <Field label="Trigger">
-              <Select value={form.trigger} onChange={set('trigger')}>
-                <option value="load">After the page opens (timer)</option>
-                <option value="scroll">When the visitor scrolls down</option>
-              </Select>
+              <SegmentedControl
+                value={form.trigger}
+                onChange={(v) => setForm((f) => ({ ...f, trigger: v }))}
+                options={[{ value: 'load', label: 'After page opens (timer)' }, { value: 'scroll', label: 'On scroll' }]}
+              />
             </Field>
             {form.trigger === 'load' ? (
               <Field label="Delay (seconds)" hint="How long after the page loads before the popup appears.">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Select, Toggle, Button, Banner } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
 const blank = {
   eyebrow: '', heading: '', body: '', imageUrl: '',
@@ -75,10 +75,10 @@ export default function SectionsAdmin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-as-charcoal">Custom Sections</h1>
-        {!editing && <Button onClick={startNew}>+ New section</Button>}
-      </div>
+      <PageHeader
+        title="Custom Sections"
+        actions={!editing && <Button onClick={startNew}>+ New section</Button>}
+      />
 
       <Banner kind="info">
         Sections you create here are added to the bottom of the homepage, in sort order. Each can
@@ -102,10 +102,11 @@ export default function SectionsAdmin() {
                 <TextInput value={form.buttonUrl} onChange={set('buttonUrl')} placeholder="https://... or /events" />
               </Field>
               <Field label="Background">
-                <Select value={form.theme} onChange={set('theme')}>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark (charcoal)</option>
-                </Select>
+                <SegmentedControl
+                  value={form.theme}
+                  onChange={(v) => setForm((f) => ({ ...f, theme: v }))}
+                  options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark (charcoal)' }]}
+                />
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
             </div>
