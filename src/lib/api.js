@@ -290,6 +290,8 @@ export function mapStoryPanel(p) {
     caption: p.caption || '',
     image: p.imageUrl || '',
     accent: p.accent || '',
+    accent2: p.accent2 || '',
+    gradientType: p.gradientType || 'linear',
     link: p.linkUrl || '',
     size: p.size || 'md',
     visible: p.visible !== false,

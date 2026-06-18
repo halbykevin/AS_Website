@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useReducedMotion, useInView } from 'framer-motion'
+import { motion, useReducedMotion, useInView, useMotionValue, useTransform } from 'framer-motion'
 import { useScrollEl } from '../store/scroll.jsx'
 
 // Shared scroll-in reveal: text rises + fades as a panel enters view, staggered
@@ -70,9 +70,14 @@ function PinnedStory({ story }) {
   const panels = story.panels
   const n = panels.length
   const [dims, setDims] = useState({ w: 0, h: 0 })
-  const [progress, setProgress] = useState(0)
 
   const overflow = dims.w * (n - 1) // total horizontal distance to travel
+
+  // Scroll progress lives in a motion value, NOT React state — updating it on
+  // scroll drives the transforms straight on the compositor with zero React
+  // re-renders, which keeps it smooth on mobile.
+  const progress = useMotionValue(0)
+  const trackX = useTransform(progress, (p) => -(p * overflow))
 
   // The pinned stage matches the scroll container's visible size.
   useLayoutEffect(() => {
@@ -95,9 +100,9 @@ function PinnedStory({ story }) {
       raf = requestAnimationFrame(() => {
         raf = 0
         const wrap = wrapRef.current
-        if (!wrap || overflow <= 0) return setProgress(0)
+        if (!wrap || overflow <= 0) return progress.set(0)
         const rel = wrap.getBoundingClientRect().top - sc.getBoundingClientRect().top
-        setProgress(Math.min(1, Math.max(0, -rel / overflow)))
+        progress.set(Math.min(1, Math.max(0, -rel / overflow)))
       })
     }
     onScroll()
@@ -106,9 +111,7 @@ function PinnedStory({ story }) {
       sc.removeEventListener('scroll', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [scrollRef, overflow])
-
-  const translateX = -(progress * overflow)
+  }, [scrollRef, overflow, progress])
 
   return (
     <section
@@ -118,15 +121,22 @@ function PinnedStory({ story }) {
       style={{ height: dims.h ? dims.h + overflow : undefined, background: DARK }}
     >
       <div className="sticky top-0 overflow-hidden" style={{ height: dims.h || '100dvh' }}>
-        <div
+        <motion.div
           className="flex h-full will-change-transform"
-          style={{ width: dims.w ? dims.w * n : '100%', transform: `translate3d(${translateX}px,0,0)` }}
+          style={{ width: dims.w ? dims.w * n : '100%', x: trackX }}
         >
-          {panels.map((p, i) => {
-            const delta = dims.w ? i * dims.w + translateX : 0 // 0 when this panel is centered
-            return <StoryPanel key={p.id ?? i} panel={p} width={dims.w} delta={delta} flip={i % 2 === 1} />
-          })}
-        </div>
+          {panels.map((p, i) => (
+            <StoryPanel
+              key={p.id ?? i}
+              panel={p}
+              width={dims.w}
+              index={i}
+              overflow={overflow}
+              progress={progress}
+              flip={i % 2 === 1}
+            />
+          ))}
+        </motion.div>
 
         {/* Fixed section label */}
         <div className="pointer-events-none absolute left-5 top-5 sm:left-8 sm:top-8">
@@ -138,44 +148,65 @@ function PinnedStory({ story }) {
           {story.heading && <h2 className="mt-3 max-w-xs text-lg font-bold text-white/90">{story.heading}</h2>}
         </div>
 
-        {/* Scroll progress bar */}
+        {/* Scroll progress bar (scaleX is composited — no layout thrash) */}
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
-          <div className="h-full bg-as-red" style={{ width: `${progress * 100}%` }} />
+          <motion.div className="h-full origin-left bg-as-red" style={{ scaleX: progress }} />
         </div>
       </div>
     </section>
   )
 }
 
-// One full-screen panel with parallaxing text + image.
-function StoryPanel({ panel, width, delta, flip }) {
-  const accent = panel.accent || DEFAULT_ACCENT
-  const imgShift = -delta * 0.12
-  const textShift = delta * 0.04
-  const off = width ? Math.min(1, Math.abs(delta) / width) : 0
-  const opacity = 1 - off * 0.5
+// Resolve a panel's accent into a solid colour or a 2-colour gradient.
+function panelColors(panel) {
+  const c1 = panel.accent || DEFAULT_ACCENT
+  const c2 = panel.accent2
+  const type = panel.gradientType || 'linear'
+  const hasGradient = Boolean(c2) && type !== 'solid'
+  const gradient = !hasGradient
+    ? c1
+    : type === 'radial'
+      ? `radial-gradient(circle at 30% 30%, ${c1}, ${c2})`
+      : `linear-gradient(120deg, ${c1}, ${c2})`
+  return { c1, hasGradient, gradient }
+}
+
+// One full-screen panel with parallaxing text + image. Memoised + driven by the
+// shared `progress` motion value, so scrolling never re-renders it in React.
+const StoryPanel = memo(function StoryPanel({ panel, width, index, overflow, progress, flip }) {
+  const { c1, hasGradient, gradient } = panelColors(panel)
+
+  // Parallax + dimming derived from scroll progress (compositor-driven, no
+  // React re-render). `delta` is 0 when this panel is centred.
+  const delta = (p) => (width ? index * width - p * overflow : 0)
+  const imgX = useTransform(progress, (p) => -delta(p) * 0.12)
+  const textX = useTransform(progress, (p) => delta(p) * 0.04)
+  const opacity = useTransform(progress, (p) => 1 - (width ? Math.min(1, Math.abs(delta(p)) / width) : 0) * 0.5)
 
   const image = panel.image ? (
     <img src={panel.image} alt={panel.heading || ''} draggable={false} className="h-full w-full object-cover" />
   ) : (
     <div
       className="flex h-full w-full items-center justify-center"
-      style={{ background: `linear-gradient(135deg, ${accent}33, #ffffff10)` }}
+      style={{ background: hasGradient ? gradient : `linear-gradient(135deg, ${c1}55, ${c1}10)` }}
     >
-      <span className="px-6 text-center text-xl font-bold uppercase tracking-wide text-white/70">{panel.heading}</span>
+      <span className="px-6 text-center text-xl font-bold uppercase tracking-wide text-white/80">{panel.heading}</span>
     </div>
   )
 
+  const headingStyle = hasGradient
+    ? { backgroundImage: gradient, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }
+    : undefined
+
   return (
-    <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw', opacity }}>
+    <motion.div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw', opacity }}>
       <div
         className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-7 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
         }`}
       >
-        {/* Parallax wrapper (transform) is separate from the motion wrapper so
-            the two don't fight over `transform`. */}
-        <div className="w-full sm:flex-1" style={{ transform: `translateX(${textShift}px)` }}>
+        {/* Parallax (x) is on this motion wrapper; the reveal stagger is inside. */}
+        <motion.div className="w-full sm:flex-1" style={{ x: textX }}>
           <motion.div
             variants={stagger}
             initial="hidden"
@@ -186,13 +217,16 @@ function StoryPanel({ panel, width, delta, flip }) {
               <motion.span
                 variants={riseItem}
                 className="block text-sm font-semibold uppercase tracking-widest"
-                style={{ color: accent }}
+                style={{ color: c1 }}
               >
                 {panel.caption}
               </motion.span>
             )}
-            <h3 className="mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
-              <Typewriter text={panel.heading} />
+            <h3
+              className={`mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl ${hasGradient ? '' : 'text-white'}`}
+              style={headingStyle}
+            >
+              <Typewriter text={panel.heading} caretColor={hasGradient ? c1 : 'currentColor'} />
             </h3>
             {panel.link && (
               <motion.div variants={riseItem}>
@@ -205,13 +239,13 @@ function StoryPanel({ panel, width, delta, flip }) {
               </motion.div>
             )}
           </motion.div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
           className={`relative aspect-[4/5] shrink-0 ${SIZE[panel.size] || SIZE.md}`}
-          style={{ transform: `translateX(${imgShift}px)` }}
+          style={{ x: imgX }}
         >
-          <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: `${accent}0d` }} />
+          <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: gradient, opacity: 0.08 }} />
           <motion.div
             className="relative h-full w-full overflow-hidden rounded-3xl"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -227,11 +261,11 @@ function StoryPanel({ panel, width, delta, flip }) {
               image
             )}
           </motion.div>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
-}
+})
 
 // ---- Mobile / reduced motion: swipe carousel ------------------------------
 function CarouselStory({ story }) {
@@ -307,7 +341,7 @@ function StoryCard({ panel }) {
 
 // Types its text out character-by-character the first time it scrolls into
 // view, with a blinking caret. Reduced-motion users get the full text instantly.
-function Typewriter({ text = '', speed = 45, className = '' }) {
+function Typewriter({ text = '', speed = 45, className = '', caretColor = 'currentColor' }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, amount: 0.6 })
   const reduce = useReducedMotion()
@@ -330,11 +364,12 @@ function Typewriter({ text = '', speed = 45, className = '' }) {
   return (
     <span ref={ref} aria-label={text} className={className}>
       <span aria-hidden="true">{text.slice(0, count)}</span>
-      {!reduce && (
+      {/* Caret shows only while typing — it disappears once the line finishes. */}
+      {!reduce && !done && (
         <span
           aria-hidden="true"
-          className={`ml-[0.06em] inline-block w-[0.5ch] bg-current align-baseline ${done ? 'animate-blink' : ''}`}
-          style={{ height: '0.95em', transform: 'translateY(0.12em)' }}
+          className="ml-[0.06em] inline-block w-[0.5ch] align-baseline"
+          style={{ background: caretColor, height: '0.95em', transform: 'translateY(0.12em)' }}
         />
       )}
     </span>

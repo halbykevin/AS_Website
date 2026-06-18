@@ -8,7 +8,15 @@ const SIZES = [
   { value: 'lg', label: 'Large' },
   { value: 'xl', label: 'Extra large' },
 ]
-const blankPanel = { heading: '', caption: '', imageUrl: '', accent: '', linkUrl: '', size: 'md', sort: 0, visible: true }
+const GRADIENTS = [
+  { value: 'solid', label: 'Solid' },
+  { value: 'linear', label: 'Linear' },
+  { value: 'radial', label: 'Radial' },
+]
+const blankPanel = {
+  heading: '', caption: '', imageUrl: '', accent: '', accent2: '', gradientType: 'solid',
+  linkUrl: '', size: 'md', sort: 0, visible: true,
+}
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
 
 export default function StoryAdmin() {
@@ -71,6 +79,8 @@ export default function StoryAdmin() {
       caption: r.caption || '',
       imageUrl: r.imageUrl || '',
       accent: r.accent || '',
+      accent2: r.accent2 || '',
+      gradientType: r.gradientType || 'solid',
       linkUrl: r.linkUrl || '',
       size: r.size || 'md',
       sort: r.sort || 0,
@@ -165,23 +175,44 @@ export default function StoryAdmin() {
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
             </div>
+            <Field label="Colour style" hint="Solid, or a 2-colour gradient applied to the heading + glow.">
+              <SegmentedControl
+                value={form.gradientType}
+                onChange={(v) => setForm((f) => ({ ...f, gradientType: v }))}
+                options={GRADIENTS}
+              />
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Accent colour" hint="Used for the caption + glow. Leave empty for brand red.">
+              <Field label={form.gradientType === 'solid' ? 'Colour' : 'Colour 1 (gradient start)'} hint="Also the caption + glow colour.">
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={form.accent || '#A41E22'}
                     onChange={set('accent')}
                     className="h-10 w-12 shrink-0 cursor-pointer rounded border border-black/10 bg-white"
-                    aria-label="Accent colour"
+                    aria-label="Colour 1"
                   />
                   <TextInput value={form.accent} onChange={set('accent')} placeholder="#A41E22" />
                 </div>
               </Field>
-              <Field label="Link (optional)" hint="Where the panel’s image/button goes. Path (/events) or full URL.">
-                <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="/events or https://…" />
-              </Field>
+              {form.gradientType !== 'solid' && (
+                <Field label="Colour 2 (gradient end)">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={form.accent2 || '#C53A3F'}
+                      onChange={set('accent2')}
+                      className="h-10 w-12 shrink-0 cursor-pointer rounded border border-black/10 bg-white"
+                      aria-label="Colour 2"
+                    />
+                    <TextInput value={form.accent2} onChange={set('accent2')} placeholder="#C53A3F" />
+                  </div>
+                </Field>
+              )}
             </div>
+            <Field label="Link (optional)" hint="Where the panel’s image/button goes. Path (/events) or full URL.">
+              <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="/events or https://…" />
+            </Field>
             <Field label="Image size" hint="Controls how big this panel's image is — mix sizes for variety. Scales on mobile too.">
               <SegmentedControl
                 value={form.size}
