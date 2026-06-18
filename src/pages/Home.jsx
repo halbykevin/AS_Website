@@ -3,18 +3,18 @@ import Icon from '../components/Icon.jsx'
 import EventCard from '../components/EventCard.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
 import CategoryTiles from '../components/CategoryTiles.jsx'
-import StoreShowcase from '../components/StoreShowcase.jsx'
+import HorizontalStory from '../components/HorizontalStory.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Home() {
-  const { hero, services, eventsSection, store, storeShowcase, about, ticketing, events, banners, sections, categories } = useContent()
+  const { hero, services, eventsSection, store, story, about, ticketing, events, banners, sections, categories } = useContent()
   const upcoming = events.slice(0, 3)
 
   return (
     <>
-      {/* ---------------- AS Store showcase (top of page, admin-managed) ---------------- */}
-      <StoreShowcase showcase={storeShowcase} storeUrl={store.url} variant="marquee" />
+      {/* ---------------- Horizontal scroll-story (top of page, admin-managed) ---------------- */}
+      <HorizontalStory story={story} />
 
       {/* ---------------- Banner slideshow (admin-managed) ---------------- */}
       <BannerSlider banners={banners} />

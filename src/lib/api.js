@@ -69,6 +69,7 @@ export const defaultContent = {
   sections: [],
   categories: [],
   popup: null,
+  story: null,
   published: false,
 }
 
@@ -282,6 +283,31 @@ function mapStoreShowcase(meta, products) {
   }
 }
 
+export function mapStoryPanel(p) {
+  return {
+    id: p.id,
+    heading: p.heading || '',
+    caption: p.caption || '',
+    image: p.imageUrl || '',
+    accent: p.accent || '',
+    link: p.linkUrl || '',
+    visible: p.visible !== false,
+  }
+}
+
+// The horizontal scroll-story: section copy + its ordered, visible panels.
+// Hidden (null) unless enabled with at least one visible panel.
+function mapStory(meta, panels) {
+  const list = Array.isArray(panels) ? panels.map(mapStoryPanel).filter((p) => p.visible) : []
+  if (!meta || meta.enabled === false || list.length === 0) return null
+  return {
+    eyebrow: meta.eyebrow || '',
+    heading: meta.heading || '',
+    subheading: meta.subheading || '',
+    panels: list,
+  }
+}
+
 export function mapPopup(p) {
   if (!p) return null
   return {
@@ -301,7 +327,7 @@ export function mapPopup(p) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts] =
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels] =
       await Promise.all([
         request('/api/settings'),
         request('/api/services'),
@@ -312,6 +338,8 @@ export async function loadSite() {
         request('/api/popup').catch(() => null),
         request('/api/store-showcase').catch(() => null),
         request('/api/store-products').catch(() => []),
+        request('/api/story').catch(() => null),
+        request('/api/story-panels').catch(() => []),
       ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -335,6 +363,7 @@ export async function loadSite() {
     content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter((c) => c.visible) : []
     content.popup = mapPopup(popup)
     content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
+    content.story = mapStory(storyMeta, storyPanels)
     return { content, events: mappedEvents }
   } catch {
     return null
@@ -389,6 +418,13 @@ export const adminApi = {
   createStoreProduct: (data) => request('/api/store-products', { method: 'POST', body: data, authed: true }),
   updateStoreProduct: (id, data) => request(`/api/store-products/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteStoreProduct: (id) => request(`/api/store-products/${id}`, { method: 'DELETE', authed: true }),
+
+  getStory: () => request('/api/story'),
+  saveStory: (data) => request('/api/story', { method: 'PUT', body: data, authed: true }),
+  listStoryPanels: () => request('/api/story-panels'),
+  createStoryPanel: (data) => request('/api/story-panels', { method: 'POST', body: data, authed: true }),
+  updateStoryPanel: (id, data) => request(`/api/story-panels/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteStoryPanel: (id) => request(`/api/story-panels/${id}`, { method: 'DELETE', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

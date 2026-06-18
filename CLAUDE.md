@@ -121,11 +121,11 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
-  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, SitePopup
+  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, PopupAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -138,7 +138,9 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/popup`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/scraper`
+
+The homepage opens with an admin-managed **horizontal scroll-story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a GSAP-style pinned section that turns vertical scroll into horizontal panel travel on desktop, and a swipe carousel on mobile. It reads the custom scroll container via `useScrollEl()`. Hidden until enabled with ≥1 visible panel.
 
 ## Brand
 

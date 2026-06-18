@@ -78,6 +78,14 @@ const storeProductJson = (r) => ({
   id: r.id, name: r.name, imageUrl: r.image_url, linkUrl: r.link_url,
   sort: r.sort, visible: r.visible,
 })
+const storyJson = (r) => ({
+  enabled: r.enabled, eyebrow: r.eyebrow, heading: r.heading,
+  subheading: r.subheading, updatedAt: r.updated_at,
+})
+const storyPanelJson = (r) => ({
+  id: r.id, heading: r.heading, caption: r.caption, imageUrl: r.image_url,
+  accent: r.accent, linkUrl: r.link_url, sort: r.sort, visible: r.visible,
+})
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
@@ -400,6 +408,57 @@ app.put('/api/store-products/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/store-products/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM store_products WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Story (horizontal scroll) =========================
+// Public read; admin edits the singleton section row + manages the panels.
+app.get('/api/story', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM story WHERE id = 1')
+  res.json(rows[0] ? storyJson(rows[0]) : null)
+}))
+
+app.put('/api/story', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const { rows } = await query(
+    `UPDATE story SET enabled=$1, eyebrow=$2, heading=$3, subheading=$4, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [b.enabled === undefined ? true : Boolean(b.enabled), b.eyebrow || '', b.heading || '', b.subheading || '']
+  )
+  res.json(storyJson(rows[0]))
+}))
+
+app.get('/api/story-panels', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM story_panels ORDER BY sort ASC, id ASC')
+  res.json(rows.map(storyPanelJson))
+}))
+
+const storyPanelParams = (b) => [
+  b.heading || '', b.caption || '', b.imageUrl || '', b.accent || '', b.linkUrl || '',
+  Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/story-panels', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO story_panels (heading, caption, image_url, accent, link_url, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    storyPanelParams(req.body || {})
+  )
+  res.status(201).json(storyPanelJson(rows[0]))
+}))
+
+app.put('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE story_panels SET heading=$1, caption=$2, image_url=$3, accent=$4, link_url=$5, sort=$6, visible=$7
+     WHERE id=$8 RETURNING *`,
+    [...storyPanelParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(storyPanelJson(rows[0]))
+}))
+
+app.delete('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM story_panels WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

@@ -129,6 +129,30 @@ CREATE TABLE IF NOT EXISTS store_products (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Horizontal scroll-story: a singleton row of section copy + ordered panels
+-- (each a heading + image) shown in the pinned horizontal-scroll homepage hero.
+CREATE TABLE IF NOT EXISTS story (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT true,
+  eyebrow TEXT DEFAULT '',
+  heading TEXT DEFAULT '',
+  subheading TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT story_singleton CHECK (id = 1)
+);
+
+CREATE TABLE IF NOT EXISTS story_panels (
+  id SERIAL PRIMARY KEY,
+  heading TEXT DEFAULT '',
+  caption TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  accent TEXT DEFAULT '',
+  link_url TEXT DEFAULT '',
+  sort INTEGER DEFAULT 0,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;
@@ -194,6 +218,12 @@ INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 INSERT INTO store_showcase (id, enabled, eyebrow, heading, subheading, visible_count)
 VALUES (1, true, 'AS Store', 'A glimpse of the AS Store',
   'The latest tech, gadgets and accessories — launching soon.', 8)
+ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton story row exists (no panels yet, so it stays hidden).
+INSERT INTO story (id, enabled, eyebrow, heading, subheading)
+VALUES (1, true, 'AS Company', 'Built for the moment',
+  'Keep scrolling to explore what we bring to life.')
 ON CONFLICT (id) DO NOTHING;
 `
 
