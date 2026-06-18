@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Reveal from './Reveal.jsx'
 
@@ -8,9 +8,10 @@ import Reveal from './Reveal.jsx'
 // AS Store (or the "coming soon" page while the store isn't live yet).
 //
 // `variant` lets us trial different looks and pick the most eye-catching one:
-//   'marquee' — auto-scrolling row that pauses + lifts cards on hover (default)
+//   'marquee' — shuffling card stack: a tilted deck that auto-tosses the front
+//               card and lets you swipe/drag to throw it (default)
 //   'grid'    — responsive reveal-on-scroll grid
-//   'both'    — marquee on top, grid below
+//   'both'    — card stack on top, grid below
 // ---------------------------------------------------------------------------
 
 function shuffle(arr) {
@@ -72,7 +73,7 @@ export default function StoreShowcase({ showcase, storeUrl = '', variant = 'marq
 
         {/* Animation */}
         {(variant === 'marquee' || variant === 'both') && (
-          <Marquee products={products} href={href} external={external} />
+          <CardStack products={products} href={href} external={external} />
         )}
         {(variant === 'grid' || variant === 'both') && (
           <div className="mx-auto mt-8 max-w-7xl px-5 sm:px-8">
@@ -90,91 +91,71 @@ export default function StoreShowcase({ showcase, storeUrl = '', variant = 'marq
   )
 }
 
-// Auto-scrolling, drag/swipe-able row. The track holds the products twice, so
-// when the scroll position passes the half-way point we subtract it for a
-// seamless loop. Auto-scroll runs on rAF and pauses only while the user is
-// actively dragging/swiping — it resumes the moment they let go or leave.
-const AUTO_SPEED = 0.6 // px per frame (~36px/s at 60fps)
+// A shuffling deck of product "cards" stacked like tilted photos. The front
+// card auto-tosses away every few seconds and the next rises to the top; you
+// can also drag/swipe the top card to throw it. Pauses on hover, and respects
+// prefers-reduced-motion (manual swipe still works, no auto-shuffle).
+const AUTO_MS = 3200 // time the front card sits before it auto-tosses
+const TOSS_THRESHOLD = 90 // px you must drag before release throws the card
 
-function Marquee({ products, href, external }) {
-  const loop = [...products, ...products]
-  const scrollerRef = useRef(null)
-  const pausedRef = useRef(false) // true while the pointer is down on the track
-  const resumeAtRef = useRef(0) // don't auto-scroll again until this timestamp (lets touch inertia settle)
-  const dragRef = useRef(null) // mouse drag state: { startX, startScroll }
-  const movedRef = useRef(false) // did this gesture move? (suppresses the click)
+function CardStack({ products, href, external }) {
+  const n = products.length
+  // Keep the just-tossed card off the visible depths so it never animates back
+  // into the stack on small catalogs.
+  const visible = Math.max(1, Math.min(3, n - 1)) || 1
 
-  // rAF auto-scroll loop. Keeps a float position so fractional speeds don't
-  // get lost to integer scrollLeft rounding, and wraps in both directions so
-  // dragging/swiping backwards stays seamless too.
+  const [front, setFront] = useState(0)
+  const [toss, setToss] = useState(null) // 'left' | 'right' while the front card flies off
+  const [drag, setDrag] = useState(0) // live horizontal drag offset (px)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const movedRef = useRef(false)
+  const pausedRef = useRef(false) // hover-pause (desktop)
+
+  const reduce =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  const throwCard = (dir) => {
+    if (!toss) setToss(dir)
+  }
+
+  // Once the front card has flown off, advance to the next and reset.
+  const onTossEnd = (e) => {
+    if (!toss || e.propertyName !== 'transform') return
+    setToss(null)
+    setDrag(0)
+    setFront((f) => (f + 1) % n)
+  }
+
+  // Auto-shuffle.
   useEffect(() => {
-    const el = scrollerRef.current
-    if (!el) return
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    let pos = el.scrollLeft
-    let raf
-    const step = () => {
-      const half = el.scrollWidth / 2
-      // Paused while the user touches, and through the inertia afterwards, so the
-      // auto-scroll never writes scrollLeft on top of a native momentum swipe.
-      const idle = pausedRef.current || performance.now() < resumeAtRef.current
-      if (idle || reduce) {
-        pos = el.scrollLeft // follow the user while they scroll
-      } else {
-        pos += AUTO_SPEED
-        el.scrollLeft = pos
-      }
-      if (half > 0) {
-        if (el.scrollLeft >= half) {
-          el.scrollLeft -= half
-          pos = el.scrollLeft
-        } else if (el.scrollLeft < 0) {
-          el.scrollLeft += half
-          pos = el.scrollLeft
-        }
-      }
-      raf = requestAnimationFrame(step)
-    }
-    raf = requestAnimationFrame(step)
+    if (reduce || n < 2 || toss || dragging) return
+    const id = setTimeout(() => {
+      if (!pausedRef.current) throwCard(Math.random() < 0.5 ? 'left' : 'right')
+    }, AUTO_MS)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [front, toss, dragging, n, reduce])
 
-    // While the user is driving the scroll (finger down, or momentum still
-    // running during the cooldown), keep pushing the resume time forward — so
-    // auto-scroll only kicks back in once the swipe has fully settled.
-    const onUserScroll = () => {
-      if (pausedRef.current || performance.now() < resumeAtRef.current) {
-        resumeAtRef.current = performance.now() + 600
-      }
-    }
-    el.addEventListener('scroll', onUserScroll, { passive: true })
-    return () => {
-      cancelAnimationFrame(raf)
-      el.removeEventListener('scroll', onUserScroll)
-    }
-  }, [products.length])
-
-  const onPointerDown = (e) => {
-    pausedRef.current = true
+  // ---- drag / swipe the top card ----
+  const down = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    startX.current = e.clientX
     movedRef.current = false
-    // Touch scrolls natively; only mouse needs manual drag-to-scroll.
-    if (e.pointerType !== 'touch') {
-      const el = scrollerRef.current
-      dragRef.current = { startX: e.clientX, startScroll: el.scrollLeft }
-      el.setPointerCapture?.(e.pointerId)
-    }
+    setDragging(true)
   }
-  const onPointerMove = (e) => {
-    const drag = dragRef.current
-    if (!drag) return
-    const dx = e.clientX - drag.startX
-    if (Math.abs(dx) > 3) movedRef.current = true
-    scrollerRef.current.scrollLeft = drag.startScroll - dx
+  const move = (e) => {
+    if (!dragging) return
+    const dx = e.clientX - startX.current
+    if (Math.abs(dx) > 4) movedRef.current = true
+    setDrag(dx)
   }
-  const endGesture = (e) => {
-    dragRef.current = null
-    pausedRef.current = false
-    // Touch lifts into an inertia fling — hold auto-scroll off so it doesn't
-    // fight the momentum. (Mouse has no inertia, so it can resume right away.)
-    if (e?.pointerType === 'touch') resumeAtRef.current = performance.now() + 1200
+  const up = () => {
+    if (!dragging) return
+    setDragging(false)
+    if (Math.abs(drag) > TOSS_THRESHOLD) throwCard(drag < 0 ? 'left' : 'right')
+    else setDrag(0) // didn't throw far enough — spring back
   }
   // Swallow the click that follows a drag so it doesn't open the store page.
   const onClickCapture = (e) => {
@@ -185,31 +166,118 @@ function Marquee({ products, href, external }) {
     }
   }
 
+  // Render back-to-front so the front card paints on top.
+  const slots = []
+  for (let d = visible - 1; d >= 0; d--) {
+    const idx = (front + d) % n
+    slots.push({ idx, depth: d, product: products[idx] })
+  }
+
   return (
-    <div className="relative mt-8 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
-      <div
-        ref={scrollerRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endGesture}
-        onPointerCancel={endGesture}
-        onPointerLeave={endGesture}
-        onClickCapture={onClickCapture}
-        className="flex cursor-grab gap-4 overflow-x-auto px-4 select-none touch-pan-x overscroll-x-contain active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {loop.map((p, i) => (
-          <div key={i} className="w-44 shrink-0 sm:w-52">
-            <ProductCard
-              product={p}
-              href={href}
-              external={external}
-              aria-hidden={i >= products.length}
-              draggable={false}
-            />
+    <div
+      className="relative mx-auto mt-10 h-80 w-60 select-none sm:h-96 sm:w-72"
+      onMouseEnter={() => (pausedRef.current = true)}
+      onMouseLeave={() => {
+        pausedRef.current = false
+        if (dragging) up()
+      }}
+    >
+      {slots.map(({ idx, depth, product }) => {
+        const isFront = depth === 0
+        const tilt = ((idx * 47) % 11) - 5 // stable -5..5° so the stack looks hand-placed
+
+        let transform
+        let transition = 'transform .45s cubic-bezier(.2,.7,.3,1), opacity .45s ease'
+        if (isFront && toss) {
+          const dir = toss === 'left' ? -1 : 1
+          transform = `translateX(${dir * 130}%) rotate(${dir * 18}deg)`
+        } else if (isFront && dragging) {
+          transform = `translateX(${drag}px) rotate(${drag / 22}deg)`
+          transition = 'none'
+        } else if (isFront) {
+          transform = 'translateY(0) scale(1) rotate(0deg)'
+        } else {
+          transform = `translateY(-${depth * 14}px) scale(${1 - depth * 0.07}) rotate(${tilt}deg)`
+        }
+
+        return (
+          <div
+            key={idx}
+            className="absolute inset-0"
+            style={{
+              transform,
+              transition,
+              opacity: isFront && toss ? 0 : 1,
+              zIndex: visible - depth,
+              willChange: 'transform',
+            }}
+            onTransitionEnd={isFront ? onTossEnd : undefined}
+            onPointerDown={isFront ? down : undefined}
+            onPointerMove={isFront ? move : undefined}
+            onPointerUp={isFront ? up : undefined}
+            onPointerCancel={isFront ? up : undefined}
+            onClickCapture={isFront ? onClickCapture : undefined}
+          >
+            <div
+              className={`h-full ${isFront ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'}`}
+              style={{ touchAction: 'pan-y' }}
+            >
+              <StackCard product={product} href={href} external={external} interactive={isFront} />
+            </div>
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
+  )
+}
+
+// A single full-height stack card. Only the front card is a real link; the
+// ones behind are inert visuals (not focusable / clickable).
+function StackCard({ product, href, external, interactive }) {
+  const link = product.link || href
+  const isExternal = product.link ? /^https?:\/\//i.test(product.link) : external
+  const cls =
+    'flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-black/5'
+  const inner = (
+    <>
+      <div className="relative flex-1 overflow-hidden">
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            draggable={false}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-as-charcoal/5 via-white to-as-red/5">
+            <span className="px-4 text-center text-base font-bold uppercase tracking-wide text-as-charcoal/70">
+              {product.name}
+            </span>
+          </div>
+        )}
+        <span className="absolute inset-x-0 bottom-0 h-1 bg-as-red" />
+      </div>
+      <div className="px-4 py-3">
+        <p className="truncate text-sm font-semibold text-as-charcoal">{product.name}</p>
+      </div>
+    </>
+  )
+
+  if (!interactive) {
+    return (
+      <div className={cls} aria-hidden>
+        {inner}
+      </div>
+    )
+  }
+  return external ? (
+    <a href={link} target="_blank" rel="noreferrer" className={cls} draggable={false}>
+      {inner}
+    </a>
+  ) : (
+    <Link to={link} className={cls} draggable={false}>
+      {inner}
+    </Link>
   )
 }
 
