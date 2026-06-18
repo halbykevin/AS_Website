@@ -32,12 +32,19 @@ export default {
           '0%': { transform: 'scale(0.9)', opacity: '0.7' },
           '100%': { transform: 'scale(1.6)', opacity: '0' },
         },
+        // Continuous horizontal scroll for the AS Store showcase. The track
+        // holds two copies of the products, so -50% lands on a seamless loop.
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.7s ease-out forwards',
         'fade-in': 'fade-in 0.5s ease-out forwards',
         float: 'float 6s ease-in-out infinite',
         'pulse-ring': 'pulse-ring 2.5s ease-out infinite',
+        marquee: 'marquee 40s linear infinite',
       },
     },
   },

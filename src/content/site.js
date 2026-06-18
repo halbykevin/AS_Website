@@ -77,6 +77,31 @@ export const store = {
   cta: 'Visit AS Store',
 }
 
+// AS Store showcase — the eye-catching product strip at the very top of the
+// homepage. Each item links to the AS Store (or the "coming soon" page while
+// store.url is empty). Fully editable from the admin panel later; these are the
+// static defaults / fallback. Items with no `image` render a branded tile.
+export const storeShowcase = {
+  enabled: true,
+  eyebrow: 'AS Store',
+  heading: 'A glimpse of the AS Store',
+  subheading: 'The latest tech, gadgets and accessories — launching soon.',
+  // Visitors see this many items, shuffled on each load.
+  visibleCount: 8,
+  products: [
+    { id: 'smartphones', name: 'Smartphones', image: '' },
+    { id: 'earbuds', name: 'Wireless Earbuds', image: '' },
+    { id: 'smartwatch', name: 'Smartwatches', image: '' },
+    { id: 'laptops', name: 'Laptops', image: '' },
+    { id: 'speakers', name: 'Bluetooth Speakers', image: '' },
+    { id: 'gaming', name: 'Gaming Gear', image: '' },
+    { id: 'tablets', name: 'Tablets', image: '' },
+    { id: 'cameras', name: 'Cameras', image: '' },
+    { id: 'accessories', name: 'Accessories', image: '' },
+    { id: 'chargers', name: 'Chargers & Cables', image: '' },
+  ],
+}
+
 export const ticketing = {
   // Events / reservations are powered by Ticketing Box Office.
   logo: '/ticketing-box-office.png',

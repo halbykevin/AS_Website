@@ -72,6 +72,14 @@ const popupJson = (r) => ({
   linkUrl: r.link_url, linkLabel: r.link_label, trigger: r.trigger_type,
   delaySeconds: r.delay_seconds, scrollPercent: r.scroll_percent, updatedAt: r.updated_at,
 })
+const storeShowcaseJson = (r) => ({
+  enabled: r.enabled, eyebrow: r.eyebrow, heading: r.heading,
+  subheading: r.subheading, visibleCount: r.visible_count, updatedAt: r.updated_at,
+})
+const storeProductJson = (r) => ({
+  id: r.id, name: r.name, imageUrl: r.image_url, linkUrl: r.link_url,
+  sort: r.sort, visible: r.visible,
+})
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
@@ -334,6 +342,62 @@ app.put('/api/popup', requireAuth, ah(async (req, res) => {
     ]
   )
   res.json(popupJson(rows[0]))
+}))
+
+// ========================= AS Store showcase =========================
+// Public read; admin edits the singleton section row + manages the products.
+app.get('/api/store-showcase', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM store_showcase WHERE id = 1')
+  res.json(rows[0] ? storeShowcaseJson(rows[0]) : null)
+}))
+
+app.put('/api/store-showcase', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const { rows } = await query(
+    `UPDATE store_showcase SET
+       enabled=$1, eyebrow=$2, heading=$3, subheading=$4, visible_count=$5, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [
+      b.enabled === undefined ? true : Boolean(b.enabled),
+      b.eyebrow || '', b.heading || '', b.subheading || '',
+      Math.max(1, Number(b.visibleCount) || 8),
+    ]
+  )
+  res.json(storeShowcaseJson(rows[0]))
+}))
+
+app.get('/api/store-products', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM store_products ORDER BY sort ASC, id ASC')
+  res.json(rows.map(storeProductJson))
+}))
+
+const storeProductParams = (b) => [
+  b.name || '', b.imageUrl || '', b.linkUrl || '',
+  Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/store-products', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO store_products (name, image_url, link_url, sort, visible)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    storeProductParams(req.body || {})
+  )
+  res.status(201).json(storeProductJson(rows[0]))
+}))
+
+app.put('/api/store-products/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE store_products SET name=$1, image_url=$2, link_url=$3, sort=$4, visible=$5
+     WHERE id=$6 RETURNING *`,
+    [...storeProductParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(storeProductJson(rows[0]))
+}))
+
+app.delete('/api/store-products/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM store_products WHERE id=$1', [req.params.id])
+  res.status(204).end()
 }))
 
 // ========================= Reservations =========================

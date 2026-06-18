@@ -61,6 +61,7 @@ export const defaultContent = {
   services: defaults.services,
   eventsSection: defaults.eventsSection,
   store: defaults.store,
+  storeShowcase: defaults.storeShowcase,
   ticketing: defaults.ticketing,
   about: defaults.about,
   contact: defaults.contact,
@@ -202,6 +203,33 @@ export function mapSection(s) {
   }
 }
 
+export function mapStoreProduct(p) {
+  return {
+    id: p.id,
+    name: p.name || '',
+    image: p.imageUrl || '',
+    link: p.linkUrl || '',
+    visible: p.visible !== false,
+  }
+}
+
+// Combine the showcase section row (copy + flags) with its products. Falls back
+// to the static defaults for any empty copy field so the section never looks
+// broken; products come straight from the DB (empty = section hidden).
+function mapStoreShowcase(meta, products) {
+  const d = defaultContent.storeShowcase
+  const mapped = Array.isArray(products) ? products.map(mapStoreProduct).filter((p) => p.visible) : []
+  if (!meta) return { ...d, products: mapped }
+  return {
+    enabled: meta.enabled !== false,
+    eyebrow: pick(meta.eyebrow, d.eyebrow),
+    heading: pick(meta.heading, d.heading),
+    subheading: pick(meta.subheading, d.subheading),
+    visibleCount: Number(meta.visibleCount) || d.visibleCount,
+    products: mapped,
+  }
+}
+
 export function mapPopup(p) {
   if (!p) return null
   return {
@@ -221,15 +249,18 @@ export function mapPopup(p) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup] = await Promise.all([
-      request('/api/settings'),
-      request('/api/services'),
-      request('/api/events'),
-      request('/api/banners').catch(() => []),
-      request('/api/sections').catch(() => []),
-      request('/api/categories').catch(() => []),
-      request('/api/popup').catch(() => null),
-    ])
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts] =
+      await Promise.all([
+        request('/api/settings'),
+        request('/api/services'),
+        request('/api/events'),
+        request('/api/banners').catch(() => []),
+        request('/api/sections').catch(() => []),
+        request('/api/categories').catch(() => []),
+        request('/api/popup').catch(() => null),
+        request('/api/store-showcase').catch(() => null),
+        request('/api/store-products').catch(() => []),
+      ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
       content.services = {
@@ -244,6 +275,7 @@ export async function loadSite() {
     content.sections = Array.isArray(sections) ? sections.map(mapSection).filter((s) => s.visible) : []
     content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter((c) => c.visible) : []
     content.popup = mapPopup(popup)
+    content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
     return { content, events: mappedEvents }
   } catch {
     return null
@@ -302,6 +334,13 @@ export const adminApi = {
 
   getPopup: () => request('/api/popup'),
   savePopup: (data) => request('/api/popup', { method: 'PUT', body: data, authed: true }),
+
+  getStoreShowcase: () => request('/api/store-showcase'),
+  saveStoreShowcase: (data) => request('/api/store-showcase', { method: 'PUT', body: data, authed: true }),
+  listStoreProducts: () => request('/api/store-products'),
+  createStoreProduct: (data) => request('/api/store-products', { method: 'POST', body: data, authed: true }),
+  updateStoreProduct: (id, data) => request(`/api/store-products/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteStoreProduct: (id) => request(`/api/store-products/${id}`, { method: 'DELETE', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

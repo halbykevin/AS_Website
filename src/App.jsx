@@ -11,6 +11,7 @@ import RequireAuth from './admin/RequireAuth.jsx'
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Events = lazy(() => import('./pages/Events.jsx'))
 const EventDetail = lazy(() => import('./pages/EventDetail.jsx'))
+const StoreComingSoon = lazy(() => import('./pages/StoreComingSoon.jsx'))
 
 // Admin area — split so public visitors never download the dashboard bundle.
 const AdminLogin = lazy(() => import('./admin/Login.jsx'))
@@ -22,6 +23,7 @@ const ReservationsAdmin = lazy(() => import('./admin/pages/ReservationsAdmin.jsx
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
 const SectionsAdmin = lazy(() => import('./admin/pages/SectionsAdmin.jsx'))
 const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
+const StoreAdmin = lazy(() => import('./admin/pages/StoreAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 
@@ -39,6 +41,7 @@ function PublicSite() {
           <Route path="/" element={<Home />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/store" element={<StoreComingSoon />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -68,6 +71,7 @@ export default function App() {
               <Route path="services" element={<ServicesAdmin />} />
               <Route path="events" element={<EventsAdmin />} />
               <Route path="categories" element={<CategoriesAdmin />} />
+              <Route path="store" element={<StoreAdmin />} />
               <Route path="reservations" element={<ReservationsAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="scraper" element={<ScraperAdmin />} />

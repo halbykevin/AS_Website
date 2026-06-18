@@ -104,6 +104,28 @@ CREATE TABLE IF NOT EXISTS popup (
   CONSTRAINT popup_singleton CHECK (id = 1)
 );
 
+-- AS Store showcase: a singleton row of section copy + the product strip.
+CREATE TABLE IF NOT EXISTS store_showcase (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT true,
+  eyebrow TEXT DEFAULT '',
+  heading TEXT DEFAULT '',
+  subheading TEXT DEFAULT '',
+  visible_count INTEGER DEFAULT 8,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT store_showcase_singleton CHECK (id = 1)
+);
+
+CREATE TABLE IF NOT EXISTS store_products (
+  id SERIAL PRIMARY KEY,
+  name TEXT DEFAULT '',
+  image_url TEXT DEFAULT '',
+  link_url TEXT DEFAULT '',
+  sort INTEGER DEFAULT 0,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;
@@ -160,6 +182,12 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton popup row exists (disabled by default).
 INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton store-showcase row exists with sensible defaults.
+INSERT INTO store_showcase (id, enabled, eyebrow, heading, subheading, visible_count)
+VALUES (1, true, 'AS Store', 'A glimpse of the AS Store',
+  'The latest tech, gadgets and accessories — launching soon.', 8)
+ON CONFLICT (id) DO NOTHING;
 `
 
 async function run() {
