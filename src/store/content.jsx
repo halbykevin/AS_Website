@@ -30,6 +30,22 @@ export function ContentProvider({ children }) {
           : 'AS Company (Absolute Solutions SAL) — market leader in telecommunication and electronics since 2008. New website coming soon.'
       )
     }
+
+    // Swap the browser-tab icon + iOS home-screen icon if the admin set one.
+    const faviconUrl = state.content?.faviconUrl
+    if (faviconUrl) {
+      const setIcon = (rel) => {
+        let link = document.querySelector(`link[rel='${rel}']`)
+        if (!link) {
+          link = document.createElement('link')
+          link.rel = rel
+          document.head.appendChild(link)
+        }
+        link.href = faviconUrl
+      }
+      setIcon('icon')
+      setIcon('apple-touch-icon')
+    }
   }, [state.loading, state.content])
 
   useEffect(() => {

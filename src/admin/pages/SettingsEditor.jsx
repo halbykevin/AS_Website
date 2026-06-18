@@ -17,7 +17,7 @@ const SECTIONS = [
 ]
 
 const empty = {
-  brandName: '', legalName: '', tagline: '', logoUrl: '',
+  brandName: '', legalName: '', tagline: '', logoUrl: '', faviconUrl: '',
   heroEyebrow: '', heroTitle: '', heroSubtitle: '',
   heroPrimaryLabel: '', heroSecondaryLabel: '',
   servicesHeading: '', servicesSubheading: '',
@@ -34,6 +34,7 @@ export default function SettingsEditor() {
   const [form, setForm] = useState(empty)
   const [stats, setStats] = useState([])
   const [logoFile, setLogoFile] = useState(null)
+  const [faviconFile, setFaviconFile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -48,7 +49,7 @@ export default function SettingsEditor() {
       if (s) {
         setForm({
           brandName: s.brandName || '', legalName: s.legalName || '', tagline: s.tagline || '',
-          logoUrl: s.logoUrl || '',
+          logoUrl: s.logoUrl || '', faviconUrl: s.faviconUrl || '',
           heroEyebrow: s.heroEyebrow || '', heroTitle: s.heroTitle || '', heroSubtitle: s.heroSubtitle || '',
           heroPrimaryLabel: s.heroPrimaryLabel || '', heroSecondaryLabel: s.heroSecondaryLabel || '',
           servicesHeading: s.servicesHeading || '', servicesSubheading: s.servicesSubheading || '',
@@ -91,15 +92,22 @@ export default function SettingsEditor() {
         const up = await adminApi.upload(logoFile)
         logoUrl = up.url
       }
+      let faviconUrl = form.faviconUrl
+      if (faviconFile) {
+        const up = await adminApi.upload(faviconFile)
+        faviconUrl = up.url
+      }
       const payload = {
         ...form,
         logoUrl,
+        faviconUrl,
         aboutBody: form.aboutBody.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean),
         aboutStats: stats.filter((s) => s.value || s.label),
       }
       const saved = await adminApi.saveSettings(payload)
-      setForm((f) => ({ ...f, logoUrl: saved.logoUrl || logoUrl }))
+      setForm((f) => ({ ...f, logoUrl: saved.logoUrl || logoUrl, faviconUrl: saved.faviconUrl || faviconUrl }))
       setLogoFile(null)
+      setFaviconFile(null)
       setMsg({ kind: 'success', text: 'Saved. Changes are live on the site.' })
     } catch (err) {
       setMsg({ kind: 'error', text: 'Save failed: ' + (err?.message || 'unknown error') })
@@ -152,6 +160,20 @@ export default function SettingsEditor() {
                 />
               )}
               <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="text-sm" />
+            </div>
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Tab icon (favicon)" hint="The small icon shown in the browser tab. A square PNG works best. Leave empty to keep the current one.">
+            <div className="flex items-center gap-4">
+              {(faviconFile || form.faviconUrl) && (
+                <img
+                  src={faviconFile ? URL.createObjectURL(faviconFile) : form.faviconUrl}
+                  alt="Favicon preview"
+                  className="h-10 w-10 rounded border border-black/5 bg-white object-contain p-1"
+                />
+              )}
+              <input type="file" accept="image/*" onChange={(e) => setFaviconFile(e.target.files?.[0] || null)} className="text-sm" />
             </div>
           </Field>
         </div>

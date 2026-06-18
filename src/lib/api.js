@@ -84,6 +84,8 @@ function mergeSettings(s) {
     // Global WhatsApp number (international digits) used to build event/banner
     // "reserve" links — see whatsappBookingUrl().
     whatsappNumber: pick(s.whatsappNumber, ''),
+    // Browser-tab icon (favicon); applied at runtime in ContentProvider.
+    faviconUrl: pick(s.faviconUrl, ''),
     brand: {
       ...d.brand,
       name: pick(s.brandName, d.brand.name),
