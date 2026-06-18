@@ -1,41 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 
-// Fades + slides its children in the first time they scroll into view.
-// Lightweight (one IntersectionObserver per instance, disconnects after firing).
-export default function Reveal({ children, className = '', delay = 0, as: Tag = 'div' }) {
-  const ref = useRef(null)
-  const [shown, setShown] = useState(false)
+// Fades + slides its children in the first time they scroll into view, on any
+// scroll (Framer Motion's whileInView uses IntersectionObserver, so it fires on
+// mobile and inside the custom scroll container too). Respects reduced motion.
+//
+// API kept stable: `children`, `className`, `delay` (ms), `as` (tag name).
+export default function Reveal({ children, className = '', delay = 0, as = 'div', y = 24 }) {
+  const reduce = useReducedMotion()
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    // Respect users who prefer reduced motion — show immediately.
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      setShown(true)
-      return
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShown(true)
-          io.disconnect()
-        }
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
+  if (reduce) {
+    const Tag = as
+    return <Tag className={className}>{children}</Tag>
+  }
 
+  const MotionTag = motion[as] || motion.div
   return (
-    <Tag
-      ref={ref}
-      style={{ transitionDelay: shown ? `${delay}ms` : '0ms' }}
-      className={`transition-all duration-700 ease-out ${
-        shown ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
-      } ${className}`}
+    <MotionTag
+      className={className}
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2, margin: '0px 0px -40px 0px' }}
+      transition={{ duration: 0.6, ease: [0.22, 0.7, 0.3, 1], delay: delay / 1000 }}
     >
       {children}
-    </Tag>
+    </MotionTag>
   )
 }

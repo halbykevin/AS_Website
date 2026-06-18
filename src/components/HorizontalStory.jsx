@@ -1,6 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useScrollEl } from '../store/scroll.jsx'
+
+// Shared scroll-in reveal: text rises + fades as a panel enters view, staggered
+// child-by-child. Plays on desktop (pinned) and mobile (carousel) alike.
+const EASE = [0.22, 0.7, 0.3, 1]
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } } }
+const riseItem = {
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
+}
 
 // ---------------------------------------------------------------------------
 // Horizontal scroll-story — a GSAP-style pinned section. On desktop the section
@@ -150,23 +160,41 @@ function StoryPanel({ panel, width, delta, flip }) {
           flip ? 'flex-row-reverse' : ''
         }`}
       >
+        {/* Parallax wrapper (transform) is separate from the motion wrapper so
+            the two don't fight over `transform`. */}
         <div className="flex-1" style={{ transform: `translateX(${textShift}px)` }}>
-          {panel.caption && (
-            <span className="text-sm font-semibold uppercase tracking-widest" style={{ color: accent }}>
-              {panel.caption}
-            </span>
-          )}
-          <h3 className="mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
-            {panel.heading}
-          </h3>
-          {panel.link && (
-            <PanelLink
-              to={panel.link}
-              className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-as-charcoal transition hover:bg-white/90"
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.5 }}
+          >
+            {panel.caption && (
+              <motion.span
+                variants={riseItem}
+                className="block text-sm font-semibold uppercase tracking-widest"
+                style={{ color: accent }}
+              >
+                {panel.caption}
+              </motion.span>
+            )}
+            <motion.h3
+              variants={riseItem}
+              className="mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl"
             >
-              Explore →
-            </PanelLink>
-          )}
+              {panel.heading}
+            </motion.h3>
+            {panel.link && (
+              <motion.div variants={riseItem}>
+                <PanelLink
+                  to={panel.link}
+                  className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-as-charcoal transition hover:bg-white/90"
+                >
+                  Explore →
+                </PanelLink>
+              </motion.div>
+            )}
+          </motion.div>
         </div>
 
         <div
@@ -174,7 +202,13 @@ function StoryPanel({ panel, width, delta, flip }) {
           style={{ transform: `translateX(${imgShift}px)` }}
         >
           <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: `${accent}22` }} />
-          <div className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-1 ring-white/10">
+          <motion.div
+            className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-1 ring-white/10"
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.7, ease: EASE }}
+          >
             {panel.link ? (
               <PanelLink to={panel.link} className="block h-full w-full">
                 {image}
@@ -182,7 +216,7 @@ function StoryPanel({ panel, width, delta, flip }) {
             ) : (
               image
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
@@ -216,8 +250,15 @@ function CarouselStory({ story }) {
 
 function StoryCard({ panel }) {
   const accent = panel.accent || DEFAULT_ACCENT
+  const reduce = useReducedMotion()
   const card = (
-    <div className="overflow-hidden rounded-3xl bg-white/[0.04] ring-1 ring-white/10">
+    <motion.div
+      className="overflow-hidden rounded-3xl bg-white/[0.04] ring-1 ring-white/10"
+      variants={stagger}
+      initial={reduce ? false : 'hidden'}
+      whileInView="show"
+      viewport={{ once: true, amount: 0.3 }}
+    >
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         {panel.image ? (
           <img src={panel.image} alt={panel.heading || ''} className="h-full w-full object-cover" />
@@ -232,13 +273,15 @@ function StoryCard({ panel }) {
       </div>
       <div className="p-5">
         {panel.caption && (
-          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: accent }}>
+          <motion.span variants={riseItem} className="block text-xs font-semibold uppercase tracking-widest" style={{ color: accent }}>
             {panel.caption}
-          </span>
+          </motion.span>
         )}
-        <h3 className="mt-2 text-xl font-extrabold text-white">{panel.heading}</h3>
+        <motion.h3 variants={riseItem} className="mt-2 text-xl font-extrabold text-white">
+          {panel.heading}
+        </motion.h3>
       </div>
-    </div>
+    </motion.div>
   )
   return panel.link ? (
     <PanelLink to={panel.link} className="block">
