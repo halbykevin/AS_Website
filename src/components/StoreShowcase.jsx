@@ -100,6 +100,7 @@ function Marquee({ products, href, external }) {
   const loop = [...products, ...products]
   const scrollerRef = useRef(null)
   const pausedRef = useRef(false) // true while the pointer is down on the track
+  const resumeAtRef = useRef(0) // don't auto-scroll again until this timestamp (lets touch inertia settle)
   const dragRef = useRef(null) // mouse drag state: { startX, startScroll }
   const movedRef = useRef(false) // did this gesture move? (suppresses the click)
 
@@ -114,7 +115,10 @@ function Marquee({ products, href, external }) {
     let raf
     const step = () => {
       const half = el.scrollWidth / 2
-      if (pausedRef.current || reduce) {
+      // Paused while the user touches, and through the inertia afterwards, so the
+      // auto-scroll never writes scrollLeft on top of a native momentum swipe.
+      const idle = pausedRef.current || performance.now() < resumeAtRef.current
+      if (idle || reduce) {
         pos = el.scrollLeft // follow the user while they scroll
       } else {
         pos += AUTO_SPEED
@@ -132,7 +136,20 @@ function Marquee({ products, href, external }) {
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+
+    // While the user is driving the scroll (finger down, or momentum still
+    // running during the cooldown), keep pushing the resume time forward — so
+    // auto-scroll only kicks back in once the swipe has fully settled.
+    const onUserScroll = () => {
+      if (pausedRef.current || performance.now() < resumeAtRef.current) {
+        resumeAtRef.current = performance.now() + 600
+      }
+    }
+    el.addEventListener('scroll', onUserScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      el.removeEventListener('scroll', onUserScroll)
+    }
   }, [products.length])
 
   const onPointerDown = (e) => {
@@ -152,9 +169,12 @@ function Marquee({ products, href, external }) {
     if (Math.abs(dx) > 3) movedRef.current = true
     scrollerRef.current.scrollLeft = drag.startScroll - dx
   }
-  const endGesture = () => {
+  const endGesture = (e) => {
     dragRef.current = null
     pausedRef.current = false
+    // Touch lifts into an inertia fling — hold auto-scroll off so it doesn't
+    // fight the momentum. (Mouse has no inertia, so it can resume right away.)
+    if (e?.pointerType === 'touch') resumeAtRef.current = performance.now() + 1200
   }
   // Swallow the click that follows a drag so it doesn't open the store page.
   const onClickCapture = (e) => {

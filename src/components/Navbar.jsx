@@ -132,9 +132,13 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile menu */}
-      {open && (
-        <div className="border-t border-black/5 bg-white md:hidden">
+      {/* Mobile menu — always rendered, animates open via grid-rows height + fade */}
+      <div
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out md:hidden ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className={`min-h-0 overflow-hidden border-t border-black/5 bg-white transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex flex-col gap-1 px-5 py-3">
             {nav.map((item) =>
               item.href.includes('#') ? (
@@ -164,7 +168,7 @@ export default function Navbar() {
             </Link>
           </div>
         </div>
-      )}
+      </div>
       </header>
     </div>
   )
