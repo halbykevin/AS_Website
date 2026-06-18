@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Admin-managed hero banner carousel (like a box-office site): the slides
-// auto-advance, the image and the "Buy tickets" button both open the link
-// the admin set for that banner.
+// Admin-managed hero banner carousel, styled like a box-office site
+// (ticketingboxoffice.com): full-bleed, a fixed cinematic aspect ratio with the
+// image cropped to fill, and the event details (title, subtitle, "Buy tickets")
+// overlaid on a gradient. The whole slide opens the link the admin set.
 
 const INTERVAL = 5000
+
+// One fixed aspect ratio per breakpoint — every banner is cropped to fit, so
+// the strip never changes height between slides. Taller on phones, wide and
+// cinematic on larger screens.
+const ASPECT = 'aspect-[3/2] sm:aspect-[16/7] lg:aspect-[16/6]'
 
 export default function BannerSlider({ banners }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [drag, setDrag] = useState(0)
   const [dragging, setDragging] = useState(false)
-  const [boxHeight, setBoxHeight] = useState(null)
   const timer = useRef(null)
   const startX = useRef(0)
   const moved = useRef(false)
-  const slideRefs = useRef([])
 
   const count = banners.length
   const go = (i) => setIndex(((i % count) + count) % count)
@@ -25,18 +29,6 @@ export default function BannerSlider({ banners }) {
     timer.current = setInterval(() => setIndex((i) => (i + 1) % count), INTERVAL)
     return () => clearInterval(timer.current)
   }, [paused, dragging, count])
-
-  // Banners can have different aspect ratios. Size the viewport to whichever
-  // slide is showing so the full image fits with no crop and no empty bars.
-  const syncHeight = () => {
-    const el = slideRefs.current[index]
-    if (el) setBoxHeight(el.offsetHeight)
-  }
-  useEffect(() => {
-    syncHeight()
-    window.addEventListener('resize', syncHeight)
-    return () => window.removeEventListener('resize', syncHeight)
-  }, [index, count])
 
   // ---- Touch / mouse drag to slide (works on both mobile and desktop) ----
   const dragStart = (clientX) => {
@@ -80,21 +72,18 @@ export default function BannerSlider({ banners }) {
   }
 
   if (!count) return null
-  const current = banners[index]
 
   return (
     <section
       aria-label="Featured"
+      className="relative w-full"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Slides — centered container; height follows the active slide */}
-      <div
-        className="relative mx-auto max-w-7xl overflow-hidden bg-as-charcoal transition-[height] duration-500 ease-out"
-        style={{ height: boxHeight ? `${boxHeight}px` : undefined }}
-      >
+      {/* Full-bleed viewport with a fixed aspect ratio */}
+      <div className={`relative w-full overflow-hidden bg-as-charcoal ${ASPECT}`}>
         <div
-          className={`flex cursor-grab touch-pan-y select-none items-start active:cursor-grabbing ${
+          className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
             dragging ? '' : 'transition-transform duration-700 ease-out'
           }`}
           style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
@@ -107,17 +96,8 @@ export default function BannerSlider({ banners }) {
           onMouseLeave={() => dragging && dragEnd()}
           onClickCapture={onClickCapture}
         >
-          {banners.map((b, i) => (
-            <SlideLink key={b.id} banner={b}>
-              <img
-                ref={(el) => (slideRefs.current[i] = el)}
-                src={b.image}
-                alt={b.title || 'Banner'}
-                className="block h-auto w-full select-none object-cover"
-                onLoad={syncHeight}
-                draggable={false}
-              />
-            </SlideLink>
+          {banners.map((b) => (
+            <Slide key={b.id} banner={b} />
           ))}
         </div>
 
@@ -131,7 +111,7 @@ export default function BannerSlider({ banners }) {
 
         {/* Dots */}
         {count > 1 && (
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+          <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2">
             {banners.map((b, i) => (
               <button
                 key={b.id}
@@ -146,49 +126,55 @@ export default function BannerSlider({ banners }) {
           </div>
         )}
       </div>
-
-      {/* Info bar for the current slide */}
-      <div className="border-b border-black/5 bg-as-charcoal/[0.03]">
-        <div className="mx-auto max-w-7xl px-5 py-5 text-center sm:px-8">
-          <div key={current.id} className="animate-fade-in">
-            {current.title && (
-              <h2 className="text-xl font-extrabold tracking-tight text-as-charcoal sm:text-2xl">
-                {current.title}
-              </h2>
-            )}
-            {current.subtitle && (
-              <p className="mt-1 text-sm text-as-charcoal/60">{current.subtitle}</p>
-            )}
-            {current.link && (
-              <a
-                href={current.link}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center rounded-full bg-as-red px-7 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
-              >
-                Buy tickets
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
     </section>
   )
 }
 
-// The whole slide is clickable when the banner has a link.
-function SlideLink({ banner, children }) {
-  if (!banner.link) return <div className="w-full shrink-0">{children}</div>
+// A single full-bleed slide: cropped image + gradient + overlaid details. The
+// whole slide is the link (so the "Buy tickets" pill is a styled span, not a
+// nested <a>).
+function Slide({ banner }) {
+  const hasLink = Boolean(banner.link)
+  const Wrapper = hasLink ? 'a' : 'div'
+  const wrapperProps = hasLink
+    ? { href: banner.link, target: '_blank', rel: 'noreferrer', 'aria-label': banner.title || 'Open event' }
+    : {}
+
   return (
-    <a
-      href={banner.link}
-      target="_blank"
-      rel="noreferrer"
-      className="block w-full shrink-0"
-      aria-label={banner.title || 'Open event'}
-    >
-      {children}
-    </a>
+    <Wrapper {...wrapperProps} className="group relative block h-full w-full shrink-0">
+      <img
+        src={banner.image}
+        alt={banner.title || 'Banner'}
+        className="absolute inset-0 h-full w-full select-none object-cover"
+        draggable={false}
+      />
+
+      {/* Detail overlay — only when there's something to show */}
+      {(banner.title || banner.subtitle || hasLink) && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 px-5 pb-10 sm:px-8 sm:pb-12 lg:px-12 lg:pb-14">
+            <div className="mx-auto max-w-7xl">
+              {banner.title && (
+                <h2 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-tight text-white drop-shadow sm:text-4xl lg:text-5xl">
+                  {banner.title}
+                </h2>
+              )}
+              {banner.subtitle && (
+                <p className="mt-2 max-w-xl text-sm text-white/85 drop-shadow sm:text-base">
+                  {banner.subtitle}
+                </p>
+              )}
+              {hasLink && (
+                <span className="mt-4 inline-flex items-center rounded-full bg-as-red px-7 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg transition group-hover:bg-as-red-light sm:text-sm">
+                  Buy tickets
+                </span>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </Wrapper>
   )
 }
 
@@ -199,7 +185,7 @@ function Arrow({ dir, onClick }) {
       type="button"
       aria-label={prev ? 'Previous slide' : 'Next slide'}
       onClick={onClick}
-      className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-2.5 text-white backdrop-blur transition hover:bg-as-red ${
+      className={`absolute top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/30 p-2.5 text-white backdrop-blur transition hover:bg-as-red ${
         prev ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
       }`}
     >
