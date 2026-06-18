@@ -160,6 +160,8 @@ export function mapBanner(b) {
     link: b.linkUrl || '',
     active: b.active !== false,
     eventId: b.eventId || null,
+    focalX: b.focalX === undefined || b.focalX === null ? 50 : Number(b.focalX),
+    focalY: b.focalY === undefined || b.focalY === null ? 50 : Number(b.focalY),
   }
 }
 

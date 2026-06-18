@@ -146,6 +146,7 @@ function Slide({ banner }) {
         src={banner.image}
         alt={banner.title || 'Banner'}
         className="absolute inset-0 h-full w-full select-none object-cover"
+        style={{ objectPosition: `${banner.focalX ?? 50}% ${banner.focalY ?? 50}%` }}
         draggable={false}
       />
 

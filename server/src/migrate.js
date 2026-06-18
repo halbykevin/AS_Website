@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS banners (
   link_url TEXT DEFAULT '',
   sort INTEGER DEFAULT 0,
   active BOOLEAN DEFAULT true,
+  focal_x INTEGER DEFAULT 50,
+  focal_y INTEGER DEFAULT 50,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -141,6 +143,9 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT ''
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;
+-- Per-banner focal point (%) so the admin controls how the image is cropped.
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_x INTEGER DEFAULT 50;
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_y INTEGER DEFAULT 50;
 -- Multi-date events + provenance for the Ticketing Box Office sync (idempotent upsert).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';

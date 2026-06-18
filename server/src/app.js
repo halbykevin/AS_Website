@@ -55,6 +55,7 @@ const eventJson = (r) => ({
 const bannerJson = (r) => ({
   id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,
   linkUrl: r.link_url, sort: r.sort, active: r.active, eventId: r.event_id,
+  focalX: r.focal_x, focalY: r.focal_y,
 })
 const categoryJson = (r) => ({
   id: r.id, name: r.name, slug: r.slug, imageUrl: r.image_url, sort: r.sort, visible: r.visible,
@@ -216,16 +217,20 @@ app.get('/api/banners', ah(async (req, res) => {
   res.json(rows.map(bannerJson))
 }))
 
+// Clamp a focal-point percentage to 0–100 (default 50 = centred).
+const clampPct = (v) => Math.min(100, Math.max(0, Math.round(Number(v))))
+const focal = (v) => (v === undefined || v === null || v === '' || Number.isNaN(Number(v)) ? 50 : clampPct(v))
+
 const bannerParams = (b) => [
   b.title || '', b.subtitle || '', b.imageUrl || '', b.linkUrl || '',
   Number(b.sort) || 0, b.active === undefined ? true : Boolean(b.active),
-  b.eventId ? Number(b.eventId) : null,
+  b.eventId ? Number(b.eventId) : null, focal(b.focalX), focal(b.focalY),
 ]
 
 app.post('/api/banners', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO banners (title, subtitle, image_url, link_url, sort, active, event_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    `INSERT INTO banners (title, subtitle, image_url, link_url, sort, active, event_id, focal_x, focal_y)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     bannerParams(req.body || {})
   )
   res.status(201).json(bannerJson(rows[0]))
@@ -233,8 +238,9 @@ app.post('/api/banners', requireAuth, ah(async (req, res) => {
 
 app.put('/api/banners/:id', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `UPDATE banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, sort=$5, active=$6, event_id=$7
-     WHERE id=$8 RETURNING *`,
+    `UPDATE banners SET title=$1, subtitle=$2, image_url=$3, link_url=$4, sort=$5, active=$6,
+       event_id=$7, focal_x=$8, focal_y=$9
+     WHERE id=$10 RETURNING *`,
     [...bannerParams(req.body || {}), req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
