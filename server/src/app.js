@@ -39,6 +39,7 @@ const settingsJson = (r) => ({
   aboutHeading: r.about_heading, aboutBody: r.about_body, aboutStats: r.about_stats,
   contactHeading: r.contact_heading, contactSubheading: r.contact_subheading,
   contactEmail: r.contact_email, contactWhatsapp: r.contact_whatsapp,
+  whatsappNumber: r.whatsapp_number,
   contactInstagram: r.contact_instagram, contactInstagramHandle: r.contact_instagram_handle,
   storeTitle: r.store_title, storeEyebrow: r.store_eyebrow,
   storeDescription: r.store_description, storeUrl: r.store_url,
@@ -113,7 +114,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        contact_heading=$17, contact_subheading=$18,
        contact_email=$19, contact_whatsapp=$20, contact_instagram=$21, contact_instagram_handle=$22,
        store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
-       published=$27, updated_at=now()
+       published=$27, whatsapp_number=$28, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
@@ -125,7 +126,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       b.contactHeading || '', b.contactSubheading || '',
       b.contactEmail || '', b.contactWhatsapp || '', b.contactInstagram || '', b.contactInstagramHandle || '',
       b.storeTitle || '', b.storeEyebrow || '', b.storeDescription || '', b.storeUrl || '',
-      Boolean(b.published),
+      Boolean(b.published), b.whatsappNumber || '',
     ]
   )
   res.json(settingsJson(rows[0]))

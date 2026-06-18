@@ -58,7 +58,7 @@ export default function EventCard({ event }) {
 
         <div className="mt-5 flex items-center justify-end border-t border-black/5 pt-4">
           <span className="flex items-center gap-1 text-sm font-semibold text-as-red">
-            {event.ticketUrl ? 'Buy tickets' : 'Details'}
+            {event.bookingUrl ? 'Reserve now' : 'Details'}
             <Icon name="arrow" className="h-4 w-4 transition group-hover:translate-x-1" />
           </span>
         </div>
@@ -66,10 +66,11 @@ export default function EventCard({ event }) {
     </>
   )
 
-  // With a ticket link the whole card opens it; otherwise go to the detail page.
-  if (event.ticketUrl) {
+  // With a reserve link (WhatsApp when configured, else the ticket URL) the
+  // whole card opens it; otherwise go to the detail page.
+  if (event.bookingUrl) {
     return (
-      <a href={event.ticketUrl} target="_blank" rel="noreferrer" className={cardCls}>
+      <a href={event.bookingUrl} target="_blank" rel="noreferrer" className={cardCls}>
         {body}
       </a>
     )

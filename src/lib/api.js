@@ -80,6 +80,9 @@ function mergeSettings(s) {
   return {
     ...d,
     published: Boolean(s.published),
+    // Global WhatsApp number (international digits) used to build event/banner
+    // "reserve" links — see whatsappBookingUrl().
+    whatsappNumber: pick(s.whatsappNumber, ''),
     brand: {
       ...d.brand,
       name: pick(s.brandName, d.brand.name),
@@ -195,6 +198,30 @@ function eventDateLabel(ev) {
   return formatBannerDate(ev.date)
 }
 
+// Build a WhatsApp "click to chat" link for an event: opens a chat with the
+// admin-configured number, pre-filled with the event details so the visitor
+// just hits send. Returns '' when no number is set, so callers can fall back to
+// the original ticket link. The mapped event carries title/date/venue/ticketUrl.
+export function whatsappBookingUrl(number, event) {
+  const digits = String(number || '').replace(/\D/g, '')
+  if (!digits || !event) return ''
+  const location = [event.venue, event.city].filter(Boolean).join(', ')
+  const details = [
+    event.title && `🎫 ${event.title}`,
+    eventDateLabel(event) && `📅 ${eventDateLabel(event)}`,
+    location && `📍 ${location}`,
+    event.ticketUrl && `🔗 ${event.ticketUrl}`,
+  ].filter(Boolean)
+  const message = [
+    "Hello👋 I'd like more details about this event:",
+    '',
+    ...details,
+    '',
+    'Is it still available, and how can I reserve a spot?',
+  ].join('\n')
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+}
+
 // A banner can be "driven" by an event: it then borrows the event's image,
 // title and link, so updating the event updates the banner automatically.
 // Any field the admin typed on the banner still wins.
@@ -208,7 +235,9 @@ function resolveBanner(banner, events) {
     image: banner.image || ev.image,
     title: banner.title || ev.title,
     subtitle: banner.subtitle || dateLabel || [ev.venue, ev.city].filter(Boolean).join(', ') || ev.excerpt,
-    link: banner.link || ev.ticketUrl || `/events/${ev.id}`,
+    // Borrow the event's reserve link (WhatsApp when configured, else its ticket
+    // URL); a link the admin typed on the banner still wins.
+    link: banner.link || ev.bookingUrl || ev.ticketUrl || `/events/${ev.id}`,
   }
 }
 
@@ -291,7 +320,14 @@ export async function loadSite() {
         items: services.map((s) => ({ title: s.title, description: s.description, icon: s.icon || 'chip' })),
       }
     }
-    const mappedEvents = Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents
+    const baseEvents = Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents
+    // Attach a "reserve" link to every event: a pre-filled WhatsApp chat when a
+    // number is configured, otherwise the original ticket URL. Cards, banners
+    // and the detail CTA all open this.
+    const mappedEvents = baseEvents.map((e) => ({
+      ...e,
+      bookingUrl: whatsappBookingUrl(content.whatsappNumber, e) || e.ticketUrl,
+    }))
     content.banners = Array.isArray(banners)
       ? banners.map(mapBanner).map((b) => resolveBanner(b, mappedEvents)).filter((b) => b.active && b.image)
       : []

@@ -11,6 +11,7 @@ const empty = {
   aboutHeading: '', aboutBody: '',
   contactHeading: '', contactSubheading: '',
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
+  whatsappNumber: '',
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
   published: false,
 }
@@ -42,6 +43,7 @@ export default function SettingsEditor() {
           contactHeading: s.contactHeading || '', contactSubheading: s.contactSubheading || '',
           contactEmail: s.contactEmail || '', contactWhatsapp: s.contactWhatsapp || '',
           contactInstagram: s.contactInstagram || '', contactInstagramHandle: s.contactInstagramHandle || '',
+          whatsappNumber: s.whatsappNumber || '',
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
           published: Boolean(s.published),
@@ -198,6 +200,12 @@ export default function SettingsEditor() {
           <Field label="Subheading"><TextInput value={form.contactSubheading} onChange={set('contactSubheading')} /></Field>
           <Field label="Email"><TextInput type="email" value={form.contactEmail} onChange={set('contactEmail')} /></Field>
           <Field label="WhatsApp link"><TextInput value={form.contactWhatsapp} onChange={set('contactWhatsapp')} /></Field>
+          <Field
+            label="Event reservations WhatsApp number"
+            hint="International format, digits only (e.g. 9613123456). Event cards & banners open a WhatsApp chat to this number, pre-filled with the event details. Leave empty to keep opening the ticket link."
+          >
+            <TextInput value={form.whatsappNumber} onChange={set('whatsappNumber')} placeholder="9613123456" />
+          </Field>
           <Field label="Instagram link"><TextInput value={form.contactInstagram} onChange={set('contactInstagram')} /></Field>
           <Field label="Instagram handle"><TextInput value={form.contactInstagramHandle} onChange={set('contactInstagramHandle')} /></Field>
         </div>

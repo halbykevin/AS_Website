@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS settings (
   about_stats JSONB DEFAULT '[]'::jsonb,
   contact_email TEXT DEFAULT '',
   contact_whatsapp TEXT DEFAULT '',
+  whatsapp_number TEXT DEFAULT '',
   contact_instagram TEXT DEFAULT '',
   contact_instagram_handle TEXT DEFAULT '',
   store_title TEXT DEFAULT '',
@@ -140,6 +141,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS events_heading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS events_intro TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_heading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;
