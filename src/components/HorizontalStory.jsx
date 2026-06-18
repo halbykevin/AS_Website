@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useScrollEl } from '../store/scroll.jsx'
 
 // Shared scroll-in reveal: text rises + fades as a panel enters view, staggered
-// child-by-child. Plays on desktop (pinned) and mobile (carousel) alike.
+// child-by-child. Plays on every size (the pinned section runs on mobile too).
 const EASE = [0.22, 0.7, 0.3, 1]
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } } }
 const riseItem = {
@@ -16,15 +16,16 @@ const scaleItem = {
   show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE } },
 }
 
-// Per-panel image size (admin-controlled) — desktop sets the column width,
-// mobile sets the image aspect ratio so bigger sizes are taller.
-const SIZE_DESKTOP = {
-  sm: 'w-[26%] max-w-xs',
-  md: 'w-[38%] max-w-sm',
-  lg: 'w-[48%] max-w-md',
-  xl: 'w-[58%] max-w-lg',
+// Per-panel image size (admin-controlled). Responsive: a larger share of the
+// width on phones, a column width on desktop — so panels can differ in size on
+// both. (SIZE_CARD is the aspect ratio used by the reduced-motion carousel.)
+const SIZE = {
+  sm: 'w-[52%] max-w-[12rem] sm:w-[26%] sm:max-w-xs',
+  md: 'w-[64%] max-w-[15rem] sm:w-[38%] sm:max-w-sm',
+  lg: 'w-[76%] max-w-[18rem] sm:w-[48%] sm:max-w-md',
+  xl: 'w-[88%] max-w-[22rem] sm:w-[58%] sm:max-w-lg',
 }
-const SIZE_MOBILE = {
+const SIZE_CARD = {
   sm: 'aspect-[4/3]',
   md: 'aspect-square',
   lg: 'aspect-[4/5]',
@@ -32,10 +33,11 @@ const SIZE_MOBILE = {
 }
 
 // ---------------------------------------------------------------------------
-// Horizontal scroll-story — a GSAP-style pinned section. On desktop the section
-// sticks to the viewport and vertical scrolling is translated into horizontal
-// travel of the panels (big typography + images), with light parallax. On
-// mobile (or with reduced motion) it falls back to a swipeable carousel.
+// Horizontal scroll-story — a GSAP-style pinned section. On every screen size
+// (desktop AND mobile) the section sticks to the viewport and vertical scrolling
+// is translated into horizontal travel of the panels (big typography + images),
+// with light parallax and scroll-in reveals. Only reduced-motion users get a
+// plain static carousel.
 //
 // IMPORTANT: the public site scrolls inside a container (Layout's scrollRef),
 // not the window — so the scroll math reads that element via useScrollEl().
@@ -45,24 +47,16 @@ const DARK = '#0b0b0c'
 const DEFAULT_ACCENT = '#A41E22' // as-red
 
 export default function HorizontalStory({ story }) {
-  // Pin only on a wide viewport with motion allowed; otherwise carousel.
+  // Pin on all sizes; only reduced-motion users fall back to a static carousel.
   const [pinned, setPinned] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia('(min-width: 768px)').matches &&
-      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    () => typeof window !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
     const rm = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setPinned(mq.matches && !rm.matches)
-    mq.addEventListener('change', update)
+    const update = () => setPinned(!rm.matches)
     rm.addEventListener('change', update)
-    return () => {
-      mq.removeEventListener('change', update)
-      rm.removeEventListener('change', update)
-    }
+    return () => rm.removeEventListener('change', update)
   }, [])
 
   if (!story || !story.panels?.length) return null
@@ -175,18 +169,18 @@ function StoryPanel({ panel, width, delta, flip }) {
   return (
     <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw', opacity }}>
       <div
-        className={`mx-auto flex w-full max-w-6xl items-center gap-8 px-6 sm:gap-12 sm:px-10 ${
-          flip ? 'flex-row-reverse' : ''
+        className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-7 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
+          flip ? 'sm:flex-row-reverse' : ''
         }`}
       >
         {/* Parallax wrapper (transform) is separate from the motion wrapper so
             the two don't fight over `transform`. */}
-        <div className="flex-1" style={{ transform: `translateX(${textShift}px)` }}>
+        <div className="w-full sm:flex-1" style={{ transform: `translateX(${textShift}px)` }}>
           <motion.div
             variants={stagger}
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.5 }}
+            viewport={{ once: false, amount: 0.4 }}
           >
             {panel.caption && (
               <motion.span
@@ -199,7 +193,7 @@ function StoryPanel({ panel, width, delta, flip }) {
             )}
             <motion.h3
               variants={riseItem}
-              className="mt-3 text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl"
+              className="mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl"
             >
               {panel.heading}
             </motion.h3>
@@ -217,7 +211,7 @@ function StoryPanel({ panel, width, delta, flip }) {
         </div>
 
         <div
-          className={`relative aspect-[4/5] shrink-0 ${SIZE_DESKTOP[panel.size] || SIZE_DESKTOP.md}`}
+          className={`relative aspect-[4/5] shrink-0 ${SIZE[panel.size] || SIZE.md}`}
           style={{ transform: `translateX(${imgShift}px)` }}
         >
           <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: `${accent}0d` }} />
@@ -280,7 +274,7 @@ function StoryCard({ panel }) {
     >
       <motion.div
         variants={scaleItem}
-        className={`relative w-full overflow-hidden ${SIZE_MOBILE[panel.size] || SIZE_MOBILE.md}`}
+        className={`relative w-full overflow-hidden ${SIZE_CARD[panel.size] || SIZE_CARD.md}`}
       >
         {panel.image ? (
           <img src={panel.image} alt={panel.heading || ''} className="h-full w-full object-cover" />
