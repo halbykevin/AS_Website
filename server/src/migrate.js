@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS story_panels (
   image_url TEXT DEFAULT '',
   accent TEXT DEFAULT '',
   link_url TEXT DEFAULT '',
+  size TEXT DEFAULT 'md',
   sort INTEGER DEFAULT 0,
   visible BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -166,6 +167,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS events_intro TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_heading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
+ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;

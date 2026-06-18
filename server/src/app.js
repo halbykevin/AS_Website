@@ -84,7 +84,7 @@ const storyJson = (r) => ({
 })
 const storyPanelJson = (r) => ({
   id: r.id, heading: r.heading, caption: r.caption, imageUrl: r.image_url,
-  accent: r.accent, linkUrl: r.link_url, sort: r.sort, visible: r.visible,
+  accent: r.accent, linkUrl: r.link_url, size: r.size, sort: r.sort, visible: r.visible,
 })
 
 // ========================= Health =========================
@@ -435,13 +435,13 @@ app.get('/api/story-panels', ah(async (req, res) => {
 
 const storyPanelParams = (b) => [
   b.heading || '', b.caption || '', b.imageUrl || '', b.accent || '', b.linkUrl || '',
-  Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
+  b.size || 'md', Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
 ]
 
 app.post('/api/story-panels', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO story_panels (heading, caption, image_url, accent, link_url, sort, visible)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    `INSERT INTO story_panels (heading, caption, image_url, accent, link_url, size, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     storyPanelParams(req.body || {})
   )
   res.status(201).json(storyPanelJson(rows[0]))
@@ -449,8 +449,8 @@ app.post('/api/story-panels', requireAuth, ah(async (req, res) => {
 
 app.put('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `UPDATE story_panels SET heading=$1, caption=$2, image_url=$3, accent=$4, link_url=$5, sort=$6, visible=$7
-     WHERE id=$8 RETURNING *`,
+    `UPDATE story_panels SET heading=$1, caption=$2, image_url=$3, accent=$4, link_url=$5, size=$6, sort=$7, visible=$8
+     WHERE id=$9 RETURNING *`,
     [...storyPanelParams(req.body || {}), req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })

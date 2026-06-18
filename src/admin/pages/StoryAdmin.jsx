@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
-import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
+import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
-const blankPanel = { heading: '', caption: '', imageUrl: '', accent: '', linkUrl: '', sort: 0, visible: true }
+const SIZES = [
+  { value: 'sm', label: 'Small' },
+  { value: 'md', label: 'Medium' },
+  { value: 'lg', label: 'Large' },
+  { value: 'xl', label: 'Extra large' },
+]
+const blankPanel = { heading: '', caption: '', imageUrl: '', accent: '', linkUrl: '', size: 'md', sort: 0, visible: true }
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
 
 export default function StoryAdmin() {
@@ -66,6 +72,7 @@ export default function StoryAdmin() {
       imageUrl: r.imageUrl || '',
       accent: r.accent || '',
       linkUrl: r.linkUrl || '',
+      size: r.size || 'md',
       sort: r.sort || 0,
       visible: r.visible !== false,
     })
@@ -175,6 +182,13 @@ export default function StoryAdmin() {
                 <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="/events or https://…" />
               </Field>
             </div>
+            <Field label="Image size" hint="Controls how big this panel's image is — mix sizes for variety. Scales on mobile too.">
+              <SegmentedControl
+                value={form.size}
+                onChange={(v) => setForm((f) => ({ ...f, size: v }))}
+                options={SIZES}
+              />
+            </Field>
             <Field label="Image" hint="Portrait images look best on desktop. Leave empty for a branded tile.">
               <div className="flex items-center gap-4">
                 {(imageFile || form.imageUrl) && (

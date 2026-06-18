@@ -11,6 +11,25 @@ const riseItem = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
 }
+const scaleItem = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE } },
+}
+
+// Per-panel image size (admin-controlled) — desktop sets the column width,
+// mobile sets the image aspect ratio so bigger sizes are taller.
+const SIZE_DESKTOP = {
+  sm: 'w-[26%] max-w-xs',
+  md: 'w-[38%] max-w-sm',
+  lg: 'w-[48%] max-w-md',
+  xl: 'w-[58%] max-w-lg',
+}
+const SIZE_MOBILE = {
+  sm: 'aspect-[4/3]',
+  md: 'aspect-square',
+  lg: 'aspect-[4/5]',
+  xl: 'aspect-[3/4]',
+}
 
 // ---------------------------------------------------------------------------
 // Horizontal scroll-story — a GSAP-style pinned section. On desktop the section
@@ -198,12 +217,12 @@ function StoryPanel({ panel, width, delta, flip }) {
         </div>
 
         <div
-          className="relative aspect-[4/5] w-[38%] max-w-sm shrink-0"
+          className={`relative aspect-[4/5] shrink-0 ${SIZE_DESKTOP[panel.size] || SIZE_DESKTOP.md}`}
           style={{ transform: `translateX(${imgShift}px)` }}
         >
-          <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: `${accent}22` }} />
+          <div className="pointer-events-none absolute -inset-6 rounded-full blur-3xl" style={{ background: `${accent}0d` }} />
           <motion.div
-            className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-1 ring-white/10"
+            className="relative h-full w-full overflow-hidden rounded-3xl"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, amount: 0.4 }}
@@ -253,13 +272,16 @@ function StoryCard({ panel }) {
   const reduce = useReducedMotion()
   const card = (
     <motion.div
-      className="overflow-hidden rounded-3xl bg-white/[0.04] ring-1 ring-white/10"
+      className="overflow-hidden rounded-3xl bg-white/[0.04]"
       variants={stagger}
       initial={reduce ? false : 'hidden'}
       whileInView="show"
-      viewport={{ once: true, amount: 0.3 }}
+      viewport={{ once: false, amount: 0.35 }}
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
+      <motion.div
+        variants={scaleItem}
+        className={`relative w-full overflow-hidden ${SIZE_MOBILE[panel.size] || SIZE_MOBILE.md}`}
+      >
         {panel.image ? (
           <img src={panel.image} alt={panel.heading || ''} className="h-full w-full object-cover" />
         ) : (
@@ -270,7 +292,7 @@ function StoryCard({ panel }) {
             <span className="px-4 text-center text-lg font-bold uppercase tracking-wide text-white/70">{panel.heading}</span>
           </div>
         )}
-      </div>
+      </motion.div>
       <div className="p-5">
         {panel.caption && (
           <motion.span variants={riseItem} className="block text-xs font-semibold uppercase tracking-widest" style={{ color: accent }}>

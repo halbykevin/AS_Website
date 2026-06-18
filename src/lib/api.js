@@ -291,6 +291,7 @@ export function mapStoryPanel(p) {
     image: p.imageUrl || '',
     accent: p.accent || '',
     link: p.linkUrl || '',
+    size: p.size || 'md',
     visible: p.visible !== false,
   }
 }
