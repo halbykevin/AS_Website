@@ -175,12 +175,24 @@ export function mapCategory(c) {
   }
 }
 
-// Format an event date (YYYY-MM-DD) to a readable label, e.g. "12 Jul 2026".
+// Format an event date (YYYY-MM-DD) with weekday, e.g. "Thursday 18 Jun 2026".
 function formatBannerDate(date) {
   if (!date) return ''
   const d = new Date(`${date}T00:00:00`)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// The date label shown under the banner title: a weekday range for multi-day
+// events ("Thursday 18 Jun 2026 - Friday 03 Jul 2026"), otherwise a single day.
+function eventDateLabel(ev) {
+  const days = Array.isArray(ev.dates) ? ev.dates.map((d) => d?.date).filter(Boolean).sort() : []
+  if (days.length > 1) {
+    const start = formatBannerDate(days[0])
+    const end = formatBannerDate(days[days.length - 1])
+    return start && end ? `${start} - ${end}` : start || end
+  }
+  return formatBannerDate(ev.date)
 }
 
 // A banner can be "driven" by an event: it then borrows the event's image,
@@ -190,15 +202,12 @@ function resolveBanner(banner, events) {
   if (!banner.eventId) return banner
   const ev = events.find((e) => e.recordId === banner.eventId)
   if (!ev) return banner
-  // Detail line like Ticketing Box Office: date · venue, city.
-  const detail = [formatBannerDate(ev.date), [ev.venue, ev.city].filter(Boolean).join(', ')]
-    .filter(Boolean)
-    .join(' · ')
+  const dateLabel = eventDateLabel(ev)
   return {
     ...banner,
     image: banner.image || ev.image,
     title: banner.title || ev.title,
-    subtitle: banner.subtitle || detail || ev.excerpt,
+    subtitle: banner.subtitle || dateLabel || [ev.venue, ev.city].filter(Boolean).join(', ') || ev.excerpt,
     link: banner.link || ev.ticketUrl || `/events/${ev.id}`,
   }
 }

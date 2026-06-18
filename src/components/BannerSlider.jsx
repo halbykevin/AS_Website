@@ -72,6 +72,7 @@ export default function BannerSlider({ banners }) {
   }
 
   if (!count) return null
+  const current = banners[index]
 
   return (
     <section
@@ -126,13 +127,42 @@ export default function BannerSlider({ banners }) {
           </div>
         )}
       </div>
+
+      {/* Details bar for the current slide (below the image, AS Company style) */}
+      {(current.title || current.subtitle || current.link) && (
+        <div className="border-b border-black/5 bg-white">
+          <div className="mx-auto max-w-3xl px-5 py-7 text-center sm:px-8 sm:py-9">
+            <div key={current.id} className="animate-fade-in">
+              {current.title && (
+                <h2 className="text-2xl font-extrabold uppercase tracking-tight text-as-charcoal sm:text-3xl">
+                  {current.title}
+                </h2>
+              )}
+              {current.subtitle && (
+                <p className="mt-2 text-sm font-medium text-as-charcoal/55 sm:text-base">
+                  {current.subtitle}
+                </p>
+              )}
+              {current.link && (
+                <a
+                  href={current.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-5 inline-flex items-center rounded-full border-2 border-as-red px-8 py-2.5 text-xs font-semibold uppercase tracking-widest text-as-red transition hover:bg-as-red hover:text-white sm:text-sm"
+                >
+                  Buy tickets
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
 
-// A single full-bleed slide: cropped image + gradient + overlaid details. The
-// whole slide is the link (so the "Buy tickets" pill is a styled span, not a
-// nested <a>).
+// A single full-bleed slide: the cropped image, positioned by its focal point.
+// Details live in the bar below the slideshow, not over the image.
 function Slide({ banner }) {
   const hasLink = Boolean(banner.link)
   const Wrapper = hasLink ? 'a' : 'div'
@@ -141,7 +171,7 @@ function Slide({ banner }) {
     : {}
 
   return (
-    <Wrapper {...wrapperProps} className="group relative block h-full w-full shrink-0">
+    <Wrapper {...wrapperProps} className="relative block h-full w-full shrink-0">
       <img
         src={banner.image}
         alt={banner.title || 'Banner'}
@@ -149,32 +179,6 @@ function Slide({ banner }) {
         style={{ objectPosition: `${banner.focalX ?? 50}% ${banner.focalY ?? 50}%` }}
         draggable={false}
       />
-
-      {/* Detail overlay — only when there's something to show */}
-      {(banner.title || banner.subtitle || hasLink) && (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 px-5 pb-10 sm:px-8 sm:pb-12 lg:px-12 lg:pb-14">
-            <div className="mx-auto max-w-7xl">
-              {banner.title && (
-                <h2 className="max-w-2xl text-2xl font-extrabold leading-tight tracking-tight text-white drop-shadow sm:text-4xl lg:text-5xl">
-                  {banner.title}
-                </h2>
-              )}
-              {banner.subtitle && (
-                <p className="mt-2 max-w-xl text-sm text-white/85 drop-shadow sm:text-base">
-                  {banner.subtitle}
-                </p>
-              )}
-              {hasLink && (
-                <span className="mt-4 inline-flex items-center rounded-full bg-as-red px-7 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg transition group-hover:bg-as-red-light sm:text-sm">
-                  Buy tickets
-                </span>
-              )}
-            </div>
-          </div>
-        </>
-      )}
     </Wrapper>
   )
 }
