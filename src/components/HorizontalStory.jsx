@@ -87,7 +87,7 @@ function AutoStory({ story }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div ref={wrapRef} className="relative h-[48svh] min-h-[340px] max-h-[520px] w-full overflow-hidden">
+      <div ref={wrapRef} className="relative h-[42svh] min-h-[300px] max-h-[460px] w-full overflow-hidden">
         <motion.div
           className="flex h-full will-change-transform"
           style={{ width: w ? w * n : '100%' }}
@@ -111,7 +111,7 @@ function AutoStory({ story }) {
 
         {/* Panel dots */}
         {n > 1 && (
-          <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
             {panels.map((p, i) => (
               <button
                 key={p.id ?? i}
