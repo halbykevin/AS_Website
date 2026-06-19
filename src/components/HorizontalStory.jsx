@@ -22,10 +22,10 @@ const INTERVAL = 3500
 // width on phones, a column width on desktop — so panels can differ in size on
 // both. (SIZE_CARD is the aspect ratio used by the reduced-motion carousel.)
 const SIZE = {
-  sm: 'w-[52%] max-w-[12rem] sm:w-[26%] sm:max-w-xs',
-  md: 'w-[64%] max-w-[15rem] sm:w-[38%] sm:max-w-sm',
-  lg: 'w-[76%] max-w-[18rem] sm:w-[48%] sm:max-w-md',
-  xl: 'w-[88%] max-w-[22rem] sm:w-[58%] sm:max-w-lg',
+  sm: 'w-[34%] max-w-[8rem] sm:w-[26%] sm:max-w-xs',
+  md: 'w-[42%] max-w-[10rem] sm:w-[38%] sm:max-w-sm',
+  lg: 'w-[50%] max-w-[12rem] sm:w-[48%] sm:max-w-md',
+  xl: 'w-[58%] max-w-[14rem] sm:w-[58%] sm:max-w-lg',
 }
 const SIZE_CARD = {
   sm: 'aspect-[4/3]',
@@ -82,12 +82,12 @@ function AutoStory({ story }) {
   return (
     <section
       aria-label={story.heading || 'Story'}
-      className="relative overflow-hidden"
+      className="relative mb-2 overflow-hidden sm:mb-3"
       style={{ background: DARK }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div ref={wrapRef} className="relative h-[42svh] min-h-[300px] max-h-[460px] w-full overflow-hidden">
+      <div ref={wrapRef} className="relative h-[50svh] min-h-[360px] max-h-[520px] w-full overflow-hidden sm:h-[42svh] sm:min-h-[300px] sm:max-h-[460px]">
         <motion.div
           className="flex h-full will-change-transform"
           style={{ width: w ? w * n : '100%' }}
@@ -167,7 +167,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
   return (
     <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
       <div
-        className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-7 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
+        className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-4 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
         }`}
       >
@@ -183,7 +183,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
               </motion.span>
             )}
             <h3
-              className={`mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl ${hasGradient ? '' : 'text-white'}`}
+              className={`mt-3 text-2xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl ${hasGradient ? '' : 'text-white'}`}
               style={headingStyle}
             >
               <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
