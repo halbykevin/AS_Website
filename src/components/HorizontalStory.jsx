@@ -16,7 +16,7 @@ const scaleItem = {
 }
 
 // How long each panel stays on screen before auto-advancing (ms).
-const INTERVAL = 5000
+const INTERVAL = 3500
 
 // Per-panel image size (admin-controlled). Responsive: a larger share of the
 // width on phones, a column width on desktop — so panels can differ in size on
@@ -87,7 +87,7 @@ function AutoStory({ story }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div ref={wrapRef} className="relative h-[86svh] min-h-[520px] max-h-[820px] w-full overflow-hidden">
+      <div ref={wrapRef} className="relative h-[62svh] min-h-[420px] max-h-[640px] w-full overflow-hidden">
         <motion.div
           className="flex h-full will-change-transform"
           style={{ width: w ? w * n : '100%' }}
