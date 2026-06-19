@@ -157,6 +157,42 @@ CREATE TABLE IF NOT EXISTS story_panels (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- "What We Do" (Absolute Solution): a singleton row of page copy
+-- (about/vision/mission/divisions) + the "solutions" the page lists.
+CREATE TABLE IF NOT EXISTS what_we_do (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT true,
+  eyebrow TEXT DEFAULT '',
+  title TEXT DEFAULT '',
+  intro JSONB DEFAULT '[]'::jsonb,
+  solutions_heading TEXT DEFAULT '',
+  solutions_intro TEXT DEFAULT '',
+  vision_heading TEXT DEFAULT '',
+  vision TEXT DEFAULT '',
+  mission_heading TEXT DEFAULT '',
+  mission TEXT DEFAULT '',
+  divisions_heading TEXT DEFAULT '',
+  divisions_intro TEXT DEFAULT '',
+  divisions JSONB DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT what_we_do_singleton CHECK (id = 1)
+);
+
+CREATE TABLE IF NOT EXISTS solutions (
+  id SERIAL PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  summary TEXT DEFAULT '',
+  icon TEXT DEFAULT 'chip',
+  image_url TEXT DEFAULT '',
+  intro TEXT DEFAULT '',
+  outro TEXT DEFAULT '',
+  items JSONB DEFAULT '[]'::jsonb,
+  sort INTEGER DEFAULT 0,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;
@@ -232,6 +268,24 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO story (id, enabled, eyebrow, heading, subheading)
 VALUES (1, true, 'AS Company', 'Built for the moment',
   'Keep scrolling to explore what we bring to life.')
+ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton "What We Do" row exists with the Absolute Solution copy.
+INSERT INTO what_we_do (id, enabled, eyebrow, title, intro,
+  solutions_heading, solutions_intro,
+  vision_heading, vision, mission_heading, mission,
+  divisions_heading, divisions_intro, divisions)
+VALUES (1, true, 'Absolute Solution', 'Absolute Solution',
+  '["Absolute Solution is the technology and business solutions division under AS SAL.","With years of expertise in Information Technology, Security Systems, Automation, and Business Solutions, Absolute Solution is dedicated to providing comprehensive services to the Lebanese market. Our professional team of consultants, engineers, and specialists assists organizations in optimizing their operations, securing their assets, and enhancing workplace productivity.","At Absolute Solution, we deliver cutting-edge technologies and innovative business solutions that contribute to efficient, secure, and productive business operations."]'::jsonb,
+  'Our Solutions',
+  'At Absolute Solution, we believe in a dynamic approach that aligns with your business objectives. Your success is a crucial factor in our growth strategy; therefore, we work in synergy with your organization to deliver measurable results and sustainable growth.',
+  'Our Vision',
+  'We are focused on delivering world-class Technology, Security, Automation, and Business Solutions. Our vision is to modernize and redefine the industry while continuously improving the customer experience to exceed expectations.',
+  'Our Mission',
+  'Our mission is to deliver comprehensive and affordable solutions that enable SMEs and enterprises to operate efficiently, securely, and productively. We provide businesses with the tools, technologies, and support needed to focus on growth opportunities and long-term success.',
+  'Our Divisions',
+  'AS SAL now operates through:',
+  '[{"name":"Absolute Solution","description":"Technology, Security, Automation, and Business Solutions."},{"name":"AS Store","description":"Telecommunications, Electronics, and Copy Center Services. Ongoing since 2008, AS Store has become a leader in telecommunications and electronics — a one-stop destination for a wide range of electronic products and advanced copy center services designed to simplify everyday needs."}]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 `
 

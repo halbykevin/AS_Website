@@ -60,6 +60,45 @@ const paths = {
       <path d="M9 21v-6h6v6" />
     </>
   ),
+  // Network — connected nodes.
+  network: (
+    <>
+      <circle cx="5" cy="6" r="2" />
+      <circle cx="19" cy="6" r="2" />
+      <circle cx="12" cy="18" r="2" />
+      <path d="M7 7 10.5 16M17 7 13.5 16M7 6h10" />
+    </>
+  ),
+  // Server / system — stacked racks.
+  server: (
+    <>
+      <rect x="3" y="4" width="18" height="7" rx="1.5" />
+      <rect x="3" y="13" width="18" height="7" rx="1.5" />
+      <path d="M7 7.5h.01M7 16.5h.01M11 7.5h3M11 16.5h3" />
+    </>
+  ),
+  // Security — shield with check.
+  shield: (
+    <>
+      <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+      <path d="m9.5 11.5 1.8 1.8 3.2-3.6" />
+    </>
+  ),
+  // Smart home — house.
+  home: (
+    <>
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5 10v10h14V10" />
+      <path d="M10 20v-6h4v6" />
+    </>
+  ),
+  // Stationery — pen / writing.
+  pen: (
+    <>
+      <path d="M12 19l7-7a2.1 2.1 0 0 0-3-3l-7 7-1.5 4.5L12 19Z" />
+      <path d="M14 8l3 3" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = 'h-6 w-6' }) {

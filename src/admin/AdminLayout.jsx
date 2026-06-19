@@ -7,6 +7,7 @@ const links = [
   { to: '/admin/banners', label: 'Banners' },
   { to: '/admin/sections', label: 'Custom Sections' },
   { to: '/admin/services', label: 'Services' },
+  { to: '/admin/what-we-do', label: 'What We Do' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/categories', label: 'Categories' },
   { to: '/admin/store', label: 'AS Store Showcase' },

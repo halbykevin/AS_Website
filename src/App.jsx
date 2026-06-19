@@ -12,12 +12,15 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Events = lazy(() => import('./pages/Events.jsx'))
 const EventDetail = lazy(() => import('./pages/EventDetail.jsx'))
 const StoreComingSoon = lazy(() => import('./pages/StoreComingSoon.jsx'))
+const WhatWeDo = lazy(() => import('./pages/WhatWeDo.jsx'))
+const SolutionDetail = lazy(() => import('./pages/SolutionDetail.jsx'))
 
 // Admin area — split so public visitors never download the dashboard bundle.
 const AdminLogin = lazy(() => import('./admin/Login.jsx'))
 const AdminLayout = lazy(() => import('./admin/AdminLayout.jsx'))
 const SettingsEditor = lazy(() => import('./admin/pages/SettingsEditor.jsx'))
 const ServicesAdmin = lazy(() => import('./admin/pages/ServicesAdmin.jsx'))
+const WhatWeDoAdmin = lazy(() => import('./admin/pages/WhatWeDoAdmin.jsx'))
 const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
 const SectionsAdmin = lazy(() => import('./admin/pages/SectionsAdmin.jsx'))
@@ -39,6 +42,8 @@ function PublicSite() {
       <Suspense fallback={<SiteSkeleton />}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/what-we-do" element={<WhatWeDo />} />
+          <Route path="/what-we-do/:slug" element={<SolutionDetail />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/store" element={<StoreComingSoon />} />
@@ -69,6 +74,7 @@ export default function App() {
               <Route path="banners" element={<BannersAdmin />} />
               <Route path="sections" element={<SectionsAdmin />} />
               <Route path="services" element={<ServicesAdmin />} />
+              <Route path="what-we-do" element={<WhatWeDoAdmin />} />
               <Route path="events" element={<EventsAdmin />} />
               <Route path="categories" element={<CategoriesAdmin />} />
               <Route path="store" element={<StoreAdmin />} />

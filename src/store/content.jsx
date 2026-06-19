@@ -69,6 +69,7 @@ export function ContentProvider({ children }) {
     ...state.content,
     events: state.events,
     getEvent: (slug) => state.events.find((e) => e.id === slug),
+    getSolution: (slug) => (state.content.solutions || []).find((s) => s.slug === slug),
   }
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>

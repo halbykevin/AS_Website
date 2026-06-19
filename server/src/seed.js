@@ -41,6 +41,100 @@ const events = [
   },
 ]
 
+// The six Absolute Solution "solutions" shown on /what-we-do (each opens a
+// detail page). `items` is a JSONB list of { title, description }.
+const solutions = [
+  {
+    slug: 'network-solutions', title: 'Network Solutions', icon: 'network', sort: 0,
+    summary: 'Complete network solutions designed to improve performance, increase security, and simplify operations.',
+    intro: 'We provide complete network solutions designed to improve performance, increase security, and simplify operations.',
+    outro: '',
+    items: [
+      { title: 'Network Infrastructure', description: '' },
+      { title: 'Network Security', description: '' },
+      { title: 'IT Security Solutions', description: '' },
+      { title: 'Voice Solutions', description: '' },
+      { title: 'Structured Cabling', description: '' },
+    ],
+  },
+  {
+    slug: 'system-solutions', title: 'System Solutions', icon: 'server', sort: 1,
+    summary: 'State-of-the-art system solutions that enhance business performance and increase profitability.',
+    intro: 'We provide state-of-the-art system solutions that enhance business performance and increase profitability.',
+    outro: 'These solutions help optimize IT investments, improve application performance, consolidate infrastructure, and ensure operational resilience.',
+    items: [
+      { title: 'Virtualization', description: '' },
+      { title: 'Cloud Solutions', description: '' },
+      { title: 'Servers & Storage', description: '' },
+      { title: 'System Infrastructure', description: '' },
+      { title: 'Data Backup & Disaster Recovery', description: '' },
+      { title: 'Business Continuity Solutions', description: '' },
+    ],
+  },
+  {
+    slug: 'security-solutions', title: 'Security Solutions', icon: 'shield', sort: 2,
+    summary: 'Protecting your people, premises, and assets is a core part of our service offering.',
+    intro: 'Protecting your people, premises, and assets is a core part of our service offering.',
+    outro: '',
+    items: [
+      { title: 'Video Surveillance (CCTV)', description: 'Customized surveillance systems designed to improve security and monitoring across all types of facilities.' },
+      { title: 'Intrusion Alarm Systems', description: 'From basic alarm installations to fully integrated security platforms capable of managing multiple sites.' },
+      { title: 'Access Control Systems', description: 'Advanced access management solutions providing secure, transparent, and reliable monitoring of facility access.' },
+      { title: 'Fire Detection Systems', description: 'Conventional and addressable fire alarm systems designed to protect lives, property, and business continuity.' },
+      { title: 'Videophone & Intercom Systems', description: 'Audio and video communication systems for residential, commercial, and industrial environments.' },
+      { title: 'Public Address Systems', description: 'Integrated communication systems for emergency announcements and public information broadcasting.' },
+      { title: 'Safe Boxes', description: 'Advanced fire-resistant and secure storage solutions for documents, valuables, and sensitive information.' },
+      { title: 'Money Counters', description: 'High-accuracy currency counting and verification systems using advanced image processing technology.' },
+    ],
+  },
+  {
+    slug: 'smart-home-building-automation', title: 'Smart Home & Building Automation', icon: 'home', sort: 3,
+    summary: 'Smart Home and Building Automation Systems that bring convenience, security, and energy efficiency together.',
+    intro: 'We design and implement Smart Home and Building Automation Systems that bring convenience, security, and energy efficiency together. Our automation solutions allow centralized control of:',
+    outro: 'Accessible locally or remotely through internet-connected devices.',
+    items: [
+      { title: 'Lighting', description: '' },
+      { title: 'Climate Control', description: '' },
+      { title: 'Security Systems', description: '' },
+      { title: 'Audio & Video Systems', description: '' },
+      { title: 'Door Access', description: '' },
+      { title: 'Remote Monitoring', description: '' },
+    ],
+  },
+  {
+    slug: 'business-stationery-workplace', title: 'Business Stationery & Workplace Solutions', icon: 'pen', sort: 4,
+    summary: 'Quality office essentials and workplace solutions to support your daily operations.',
+    intro: 'A productive workplace requires the right tools and supplies. Through our Business Stationery and Workplace Solutions, we provide organizations with quality office essentials to support daily operations.',
+    outro: 'We work with trusted international brands to provide reliable products that improve workplace efficiency and productivity.',
+    items: [
+      { title: 'Filing Systems', description: '' },
+      { title: 'Desk Accessories', description: '' },
+      { title: 'Writing Instruments', description: '' },
+      { title: 'Papers & Office Supplies', description: '' },
+      { title: 'Glues & Adhesive Tapes', description: '' },
+      { title: 'Computer Accessories', description: '' },
+      { title: 'Ink & Toner Supplies', description: '' },
+      { title: 'Visual Presentation Solutions', description: '' },
+    ],
+  },
+  {
+    slug: 'support-services', title: 'Support Services', icon: 'support', sort: 5,
+    summary: 'Comprehensive support services to ensure the smooth operation of your technology and business infrastructure.',
+    intro: 'We offer comprehensive support services to ensure the smooth operation of your technology and business infrastructure.',
+    outro: 'Our dedicated team provides prompt, organized, and effective support to keep your business running efficiently.',
+    items: [
+      { title: 'Maintenance Contracts', description: '' },
+      { title: 'Onsite Support', description: '' },
+      { title: 'Remote Support', description: '' },
+      { title: 'On-Demand Support', description: '' },
+      { title: 'IT Consultancy', description: '' },
+      { title: 'Security System Maintenance', description: '' },
+      { title: 'Infrastructure Management', description: '' },
+      { title: 'Technical Assistance', description: '' },
+    ],
+  },
+]
+
 async function run() {
   const svc = await pool.query('SELECT count(*)::int AS n FROM services')
   if (svc.rows[0].n === 0) {
@@ -67,6 +161,20 @@ async function run() {
     console.log(`✓ Seeded ${events.length} events`)
   } else {
     console.log('• Events already present — skipped')
+  }
+
+  const sol = await pool.query('SELECT count(*)::int AS n FROM solutions')
+  if (sol.rows[0].n === 0) {
+    for (const s of solutions) {
+      await pool.query(
+        `INSERT INTO solutions (slug, title, summary, icon, intro, outro, items, sort)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [s.slug, s.title, s.summary, s.icon, s.intro, s.outro, JSON.stringify(s.items), s.sort]
+      )
+    }
+    console.log(`✓ Seeded ${solutions.length} solutions`)
+  } else {
+    console.log('• Solutions already present — skipped')
   }
 
   await pool.end()

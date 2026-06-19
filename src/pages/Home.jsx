@@ -8,7 +8,8 @@ import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Home() {
-  const { hero, services, eventsSection, store, story, about, ticketing, events, banners, sections, categories } = useContent()
+  const { hero, services, solutions, eventsSection, store, story, about, ticketing, events, banners, sections, categories } = useContent()
+  const solutionCards = (solutions || []).filter((s) => s.visible !== false)
   const upcoming = events.slice(0, 3)
 
   return (
@@ -53,7 +54,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------------- Services ---------------- */}
+      {/* ---------------- What We Do (solutions) ---------------- */}
       <section id="services" className="scroll-mt-24 bg-as-charcoal/[0.02] py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div className="mx-auto max-w-2xl text-center">
@@ -63,22 +64,37 @@ export default function Home() {
             <p className="mt-4 text-base text-as-charcoal/60">{services.subheading}</p>
           </div>
 
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {services.items.map((item, i) => (
-              <Reveal
-                key={item.title}
-                delay={i * 70}
-                className="group relative overflow-hidden rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-as-red/20 hover:shadow-md"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red transition group-hover:bg-as-red group-hover:text-white">
-                  <Icon name={item.icon} className="h-6 w-6" />
-                </div>
-                <h3 className="mt-5 text-lg font-bold text-as-charcoal transition group-hover:text-as-red">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-as-charcoal/60">{item.description}</p>
-                {/* Red line that sweeps across on hover */}
-                <span className="absolute bottom-0 left-0 h-1 w-full origin-left scale-x-0 bg-as-red transition-transform duration-300 ease-out group-hover:scale-x-100" />
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {solutionCards.map((item, i) => (
+              <Reveal key={item.slug} delay={i * 70}>
+                <Link
+                  to={`/what-we-do/${item.slug}`}
+                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-as-red/20 hover:shadow-md"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red transition group-hover:bg-as-red group-hover:text-white">
+                    <Icon name={item.icon} className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-bold text-as-charcoal transition group-hover:text-as-red">{item.title}</h3>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-as-charcoal/60">{item.summary}</p>
+                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-as-red transition group-hover:gap-2">
+                    Learn more
+                    <Icon name="arrow" className="h-4 w-4" />
+                  </span>
+                  {/* Red line that sweeps across on hover */}
+                  <span className="absolute bottom-0 left-0 h-1 w-full origin-left scale-x-0 bg-as-red transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                </Link>
               </Reveal>
             ))}
+          </div>
+
+          <div className="mt-12 text-center">
+            <Link
+              to="/what-we-do"
+              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-7 py-3 text-sm font-semibold text-as-charcoal transition hover:border-as-red/30 hover:text-as-red"
+            >
+              Explore Absolute Solution
+              <Icon name="arrow" className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>

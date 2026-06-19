@@ -59,6 +59,8 @@ export const defaultContent = {
   nav: defaults.nav,
   hero: defaults.hero,
   services: defaults.services,
+  whatWeDo: defaults.whatWeDo,
+  solutions: defaults.solutions,
   eventsSection: defaults.eventsSection,
   store: defaults.store,
   storeShowcase: defaults.storeShowcase,
@@ -313,6 +315,44 @@ function mapStory(meta, panels) {
   }
 }
 
+export function mapSolution(s) {
+  return {
+    id: s.id,
+    slug: s.slug,
+    title: s.title || '',
+    summary: s.summary || '',
+    icon: s.icon || 'chip',
+    image: s.imageUrl || '',
+    intro: s.intro || '',
+    outro: s.outro || '',
+    items: Array.isArray(s.items) ? s.items.filter((it) => it && (it.title || it.description)) : [],
+    sort: s.sort || 0,
+    visible: s.visible !== false,
+  }
+}
+
+// The "What We Do" (Absolute Solution) page copy. Falls back to the static
+// defaults for any empty field so the page never looks broken.
+function mapWhatWeDo(meta) {
+  const d = defaultContent.whatWeDo
+  if (!meta) return d
+  return {
+    enabled: meta.enabled !== false,
+    eyebrow: pick(meta.eyebrow, d.eyebrow),
+    title: pick(meta.title, d.title),
+    intro: Array.isArray(meta.intro) && meta.intro.length ? meta.intro : d.intro,
+    solutionsHeading: pick(meta.solutionsHeading, d.solutionsHeading),
+    solutionsIntro: pick(meta.solutionsIntro, d.solutionsIntro),
+    visionHeading: pick(meta.visionHeading, d.visionHeading),
+    vision: pick(meta.vision, d.vision),
+    missionHeading: pick(meta.missionHeading, d.missionHeading),
+    mission: pick(meta.mission, d.mission),
+    divisionsHeading: pick(meta.divisionsHeading, d.divisionsHeading),
+    divisionsIntro: pick(meta.divisionsIntro, d.divisionsIntro),
+    divisions: Array.isArray(meta.divisions) && meta.divisions.length ? meta.divisions : d.divisions,
+  }
+}
+
 export function mapPopup(p) {
   if (!p) return null
   return {
@@ -332,7 +372,7 @@ export function mapPopup(p) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels] =
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels, whatWeDoMeta, solutionsList] =
       await Promise.all([
         request('/api/settings'),
         request('/api/services'),
@@ -345,6 +385,8 @@ export async function loadSite() {
         request('/api/store-products').catch(() => []),
         request('/api/story').catch(() => null),
         request('/api/story-panels').catch(() => []),
+        request('/api/what-we-do').catch(() => null),
+        request('/api/solutions').catch(() => []),
       ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -369,6 +411,11 @@ export async function loadSite() {
     content.popup = mapPopup(popup)
     content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
     content.story = mapStory(storyMeta, storyPanels)
+    content.whatWeDo = mapWhatWeDo(whatWeDoMeta)
+    // Solutions from the DB (visible only); fall back to the static defaults so
+    // the What We Do page still has content if the table is empty / API is down.
+    const mappedSolutions = Array.isArray(solutionsList) ? solutionsList.map(mapSolution).filter((s) => s.visible) : []
+    content.solutions = mappedSolutions.length ? mappedSolutions : defaultContent.solutions
     return { content, events: mappedEvents }
   } catch {
     return null
@@ -430,6 +477,13 @@ export const adminApi = {
   createStoryPanel: (data) => request('/api/story-panels', { method: 'POST', body: data, authed: true }),
   updateStoryPanel: (id, data) => request(`/api/story-panels/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteStoryPanel: (id) => request(`/api/story-panels/${id}`, { method: 'DELETE', authed: true }),
+
+  getWhatWeDo: () => request('/api/what-we-do'),
+  saveWhatWeDo: (data) => request('/api/what-we-do', { method: 'PUT', body: data, authed: true }),
+  listSolutions: () => request('/api/solutions'),
+  createSolution: (data) => request('/api/solutions', { method: 'POST', body: data, authed: true }),
+  updateSolution: (id, data) => request(`/api/solutions/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteSolution: (id) => request(`/api/solutions/${id}`, { method: 'DELETE', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

@@ -88,6 +88,22 @@ const storyPanelJson = (r) => ({
   accent: r.accent, accent2: r.accent2, gradientType: r.gradient_type,
   linkUrl: r.link_url, size: r.size, sort: r.sort, visible: r.visible,
 })
+const whatWeDoJson = (r) => ({
+  enabled: r.enabled, eyebrow: r.eyebrow, title: r.title,
+  intro: Array.isArray(r.intro) ? r.intro : [],
+  solutionsHeading: r.solutions_heading, solutionsIntro: r.solutions_intro,
+  visionHeading: r.vision_heading, vision: r.vision,
+  missionHeading: r.mission_heading, mission: r.mission,
+  divisionsHeading: r.divisions_heading, divisionsIntro: r.divisions_intro,
+  divisions: Array.isArray(r.divisions) ? r.divisions : [],
+  updatedAt: r.updated_at,
+})
+const solutionJson = (r) => ({
+  id: r.id, slug: r.slug, title: r.title, summary: r.summary, icon: r.icon,
+  imageUrl: r.image_url, intro: r.intro, outro: r.outro,
+  items: Array.isArray(r.items) ? r.items : [],
+  sort: r.sort, visible: r.visible,
+})
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
@@ -462,6 +478,81 @@ app.put('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM story_panels WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= What We Do (Absolute Solution) =========================
+// Public read; admin edits the singleton page-copy row + manages the solutions.
+app.get('/api/what-we-do', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM what_we_do WHERE id = 1')
+  res.json(rows[0] ? whatWeDoJson(rows[0]) : null)
+}))
+
+app.put('/api/what-we-do', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const { rows } = await query(
+    `UPDATE what_we_do SET
+       enabled=$1, eyebrow=$2, title=$3, intro=$4,
+       solutions_heading=$5, solutions_intro=$6,
+       vision_heading=$7, vision=$8, mission_heading=$9, mission=$10,
+       divisions_heading=$11, divisions_intro=$12, divisions=$13, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [
+      b.enabled === undefined ? true : Boolean(b.enabled),
+      b.eyebrow || '', b.title || '', JSON.stringify(Array.isArray(b.intro) ? b.intro : []),
+      b.solutionsHeading || '', b.solutionsIntro || '',
+      b.visionHeading || '', b.vision || '', b.missionHeading || '', b.mission || '',
+      b.divisionsHeading || '', b.divisionsIntro || '', JSON.stringify(Array.isArray(b.divisions) ? b.divisions : []),
+    ]
+  )
+  res.json(whatWeDoJson(rows[0]))
+}))
+
+app.get('/api/solutions', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM solutions ORDER BY sort ASC, id ASC')
+  res.json(rows.map(solutionJson))
+}))
+
+app.get('/api/solutions/:slug', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM solutions WHERE slug=$1', [req.params.slug])
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(solutionJson(rows[0]))
+}))
+
+const cleanItems = (items) =>
+  (Array.isArray(items) ? items : [])
+    .map((it) => ({ title: String(it?.title || '').trim(), description: String(it?.description || '').trim() }))
+    .filter((it) => it.title || it.description)
+
+const solutionParams = (b) => [
+  b.slug ? slugify(b.slug) : slugify(b.title || ''), b.title || '', b.summary || '',
+  b.icon || 'chip', b.imageUrl || '', b.intro || '', b.outro || '',
+  JSON.stringify(cleanItems(b.items)), Number(b.sort) || 0,
+  b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/solutions', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO solutions (slug, title, summary, icon, image_url, intro, outro, items, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    solutionParams(req.body || {})
+  )
+  res.status(201).json(solutionJson(rows[0]))
+}))
+
+app.put('/api/solutions/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE solutions SET slug=$1, title=$2, summary=$3, icon=$4, image_url=$5,
+       intro=$6, outro=$7, items=$8, sort=$9, visible=$10
+     WHERE id=$11 RETURNING *`,
+    [...solutionParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(solutionJson(rows[0]))
+}))
+
+app.delete('/api/solutions/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM solutions WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

@@ -45,6 +45,10 @@ the banner then borrows that event's image/title/link, resolved client-side in `
 enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
 `delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
 frontend stores in localStorage to show it once),
+`what_we_do` (single row, id=1: the **Absolute Solution** page copy — about/intro, vision,
+mission, divisions JSONB, plus section headings) and `solutions` (the items listed on that page:
+slug/title/summary/icon/image/intro/outro + an `items` JSONB array of `{title, description}`,
+sort/visible — each renders a homepage "What We Do" card and a `/what-we-do/:slug` detail page),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -122,10 +126,10 @@ src/
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
   components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
-  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail
+  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -137,8 +141,15 @@ tailwind.config.js          # brand colors, Inter font, animations
 
 ## Routes
 
-Public (gated): `/`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/scraper`
+Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/scraper`
+
+The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
+at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles
+(each opens `pages/SolutionDetail.jsx` at `/what-we-do/:slug`), vision & mission, and the company
+divisions. The same solutions populate the homepage **What We Do** card grid (`Home.jsx`), each card
+linking to its detail page. Static defaults / offline fallback live in `content/site.js`
+(`whatWeDo`, `solutions`).
 
 The homepage opens with an admin-managed **horizontal story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a self-playing, fixed-height showcase whose panels auto-advance on a timer and travel horizontally in a loop (pauses on hover, clickable dots, typewriter heading on the active panel). Reduced-motion users get a static swipe carousel instead. Hidden until enabled with ≥1 visible panel. It is followed on the homepage by the events **BannerSlider**, then the **Hero** (whose editable copy is the "Powering connection across Lebanon since 2008…" text), then the rest of the sections.
 
