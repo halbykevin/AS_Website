@@ -1,10 +1,9 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useReducedMotion, useInView, useMotionValue, useTransform } from 'framer-motion'
-import { useScrollEl } from '../store/scroll.jsx'
+import { motion, useReducedMotion } from 'framer-motion'
 
-// Shared scroll-in reveal: text rises + fades as a panel enters view, staggered
-// child-by-child. Plays on every size (the pinned section runs on mobile too).
+// Shared reveal: text rises + fades when its panel becomes active, staggered
+// child-by-child.
 const EASE = [0.22, 0.7, 0.3, 1]
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } } }
 const riseItem = {
@@ -15,6 +14,9 @@ const scaleItem = {
   hidden: { opacity: 0, scale: 0.9 },
   show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: EASE } },
 }
+
+// How long each panel stays on screen before auto-advancing (ms).
+const INTERVAL = 5000
 
 // Per-panel image size (admin-controlled). Responsive: a larger share of the
 // width on phones, a column width on desktop — so panels can differ in size on
@@ -33,100 +35,67 @@ const SIZE_CARD = {
 }
 
 // ---------------------------------------------------------------------------
-// Horizontal scroll-story — a GSAP-style pinned section. On every screen size
-// (desktop AND mobile) the section sticks to the viewport and vertical scrolling
-// is translated into horizontal travel of the panels (big typography + images),
-// with light parallax and scroll-in reveals. Only reduced-motion users get a
-// plain static carousel.
-//
-// IMPORTANT: the public site scrolls inside a container (Layout's scrollRef),
-// not the window — so the scroll math reads that element via useScrollEl().
+// Horizontal story — a self-playing, fixed-height showcase at the top of the
+// homepage. Panels (big typography + image) auto-advance on a timer and travel
+// horizontally, looping forever, with light reveals + a typewriter heading on
+// the active panel. It pauses on hover and has clickable dots. Reduced-motion
+// users get a plain static swipe carousel instead.
 // ---------------------------------------------------------------------------
 
 const DARK = '#0b0b0c'
 const DEFAULT_ACCENT = '#A41E22' // as-red
 
 export default function HorizontalStory({ story }) {
-  // Pin on all sizes; only reduced-motion users fall back to a static carousel.
-  const [pinned, setPinned] = useState(
-    () => typeof window !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-
-  useEffect(() => {
-    const rm = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setPinned(!rm.matches)
-    rm.addEventListener('change', update)
-    return () => rm.removeEventListener('change', update)
-  }, [])
-
+  const reduce = useReducedMotion()
   if (!story || !story.panels?.length) return null
-  return pinned ? <PinnedStory story={story} /> : <CarouselStory story={story} />
+  return reduce ? <CarouselStory story={story} /> : <AutoStory story={story} />
 }
 
-// ---- Desktop: pinned horizontal scroll ------------------------------------
-function PinnedStory({ story }) {
-  const scrollRef = useScrollEl()
-  const wrapRef = useRef(null)
+// ---- Auto-playing horizontal story ----------------------------------------
+function AutoStory({ story }) {
   const panels = story.panels
   const n = panels.length
-  const [dims, setDims] = useState({ w: 0, h: 0 })
+  const wrapRef = useRef(null)
+  const [w, setW] = useState(0)
+  const [index, setIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
 
-  const overflow = dims.w * (n - 1) // total horizontal distance to travel
-
-  // Scroll progress lives in a motion value, NOT React state — updating it on
-  // scroll drives the transforms straight on the compositor with zero React
-  // re-renders, which keeps it smooth on mobile.
-  const progress = useMotionValue(0)
-  const trackX = useTransform(progress, (p) => -(p * overflow))
-
-  // The pinned stage matches the scroll container's visible size.
+  // Track the stage width so the track travels exactly one panel per step
+  // (matching the scroll container, not the window — avoids scrollbar overflow).
   useLayoutEffect(() => {
-    const sc = scrollRef?.current
-    if (!sc) return
-    const measure = () => setDims({ w: sc.clientWidth, h: sc.clientHeight })
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => setW(el.clientWidth)
     measure()
     const ro = new ResizeObserver(measure)
-    ro.observe(sc)
+    ro.observe(el)
     return () => ro.disconnect()
-  }, [scrollRef])
+  }, [])
 
-  // Convert the container's scroll position into 0..1 progress.
+  // Auto-advance on a timer; pause on hover.
   useEffect(() => {
-    const sc = scrollRef?.current
-    if (!sc) return
-    let raf = 0
-    const onScroll = () => {
-      if (raf) return
-      raf = requestAnimationFrame(() => {
-        raf = 0
-        const wrap = wrapRef.current
-        if (!wrap || overflow <= 0) return progress.set(0)
-        const rel = wrap.getBoundingClientRect().top - sc.getBoundingClientRect().top
-        progress.set(Math.min(1, Math.max(0, -rel / overflow)))
-      })
-    }
-    onScroll()
-    sc.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      sc.removeEventListener('scroll', onScroll)
-      if (raf) cancelAnimationFrame(raf)
-    }
-  }, [scrollRef, overflow, progress])
+    if (paused || n < 2) return
+    const id = setInterval(() => setIndex((i) => (i + 1) % n), INTERVAL)
+    return () => clearInterval(id)
+  }, [paused, n])
 
   return (
     <section
-      ref={wrapRef}
       aria-label={story.heading || 'Story'}
-      className="relative"
-      style={{ height: dims.h ? dims.h + overflow : undefined, background: DARK }}
+      className="relative overflow-hidden"
+      style={{ background: DARK }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
-      <div className="sticky top-0 overflow-hidden" style={{ height: dims.h || '100dvh' }}>
+      <div ref={wrapRef} className="relative h-[86svh] min-h-[520px] max-h-[820px] w-full overflow-hidden">
         <motion.div
           className="flex h-full will-change-transform"
-          style={{ width: dims.w ? dims.w * n : '100%', x: trackX }}
+          style={{ width: w ? w * n : '100%' }}
+          animate={{ x: -(index * w) }}
+          transition={{ duration: 0.9, ease: EASE }}
         >
           {panels.map((p, i) => (
-            <StoryPanel key={p.id ?? i} panel={p} width={dims.w} flip={i % 2 === 1} />
+            <StoryPanel key={p.id ?? i} panel={p} width={w} flip={i % 2 === 1} active={i === index} />
           ))}
         </motion.div>
 
@@ -140,10 +109,22 @@ function PinnedStory({ story }) {
           {story.heading && <h2 className="mt-3 max-w-xs text-lg font-bold text-white/90">{story.heading}</h2>}
         </div>
 
-        {/* Scroll progress bar (scaleX is composited — no layout thrash) */}
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
-          <motion.div className="h-full origin-left bg-as-red" style={{ scaleX: progress }} />
-        </div>
+        {/* Panel dots */}
+        {n > 1 && (
+          <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+            {panels.map((p, i) => (
+              <button
+                key={p.id ?? i}
+                type="button"
+                aria-label={`Go to panel ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={`h-2 rounded-full transition-all ${
+                  i === index ? 'w-6 bg-as-red' : 'w-2 bg-white/40 hover:bg-white/70'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -163,11 +144,9 @@ function panelColors(panel) {
   return { c1, hasGradient, gradient }
 }
 
-// One full-screen panel. Fully static + memoised: it never re-renders while
-// scrolling, and has no per-frame transforms — only the parent track slides, as
-// a single composited layer. (Reveals/typewriter are IntersectionObserver-based,
-// not scroll-bound, so they don't cost anything per frame.)
-const StoryPanel = memo(function StoryPanel({ panel, width, flip }) {
+// One full-stage panel. Memoised; its reveals/typewriter run from the `active`
+// flag (set by the auto-player) rather than from scroll position.
+const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
   const { c1, hasGradient, gradient } = panelColors(panel)
 
   const image = panel.image ? (
@@ -193,7 +172,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip }) {
         }`}
       >
         <div className="w-full sm:flex-1">
-          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.4 }}>
+          <motion.div variants={stagger} initial="hidden" animate={active ? 'show' : 'hidden'}>
             {panel.caption && (
               <motion.span
                 variants={riseItem}
@@ -207,7 +186,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip }) {
               className={`mt-3 text-3xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl ${hasGradient ? '' : 'text-white'}`}
               style={headingStyle}
             >
-              <Typewriter text={panel.heading} caretColor={hasGradient ? c1 : 'currentColor'} />
+              <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
             </h3>
             {panel.link && (
               <motion.div variants={riseItem}>
@@ -231,8 +210,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip }) {
           <motion.div
             className="relative h-full w-full overflow-hidden rounded-3xl"
             initial={{ opacity: 0, scale: 0.92 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, amount: 0.4 }}
+            animate={active ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.92 }}
             transition={{ duration: 0.6, ease: EASE }}
           >
             {panel.link ? (
@@ -321,18 +299,16 @@ function StoryCard({ panel }) {
   )
 }
 
-// Types its text out character-by-character the first time it scrolls into
-// view, with a blinking caret. Reduced-motion users get the full text instantly.
-function Typewriter({ text = '', speed = 45, className = '', caretColor = 'currentColor' }) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, amount: 0.6 })
+// Types its text out character-by-character whenever `run` becomes true, with a
+// blinking caret. Reduced-motion users get the full text instantly.
+function Typewriter({ text = '', speed = 45, className = '', caretColor = 'currentColor', run = true }) {
   const reduce = useReducedMotion()
   const [count, setCount] = useState(0)
   const done = count >= text.length
 
   useEffect(() => {
     if (reduce) return setCount(text.length)
-    if (!inView) return
+    if (!run) return setCount(0)
     setCount(0)
     let i = 0
     const id = setInterval(() => {
@@ -341,10 +317,10 @@ function Typewriter({ text = '', speed = 45, className = '', caretColor = 'curre
       if (i >= text.length) clearInterval(id)
     }, speed)
     return () => clearInterval(id)
-  }, [inView, text, speed, reduce])
+  }, [run, text, speed, reduce])
 
   return (
-    <span ref={ref} aria-label={text} className={className}>
+    <span aria-label={text} className={className}>
       <span aria-hidden="true">{text.slice(0, count)}</span>
       {/* Caret shows only while typing — it disappears once the line finishes. */}
       {!reduce && !done && (

@@ -140,7 +140,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 Public (gated): `/`, `/events`, `/events/:id`
 Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/scraper`
 
-The homepage opens with an admin-managed **horizontal scroll-story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a GSAP-style pinned section that turns vertical scroll into horizontal panel travel on desktop, and a swipe carousel on mobile. It reads the custom scroll container via `useScrollEl()`. Hidden until enabled with ≥1 visible panel.
+The homepage opens with an admin-managed **horizontal story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a self-playing, fixed-height showcase whose panels auto-advance on a timer and travel horizontally in a loop (pauses on hover, clickable dots, typewriter heading on the active panel). Reduced-motion users get a static swipe carousel instead. Hidden until enabled with ≥1 visible panel. It is followed on the homepage by the events **BannerSlider**, then the **Hero** (whose editable copy is the "Powering connection across Lebanon since 2008…" text), then the rest of the sections.
 
 ## Brand
 
