@@ -201,7 +201,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
           </motion.div>
         </div>
 
-        <div className={`relative aspect-[4/5] shrink-0 ${SIZE[panel.size] || SIZE.md}`}>
+        <div className={`relative aspect-[4/5] shrink-0 translate-y-6 sm:translate-y-0 ${SIZE[panel.size] || SIZE.md}`}>
           {/* Soft glow via a radial gradient — cheap, no expensive blur filter. */}
           <div
             className="pointer-events-none absolute -inset-8 rounded-[50%]"
