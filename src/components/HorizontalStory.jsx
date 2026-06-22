@@ -59,6 +59,7 @@ function AutoStory({ story }) {
   const [w, setW] = useState(0)
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [inView, setInView] = useState(true)
 
   // Track the stage width so the track travels exactly one panel per step
   // (matching the scroll container, not the window — avoids scrollbar overflow).
@@ -72,12 +73,23 @@ function AutoStory({ story }) {
     return () => ro.disconnect()
   }, [])
 
-  // Auto-advance on a timer; pause on hover.
+  // Only run the auto-player while the story is on screen. Once it's scrolled
+  // out of view we stop the timer (and drop the compositor layer below) so its
+  // animations can't stutter the page scroll.
   useEffect(() => {
-    if (paused || n < 2) return
+    const el = wrapRef.current
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  // Auto-advance on a timer; pause on hover or when off-screen.
+  useEffect(() => {
+    if (paused || n < 2 || !inView) return
     const id = setInterval(() => setIndex((i) => (i + 1) % n), INTERVAL)
     return () => clearInterval(id)
-  }, [paused, n])
+  }, [paused, n, inView])
 
   return (
     <section
@@ -91,7 +103,7 @@ function AutoStory({ story }) {
           the same height at every breakpoint. */}
       <div ref={wrapRef} className="relative aspect-[3/2] w-full overflow-hidden sm:aspect-[16/7] lg:aspect-[16/6]">
         <motion.div
-          className="flex h-full will-change-transform"
+          className={`flex h-full ${inView ? 'will-change-transform' : ''}`}
           style={{ width: w ? w * n : '100%' }}
           animate={{ x: -(index * w) }}
           transition={{ duration: 0.9, ease: EASE }}
