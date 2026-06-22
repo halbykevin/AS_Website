@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+
+// Every banner — the image and the "Buy tickets" button — sends visitors to the
+// events listing page (www.as.com.lb/events in production) rather than each
+// banner's own link.
+const EVENTS_PATH = '/events'
 
 // Admin-managed hero banner carousel, styled like a box-office site
 // (ticketingboxoffice.com): full-bleed, a fixed cinematic aspect ratio with the
@@ -144,14 +150,12 @@ export default function BannerSlider({ banners }) {
                 </p>
               )}
               {current.link && (
-                <a
-                  href={current.link}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to={EVENTS_PATH}
                   className="mt-5 inline-flex items-center rounded-full border-2 border-as-red px-8 py-2.5 text-xs font-semibold uppercase tracking-widest text-as-red transition hover:bg-as-red hover:text-white sm:text-sm"
                 >
                   Buy tickets
-                </a>
+                </Link>
               )}
             </div>
           </div>
@@ -162,16 +166,10 @@ export default function BannerSlider({ banners }) {
 }
 
 // A single full-bleed slide: the cropped image, positioned by its focal point.
-// Details live in the bar below the slideshow, not over the image.
+// The whole slide links to the events page. Details live in the bar below.
 function Slide({ banner }) {
-  const hasLink = Boolean(banner.link)
-  const Wrapper = hasLink ? 'a' : 'div'
-  const wrapperProps = hasLink
-    ? { href: banner.link, target: '_blank', rel: 'noreferrer', 'aria-label': banner.title || 'Open event' }
-    : {}
-
   return (
-    <Wrapper {...wrapperProps} className="relative block h-full w-full shrink-0">
+    <Link to={EVENTS_PATH} aria-label={banner.title || 'Browse events'} className="relative block h-full w-full shrink-0">
       <img
         src={banner.image}
         alt={banner.title || 'Banner'}
@@ -179,7 +177,7 @@ function Slide({ banner }) {
         style={{ objectPosition: `${banner.focalX ?? 50}% ${banner.focalY ?? 50}%` }}
         draggable={false}
       />
-    </Wrapper>
+    </Link>
   )
 }
 

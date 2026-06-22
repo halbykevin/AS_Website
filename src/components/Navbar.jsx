@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 import { useScrollEl } from '../store/scroll.jsx'
@@ -8,30 +8,15 @@ export default function Navbar() {
   const scrollRef = useScrollEl()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [hidden, setHidden] = useState(false)
-  const lastY = useRef(0)
   const location = useLocation()
   const navigate = useNavigate()
 
+  // The header is always visible (it lives outside the scroll area). We only
+  // track whether the page has scrolled, to add the subtle background + shadow.
   useEffect(() => {
     const el = scrollRef?.current
     if (!el) return
-    const onScroll = () => {
-      const y = el.scrollTop
-      setScrolled(y > 8)
-      const delta = y - lastY.current
-      if (y <= 80) {
-        // Near the top: always show.
-        setHidden(false)
-      } else if (delta > 4) {
-        // Scrolling down: hide.
-        setHidden(true)
-      } else if (delta < -4) {
-        // Scrolling up: show.
-        setHidden(false)
-      }
-      lastY.current = y
-    }
+    const onScroll = () => setScrolled(el.scrollTop > 8)
     onScroll()
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
@@ -58,18 +43,10 @@ export default function Navbar() {
     setOpen(false)
   }
 
-  // Hide by collapsing the header's row to zero height, so the content area
-  // below (and its scrollbar) expands right up to the top edge.
-  const collapsed = hidden && !open
-
   return (
-    <div
-      className={`relative z-50 grid transition-[grid-template-rows] duration-300 ease-out ${
-        collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
-      }`}
-    >
+    <div className="relative z-50">
       <header
-        className={`min-h-0 overflow-hidden transition-[background-color,box-shadow] duration-300 ${
+        className={`transition-[background-color,box-shadow] duration-300 ${
           scrolled
             ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
             : 'bg-white'
