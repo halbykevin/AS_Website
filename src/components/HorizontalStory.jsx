@@ -101,9 +101,8 @@ function AutoStory({ story }) {
           ))}
         </motion.div>
 
-        {/* Fixed section label. On mobile the panels are bottom-anchored (see the
-            panel wrapper), so this top-left label has the top of the strip to
-            itself and the two no longer overlap. */}
+        {/* Fixed section label, pinned top-left above the centered panel content
+            (z-10 keeps it legible; it's kept small on mobile to stay clear). */}
         <div className="pointer-events-none absolute left-5 top-5 z-10 sm:left-8 sm:top-8">
           {story.eyebrow && (
             <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/80 sm:px-3 sm:py-1 sm:text-xs">
@@ -171,7 +170,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
     : undefined
 
   return (
-    <div className="relative flex h-full shrink-0 items-end pb-9 sm:items-center sm:pb-0" style={{ width: width || '100vw' }}>
+    <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
       <div
         className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-3 px-6 text-center sm:flex-row sm:gap-10 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
