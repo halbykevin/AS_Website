@@ -21,11 +21,14 @@ const INTERVAL = 3500
 // Per-panel image size (admin-controlled). Responsive: a larger share of the
 // width on phones, a column width on desktop — so panels can differ in size on
 // both. (SIZE_CARD is the aspect ratio used by the reduced-motion carousel.)
+// Mobile widths are kept smaller (so the centered block fits the short strip
+// without crowding the heading/dots); the sm: widths drive the larger desktop
+// look that already reads well.
 const SIZE = {
-  sm: 'w-[32%] max-w-[7rem] sm:w-[26%] sm:max-w-[12rem]',
-  md: 'w-[42%] max-w-[9rem] sm:w-[34%] sm:max-w-[16rem]',
-  lg: 'w-[52%] max-w-[11rem] sm:w-[42%] sm:max-w-[20rem]',
-  xl: 'w-[62%] max-w-[13rem] sm:w-[50%] sm:max-w-[24rem]',
+  sm: 'w-[26%] max-w-[5.5rem] sm:w-[26%] sm:max-w-[12rem]',
+  md: 'w-[34%] max-w-[7rem] sm:w-[34%] sm:max-w-[16rem]',
+  lg: 'w-[42%] max-w-[8.5rem] sm:w-[42%] sm:max-w-[20rem]',
+  xl: 'w-[50%] max-w-[10rem] sm:w-[50%] sm:max-w-[24rem]',
 }
 
 // Admin-controlled heading font size (per panel). Mobile + desktop pairs; `md`
@@ -270,7 +273,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
     : undefined
 
   return (
-    <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
+    <div className="relative flex h-full shrink-0 items-center pb-8 sm:pb-0" style={{ width: width || '100vw' }}>
       <div
         className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-3 px-6 text-center sm:flex-row sm:gap-10 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
