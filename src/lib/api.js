@@ -298,6 +298,7 @@ export function mapStoryPanel(p) {
     gradientType: p.gradientType || 'linear',
     link: p.linkUrl || '',
     size: p.size || 'md',
+    fontSize: p.fontSize || 'md',
     visible: p.visible !== false,
   }
 }

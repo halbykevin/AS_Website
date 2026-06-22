@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS story_panels (
   gradient_type TEXT DEFAULT 'linear',
   link_url TEXT DEFAULT '',
   size TEXT DEFAULT 'md',
+  font_size TEXT DEFAULT 'md',
   sort INTEGER DEFAULT 0,
   visible BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -208,6 +209,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT ''
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS favicon_url TEXT DEFAULT '';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
+ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS gradient_type TEXT DEFAULT 'linear';
 -- Events belong to an (optional) category; banners can be driven by an event.

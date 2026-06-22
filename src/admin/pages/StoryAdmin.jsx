@@ -8,6 +8,8 @@ const SIZES = [
   { value: 'lg', label: 'Large' },
   { value: 'xl', label: 'Extra large' },
 ]
+// Heading font size — reuses the same scale as image size.
+const FONT_SIZES = SIZES
 const GRADIENTS = [
   { value: 'solid', label: 'Solid' },
   { value: 'linear', label: 'Linear' },
@@ -15,7 +17,7 @@ const GRADIENTS = [
 ]
 const blankPanel = {
   heading: '', caption: '', imageUrl: '', accent: '', accent2: '', gradientType: 'solid',
-  linkUrl: '', size: 'md', sort: 0, visible: true,
+  linkUrl: '', size: 'md', fontSize: 'md', sort: 0, visible: true,
 }
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
 
@@ -83,6 +85,7 @@ export default function StoryAdmin() {
       gradientType: r.gradientType || 'solid',
       linkUrl: r.linkUrl || '',
       size: r.size || 'md',
+      fontSize: r.fontSize || 'md',
       sort: r.sort || 0,
       visible: r.visible !== false,
     })
@@ -221,7 +224,14 @@ export default function StoryAdmin() {
                 options={SIZES}
               />
             </Field>
-            <Field label="Image" hint="Portrait images look best on desktop. Leave empty for a branded tile.">
+            <Field label="Heading font size" hint="How big this panel's headline is. Scales down on mobile.">
+              <SegmentedControl
+                value={form.fontSize}
+                onChange={(v) => setForm((f) => ({ ...f, fontSize: v }))}
+                options={FONT_SIZES}
+              />
+            </Field>
+            <Field label="Image" hint="Shown in full (not cropped) — any shape works. Transparent PNGs look best. Leave empty for a branded tile.">
               <div className="flex items-center gap-4">
                 {(imageFile || form.imageUrl) && (
                   <img

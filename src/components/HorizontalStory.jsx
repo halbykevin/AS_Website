@@ -22,10 +22,19 @@ const INTERVAL = 3500
 // width on phones, a column width on desktop — so panels can differ in size on
 // both. (SIZE_CARD is the aspect ratio used by the reduced-motion carousel.)
 const SIZE = {
-  sm: 'w-[22%] max-w-[5rem] sm:w-[24%] sm:max-w-[9rem]',
-  md: 'w-[28%] max-w-[6rem] sm:w-[30%] sm:max-w-[12rem]',
-  lg: 'w-[34%] max-w-[7.5rem] sm:w-[36%] sm:max-w-[15rem]',
-  xl: 'w-[40%] max-w-[9rem] sm:w-[42%] sm:max-w-[18rem]',
+  sm: 'w-[32%] max-w-[7rem] sm:w-[26%] sm:max-w-[12rem]',
+  md: 'w-[42%] max-w-[9rem] sm:w-[34%] sm:max-w-[16rem]',
+  lg: 'w-[52%] max-w-[11rem] sm:w-[42%] sm:max-w-[20rem]',
+  xl: 'w-[62%] max-w-[13rem] sm:w-[50%] sm:max-w-[24rem]',
+}
+
+// Admin-controlled heading font size (per panel). Mobile + desktop pairs; `md`
+// matches the previous fixed size.
+const FONT = {
+  sm: 'text-base sm:text-3xl',
+  md: 'text-lg sm:text-5xl',
+  lg: 'text-xl sm:text-6xl',
+  xl: 'text-2xl sm:text-7xl',
 }
 const SIZE_CARD = {
   sm: 'aspect-[4/3]',
@@ -60,6 +69,10 @@ function AutoStory({ story }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [inView, setInView] = useState(true)
+  const [drag, setDrag] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const moved = useRef(false)
 
   // Track the stage width so the track travels exactly one panel per step
   // (matching the scroll container, not the window — avoids scrollbar overflow).
@@ -84,12 +97,41 @@ function AutoStory({ story }) {
     return () => io.disconnect()
   }, [])
 
-  // Auto-advance on a timer; pause on hover or when off-screen.
+  // Auto-advance on a timer; pause on hover, while dragging, or when off-screen.
   useEffect(() => {
-    if (paused || n < 2 || !inView) return
+    if (paused || n < 2 || !inView || dragging) return
     const id = setInterval(() => setIndex((i) => (i + 1) % n), INTERVAL)
     return () => clearInterval(id)
-  }, [paused, n, inView])
+  }, [paused, n, inView, dragging])
+
+  // Go to a panel, wrapping around the ends.
+  const go = (i) => setIndex(((i % n) + n) % n)
+
+  // ---- Touch / mouse drag to swipe between panels ----
+  const dragStart = (x) => {
+    startX.current = x
+    moved.current = false
+    setDragging(true)
+  }
+  const dragMove = (x) => {
+    const dx = x - startX.current
+    if (Math.abs(dx) > 8) moved.current = true
+    setDrag(dx)
+  }
+  const dragEnd = () => {
+    if (!dragging) return
+    setDragging(false)
+    if (Math.abs(drag) > 50) go(index + (drag < 0 ? 1 : -1))
+    setDrag(0)
+  }
+  // A swipe shouldn't also trigger a panel's link.
+  const onClickCapture = (e) => {
+    if (moved.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      moved.current = false
+    }
+  }
 
   return (
     <section
@@ -102,16 +144,35 @@ function AutoStory({ story }) {
       {/* Same aspect ratio as the events BannerSlider, so both strips are exactly
           the same height at every breakpoint. */}
       <div ref={wrapRef} className="relative aspect-[3/2] w-full overflow-hidden sm:aspect-[16/7] lg:aspect-[16/6]">
-        <motion.div
-          className={`flex h-full ${inView ? 'will-change-transform' : ''}`}
-          style={{ width: w ? w * n : '100%' }}
-          animate={{ x: -(index * w) }}
-          transition={{ duration: 0.9, ease: EASE }}
+        <div
+          className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
+            inView ? 'will-change-transform' : ''
+          } ${dragging ? '' : 'transition-transform duration-700 ease-out'}`}
+          style={{ width: w ? w * n : '100%', transform: `translateX(${-(index * w) + drag}px)` }}
+          onTouchStart={(e) => dragStart(e.touches[0].clientX)}
+          onTouchMove={(e) => dragging && dragMove(e.touches[0].clientX)}
+          onTouchEnd={dragEnd}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            dragStart(e.clientX)
+          }}
+          onMouseMove={(e) => dragging && dragMove(e.clientX)}
+          onMouseUp={dragEnd}
+          onMouseLeave={dragEnd}
+          onClickCapture={onClickCapture}
         >
           {panels.map((p, i) => (
             <StoryPanel key={p.id ?? i} panel={p} width={w} flip={i % 2 === 1} active={i === index} />
           ))}
-        </motion.div>
+        </div>
+
+        {/* Prev / next arrows */}
+        {n > 1 && (
+          <>
+            <StoryArrow dir="prev" onClick={() => go(index - 1)} />
+            <StoryArrow dir="next" onClick={() => go(index + 1)} />
+          </>
+        )}
 
         {/* Fixed section label, pinned top-left above the centered panel content
             (z-10 keeps it legible; it's kept small on mobile to stay clear). */}
@@ -147,6 +208,33 @@ function AutoStory({ story }) {
   )
 }
 
+// Prev/next arrow over the story, matching the events BannerSlider style.
+function StoryArrow({ dir, onClick }) {
+  const prev = dir === 'prev'
+  return (
+    <button
+      type="button"
+      aria-label={prev ? 'Previous panel' : 'Next panel'}
+      onClick={onClick}
+      className={`absolute top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/30 p-2.5 text-white backdrop-blur transition hover:bg-as-red ${
+        prev ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
+      }`}
+    >
+      <svg
+        className={`h-5 w-5 ${prev ? 'rotate-180' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+  )
+}
+
 // Resolve a panel's accent into a solid colour or a 2-colour gradient.
 function panelColors(panel) {
   const c1 = panel.accent || DEFAULT_ACCENT
@@ -167,7 +255,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
   const { c1, hasGradient, gradient } = panelColors(panel)
 
   const image = panel.image ? (
-    <img src={panel.image} alt={panel.heading || ''} draggable={false} className="h-full w-full object-cover" />
+    <img src={panel.image} alt={panel.heading || ''} draggable={false} className="h-full w-full object-contain" />
   ) : (
     <div
       className="flex h-full w-full items-center justify-center"
@@ -200,7 +288,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
               </motion.span>
             )}
             <h3
-              className={`mt-2 text-lg font-extrabold leading-[1.05] tracking-tight sm:mt-3 sm:text-5xl ${hasGradient ? '' : 'text-white'}`}
+              className={`mt-2 font-extrabold leading-[1.05] tracking-tight sm:mt-3 ${FONT[panel.fontSize] || FONT.md} ${hasGradient ? '' : 'text-white'}`}
               style={headingStyle}
             >
               <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
@@ -218,7 +306,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
           </motion.div>
         </div>
 
-        <div className={`relative aspect-[4/5] shrink-0 translate-y-1 sm:translate-y-0 ${SIZE[panel.size] || SIZE.md}`}>
+        <div className={`relative aspect-square shrink-0 translate-y-1 sm:translate-y-0 ${SIZE[panel.size] || SIZE.md}`}>
           {/* Soft glow via a radial gradient — cheap, no expensive blur filter. */}
           <div
             className="pointer-events-none absolute -inset-8 rounded-[50%]"

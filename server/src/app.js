@@ -86,7 +86,7 @@ const storyJson = (r) => ({
 const storyPanelJson = (r) => ({
   id: r.id, heading: r.heading, caption: r.caption, imageUrl: r.image_url,
   accent: r.accent, accent2: r.accent2, gradientType: r.gradient_type,
-  linkUrl: r.link_url, size: r.size, sort: r.sort, visible: r.visible,
+  linkUrl: r.link_url, size: r.size, fontSize: r.font_size, sort: r.sort, visible: r.visible,
 })
 const whatWeDoJson = (r) => ({
   enabled: r.enabled, eyebrow: r.eyebrow, title: r.title,
@@ -453,14 +453,14 @@ app.get('/api/story-panels', ah(async (req, res) => {
 
 const storyPanelParams = (b) => [
   b.heading || '', b.caption || '', b.imageUrl || '', b.accent || '', b.accent2 || '',
-  b.gradientType || 'linear', b.linkUrl || '', b.size || 'md',
+  b.gradientType || 'linear', b.linkUrl || '', b.size || 'md', b.fontSize || 'md',
   Number(b.sort) || 0, b.visible === undefined ? true : Boolean(b.visible),
 ]
 
 app.post('/api/story-panels', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO story_panels (heading, caption, image_url, accent, accent2, gradient_type, link_url, size, sort, visible)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    `INSERT INTO story_panels (heading, caption, image_url, accent, accent2, gradient_type, link_url, size, font_size, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     storyPanelParams(req.body || {})
   )
   res.status(201).json(storyPanelJson(rows[0]))
@@ -468,8 +468,8 @@ app.post('/api/story-panels', requireAuth, ah(async (req, res) => {
 
 app.put('/api/story-panels/:id', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `UPDATE story_panels SET heading=$1, caption=$2, image_url=$3, accent=$4, accent2=$5, gradient_type=$6, link_url=$7, size=$8, sort=$9, visible=$10
-     WHERE id=$11 RETURNING *`,
+    `UPDATE story_panels SET heading=$1, caption=$2, image_url=$3, accent=$4, accent2=$5, gradient_type=$6, link_url=$7, size=$8, font_size=$9, sort=$10, visible=$11
+     WHERE id=$12 RETURNING *`,
     [...storyPanelParams(req.body || {}), req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
