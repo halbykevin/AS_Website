@@ -101,15 +101,18 @@ function AutoStory({ story }) {
           ))}
         </motion.div>
 
-        {/* Fixed section label — hidden on the short mobile strip so it can't
-            collide with the centered panel content. */}
-        <div className="pointer-events-none absolute left-5 top-5 hidden sm:left-8 sm:top-8 sm:block">
+        {/* Fixed section label. On mobile the panels are bottom-anchored (see the
+            panel wrapper), so this top-left label has the top of the strip to
+            itself and the two no longer overlap. */}
+        <div className="pointer-events-none absolute left-5 top-5 z-10 sm:left-8 sm:top-8">
           {story.eyebrow && (
-            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
+            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/80 sm:px-3 sm:py-1 sm:text-xs">
               {story.eyebrow}
             </span>
           )}
-          {story.heading && <h2 className="mt-3 max-w-xs text-lg font-bold text-white/90">{story.heading}</h2>}
+          {story.heading && (
+            <h2 className="mt-2 max-w-[55%] text-sm font-bold text-white/90 sm:mt-3 sm:max-w-xs sm:text-lg">{story.heading}</h2>
+          )}
         </div>
 
         {/* Panel dots */}
@@ -168,7 +171,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
     : undefined
 
   return (
-    <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
+    <div className="relative flex h-full shrink-0 items-end pb-9 sm:items-center sm:pb-0" style={{ width: width || '100vw' }}>
       <div
         className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-3 px-6 text-center sm:flex-row sm:gap-10 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''

@@ -144,10 +144,10 @@ export default function StoryAdmin() {
             description="Turn off to hide the whole section without deleting panels."
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Eyebrow" hint="Small label pinned in the corner (tablet & desktop only).">
+            <Field label="Eyebrow" hint="Small label pinned in the top-left corner.">
               <TextInput value={story.eyebrow} onChange={(e) => setStory((s) => ({ ...s, eyebrow: e.target.value }))} />
             </Field>
-            <Field label="Heading" hint="Section title pinned in the corner (tablet & desktop only).">
+            <Field label="Heading" hint="Section title pinned in the top-left corner. Keep it short on mobile.">
               <TextInput value={story.heading} onChange={(e) => setStory((s) => ({ ...s, heading: e.target.value }))} />
             </Field>
           </div>
