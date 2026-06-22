@@ -125,10 +125,11 @@ export default function StoryAdmin() {
       <PageHeader title="Scroll Story" />
 
       <Banner kind="info">
-        The pinned horizontal-scroll section at the very top of the homepage. Each panel is a
-        heading + image; on desktop they slide across as visitors scroll, on phones they become a
-        swipeable carousel. The whole section stays hidden until it’s enabled and has at least one
-        visible panel.
+        The self-playing showcase strip at the very top of the homepage. Each panel is a heading +
+        image; they auto-advance on a timer (a swipeable carousel for reduced-motion visitors). The
+        strip is a fixed height that matches the events banner below it, so keep headings short and
+        images simple. The whole section stays hidden until it’s enabled and has at least one visible
+        panel.
       </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
@@ -143,10 +144,10 @@ export default function StoryAdmin() {
             description="Turn off to hide the whole section without deleting panels."
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Eyebrow" hint="Small label pinned in the corner.">
+            <Field label="Eyebrow" hint="Small label pinned in the corner (tablet & desktop only).">
               <TextInput value={story.eyebrow} onChange={(e) => setStory((s) => ({ ...s, eyebrow: e.target.value }))} />
             </Field>
-            <Field label="Heading" hint="Section title pinned in the corner.">
+            <Field label="Heading" hint="Section title pinned in the corner (tablet & desktop only).">
               <TextInput value={story.heading} onChange={(e) => setStory((s) => ({ ...s, heading: e.target.value }))} />
             </Field>
           </div>

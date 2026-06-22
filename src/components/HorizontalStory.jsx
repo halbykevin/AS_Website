@@ -22,10 +22,10 @@ const INTERVAL = 3500
 // width on phones, a column width on desktop — so panels can differ in size on
 // both. (SIZE_CARD is the aspect ratio used by the reduced-motion carousel.)
 const SIZE = {
-  sm: 'w-[34%] max-w-[8rem] sm:w-[26%] sm:max-w-xs',
-  md: 'w-[42%] max-w-[10rem] sm:w-[38%] sm:max-w-sm',
-  lg: 'w-[50%] max-w-[12rem] sm:w-[48%] sm:max-w-md',
-  xl: 'w-[58%] max-w-[14rem] sm:w-[58%] sm:max-w-lg',
+  sm: 'w-[22%] max-w-[5rem] sm:w-[24%] sm:max-w-[9rem]',
+  md: 'w-[28%] max-w-[6rem] sm:w-[30%] sm:max-w-[12rem]',
+  lg: 'w-[34%] max-w-[7.5rem] sm:w-[36%] sm:max-w-[15rem]',
+  xl: 'w-[40%] max-w-[9rem] sm:w-[42%] sm:max-w-[18rem]',
 }
 const SIZE_CARD = {
   sm: 'aspect-[4/3]',
@@ -101,8 +101,9 @@ function AutoStory({ story }) {
           ))}
         </motion.div>
 
-        {/* Fixed section label */}
-        <div className="pointer-events-none absolute left-5 top-5 sm:left-8 sm:top-8">
+        {/* Fixed section label — hidden on the short mobile strip so it can't
+            collide with the centered panel content. */}
+        <div className="pointer-events-none absolute left-5 top-5 hidden sm:left-8 sm:top-8 sm:block">
           {story.eyebrow && (
             <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
               {story.eyebrow}
@@ -169,7 +170,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
   return (
     <div className="relative flex h-full shrink-0 items-center" style={{ width: width || '100vw' }}>
       <div
-        className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-4 px-6 text-center sm:flex-row sm:gap-12 sm:px-10 sm:text-left ${
+        className={`mx-auto flex w-full max-w-6xl flex-col-reverse items-center gap-3 px-6 text-center sm:flex-row sm:gap-10 sm:px-10 sm:text-left ${
           flip ? 'sm:flex-row-reverse' : ''
         }`}
       >
@@ -178,14 +179,14 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
             {panel.caption && (
               <motion.span
                 variants={riseItem}
-                className="block text-sm font-semibold uppercase tracking-widest"
+                className="block text-xs font-semibold uppercase tracking-widest sm:text-sm"
                 style={{ color: c1 }}
               >
                 {panel.caption}
               </motion.span>
             )}
             <h3
-              className={`mt-3 text-2xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl ${hasGradient ? '' : 'text-white'}`}
+              className={`mt-2 text-lg font-extrabold leading-[1.05] tracking-tight sm:mt-3 sm:text-5xl ${hasGradient ? '' : 'text-white'}`}
               style={headingStyle}
             >
               <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
@@ -194,7 +195,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
               <motion.div variants={riseItem}>
                 <PanelLink
                   to={panel.link}
-                  className="mt-7 inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-as-charcoal transition hover:bg-white/90"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-semibold text-as-charcoal transition hover:bg-white/90 sm:mt-6 sm:px-6 sm:py-2.5 sm:text-sm"
                 >
                   Explore →
                 </PanelLink>
@@ -203,7 +204,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
           </motion.div>
         </div>
 
-        <div className={`relative aspect-[4/5] shrink-0 translate-y-6 sm:translate-y-0 ${SIZE[panel.size] || SIZE.md}`}>
+        <div className={`relative aspect-[4/5] shrink-0 translate-y-1 sm:translate-y-0 ${SIZE[panel.size] || SIZE.md}`}>
           {/* Soft glow via a radial gradient — cheap, no expensive blur filter. */}
           <div
             className="pointer-events-none absolute -inset-8 rounded-[50%]"
