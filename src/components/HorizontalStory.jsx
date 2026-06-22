@@ -87,7 +87,9 @@ function AutoStory({ story }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div ref={wrapRef} className="relative h-[50svh] min-h-[360px] max-h-[520px] w-full overflow-hidden sm:h-[42svh] sm:min-h-[300px] sm:max-h-[460px]">
+      {/* Same aspect ratio as the events BannerSlider, so both strips are exactly
+          the same height at every breakpoint. */}
+      <div ref={wrapRef} className="relative aspect-[3/2] w-full overflow-hidden sm:aspect-[16/7] lg:aspect-[16/6]">
         <motion.div
           className="flex h-full will-change-transform"
           style={{ width: w ? w * n : '100%' }}
