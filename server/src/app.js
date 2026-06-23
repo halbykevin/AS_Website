@@ -32,7 +32,7 @@ const fmtDate = (d) => (d ? String(d).slice(0, 10) : '')
 // ---- Response mappers (DB snake_case -> API camelCase) ----
 const settingsJson = (r) => ({
   brandName: r.brand_name, legalName: r.legal_name, tagline: r.tagline, logoUrl: r.logo_url,
-  faviconUrl: r.favicon_url,
+  logoSize: r.logo_size, faviconUrl: r.favicon_url,
   heroEyebrow: r.hero_eyebrow, heroTitle: r.hero_title, heroSubtitle: r.hero_subtitle,
   heroPrimaryLabel: r.hero_primary_label, heroSecondaryLabel: r.hero_secondary_label,
   servicesHeading: r.services_heading, servicesSubheading: r.services_subheading,
@@ -136,7 +136,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        contact_heading=$17, contact_subheading=$18,
        contact_email=$19, contact_whatsapp=$20, contact_instagram=$21, contact_instagram_handle=$22,
        store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
-       published=$27, whatsapp_number=$28, favicon_url=$29, updated_at=now()
+       published=$27, whatsapp_number=$28, favicon_url=$29, logo_size=$30, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
@@ -149,6 +149,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       b.contactEmail || '', b.contactWhatsapp || '', b.contactInstagram || '', b.contactInstagramHandle || '',
       b.storeTitle || '', b.storeEyebrow || '', b.storeDescription || '', b.storeUrl || '',
       Boolean(b.published), b.whatsappNumber || '', b.faviconUrl || '',
+      Number(b.logoSize) || 48,
     ]
   )
   res.json(settingsJson(rows[0]))

@@ -17,7 +17,7 @@ const SECTIONS = [
 ]
 
 const empty = {
-  brandName: '', legalName: '', tagline: '', logoUrl: '', faviconUrl: '',
+  brandName: '', legalName: '', tagline: '', logoUrl: '', logoSize: 48, faviconUrl: '',
   heroEyebrow: '', heroTitle: '', heroSubtitle: '',
   heroPrimaryLabel: '', heroSecondaryLabel: '',
   servicesHeading: '', servicesSubheading: '',
@@ -49,7 +49,7 @@ export default function SettingsEditor() {
       if (s) {
         setForm({
           brandName: s.brandName || '', legalName: s.legalName || '', tagline: s.tagline || '',
-          logoUrl: s.logoUrl || '', faviconUrl: s.faviconUrl || '',
+          logoUrl: s.logoUrl || '', logoSize: s.logoSize || 48, faviconUrl: s.faviconUrl || '',
           heroEyebrow: s.heroEyebrow || '', heroTitle: s.heroTitle || '', heroSubtitle: s.heroSubtitle || '',
           heroPrimaryLabel: s.heroPrimaryLabel || '', heroSecondaryLabel: s.heroSecondaryLabel || '',
           servicesHeading: s.servicesHeading || '', servicesSubheading: s.servicesSubheading || '',
@@ -156,10 +156,29 @@ export default function SettingsEditor() {
                 <img
                   src={logoFile ? URL.createObjectURL(logoFile) : form.logoUrl}
                   alt="Logo preview"
-                  className="h-12 w-auto rounded border border-black/5 bg-white p-1"
+                  className="w-auto rounded border border-black/5 bg-white p-1"
+                  style={{ height: `${Number(form.logoSize) || 48}px` }}
                 />
               )}
               <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="text-sm" />
+            </div>
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Logo size" hint="Height of the logo in the top navigation bar (preview above updates as you drag).">
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="32"
+                max="80"
+                step="1"
+                value={Number(form.logoSize) || 48}
+                onChange={set('logoSize')}
+                className="w-48 accent-as-red"
+                aria-label="Logo size"
+              />
+              <TextInput type="number" min="32" max="80" value={form.logoSize} onChange={set('logoSize')} className="max-w-[90px]" />
+              <span className="text-sm text-as-charcoal/55">px</span>
             </div>
           </Field>
         </div>

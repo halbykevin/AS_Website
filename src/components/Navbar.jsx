@@ -5,6 +5,7 @@ import { useScrollEl } from '../store/scroll.jsx'
 
 export default function Navbar() {
   const { brand, nav } = useContent()
+  const logoH = Number(brand.logoSize) || 48
   const scrollRef = useScrollEl()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -46,10 +47,8 @@ export default function Navbar() {
   return (
     <div className="relative z-50">
       <header
-        className={`transition-[background-color,box-shadow] duration-300 ${
-          scrolled
-            ? 'border-b border-black/5 bg-white/90 shadow-sm backdrop-blur'
-            : 'bg-white'
+        className={`transition-[box-shadow] duration-300 ${
+          scrolled ? 'border-b border-black/5 bg-white shadow-sm' : 'bg-white'
         }`}
       >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 sm:py-4">
@@ -57,11 +56,10 @@ export default function Navbar() {
           <img
             src={brand.logo}
             alt={brand.name}
-            width="120"
-            height="80"
             fetchpriority="high"
             decoding="async"
-            className="h-20 w-auto mix-blend-multiply sm:h-16"
+            className="w-auto mix-blend-multiply"
+            style={{ height: `${logoH}px` }}
           />
         </Link>
 

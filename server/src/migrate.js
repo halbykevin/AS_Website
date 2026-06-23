@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS settings (
   legal_name TEXT DEFAULT '',
   tagline TEXT DEFAULT '',
   logo_url TEXT DEFAULT '',
+  logo_size INTEGER DEFAULT 48,
   favicon_url TEXT DEFAULT '',
   hero_eyebrow TEXT DEFAULT '',
   hero_title TEXT DEFAULT '',
@@ -208,6 +209,7 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_heading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS favicon_url TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS logo_size INTEGER DEFAULT 48;
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';
