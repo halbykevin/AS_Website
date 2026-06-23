@@ -51,7 +51,7 @@ export default function Navbar() {
           scrolled ? 'border-b border-black/5 bg-white shadow-sm' : 'bg-white'
         }`}
       >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 sm:py-4">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-1.5 sm:px-8 sm:py-2">
         <Link to="/" className="flex items-center gap-2" aria-label={brand.name}>
           <img
             src={brand.logo}
