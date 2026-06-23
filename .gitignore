@@ -10,9 +10,6 @@ dist-ssr
 # Web scraper run output (per-job folders created at runtime)
 server/scrapes/
 
-# Set-aside template git history (local safety backup, not for the repo)
-EcomWebsite/.git_template_backup/
-
 # Dev server logs
 dev-server.log
 **/dev-server.log
