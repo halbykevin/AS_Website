@@ -1,0 +1,7 @@
+now i'd like to create the ecommerce for AS Store
+i want it high end and everything controlled in admin pannel
+in admin panel we'll create an interfacce called AS Store button or anything like that it takes us into cms for teh Store
+i want it fully responsive and great futuristic design but with branding of as 
+first let's start with some light stuff we'll do everyhting prompt by prompt
+one more thing let's create a folder inside as_wesbite called as_store we'll do the project there
+let's start first with the ui and use @logo_as_store-removebg-preview

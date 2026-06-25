@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-as-ink antialiased;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@layer components {
+  /* Apple-ish content widths. */
+  .shell {
+    @apply mx-auto w-full max-w-[1024px] px-6 sm:px-8;
+  }
+  .shell-wide {
+    @apply mx-auto w-full max-w-[1280px] px-6 sm:px-8;
+  }
+
+  /* Inline accent link with a chevron — Apple's "Learn more ›" / "Buy ›". */
+  .link-cta {
+    @apply inline-flex items-center gap-1 text-[17px] font-medium text-as-red transition-colors hover:text-as-red-light;
+  }
+
+  /* Rounded solid pill button. */
+  .pill {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-as-red px-6 py-2.5 text-sm font-medium text-white transition hover:bg-as-red-light active:scale-[.98];
+  }
+  .pill-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-as-ink/15 px-6 py-2.5 text-sm font-medium text-as-ink transition hover:bg-as-ink/[0.04];
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  /* Tight Apple headline tracking. */
+  .tracking-apple {
+    letter-spacing: -0.022em;
+  }
+}
