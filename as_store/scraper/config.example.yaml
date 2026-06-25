@@ -1,0 +1,34 @@
+# Optional config. You only need this for sites that DON'T expose structured
+# data (JSON-LD / Open Graph). For those, define CSS selectors per field.
+#
+# Use it with:  python scrape.py --url <URL> --config config.example.yaml
+
+# Use a headless browser for JavaScript-rendered pages (same as --render).
+render: false
+
+# Regex used to recognise product links when using --crawl.
+link_pattern: "/(product|products|item|p|dp)/"
+
+# Override request headers if needed (e.g. a custom User-Agent or cookies).
+# headers:
+#   User-Agent: "MyBot/1.0 (+https://example.com/bot)"
+
+# CSS selectors. A value is either:
+#   - a CSS string            -> grabs the element's text
+#   - {selector, attr}        -> grabs an attribute (e.g. img src, data-price)
+# 'images' and 'categories' collect ALL matches; other fields take the first.
+selectors:
+  name: "h1.product-title"
+  brand: ".product-brand"
+  sku: { selector: "[itemprop='sku']", attr: "content" }
+  price: ".price .amount"
+  currency: { selector: "meta[itemprop='priceCurrency']", attr: "content" }
+  availability: ".stock-status"
+  description: ".product-description"
+  rating: ".rating-value"
+  review_count: ".review-count"
+  categories: ".breadcrumb a"
+  images: { selector: ".product-gallery img", attr: "src" }
+
+  # Any field name not built-in is stored under "extra_<name>" in the export:
+  # material: ".spec-material"

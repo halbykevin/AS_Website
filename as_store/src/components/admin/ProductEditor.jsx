@@ -15,7 +15,7 @@ const slugify = (s) =>
 
 const BLANK = {
   name: '', slug: '', tagline: '', description: '', price: '', oldPrice: '',
-  categoryId: '', stock: '0', isNew: true, featured: false, visible: true, colors: [],
+  categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true, colors: [],
 }
 
 export default function ProductEditor({ id }) {
@@ -34,6 +34,7 @@ export default function ProductEditor({ id }) {
   const fileRef = useRef(null)
 
   const categories = useQuery({ queryKey: ['admin', 'categories'], queryFn: adminApi.listCategories })
+  const brands = useQuery({ queryKey: ['admin', 'brands'], queryFn: adminApi.listBrands })
   const products = useQuery({
     queryKey: ['admin', 'products'],
     queryFn: adminApi.listProducts,
@@ -58,6 +59,7 @@ export default function ProductEditor({ id }) {
       description: p.description || '', price: String(p.price ?? ''),
       oldPrice: p.oldPrice != null ? String(p.oldPrice) : '',
       categoryId: p.categoryId != null ? String(p.categoryId) : '',
+      brandId: p.brandId != null ? String(p.brandId) : '',
       stock: String(p.stock ?? 0), isNew: !!p.isNew, featured: !!p.featured,
       visible: p.visible !== false, colors: Array.isArray(p.colors) ? p.colors : [],
     })
@@ -150,6 +152,7 @@ export default function ProductEditor({ id }) {
       price: Number(form.price),
       oldPrice: form.oldPrice === '' ? null : Number(form.oldPrice),
       categoryId: form.categoryId === '' ? null : Number(form.categoryId),
+      brandId: form.brandId === '' ? null : Number(form.brandId),
       stock: Number(form.stock) || 0,
       isNew: form.isNew,
       featured: form.featured,
@@ -238,6 +241,16 @@ export default function ProductEditor({ id }) {
                 {(categories.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Brand">
+              <Select value={form.brandId} onChange={(e) => set('brandId', e.target.value)}>
+                <option value="">— None —</option>
+                {(brands.data ?? []).map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
                   </option>
                 ))}
               </Select>

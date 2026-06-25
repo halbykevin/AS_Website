@@ -111,3 +111,28 @@ DROP TRIGGER IF EXISTS trg_pages_updated ON pages;
 CREATE TRIGGER trg_pages_updated
   BEFORE UPDATE ON pages
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Brands ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS brands (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  slug       TEXT UNIQUE NOT NULL,
+  image_url  TEXT DEFAULT '',
+  visible    BOOLEAN DEFAULT true,
+  sort       INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Link products to a brand, and remember where a scraped product came from
+-- (so re-scraping updates rather than duplicates).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS brand_id   INTEGER REFERENCES brands(id) ON DELETE SET NULL;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS source_url TEXT DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_products_brand  ON products(brand_id);
+CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);
+
+DROP TRIGGER IF EXISTS trg_brands_updated ON brands;
+CREATE TRIGGER trg_brands_updated
+  BEFORE UPDATE ON brands
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();

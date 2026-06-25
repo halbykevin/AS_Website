@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth, optionalAuth } from './auth.js'
+import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -37,6 +38,15 @@ const categoryJson = (r) => ({
   visible: r.visible,
 })
 
+const brandJson = (r) => ({
+  id: r.id,
+  name: r.name,
+  slug: r.slug,
+  imageUrl: r.image_url || '',
+  sort: r.sort,
+  visible: r.visible,
+})
+
 const productJson = (r) => ({
   id: r.id,
   name: r.name,
@@ -48,6 +58,9 @@ const productJson = (r) => ({
   categoryId: r.category_id,
   category: r.category_name || '',
   categorySlug: r.category_slug || '',
+  brandId: r.brand_id,
+  brand: r.brand_name || '',
+  sourceUrl: r.source_url || '',
   colors: Array.isArray(r.colors) ? r.colors : [],
   stock: r.stock,
   isNew: r.is_new,
@@ -85,18 +98,20 @@ const pageJson = (r) => ({
 
 // Shared SELECT fragments.
 const LIST_SELECT = `
-  SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+  SELECT p.*, c.name AS category_name, c.slug AS category_slug, b.name AS brand_name,
     (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id
        ORDER BY pi.sort, pi.id LIMIT 1) AS image
   FROM products p
-  LEFT JOIN categories c ON c.id = p.category_id`
+  LEFT JOIN categories c ON c.id = p.category_id
+  LEFT JOIN brands b ON b.id = p.brand_id`
 
 const DETAIL_SELECT = `
-  SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+  SELECT p.*, c.name AS category_name, c.slug AS category_slug, b.name AS brand_name,
     COALESCE((SELECT json_agg(pi.url ORDER BY pi.sort, pi.id)
               FROM product_images pi WHERE pi.product_id = p.id), '[]') AS images
   FROM products p
-  LEFT JOIN categories c ON c.id = p.category_id`
+  LEFT JOIN categories c ON c.id = p.category_id
+  LEFT JOIN brands b ON b.id = p.brand_id`
 
 // Columns that admin create/update accept, mapped from camelCase body keys.
 const PRODUCT_COLS = {
@@ -107,6 +122,7 @@ const PRODUCT_COLS = {
   price: 'price',
   oldPrice: 'old_price',
   categoryId: 'category_id',
+  brandId: 'brand_id',
   colors: 'colors',
   stock: 'stock',
   isNew: 'is_new',
@@ -248,9 +264,9 @@ app.post(
     const slug = (b.slug || '').trim() || slugify(name)
     const { rows } = await query(
       `INSERT INTO products
-         (name, slug, tagline, description, price, old_price, category_id,
+         (name, slug, tagline, description, price, old_price, category_id, brand_id,
           colors, stock, is_new, featured, visible, sort)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
         name,
@@ -260,6 +276,7 @@ app.post(
         b.price ?? 0,
         b.oldPrice ?? null,
         b.categoryId ?? null,
+        b.brandId ?? null,
         JSON.stringify(Array.isArray(b.colors) ? b.colors : []),
         b.stock ?? 0,
         b.isNew ?? false,
@@ -362,6 +379,65 @@ app.delete(
       req.params.imageId,
       req.params.id,
     ])
+    res.json({ ok: true })
+  }),
+)
+
+// ========================= Brands =========================
+app.get(
+  '/api/brands',
+  optionalAuth,
+  ah(async (req, res) => {
+    const all = req.admin && req.query.all === '1'
+    const { rows } = await query(
+      `SELECT * FROM brands ${all ? '' : 'WHERE visible = true'} ORDER BY sort, name`,
+    )
+    res.json(rows.map(brandJson))
+  }),
+)
+
+app.post(
+  '/api/brands',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const name = (b.name || '').trim()
+    if (!name) return res.status(400).json({ error: 'name is required' })
+    const slug = (b.slug || '').trim() || slugify(name)
+    const { rows } = await query(
+      `INSERT INTO brands (name, slug, image_url, sort, visible)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [name, slug, b.imageUrl || '', b.sort ?? 0, b.visible ?? true],
+    )
+    res.status(201).json(brandJson(rows[0]))
+  }),
+)
+
+app.put(
+  '/api/brands/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const { rows } = await query(
+      `UPDATE brands SET
+         name      = COALESCE($2, name),
+         slug      = COALESCE($3, slug),
+         image_url = COALESCE($4, image_url),
+         sort      = COALESCE($5, sort),
+         visible   = COALESCE($6, visible)
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, b.name ?? null, b.slug ?? null, b.imageUrl ?? null, b.sort ?? null, b.visible ?? null],
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(brandJson(rows[0]))
+  }),
+)
+
+app.delete(
+  '/api/brands/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    await query(`DELETE FROM brands WHERE id = $1`, [req.params.id])
     res.json({ ok: true })
   }),
 )
@@ -495,6 +571,10 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
   res.status(201).json({ url: `${PUBLIC_URL}/uploads/${req.file.filename}` })
 })
+
+// ========================= Scraper =========================
+// Spawns the Python scraper and ingests its output into the catalog.
+app.use(scraperRouter)
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {

@@ -72,6 +72,14 @@ const paths = {
       <path d="M3 7l9 6 9-6" />
     </>
   ),
+  bookmark: <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />,
+  download: <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />,
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.7 }) {

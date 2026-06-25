@@ -7,13 +7,13 @@ import { addItem } from '@/store/cartSlice'
 // "From $X", and an Add to Bag pill (wired to Redux).
 export default function ProductTile({ product }) {
   const dispatch = useDispatch()
-  const { id, name, tagline, price, image, colors = [] } = product
+  const { id, name, tagline, price, image, colors = [], brand } = product
 
   const add = () => dispatch(addItem({ id, title: name, image, price }))
 
   return (
     <div className="flex w-[260px] shrink-0 snap-start flex-col items-center rounded-[28px] bg-as-fog p-6 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(0,0,0,0.3)] sm:w-[300px]">
-      <p className="text-xs font-semibold uppercase tracking-wide text-as-red">New</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{brand || 'New'}</p>
       <h3 className="mt-2 text-xl font-semibold tracking-apple text-as-ink">{name}</h3>
       <p className="mt-1 text-sm text-as-ink/55">{tagline}</p>
 

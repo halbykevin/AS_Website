@@ -11,6 +11,8 @@ const NAV = [
   { href: '/admin', label: 'Dashboard', icon: 'grid', exact: true },
   { href: '/admin/products', label: 'Products', icon: 'box' },
   { href: '/admin/categories', label: 'Categories', icon: 'tag' },
+  { href: '/admin/brands', label: 'Brands', icon: 'bookmark' },
+  { href: '/admin/import', label: 'Import', icon: 'download' },
   { href: '/admin/pages', label: 'Pages', icon: 'file' },
   { href: '/admin/settings', label: 'Settings', icon: 'cog' },
 ]

@@ -75,4 +75,14 @@ export const adminApi = {
     fd.append('file', file)
     return req('/api/uploads', { method: 'POST', auth: true, body: fd, form: true })
   },
+
+  // brands
+  listBrands: () => req('/api/brands?all=1', { auth: true }),
+  createBrand: (data) => req('/api/brands', { method: 'POST', auth: true, body: data }),
+  updateBrand: (id, data) => req(`/api/brands/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteBrand: (id) => req(`/api/brands/${id}`, { method: 'DELETE', auth: true }),
+
+  // scraper / import
+  startScrape: (opts) => req('/api/scrape', { method: 'POST', auth: true, body: opts }),
+  getScrape: (id) => req(`/api/scrape/${id}`, { auth: true }),
 }
