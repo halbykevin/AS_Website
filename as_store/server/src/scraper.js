@@ -31,6 +31,33 @@ const slugify = (s) =>
 
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d)
 
+// Decode HTML entities (&amp; &gt; &#39; …) that leak into scraped text. Runs
+// twice to also handle double-encoded values (&amp;gt;).
+const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+export function decodeEntities(str) {
+  if (!str) return ''
+  let s = String(str)
+  for (let i = 0; i < 2; i++) {
+    s = s.replace(/&(#x?[0-9a-f]+|[a-z0-9]+);/gi, (m, e) => {
+      if (e[0] === '#') {
+        const code = /^#x/i.test(e) ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)
+        return Number.isFinite(code) ? String.fromCodePoint(code) : m
+      }
+      const v = NAMED_ENTITIES[e.toLowerCase()]
+      return v != null ? v : m
+    })
+  }
+  return s
+}
+
+// A scraped category is often a "A > B > C" breadcrumb (HTML-encoded). Decode it
+// and keep the most specific (leaf) segment as the category name.
+export function cleanCategoryName(raw) {
+  const decoded = decodeEntities(raw)
+  const segs = decoded.split(/[>›»→|]/).map((x) => x.trim()).filter(Boolean)
+  return (segs.length ? segs[segs.length - 1] : decoded).trim()
+}
+
 function buildArgs(opts, outDir) {
   const mode =
     opts.mode === 'single' ? '--url'
@@ -72,7 +99,7 @@ export async function ingestProducts(products) {
   let skipped = 0
 
   for (const p of Array.isArray(products) ? products : []) {
-    const name = (p?.name || '').trim()
+    const name = decodeEntities(p?.name || '').trim()
     const price = num(p?.price, 0) || 0
     if (!name && !price) {
       skipped++
@@ -82,8 +109,8 @@ export async function ingestProducts(products) {
 
     // brand (upsert by slug)
     let brandId = null
-    if (p.brand && String(p.brand).trim()) {
-      const bname = String(p.brand).trim()
+    const bname = decodeEntities(p.brand || '').trim()
+    if (bname) {
       const bslug = slugify(bname)
       if (bslug) {
         const { rows } = await query(
@@ -99,7 +126,7 @@ export async function ingestProducts(products) {
     // category (first one the scraper found)
     let categoryId = null
     const catName =
-      Array.isArray(p.categories) && p.categories.length ? String(p.categories[0]).trim() : ''
+      Array.isArray(p.categories) && p.categories.length ? cleanCategoryName(p.categories[0]) : ''
     if (catName) {
       const cslug = slugify(catName)
       if (cslug) {
@@ -113,7 +140,7 @@ export async function ingestProducts(products) {
       }
     }
 
-    const description = (p.description || '').trim()
+    const description = decodeEntities(p.description || '').trim()
     const tagline = (description.split('\n')[0] || '').slice(0, 90)
     const sourceUrl = p.url || ''
     const images = Array.isArray(p.images) ? p.images.filter(Boolean) : []
