@@ -1,0 +1,78 @@
+'use client'
+
+// Admin API client for the AS Store CMS. Talks to the Express server, attaches
+// the Bearer token from localStorage, and throws readable errors.
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+const TOKEN_KEY = 'as_store_admin_token'
+
+export const getToken = () =>
+  typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
+export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t)
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+export const isAuthed = () => Boolean(getToken())
+
+async function req(path, { method = 'GET', body, auth = false, form = false } = {}) {
+  const headers = {}
+  if (!form) headers['Content-Type'] = 'application/json'
+  if (auth) {
+    const t = getToken()
+    if (t) headers.Authorization = `Bearer ${t}`
+  }
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers,
+    body: form ? body : body != null ? JSON.stringify(body) : undefined,
+  })
+  if (res.status === 401) {
+    clearToken()
+    throw new Error('Session expired — please sign in again.')
+  }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}))
+    throw new Error(e.error || `Request failed (${res.status})`)
+  }
+  return res.status === 204 ? null : res.json()
+}
+
+export const adminApi = {
+  // auth
+  login: (email, password) => req('/api/auth/login', { method: 'POST', body: { email, password } }),
+  me: () => req('/api/auth/me', { auth: true }),
+
+  // products
+  listProducts: () => req('/api/products?all=1', { auth: true }),
+  createProduct: (data) => req('/api/products', { method: 'POST', auth: true, body: data }),
+  updateProduct: (id, data) => req(`/api/products/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteProduct: (id) => req(`/api/products/${id}`, { method: 'DELETE', auth: true }),
+
+  // product images
+  listImages: (id) => req(`/api/products/${id}/images`, { auth: true }),
+  addImage: (id, url) => req(`/api/products/${id}/images`, { method: 'POST', auth: true, body: { url } }),
+  deleteImage: (id, imageId) =>
+    req(`/api/products/${id}/images/${imageId}`, { method: 'DELETE', auth: true }),
+
+  // categories
+  listCategories: () => req('/api/categories?all=1', { auth: true }),
+  createCategory: (data) => req('/api/categories', { method: 'POST', auth: true, body: data }),
+  updateCategory: (id, data) =>
+    req(`/api/categories/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteCategory: (id) => req(`/api/categories/${id}`, { method: 'DELETE', auth: true }),
+
+  // settings
+  getSettings: () => req('/api/settings'),
+  updateSettings: (data) => req('/api/settings', { method: 'PUT', auth: true, body: data }),
+
+  // pages
+  listPages: () => req('/api/pages?all=1', { auth: true }),
+  createPage: (data) => req('/api/pages', { method: 'POST', auth: true, body: data }),
+  updatePage: (id, data) => req(`/api/pages/${id}`, { method: 'PUT', auth: true, body: data }),
+  deletePage: (id) => req(`/api/pages/${id}`, { method: 'DELETE', auth: true }),
+
+  // uploads
+  upload: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return req('/api/uploads', { method: 'POST', auth: true, body: fd, form: true })
+  },
+}

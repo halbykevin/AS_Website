@@ -58,6 +58,31 @@ const productJson = (r) => ({
   images: Array.isArray(r.images) ? r.images : [],
 })
 
+const settingsJson = (r) => ({
+  storeName: r.store_name || 'AS Store',
+  announcement: { enabled: r.announcement_enabled, text: r.announcement_text || '' },
+  contact: {
+    email: r.contact_email || '',
+    phone: r.contact_phone || '',
+    whatsapp: r.contact_whatsapp || '',
+    address: r.contact_address || '',
+  },
+  socials: r.socials || {},
+  navLinks: Array.isArray(r.nav_links) ? r.nav_links : [],
+  footerGroups: Array.isArray(r.footer_groups) ? r.footer_groups : [],
+  updatedAt: r.updated_at,
+})
+
+const pageJson = (r) => ({
+  id: r.id,
+  slug: r.slug,
+  title: r.title,
+  body: r.body || '',
+  visible: r.visible,
+  sort: r.sort,
+  updatedAt: r.updated_at,
+})
+
 // Shared SELECT fragments.
 const LIST_SELECT = `
   SELECT p.*, c.name AS category_name, c.slug AS category_slug,
@@ -300,6 +325,18 @@ app.delete(
 )
 
 // ---- Product images ----
+app.get(
+  '/api/products/:id/images',
+  requireAuth,
+  ah(async (req, res) => {
+    const { rows } = await query(
+      `SELECT id, url, alt, sort FROM product_images WHERE product_id = $1 ORDER BY sort, id`,
+      [req.params.id],
+    )
+    res.json(rows.map((r) => ({ id: r.id, url: r.url, alt: r.alt, sort: r.sort })))
+  }),
+)
+
 app.post(
   '/api/products/:id/images',
   requireAuth,
@@ -325,6 +362,120 @@ app.delete(
       req.params.imageId,
       req.params.id,
     ])
+    res.json({ ok: true })
+  }),
+)
+
+// ========================= Settings =========================
+app.get(
+  '/api/settings',
+  ah(async (req, res) => {
+    await query(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
+    const { rows } = await query(`SELECT * FROM settings WHERE id = 1`)
+    res.json(settingsJson(rows[0]))
+  }),
+)
+
+app.put(
+  '/api/settings',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    await query(`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
+    const { rows } = await query(
+      `UPDATE settings SET
+         store_name           = COALESCE($1, store_name),
+         announcement_enabled = COALESCE($2, announcement_enabled),
+         announcement_text    = COALESCE($3, announcement_text),
+         contact_email        = COALESCE($4, contact_email),
+         contact_phone        = COALESCE($5, contact_phone),
+         contact_whatsapp     = COALESCE($6, contact_whatsapp),
+         contact_address      = COALESCE($7, contact_address),
+         socials              = COALESCE($8::jsonb, socials),
+         nav_links            = COALESCE($9::jsonb, nav_links),
+         footer_groups        = COALESCE($10::jsonb, footer_groups)
+       WHERE id = 1 RETURNING *`,
+      [
+        b.storeName ?? null,
+        b.announcement?.enabled ?? null,
+        b.announcement?.text ?? null,
+        b.contact?.email ?? null,
+        b.contact?.phone ?? null,
+        b.contact?.whatsapp ?? null,
+        b.contact?.address ?? null,
+        b.socials ? JSON.stringify(b.socials) : null,
+        b.navLinks ? JSON.stringify(b.navLinks) : null,
+        b.footerGroups ? JSON.stringify(b.footerGroups) : null,
+      ],
+    )
+    res.json(settingsJson(rows[0]))
+  }),
+)
+
+// ========================= Pages =========================
+app.get(
+  '/api/pages',
+  optionalAuth,
+  ah(async (req, res) => {
+    const all = req.admin && req.query.all === '1'
+    const { rows } = await query(
+      `SELECT * FROM pages ${all ? '' : 'WHERE visible = true'} ORDER BY sort, id`,
+    )
+    res.json(rows.map(pageJson))
+  }),
+)
+
+app.get(
+  '/api/pages/:slug',
+  ah(async (req, res) => {
+    const { rows } = await query(`SELECT * FROM pages WHERE slug = $1`, [req.params.slug])
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(pageJson(rows[0]))
+  }),
+)
+
+app.post(
+  '/api/pages',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const title = (b.title || '').trim()
+    if (!title) return res.status(400).json({ error: 'title is required' })
+    const slug = (b.slug || '').trim() || slugify(title)
+    const { rows } = await query(
+      `INSERT INTO pages (slug, title, body, visible, sort)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [slug, title, b.body || '', b.visible ?? true, b.sort ?? 0],
+    )
+    res.status(201).json(pageJson(rows[0]))
+  }),
+)
+
+app.put(
+  '/api/pages/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const { rows } = await query(
+      `UPDATE pages SET
+         slug    = COALESCE($2, slug),
+         title   = COALESCE($3, title),
+         body    = COALESCE($4, body),
+         visible = COALESCE($5, visible),
+         sort    = COALESCE($6, sort)
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, b.slug ?? null, b.title ?? null, b.body ?? null, b.visible ?? null, b.sort ?? null],
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(pageJson(rows[0]))
+  }),
+)
+
+app.delete(
+  '/api/pages/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    await query(`DELETE FROM pages WHERE id = $1`, [req.params.id])
     res.json({ ok: true })
   }),
 )

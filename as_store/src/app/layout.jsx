@@ -1,7 +1,5 @@
 import './globals.css'
 import Providers from './providers.jsx'
-import Nav from '@/components/Nav.jsx'
-import Footer from '@/components/Footer.jsx'
 
 export const metadata = {
   title: 'AS Store — Online shopping for tech & electronics in Lebanon',
@@ -10,6 +8,8 @@ export const metadata = {
   icons: { icon: '/as-store-logo.png', apple: '/as-store-logo.png' },
 }
 
+// Root layout: html/body + global providers only. The storefront chrome
+// (Nav/Footer) lives in the (store) route group, so /admin can use its own shell.
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -22,13 +22,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
-        <Providers>
-          <div className="flex min-h-screen flex-col">
-            <Nav />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

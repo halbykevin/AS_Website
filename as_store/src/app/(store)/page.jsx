@@ -5,7 +5,7 @@ import BentoGrid from '@/components/BentoGrid.jsx'
 import Reveal from '@/components/Reveal.jsx'
 
 // AS Store homepage — Apple design language: airy hero, a pinned scroll-zoom
-// flagship, product rails, a bento lineup, and a closing CTA.
+// flagship, product rails (live from the API), a bento lineup, and a closing CTA.
 export default function HomePage() {
   return (
     <>

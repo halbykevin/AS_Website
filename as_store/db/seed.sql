@@ -53,3 +53,29 @@ FROM (VALUES
 ) AS x(slug, url)
 JOIN products p ON p.slug = x.slug
 ON CONFLICT (product_id, url) DO NOTHING;
+
+-- --- Default site settings -------------------------------------------------
+INSERT INTO settings (id, store_name, announcement_enabled, announcement_text,
+  contact_email, contact_phone, contact_whatsapp, contact_address, socials, nav_links, footer_groups)
+VALUES (
+  1, 'AS Store', true, 'Free delivery across Lebanon · 12-month warranty',
+  'store@ascompany.com', '+961 1 000 000', '+9611000000', 'Beirut, Lebanon',
+  '{"instagram":"https://instagram.com","facebook":"https://facebook.com","tiktok":"","x":"","youtube":""}'::jsonb,
+  '[{"label":"Store","href":"/"},{"label":"Smartphones","href":"/"},{"label":"Audio","href":"/"},{"label":"Computing","href":"/"},{"label":"Wearables","href":"/"},{"label":"Smart Home","href":"/"},{"label":"Accessories","href":"/"},{"label":"Support","href":"/pages/support"}]'::jsonb,
+  '[{"title":"Shop","links":[{"label":"Smartphones","href":"/"},{"label":"Audio","href":"/"},{"label":"Computing","href":"/"},{"label":"Accessories","href":"/"}]},{"title":"Support","links":[{"label":"Contact us","href":"/pages/contact"},{"label":"Shipping & Returns","href":"/pages/shipping"},{"label":"Warranty","href":"/pages/warranty"}]},{"title":"Company","links":[{"label":"About AS","href":"/pages/about"},{"label":"Support","href":"/pages/support"}]}]'::jsonb
+) ON CONFLICT (id) DO NOTHING;
+
+-- --- Sample content pages --------------------------------------------------
+INSERT INTO pages (slug, title, body, sort) VALUES
+  ('about','About AS Store','AS Store is the retail arm of AS Company (Absolute Solutions SAL), Lebanon''s market leader in telecommunication and electronics since 2008.
+
+We bring you genuine, warrantied tech delivered across Lebanon.', 1),
+  ('contact','Contact us','Questions? Reach us by email at store@ascompany.com or on WhatsApp.
+
+We''re here to help every day.', 2),
+  ('shipping','Shipping & Returns','We deliver across Lebanon within 24-72 hours.
+
+Returns are accepted within 7 days of delivery in original condition.', 3),
+  ('warranty','Warranty','All products carry a 12-month warranty unless otherwise stated.', 4),
+  ('support','Support','Need help? Visit our contact page or message us on WhatsApp and our team will assist you.', 5)
+ON CONFLICT (slug) DO NOTHING;

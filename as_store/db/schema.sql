@@ -72,3 +72,42 @@ DROP TRIGGER IF EXISTS trg_products_updated ON products;
 CREATE TRIGGER trg_products_updated
   BEFORE UPDATE ON products
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Site settings (singleton, id = 1) -------------------------------------
+CREATE TABLE IF NOT EXISTS settings (
+  id                   INTEGER PRIMARY KEY DEFAULT 1,
+  store_name           TEXT DEFAULT 'AS Store',
+  announcement_enabled BOOLEAN DEFAULT true,
+  announcement_text    TEXT DEFAULT '',
+  contact_email        TEXT DEFAULT '',
+  contact_phone        TEXT DEFAULT '',
+  contact_whatsapp     TEXT DEFAULT '',
+  contact_address      TEXT DEFAULT '',
+  socials              JSONB DEFAULT '{}'::jsonb,   -- {instagram,facebook,tiktok,x,youtube}
+  nav_links            JSONB DEFAULT '[]'::jsonb,   -- [{label, href}]
+  footer_groups        JSONB DEFAULT '[]'::jsonb,   -- [{title, links:[{label,href}]}]
+  updated_at           TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT settings_singleton CHECK (id = 1)
+);
+
+-- --- Content pages ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pages (
+  id         SERIAL PRIMARY KEY,
+  slug       TEXT UNIQUE NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT DEFAULT '',
+  visible    BOOLEAN DEFAULT true,
+  sort       INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS trg_settings_updated ON settings;
+CREATE TRIGGER trg_settings_updated
+  BEFORE UPDATE ON settings
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_pages_updated ON pages;
+CREATE TRIGGER trg_pages_updated
+  BEFORE UPDATE ON pages
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();

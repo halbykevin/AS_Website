@@ -51,11 +51,20 @@ export const products = [
   { id: 'p12', name: 'Vortex Fit Band', tagline: 'Move more.', category: 'Wearables', price: 89, image: img('as-band-16'), colors: ['#1d1d1f', '#b0392f'] },
 ]
 
-// ---- Fake async "API" (replaced by real fetch() later) ----
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+// ---- Live API (falls back to the bundled mock if the API is offline) ----
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+const toSlug = (s) => String(s).toLowerCase().trim().replace(/\s+/g, '-')
 
 export async function getProducts({ category } = {}) {
-  await wait(220)
-  if (!category || category === 'All') return products
-  return products.filter((p) => p.category === category)
+  try {
+    const qs =
+      category && category !== 'All' ? `?category=${encodeURIComponent(toSlug(category))}` : ''
+    const res = await fetch(`${API}/api/products${qs}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    // API down → render the bundled sample so the site never breaks.
+    if (!category || category === 'All') return products
+    return products.filter((p) => p.category === category)
+  }
 }
