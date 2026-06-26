@@ -192,15 +192,15 @@ function AutoStory({ story }) {
 
         {/* Panel dots */}
         {n > 1 && (
-          <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
             {panels.map((p, i) => (
               <button
                 key={p.id ?? i}
                 type="button"
                 aria-label={`Go to panel ${i + 1}`}
                 onClick={() => setIndex(i)}
-                className={`h-2 rounded-full transition-all ${
-                  i === index ? 'w-6 bg-as-red' : 'w-2 bg-white/40 hover:bg-white/70'
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index ? 'w-4 bg-as-red' : 'w-1.5 bg-white/40 hover:bg-white/70'
                 }`}
               />
             ))}
@@ -291,7 +291,7 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
               </motion.span>
             )}
             <h3
-              className={`mt-2 font-extrabold leading-[1.05] tracking-tight sm:mt-3 ${FONT[panel.fontSize] || FONT.md} ${hasGradient ? '' : 'text-white'}`}
+              className={`${panel.caption ? 'mt-2 sm:mt-3' : ''} font-extrabold leading-[1.05] tracking-tight ${FONT[panel.fontSize] || FONT.md} ${hasGradient ? '' : 'text-white'}`}
               style={headingStyle}
             >
               <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
@@ -392,7 +392,7 @@ function StoryCard({ panel }) {
             {panel.caption}
           </motion.span>
         )}
-        <motion.h3 variants={riseItem} className="mt-2 text-xl font-extrabold text-white">
+        <motion.h3 variants={riseItem} className={`${panel.caption ? 'mt-2' : ''} text-xl font-extrabold text-white`}>
           {panel.heading}
         </motion.h3>
       </div>

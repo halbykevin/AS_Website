@@ -116,15 +116,15 @@ export default function BannerSlider({ banners }) {
 
         {/* Dots */}
         {count > 1 && (
-          <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
             {banners.map((b, i) => (
               <button
                 key={b.id}
                 type="button"
                 aria-label={`Go to slide ${i + 1}`}
                 onClick={() => go(i)}
-                className={`h-2 rounded-full transition-all ${
-                  i === index ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/80'
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
                 }`}
               />
             ))}
