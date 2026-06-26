@@ -17,7 +17,7 @@ const GRADIENTS = [
 ]
 const blankPanel = {
   heading: '', caption: '', imageUrl: '', accent: '', accent2: '', gradientType: 'solid',
-  linkUrl: '', size: 'md', fontSize: 'md', sort: 0, visible: true,
+  linkUrl: '', buttonEnabled: false, buttonLabel: 'Explore', size: 'md', fontSize: 'md', sort: 0, visible: true,
 }
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
 
@@ -84,6 +84,8 @@ export default function StoryAdmin() {
       accent2: r.accent2 || '',
       gradientType: r.gradientType || 'solid',
       linkUrl: r.linkUrl || '',
+      buttonEnabled: r.buttonEnabled === true,
+      buttonLabel: r.buttonLabel || 'Explore',
       size: r.size || 'md',
       fontSize: r.fontSize || 'md',
       sort: r.sort || 0,
@@ -214,9 +216,20 @@ export default function StoryAdmin() {
                 </Field>
               )}
             </div>
-            <Field label="Link (optional)" hint="Where the panel’s image/button goes. Path (/events) or full URL.">
+            <Field label="Link (optional)" hint="Where the panel’s image and button go. Path (/events) or full URL.">
               <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="/events or https://…" />
             </Field>
+            <Toggle
+              checked={form.buttonEnabled}
+              onChange={(v) => setForm((f) => ({ ...f, buttonEnabled: v }))}
+              label={form.buttonEnabled ? 'Show a button on this panel' : 'No button on this panel'}
+              description="Adds a clickable button that opens the link above. Needs a link to be set."
+            />
+            {form.buttonEnabled && (
+              <Field label="Button label" hint="Text shown on the button (an arrow is added automatically).">
+                <TextInput value={form.buttonLabel} onChange={set('buttonLabel')} placeholder="Explore" />
+              </Field>
+            )}
             <Field label="Image size" hint="Controls how big this panel's image is — mix sizes for variety. Scales on mobile too.">
               <SegmentedControl
                 value={form.size}
@@ -286,6 +299,7 @@ export default function StoryAdmin() {
                       {r.visible === false ? 'hidden' : 'visible'}
                       {r.caption ? ` · ${r.caption}` : ''}
                       {r.linkUrl ? ' · linked' : ''}
+                      {r.buttonEnabled ? ' · button' : ''}
                     </p>
                   </div>
                 </div>

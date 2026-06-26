@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-// Every banner — the image and the "Buy tickets" button — sends visitors to the
-// events listing page (www.as.com.lb/events in production) rather than each
-// banner's own link.
+// Every banner sends visitors to the events listing page
+// (www.as.com.lb/events in production) rather than each banner's own link.
 const EVENTS_PATH = '/events'
 
 // Admin-managed hero banner carousel, styled like a box-office site
 // (ticketingboxoffice.com): full-bleed, a fixed cinematic aspect ratio with the
-// image cropped to fill, and the event details (title, subtitle, "Buy tickets")
-// overlaid on a gradient. The whole slide opens the link the admin set.
+// image cropped to fill. It carries the image only — no caption bar — and the
+// whole slide opens the events page.
 
 const INTERVAL = 5000
 
 // One fixed aspect ratio per breakpoint — every banner is cropped to fit, so
 // the strip never changes height between slides. Taller on phones, wide and
 // cinematic on larger screens.
-const ASPECT = 'aspect-[3/2] sm:aspect-[16/7] lg:aspect-[16/6]'
+const ASPECT = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
 
 export default function BannerSlider({ banners }) {
   const [index, setIndex] = useState(0)
@@ -78,7 +77,6 @@ export default function BannerSlider({ banners }) {
   }
 
   if (!count) return null
-  const current = banners[index]
 
   return (
     <section
@@ -87,8 +85,8 @@ export default function BannerSlider({ banners }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Full-bleed viewport with a fixed aspect ratio */}
-      <div className={`relative w-full overflow-hidden bg-as-charcoal ${ASPECT}`}>
+      {/* Fixed aspect ratio, softly rounded so the strips read as separate panels */}
+      <div className={`relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-xl shadow-black/10 sm:rounded-[36px] ${ASPECT}`}>
         <div
           className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
             dragging ? '' : 'transition-transform duration-700 ease-out'
@@ -133,34 +131,6 @@ export default function BannerSlider({ banners }) {
           </div>
         )}
       </div>
-
-      {/* Details bar for the current slide (below the image, AS Company style) */}
-      {(current.title || current.subtitle || current.link) && (
-        <div className="border-b border-black/5 bg-white">
-          <div className="mx-auto max-w-3xl px-5 py-7 text-center sm:px-8 sm:py-9">
-            <div key={current.id} className="animate-fade-in">
-              {current.title && (
-                <h2 className="text-2xl font-extrabold uppercase tracking-tight text-as-charcoal sm:text-3xl">
-                  {current.title}
-                </h2>
-              )}
-              {current.subtitle && (
-                <p className="mt-2 text-sm font-medium text-as-charcoal/55 sm:text-base">
-                  {current.subtitle}
-                </p>
-              )}
-              {current.link && (
-                <Link
-                  to={EVENTS_PATH}
-                  className="mt-5 inline-flex items-center rounded-full border-2 border-as-red px-8 py-2.5 text-xs font-semibold uppercase tracking-widest text-as-red transition hover:bg-as-red hover:text-white sm:text-sm"
-                >
-                  Buy tickets
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   )
 }

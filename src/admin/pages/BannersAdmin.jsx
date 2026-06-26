@@ -295,8 +295,8 @@ export default function BannersAdmin() {
 // aspect ratio and crops the image (object-cover); dragging moves the image
 // inside the frame, which we store as an object-position focal point (%).
 const PREVIEW_ASPECTS = {
-  desktop: { label: 'Desktop', cls: 'aspect-[16/6]' },
-  mobile: { label: 'Mobile', cls: 'aspect-[3/2]' },
+  desktop: { label: 'Desktop', cls: 'aspect-[16/5]' },
+  mobile: { label: 'Mobile', cls: 'aspect-[16/9]' },
 }
 const clampPct = (v) => Math.min(100, Math.max(0, v))
 

@@ -298,6 +298,8 @@ export function mapStoryPanel(p) {
     accent2: p.accent2 || '',
     gradientType: p.gradientType || 'linear',
     link: p.linkUrl || '',
+    buttonEnabled: p.buttonEnabled === true,
+    buttonLabel: p.buttonLabel || 'Explore',
     size: p.size || 'md',
     fontSize: p.fontSize || 'md',
     visible: p.visible !== false,

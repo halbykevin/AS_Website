@@ -139,14 +139,14 @@ function AutoStory({ story }) {
   return (
     <section
       aria-label={story.heading || 'Story'}
-      className="relative mb-2 overflow-hidden sm:mb-3"
+      className="relative overflow-hidden rounded-[28px] shadow-xl shadow-black/10 sm:rounded-[36px]"
       style={{ background: DARK }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       {/* Same aspect ratio as the events BannerSlider, so both strips are exactly
           the same height at every breakpoint. */}
-      <div ref={wrapRef} className="relative aspect-[3/2] w-full overflow-hidden sm:aspect-[16/7] lg:aspect-[16/6]">
+      <div ref={wrapRef} className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[16/6] lg:aspect-[16/5]">
         <div
           className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
             inView ? 'will-change-transform' : ''
@@ -296,13 +296,13 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
             >
               <Typewriter text={panel.heading} run={active} caretColor={hasGradient ? c1 : 'currentColor'} />
             </h3>
-            {panel.link && (
+            {panel.buttonEnabled && panel.link && (
               <motion.div variants={riseItem}>
                 <PanelLink
                   to={panel.link}
                   className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-xs font-semibold text-as-charcoal transition hover:bg-white/90 sm:mt-6 sm:px-6 sm:py-2.5 sm:text-sm"
                 >
-                  Explore →
+                  {panel.buttonLabel || 'Explore'} →
                 </PanelLink>
               </motion.div>
             )}

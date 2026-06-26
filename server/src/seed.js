@@ -7,8 +7,7 @@ import { pool } from './db.js'
 const services = [
   ['Telecommunication', 'Cutting-edge telecom products and solutions that keep Lebanon connected.', 'signal', 0],
   ['Electronics & Tech', 'A curated range of the latest electronics, gadgets and accessories.', 'chip', 1],
-  ['Live Events & Ticketing', 'We host and power unforgettable events — reserve your spot in just a few taps.', 'ticket', 2],
-  ['Retail & Support', 'Trusted retail experience backed by expert advice and after-sales support.', 'support', 3],
+  ['Retail & Support', 'Trusted retail experience backed by expert advice and after-sales support.', 'support', 2],
 ]
 
 const events = [
@@ -135,6 +134,21 @@ const solutions = [
   },
 ]
 
+// Homepage events banner slideshow (image + active are what make a slide show).
+const banners = [
+  { title: 'Summer Tech Expo 2026', subtitle: 'The latest gadgets, live', image_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1600&q=80', link_url: '/events', sort: 0 },
+  { title: 'Live Music Night', subtitle: 'Under the stars in Beirut', image_url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1600&q=80', link_url: '/events', sort: 1 },
+  { title: 'Gaming Championship', subtitle: 'The finals are coming', image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80', link_url: '/events', sort: 2 },
+]
+
+// Top-of-homepage horizontal scroll-story: a singleton meta row + its panels.
+const storyMeta = { eyebrow: 'AS Company', heading: 'Connecting Lebanon since 2008', subheading: 'Telecom, electronics and unforgettable live events.' }
+const storyPanels = [
+  { heading: 'Telecommunication', caption: 'Keeping Lebanon connected', image_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80', accent: '#A41E22', link_url: '/what-we-do', size: 'lg', font_size: 'lg', sort: 0 },
+  { heading: 'Electronics & Tech', caption: 'The latest, curated', image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80', accent: '#A41E22', link_url: '/what-we-do', size: 'lg', font_size: 'lg', sort: 1 },
+  { heading: 'Live Events', caption: 'Unforgettable nights', image_url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1200&q=80', accent: '#A41E22', link_url: '/events', size: 'lg', font_size: 'lg', sort: 2 },
+]
+
 async function run() {
   const svc = await pool.query('SELECT count(*)::int AS n FROM services')
   if (svc.rows[0].n === 0) {
@@ -175,6 +189,42 @@ async function run() {
     console.log(`✓ Seeded ${solutions.length} solutions`)
   } else {
     console.log('• Solutions already present — skipped')
+  }
+
+  const ban = await pool.query('SELECT count(*)::int AS n FROM banners')
+  if (ban.rows[0].n === 0) {
+    for (const b of banners) {
+      await pool.query(
+        'INSERT INTO banners (title, subtitle, image_url, link_url, sort, active) VALUES ($1,$2,$3,$4,$5,true)',
+        [b.title, b.subtitle, b.image_url, b.link_url, b.sort]
+      )
+    }
+    console.log(`✓ Seeded ${banners.length} banners`)
+  } else {
+    console.log('• Banners already present — skipped')
+  }
+
+  // Story meta is a singleton (id=1) — ensure it exists and is enabled.
+  await pool.query(
+    `INSERT INTO story (id, enabled, eyebrow, heading, subheading)
+     VALUES (1, true, $1, $2, $3)
+     ON CONFLICT (id) DO UPDATE SET enabled = true,
+       eyebrow = EXCLUDED.eyebrow, heading = EXCLUDED.heading,
+       subheading = EXCLUDED.subheading, updated_at = now()`,
+    [storyMeta.eyebrow, storyMeta.heading, storyMeta.subheading]
+  )
+  const sp = await pool.query('SELECT count(*)::int AS n FROM story_panels')
+  if (sp.rows[0].n === 0) {
+    for (const p of storyPanels) {
+      await pool.query(
+        `INSERT INTO story_panels (heading, caption, image_url, accent, link_url, size, font_size, sort, visible)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true)`,
+        [p.heading, p.caption, p.image_url, p.accent, p.link_url, p.size, p.font_size, p.sort]
+      )
+    }
+    console.log(`✓ Seeded ${storyPanels.length} story panels`)
+  } else {
+    console.log('• Story panels already present — skipped')
   }
 
   await pool.end()

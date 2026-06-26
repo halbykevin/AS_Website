@@ -19,6 +19,9 @@ export default function Layout({ children }) {
   // The page scrolls inside this box (below the header) rather than the window,
   // so the vertical scrollbar starts under the header instead of beside it.
   const scrollRef = useRef(null)
+  // The homepage is a self-contained minimal landing — no footer there.
+  const { pathname } = useLocation()
+  const showFooter = pathname !== '/'
 
   return (
     <ScrollContext.Provider value={scrollRef}>
@@ -28,7 +31,7 @@ export default function Layout({ children }) {
           <ScrollToTop scrollRef={scrollRef} />
           <div className="flex min-h-full flex-col">
             <main className="flex-1">{children}</main>
-            <Footer />
+            {showFooter && <Footer />}
           </div>
         </div>
         <SitePopup />

@@ -17,7 +17,7 @@ export const brand = {
 export const nav = [
   { label: 'What We Do', href: '/what-we-do' },
   { label: 'Events', href: '/events' },
-  { label: 'About', href: '/#about' },
+  { label: 'About', href: '/what-we-do' },
   { label: 'Contact', href: '/#contact' },
 ]
 
@@ -27,7 +27,7 @@ export const hero = {
   subtitle:
     'From the latest technology to unforgettable live events, AS Company brings people together. Discover what we do and reserve your spot at our upcoming events.',
   primaryCta: { label: 'Browse Events', href: '/events' },
-  secondaryCta: { label: 'What We Do', href: '/#services' },
+  secondaryCta: { label: 'What We Do', href: '/what-we-do' },
 }
 
 export const services = {
@@ -46,12 +46,6 @@ export const services = {
       description:
         'A curated range of the latest electronics, gadgets and accessories.',
       icon: 'chip',
-    },
-    {
-      title: 'Live Events & Ticketing',
-      description:
-        'We host and power unforgettable events — reserve your spot in just a few taps.',
-      icon: 'ticket',
     },
     {
       title: 'Retail & Support',

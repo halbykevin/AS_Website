@@ -62,9 +62,15 @@ export default function ServicesAdmin() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Services"
+        title="Services — “What We Do”"
         actions={!editing && <Button onClick={startNew}>+ New service</Button>}
       />
+
+      <Banner kind="info">
+        These are the items shown in the homepage <strong>“What We Do”</strong> section — each title
+        is typed out in the animated strip. Add, edit, reorder (via sort) or delete them here; the
+        section updates automatically.
+      </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 

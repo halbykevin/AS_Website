@@ -1,296 +1,141 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useReducedMotion } from 'framer-motion'
 import Icon from '../components/Icon.jsx'
-import EventCard from '../components/EventCard.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
-import CategoryTiles from '../components/CategoryTiles.jsx'
 import HorizontalStory from '../components/HorizontalStory.jsx'
-import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
+// The same full-bleed aspect ratio used by the HorizontalStory and the events
+// BannerSlider — so all three homepage strips are exactly the same height and
+// width at every breakpoint.
+const STRIP = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
+
+// Minimal homepage landing: the scroll-story, the events banner, then the
+// "What We Do" strip — three equally sized, softly-rounded panels with smooth
+// gaps between them (on the white page). No footer here (hidden in Layout).
 export default function Home() {
-  const { hero, services, solutions, eventsSection, store, story, about, ticketing, events, banners, sections, categories } = useContent()
-  const solutionCards = (solutions || []).filter((s) => s.visible !== false)
-  const upcoming = events.slice(0, 3)
+  const { story, banners, services, about, brand } = useContent()
 
   return (
-    <>
-      {/* ---------------- Horizontal scroll-story (top of page, admin-managed) ---------------- */}
+    <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5">
+      {/* 1 — Horizontal scroll-story */}
       <HorizontalStory story={story} />
 
-      {/* ---------------- Banner slideshow (admin-managed) ---------------- */}
+      {/* 2 — Events banner (click any slide → /events) */}
       <BannerSlider banners={banners} />
 
-      {/* ---------------- Hero ---------------- */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-as-red/5 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-as-charcoal/5 blur-3xl" />
-
-        <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28 lg:py-32">
-          <div className="mx-auto max-w-3xl text-center animate-fade-up">
-            <p className="inline-flex items-center rounded-full border border-as-red/20 bg-as-red/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-as-red">
-              {hero.eyebrow}
-            </p>
-            <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] tracking-tight text-as-charcoal sm:text-5xl lg:text-6xl">
-              {hero.title}
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-as-charcoal/60 sm:text-lg">
-              {hero.subtitle}
-            </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                to={hero.primaryCta.href}
-                className="w-full rounded-full bg-as-red px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md sm:w-auto"
-              >
-                {hero.primaryCta.label}
-              </Link>
-              <a
-                href={hero.secondaryCta.href}
-                className="w-full rounded-full border border-black/10 bg-white px-8 py-3.5 text-sm font-semibold text-as-charcoal transition hover:border-as-red/30 hover:text-as-red sm:w-auto"
-              >
-                {hero.secondaryCta.label}
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------- What We Do (solutions) ---------------- */}
-      <section id="services" className="scroll-mt-24 bg-as-charcoal/[0.02] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-              {services.heading}
-            </h2>
-            <p className="mt-4 text-base text-as-charcoal/60">{services.subheading}</p>
-          </div>
-
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {solutionCards.map((item, i) => (
-              <Reveal key={item.slug} delay={i * 70}>
-                <Link
-                  to={`/what-we-do/${item.slug}`}
-                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-as-red/20 hover:shadow-md"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-as-red/10 text-as-red transition group-hover:bg-as-red group-hover:text-white">
-                    <Icon name={item.icon} className="h-6 w-6" />
-                  </div>
-                  <h3 className="mt-5 text-lg font-bold text-as-charcoal transition group-hover:text-as-red">{item.title}</h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-as-charcoal/60">{item.summary}</p>
-                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-as-red transition group-hover:gap-2">
-                    Learn more
-                    <Icon name="arrow" className="h-4 w-4" />
-                  </span>
-                  {/* Red line that sweeps across on hover */}
-                  <span className="absolute bottom-0 left-0 h-1 w-full origin-left scale-x-0 bg-as-red transition-transform duration-300 ease-out group-hover:scale-x-100" />
-                </Link>
-              </Reveal>
-            ))}
-          </div>
-
-          <div className="mt-12 text-center">
-            <Link
-              to="/what-we-do"
-              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-7 py-3 text-sm font-semibold text-as-charcoal transition hover:border-as-red/30 hover:text-as-red"
-            >
-              Explore Absolute Solution
-              <Icon name="arrow" className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------- Browse by category + Upcoming events ---------------- */}
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          {/* Browse by category (comes first) */}
-          {categories.length > 0 && (
-            <div className="mb-14">
-              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-                Browse by category
-              </h2>
-              <Reveal className="mt-8">
-                <CategoryTiles categories={categories} />
-              </Reveal>
-            </div>
-          )}
-
-          {/* Upcoming events */}
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-                {eventsSection.heading}
-              </h2>
-              <p className="mt-3 flex items-center gap-2 text-sm text-as-charcoal/55">
-                <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
-                {ticketing.note}
-              </p>
-            </div>
-            <Link
-              to="/events"
-              className="flex items-center gap-1 text-sm font-semibold text-as-red transition hover:gap-2"
-            >
-              View all events
-              <Icon name="arrow" className="h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {upcoming.map((event, i) => (
-              <Reveal key={event.id} delay={i * 80}>
-                <EventCard event={event} />
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------- AS Store callout ---------------- */}
-      <StoreCallout store={store} />
-
-      {/* ---------------- About ---------------- */}
-      <section id="about" className="scroll-mt-24 py-20 sm:py-24">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
-          <Reveal>
-            <h2 className="text-3xl font-extrabold tracking-tight text-as-charcoal sm:text-4xl">
-              {about.heading}
-            </h2>
-            {about.body.map((p, i) => (
-              <p key={i} className="mt-4 text-base leading-relaxed text-as-charcoal/60">
-                {p}
-              </p>
-            ))}
-          </Reveal>
-          <Reveal delay={120} className="grid grid-cols-3 gap-3 sm:gap-4">
-            {about.stats.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-2xl border border-black/5 bg-white p-3 text-center shadow-sm sm:p-5"
-              >
-                <p className="text-lg font-extrabold leading-tight text-as-red [overflow-wrap:anywhere] sm:text-2xl lg:text-3xl">
-                  {s.value}
-                </p>
-                <p className="mt-1 text-xs font-medium text-as-charcoal/55">{s.label}</p>
-              </div>
-            ))}
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ---------------- Custom sections (admin-created) ---------------- */}
-      {sections.map((section) => (
-        <CustomSection key={section.id} section={section} />
-      ))}
-    </>
+      {/* 3 — What We Do */}
+      <WhatWeDoSection services={services} about={about} brand={brand} />
+    </div>
   )
 }
 
-// Renders a section created from the admin dashboard: optional eyebrow,
-// heading, paragraphs, image and button, on a light or dark background.
-function CustomSection({ section }) {
-  const dark = section.theme === 'dark'
-  const paragraphs = section.body.split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean)
-  const isExternal = /^https?:\/\//i.test(section.buttonUrl)
-
-  const button = section.buttonLabel && section.buttonUrl && (
-    <a
-      href={section.buttonUrl}
-      target={isExternal ? '_blank' : undefined}
-      rel={isExternal ? 'noreferrer' : undefined}
-      className="mt-7 inline-flex items-center rounded-full bg-as-red px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
-    >
-      {section.buttonLabel}
-    </a>
-  )
+// A full-bleed "What We Do" panel, the same size as the story + events banner,
+// with a living background and centered editorial copy: a big heading and a
+// typewriter that types out what AS Company does, plus a button.
+function WhatWeDoSection({ services, about, brand }) {
+  const reduce = useReducedMotion()
+  const words = (Array.isArray(services.items) ? services.items : [])
+    .map((i) => i?.title)
+    .filter(Boolean)
+  const stats = Array.isArray(about.stats) ? about.stats : []
 
   return (
-    <section className={`py-20 sm:py-24 ${dark ? 'bg-as-charcoal' : 'bg-as-charcoal/[0.02]'}`}>
-      <div
-        className={`mx-auto max-w-7xl items-center gap-12 px-5 sm:px-8 ${
-          section.image ? 'grid lg:grid-cols-2' : 'flex flex-col text-center'
-        }`}
-      >
-        <div className={section.image ? '' : 'mx-auto max-w-2xl'}>
-          {section.eyebrow && (
-            <span
-              className={`inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest ${
-                dark ? 'bg-white/10 text-white/80' : 'border border-as-red/20 bg-as-red/5 text-as-red'
-              }`}
-            >
-              {section.eyebrow}
-            </span>
-          )}
-          <h2
-            className={`mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl ${
-              dark ? 'text-white' : 'text-as-charcoal'
-            }`}
-          >
-            {section.heading}
+    <section aria-label={services.heading || 'What We Do'} className="relative w-full">
+      <div className={`relative w-full overflow-hidden rounded-[28px] shadow-xl shadow-black/10 sm:rounded-[36px] ${STRIP}`}>
+        {/* Layered living background */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(120% 130% at 18% 0%, #4a1d20 0%, #2c3133 42%, #15181a 100%)',
+          }}
+        />
+        {/* Drifting brand glows */}
+        <div
+          className="pointer-events-none absolute -left-24 -top-10 h-72 w-72 rounded-full bg-as-red/40 blur-3xl motion-safe:animate-float"
+        />
+        <div
+          className="pointer-events-none absolute -bottom-16 -right-16 h-80 w-80 rounded-full bg-as-red-light/25 blur-3xl motion-safe:animate-float"
+          style={{ animationDelay: '-3s', animationDuration: '8s' }}
+        />
+
+        {/* Content */}
+        <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
+          <h2 className="bg-gradient-to-br from-white via-white to-as-red-light bg-clip-text text-4xl font-black uppercase leading-[0.95] tracking-[-0.03em] text-transparent sm:text-6xl lg:text-7xl">
+            {services.heading}
           </h2>
-          {paragraphs.map((p, i) => (
-            <p
-              key={i}
-              className={`mt-4 text-base leading-relaxed ${dark ? 'text-white/70' : 'text-as-charcoal/60'}`}
-            >
-              {p}
+
+          {words.length > 0 && (
+            <p className="mt-3 text-sm font-bold uppercase tracking-[0.22em] text-as-red-light sm:mt-4 sm:text-lg">
+              <Typewriter words={words} reduce={reduce} />
             </p>
-          ))}
-          {button}
+          )}
+
+          {stats.length > 0 && (
+            <div className="mt-5 hidden flex-wrap items-center justify-center gap-2 lg:flex">
+              {stats.map((s) => (
+                <span
+                  key={s.label}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-white/65 backdrop-blur"
+                >
+                  <span className="font-bold text-white">{s.value}</span>
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <Link
+            to="/what-we-do"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-as-red/30 transition hover:bg-as-red-light hover:shadow-xl hover:shadow-as-red/40 sm:mt-6 sm:px-8 sm:py-3"
+          >
+            Explore what we do
+            <Icon name="arrow" className="h-4 w-4" />
+          </Link>
         </div>
-        {section.image && (
-          <div className="overflow-hidden rounded-3xl shadow-md">
-            <img src={section.image} alt={section.heading} className="h-full w-full object-cover" loading="lazy" />
-          </div>
-        )}
       </div>
     </section>
   )
 }
 
-function StoreCallout({ store }) {
-  const isLive = Boolean(store.url)
+// Types each word out, holds, deletes, then moves to the next — looping forever
+// with a blinking caret. Reduced-motion visitors get the first word, static.
+function Typewriter({ words, reduce }) {
+  const [idx, setIdx] = useState(0)
+  const [text, setText] = useState('')
+  const [phase, setPhase] = useState('typing') // typing | holding | deleting
+
+  useEffect(() => {
+    if (reduce) {
+      setText(words[0] || '')
+      return
+    }
+    const word = words[idx % words.length] || ''
+    let t
+    if (phase === 'typing') {
+      if (text.length < word.length) t = setTimeout(() => setText(word.slice(0, text.length + 1)), 75)
+      else t = setTimeout(() => setPhase('holding'), 1200)
+    } else if (phase === 'holding') {
+      t = setTimeout(() => setPhase('deleting'), 250)
+    } else {
+      if (text.length > 0) t = setTimeout(() => setText(word.slice(0, text.length - 1)), 40)
+      else {
+        setPhase('typing')
+        setIdx((i) => (i + 1) % words.length)
+      }
+    }
+    return () => clearTimeout(t)
+  }, [text, phase, idx, words, reduce])
+
   return (
-    <section className="py-12 sm:py-16">
-      <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="relative overflow-hidden rounded-3xl border border-black/5 bg-gradient-to-br from-white to-as-charcoal/[0.04] px-6 py-12 shadow-sm sm:px-12 sm:py-16">
-          {/* soft brand glows */}
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-as-red/5 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-as-charcoal/5 blur-3xl" />
-
-          <div className="relative flex flex-col items-center gap-10 text-center lg:flex-row lg:justify-between lg:gap-12 lg:text-left">
-            <div className="max-w-xl">
-              {store.eyebrow && (
-                <span className="inline-flex items-center rounded-full border border-as-red/20 bg-as-red/5 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-as-red">
-                  {store.eyebrow}
-                </span>
-              )}
-              <img
-                src="/asStorelogoClear.png"
-                alt={store.title}
-                className="mx-auto mt-6 h-16 w-auto sm:h-20 lg:mx-0"
-              />
-              <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-as-charcoal/60 lg:mx-0">
-                {store.description}
-              </p>
-            </div>
-
-            <a
-              href={isLive ? store.url : undefined}
-              target={isLive ? '_blank' : undefined}
-              rel={isLive ? 'noreferrer' : undefined}
-              aria-disabled={!isLive}
-              onClick={(e) => !isLive && e.preventDefault()}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-8 py-4 text-sm font-semibold shadow-sm transition ${
-                isLive
-                  ? 'bg-as-red text-white hover:bg-as-red-light hover:shadow-md'
-                  : 'cursor-not-allowed border border-black/10 bg-white text-as-charcoal/50'
-              }`}
-            >
-              <Icon name="store" className="h-5 w-5" />
-              {isLive ? store.cta : 'Coming soon'}
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
+    <span>
+      {text || ' '}
+      <span
+        className="ml-0.5 inline-block w-[2px] translate-y-[2px] bg-current align-middle motion-safe:animate-blink"
+        style={{ height: '1em' }}
+      />
+    </span>
   )
 }
