@@ -10,6 +10,11 @@ const SIZES = [
 ]
 // Heading font size — reuses the same scale as image size.
 const FONT_SIZES = SIZES
+// How the image fills its fixed square container.
+const FITS = [
+  { value: 'cover', label: 'Cover (fill & crop)' },
+  { value: 'contain', label: 'Fit (whole image)' },
+]
 const GRADIENTS = [
   { value: 'solid', label: 'Solid' },
   { value: 'linear', label: 'Linear' },
@@ -17,7 +22,7 @@ const GRADIENTS = [
 ]
 const blankPanel = {
   heading: '', caption: '', imageUrl: '', accent: '', accent2: '', gradientType: 'solid',
-  linkUrl: '', buttonEnabled: false, buttonLabel: 'Explore', size: 'md', fontSize: 'md', sort: 0, visible: true,
+  linkUrl: '', buttonEnabled: false, buttonLabel: 'Explore', size: 'md', fit: 'cover', fontSize: 'md', sort: 0, visible: true,
 }
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
 
@@ -87,6 +92,7 @@ export default function StoryAdmin() {
       buttonEnabled: r.buttonEnabled === true,
       buttonLabel: r.buttonLabel || 'Explore',
       size: r.size || 'md',
+      fit: r.fit || 'cover',
       fontSize: r.fontSize || 'md',
       sort: r.sort || 0,
       visible: r.visible !== false,
@@ -237,6 +243,13 @@ export default function StoryAdmin() {
                 options={SIZES}
               />
             </Field>
+            <Field label="Image fit" hint="Every image is forced into a fixed square. “Cover” fills it (cropping edges) so all panels look uniform; “Fit” shows the whole image (best for transparent product PNGs).">
+              <SegmentedControl
+                value={form.fit}
+                onChange={(v) => setForm((f) => ({ ...f, fit: v }))}
+                options={FITS}
+              />
+            </Field>
             <Field label="Heading font size" hint="How big this panel's headline is. Scales down on mobile.">
               <SegmentedControl
                 value={form.fontSize}
@@ -244,7 +257,7 @@ export default function StoryAdmin() {
                 options={FONT_SIZES}
               />
             </Field>
-            <Field label="Image" hint="Shown in full (not cropped) — any shape works. Transparent PNGs look best. Leave empty for a branded tile.">
+            <Field label="Image" hint="Forced into a fixed square — use “Image fit” above to fill (cover) or show the whole image. Leave empty for a branded tile.">
               <div className="flex items-center gap-4">
                 {(imageFile || form.imageUrl) && (
                   <img

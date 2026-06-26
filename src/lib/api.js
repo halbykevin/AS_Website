@@ -301,6 +301,7 @@ export function mapStoryPanel(p) {
     buttonEnabled: p.buttonEnabled === true,
     buttonLabel: p.buttonLabel || 'Explore',
     size: p.size || 'md',
+    fit: p.fit || 'cover',
     fontSize: p.fontSize || 'md',
     visible: p.visible !== false,
   }

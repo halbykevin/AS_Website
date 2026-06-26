@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS story_panels (
   button_enabled BOOLEAN DEFAULT false,
   button_label TEXT DEFAULT 'Explore',
   size TEXT DEFAULT 'md',
+  fit TEXT DEFAULT 'cover',
   font_size TEXT DEFAULT 'md',
   sort INTEGER DEFAULT 0,
   visible BOOLEAN DEFAULT true,
@@ -218,6 +219,7 @@ ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS gradient_type TEXT DEFAULT 'linear';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS button_enabled BOOLEAN DEFAULT false;
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS button_label TEXT DEFAULT 'Explore';
+ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS fit TEXT DEFAULT 'cover';
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;

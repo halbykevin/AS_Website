@@ -158,16 +158,16 @@ function Arrow({ dir, onClick }) {
       type="button"
       aria-label={prev ? 'Previous slide' : 'Next slide'}
       onClick={onClick}
-      className={`absolute top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/30 p-2.5 text-white backdrop-blur transition hover:bg-as-red ${
-        prev ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
+      className={`absolute top-1/2 z-20 -translate-y-1/2 p-2 text-white/35 transition-opacity duration-300 hover:text-white/90 ${
+        prev ? 'left-2 sm:left-4' : 'right-2 sm:right-4'
       }`}
     >
       <svg
-        className={`h-5 w-5 ${prev ? 'rotate-180' : ''}`}
+        className={`h-7 w-7 ${prev ? 'rotate-180' : ''}`}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       >

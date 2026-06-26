@@ -219,16 +219,16 @@ function StoryArrow({ dir, onClick }) {
       type="button"
       aria-label={prev ? 'Previous panel' : 'Next panel'}
       onClick={onClick}
-      className={`absolute top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/30 p-2.5 text-white backdrop-blur transition hover:bg-as-red ${
-        prev ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
+      className={`absolute top-1/2 z-20 -translate-y-1/2 p-2 text-white/35 transition-opacity duration-300 hover:text-white/90 ${
+        prev ? 'left-2 sm:left-4' : 'right-2 sm:right-4'
       }`}
     >
       <svg
-        className={`h-5 w-5 ${prev ? 'rotate-180' : ''}`}
+        className={`h-7 w-7 ${prev ? 'rotate-180' : ''}`}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
@@ -258,7 +258,12 @@ const StoryPanel = memo(function StoryPanel({ panel, width, flip, active }) {
   const { c1, hasGradient, gradient } = panelColors(panel)
 
   const image = panel.image ? (
-    <img src={panel.image} alt={panel.heading || ''} draggable={false} className="h-full w-full object-contain" />
+    <img
+      src={panel.image}
+      alt={panel.heading || ''}
+      draggable={false}
+      className={`h-full w-full ${panel.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+    />
   ) : (
     <div
       className="flex h-full w-full items-center justify-center"
@@ -376,7 +381,11 @@ function StoryCard({ panel }) {
         className={`relative w-full overflow-hidden ${SIZE_CARD[panel.size] || SIZE_CARD.md}`}
       >
         {panel.image ? (
-          <img src={panel.image} alt={panel.heading || ''} className="h-full w-full object-cover" />
+          <img
+            src={panel.image}
+            alt={panel.heading || ''}
+            className={`h-full w-full ${panel.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+          />
         ) : (
           <div
             className="flex h-full w-full items-center justify-center"
