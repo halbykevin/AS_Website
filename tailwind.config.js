@@ -43,6 +43,11 @@ export default {
           '0%, 49%': { opacity: '1' },
           '50%, 100%': { opacity: '0' },
         },
+        // Gentle breathing scale to make a card feel alive / clickable.
+        'pulse-soft': {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.008)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.7s ease-out forwards',
@@ -51,6 +56,7 @@ export default {
         'pulse-ring': 'pulse-ring 2.5s ease-out infinite',
         marquee: 'marquee 40s linear infinite',
         blink: 'blink 1s steps(1) infinite',
+        'pulse-soft': 'pulse-soft 4s ease-in-out infinite',
       },
     },
   },

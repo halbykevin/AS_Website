@@ -86,7 +86,10 @@ export default function BannerSlider({ banners }) {
       onMouseLeave={() => setPaused(false)}
     >
       {/* Fixed aspect ratio, softly rounded so the strips read as separate panels */}
-      <div className={`relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-xl shadow-black/10 sm:rounded-[36px] ${ASPECT}`}>
+      <div
+        className={`relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${ASPECT}`}
+        style={{ animationDelay: '-1.3s' }}
+      >
         <div
           className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
             dragging ? '' : 'transition-transform duration-700 ease-out'

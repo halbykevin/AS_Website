@@ -139,8 +139,8 @@ function AutoStory({ story }) {
   return (
     <section
       aria-label={story.heading || 'Story'}
-      className="relative overflow-hidden rounded-[28px] shadow-xl shadow-black/10 sm:rounded-[36px]"
-      style={{ background: DARK }}
+      className="relative overflow-hidden rounded-[28px] shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px]"
+      style={{ background: DARK, animationDelay: '-2.6s' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >

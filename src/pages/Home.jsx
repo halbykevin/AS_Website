@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useReducedMotion } from 'framer-motion'
-import Icon from '../components/Icon.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
 import HorizontalStory from '../components/HorizontalStory.jsx'
 import { useContent } from '../store/content.jsx'
@@ -11,11 +10,15 @@ import { useContent } from '../store/content.jsx'
 // width at every breakpoint.
 const STRIP = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
 
-// Minimal homepage landing: the scroll-story, the events banner, then the
-// "What We Do" strip — three equally sized, softly-rounded panels with smooth
-// gaps between them (on the white page). No footer here (hidden in Layout).
+// Smooth shadow + a gentle "clickable" breathing pulse (pauses on hover, off for
+// reduced-motion). Shared by all three homepage panels.
+const PANEL =
+  'rounded-[28px] shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px]'
+
+// Minimal homepage landing: three equally sized, softly-rounded panels with
+// smooth gaps. No footer here (hidden in Layout for the home route).
 export default function Home() {
-  const { story, banners, services, about, brand } = useContent()
+  const { story, banners, services } = useContent()
 
   return (
     <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5">
@@ -26,78 +29,155 @@ export default function Home() {
       <BannerSlider banners={banners} />
 
       {/* 3 — What We Do */}
-      <WhatWeDoSection services={services} about={about} brand={brand} />
+      <WhatWeDoSection services={services} />
     </div>
   )
 }
 
-// A full-bleed "What We Do" panel, the same size as the story + events banner,
-// with a living background and centered editorial copy: a big heading and a
-// typewriter that types out what AS Company does, plus a button.
-function WhatWeDoSection({ services, about, brand }) {
+// A light, lively "What We Do" panel — same size as the other two. An animated
+// red→white particle-line field sits behind centered animated typography, and
+// the whole panel is a clickable link into the full What We Do page.
+function WhatWeDoSection({ services }) {
   const reduce = useReducedMotion()
   const words = (Array.isArray(services.items) ? services.items : [])
     .map((i) => i?.title)
     .filter(Boolean)
-  const stats = Array.isArray(about.stats) ? about.stats : []
 
   return (
     <section aria-label={services.heading || 'What We Do'} className="relative w-full">
-      <div className={`relative w-full overflow-hidden rounded-[28px] shadow-xl shadow-black/10 sm:rounded-[36px] ${STRIP}`}>
-        {/* Layered living background */}
+      <Link
+        to="/what-we-do"
+        aria-label={`${services.heading || 'What We Do'} — explore`}
+        className={`relative block w-full overflow-hidden ${PANEL} ${STRIP}`}
+      >
+        {/* Soft off-white base (not pure white) */}
         <div
           className="absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(120% 130% at 18% 0%, #4a1d20 0%, #2c3133 42%, #15181a 100%)',
-          }}
+          style={{ background: 'radial-gradient(120% 130% at 50% 0%, #ffffff 0%, #fdeff1 70%, #fbe6e8 100%)' }}
         />
-        {/* Drifting brand glows */}
-        <div
-          className="pointer-events-none absolute -left-24 -top-10 h-72 w-72 rounded-full bg-as-red/40 blur-3xl motion-safe:animate-float"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -right-16 h-80 w-80 rounded-full bg-as-red-light/25 blur-3xl motion-safe:animate-float"
-          style={{ animationDelay: '-3s', animationDuration: '8s' }}
-        />
+        {/* Animated red→white particle network */}
+        <ParticleField reduce={reduce} className="absolute inset-0 h-full w-full" />
 
-        {/* Content */}
+        {/* Centered animated typography */}
         <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
-          <h2 className="bg-gradient-to-br from-white via-white to-as-red-light bg-clip-text text-4xl font-black uppercase leading-[0.95] tracking-[-0.03em] text-transparent sm:text-6xl lg:text-7xl">
+          <h2 className="bg-gradient-to-br from-as-charcoal via-as-charcoal to-as-red bg-clip-text text-4xl font-black uppercase leading-[0.95] tracking-[-0.03em] text-transparent sm:text-6xl lg:text-7xl">
             {services.heading}
           </h2>
 
           {words.length > 0 && (
-            <p className="mt-3 text-sm font-bold uppercase tracking-[0.22em] text-as-red-light sm:mt-4 sm:text-lg">
+            <p className="mt-3 text-sm font-bold uppercase tracking-[0.22em] text-as-red sm:mt-4 sm:text-lg">
               <Typewriter words={words} reduce={reduce} />
             </p>
           )}
-
-          {stats.length > 0 && (
-            <div className="mt-5 hidden flex-wrap items-center justify-center gap-2 lg:flex">
-              {stats.map((s) => (
-                <span
-                  key={s.label}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-white/65 backdrop-blur"
-                >
-                  <span className="font-bold text-white">{s.value}</span>
-                  {s.label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <Link
-            to="/what-we-do"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-as-red/30 transition hover:bg-as-red-light hover:shadow-xl hover:shadow-as-red/40 sm:mt-6 sm:px-8 sm:py-3"
-          >
-            Explore what we do
-            <Icon name="arrow" className="h-4 w-4" />
-          </Link>
         </div>
-      </div>
+      </Link>
     </section>
   )
+}
+
+// Lightweight canvas particle network. Points drift and connect with lines whose
+// colour breathes from brand red toward white. Pauses when off-screen; draws a
+// single static frame for reduced-motion visitors.
+function ParticleField({ className = '', reduce = false }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    let raf = 0
+    let w = 0
+    let h = 0
+    let dpr = 1
+    let t = 0
+    let running = true
+    const pts = []
+    const COUNT = 46
+    const MAXD = 130
+    const RED = [164, 30, 34]
+    const LIGHT = [246, 216, 218]
+    const lerp = (a, b, k) => a + (b - a) * k
+
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      w = canvas.clientWidth
+      h = canvas.clientHeight
+      canvas.width = Math.max(1, Math.round(w * dpr))
+      canvas.height = Math.max(1, Math.round(h * dpr))
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    const init = () => {
+      pts.length = 0
+      for (let i = 0; i < COUNT; i++) {
+        pts.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: (Math.random() - 0.5) * 0.25,
+        })
+      }
+    }
+    const frame = () => {
+      t += 0.004
+      const k = (Math.sin(t) + 1) / 2 // red ↔ white, slowly
+      const r = lerp(RED[0], LIGHT[0], k) | 0
+      const g = lerp(RED[1], LIGHT[1], k) | 0
+      const b = lerp(RED[2], LIGHT[2], k) | 0
+      ctx.clearRect(0, 0, w, h)
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]
+        p.x += p.vx
+        p.y += p.vy
+        if (p.x < 0 || p.x > w) p.vx *= -1
+        if (p.y < 0 || p.y > h) p.vy *= -1
+        for (let j = i + 1; j < pts.length; j++) {
+          const q = pts[j]
+          const dx = p.x - q.x
+          const dy = p.y - q.y
+          const d = Math.hypot(dx, dy)
+          if (d < MAXD) {
+            ctx.strokeStyle = `rgba(${r},${g},${b},${(1 - d / MAXD) * 0.4})`
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(p.x, p.y)
+            ctx.lineTo(q.x, q.y)
+            ctx.stroke()
+          }
+        }
+      }
+      for (const p of pts) {
+        ctx.fillStyle = `rgba(${r},${g},${b},0.8)`
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 1.7, 0, 6.2832)
+        ctx.fill()
+      }
+      if (running && !reduce) raf = requestAnimationFrame(frame)
+    }
+
+    resize()
+    init()
+    frame()
+    const ro = new ResizeObserver(() => {
+      resize()
+      init()
+    })
+    ro.observe(canvas)
+    const io = new IntersectionObserver(([e]) => {
+      running = e.isIntersecting
+      if (running && !reduce) {
+        cancelAnimationFrame(raf)
+        raf = requestAnimationFrame(frame)
+      }
+    })
+    io.observe(canvas)
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+      io.disconnect()
+    }
+  }, [reduce])
+
+  return <canvas ref={ref} aria-hidden="true" className={`pointer-events-none ${className}`} />
 }
 
 // Types each word out, holds, deletes, then moves to the next — looping forever
@@ -131,7 +211,7 @@ function Typewriter({ words, reduce }) {
 
   return (
     <span>
-      {text || ' '}
+      {text || ' '}
       <span
         className="ml-0.5 inline-block w-[2px] translate-y-[2px] bg-current align-middle motion-safe:animate-blink"
         style={{ height: '1em' }}
