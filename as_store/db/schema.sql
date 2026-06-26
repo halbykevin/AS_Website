@@ -86,9 +86,13 @@ CREATE TABLE IF NOT EXISTS settings (
   socials              JSONB DEFAULT '{}'::jsonb,   -- {instagram,facebook,tiktok,x,youtube}
   nav_links            JSONB DEFAULT '[]'::jsonb,   -- [{label, href}]
   footer_groups        JSONB DEFAULT '[]'::jsonb,   -- [{title, links:[{label,href}]}]
+  showcase_bg          TEXT DEFAULT '#000000',      -- homepage pinned-showcase section background
   updated_at           TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
+
+-- Backfill the showcase background colour on databases created before it existed.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS showcase_bg TEXT DEFAULT '#000000';
 
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (

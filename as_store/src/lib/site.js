@@ -9,6 +9,7 @@ export const defaultSettings = {
   announcement: { enabled: true, text: 'Free delivery across Lebanon · 12-month warranty' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},
+  showcaseBg: '#000000',
   navLinks: [
     { label: 'Store', href: '/' },
     { label: 'Smartphones', href: '/' },

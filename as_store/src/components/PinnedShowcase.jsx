@@ -7,7 +7,7 @@ import { showcase } from '@/lib/products'
 // Apple-style pinned moment: a tall section whose inner panel sticks to the
 // viewport while the flagship image scales up and its corners square off as you
 // scroll. Copy fades in then out. All scroll-linked → buttery smooth.
-export default function PinnedShowcase() {
+export default function PinnedShowcase({ bg = '#000000' }) {
   const ref = useRef(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
 
@@ -17,7 +17,12 @@ export default function PinnedShowcase() {
   const textY = useTransform(scrollYProgress, [0, 0.2], [40, 0])
 
   return (
-    <section id="showcase" ref={ref} className="relative h-[260vh] bg-black">
+    <section
+      id="showcase"
+      ref={ref}
+      style={{ backgroundColor: bg }}
+      className="relative my-16 h-[260vh] rounded-[40px] sm:my-24"
+    >
       <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
         <motion.div
           style={{ scale, borderRadius: radius }}

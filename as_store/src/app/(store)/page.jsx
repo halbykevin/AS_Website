@@ -3,14 +3,16 @@ import PinnedShowcase from '@/components/PinnedShowcase.jsx'
 import ProductRail from '@/components/ProductRail.jsx'
 import BentoGrid from '@/components/BentoGrid.jsx'
 import Reveal from '@/components/Reveal.jsx'
+import { loadSettings } from '@/lib/site'
 
 // AS Store homepage — Apple design language: airy hero, a pinned scroll-zoom
 // flagship, product rails (live from the API), a bento lineup, and a closing CTA.
-export default function HomePage() {
+export default async function HomePage() {
+  const settings = await loadSettings()
   return (
     <>
       <Hero />
-      <PinnedShowcase />
+      <PinnedShowcase bg={settings.showcaseBg} />
       <ProductRail
         id="latest"
         title="The latest."
