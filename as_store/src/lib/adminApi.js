@@ -94,4 +94,11 @@ export const adminApi = {
   // scraper / import
   startScrape: (opts) => req('/api/scrape', { method: 'POST', auth: true, body: opts }),
   getScrape: (id) => req(`/api/scrape/${id}`, { auth: true }),
+
+  // orders
+  listOrders: (status) =>
+    req(`/api/admin/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`, { auth: true }),
+  getOrder: (id) => req(`/api/admin/orders/${id}`, { auth: true }),
+  updateOrderStatus: (id, status) =>
+    req(`/api/admin/orders/${id}`, { method: 'PUT', auth: true, body: { status } }),
 }

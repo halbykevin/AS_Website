@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
+import SearchBox from './SearchBox.jsx'
 import { selectCartCount } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
+import { useAccount } from '@/lib/account'
 import { defaultSettings } from '@/lib/site'
 
 // Renders an internal link with <Link> (instant client nav) and external/hash
@@ -51,7 +53,10 @@ export default function Nav({ settings, categories = [] }) {
   const announcement = settings?.announcement
   const count = useSelector(selectCartCount)
   const dispatch = useDispatch()
+  const account = useAccount()
+  const customer = account?.customer
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
@@ -79,9 +84,16 @@ export default function Nav({ settings, categories = [] }) {
           </ul>
 
           <div className="flex items-center gap-5 text-white/80">
-            <button className="transition-colors hover:text-white" aria-label="Search">
+            <button onClick={() => setSearchOpen(true)} className="transition-colors hover:text-white" aria-label="Search">
               <Icon name="search" className="h-[18px] w-[18px]" />
             </button>
+            <Link
+              href={customer ? '/account' : '/login'}
+              className="transition-colors hover:text-white"
+              aria-label={customer ? 'Your account' : 'Sign in'}
+            >
+              <Icon name="user" className="h-[18px] w-[18px]" />
+            </Link>
             <button
               onClick={() => dispatch(openCart())}
               className="relative transition-colors hover:text-white"
@@ -140,7 +152,52 @@ export default function Nav({ settings, categories = [] }) {
                   </NavItem>
                 </motion.li>
               ))}
+              <motion.li
+                variants={{ hidden: { opacity: 0, x: -24 }, show: { opacity: 1, x: 0 } }}
+                transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+              >
+                <NavItem
+                  href={customer ? '/account' : '/login'}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-between border-b border-white/10 py-3 text-2xl font-semibold tracking-apple text-white"
+                >
+                  {customer ? 'Your account' : 'Sign in'}
+                  <Icon name="chevronRight" className="h-5 w-5 text-white/40" />
+                </NavItem>
+              </motion.li>
             </motion.ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Search overlay */}
+      <AnimatePresence>
+        {searchOpen && (
+          <motion.div
+            className="fixed inset-0 z-[60]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/40" onClick={() => setSearchOpen(false)} />
+            <motion.div
+              className="absolute inset-x-0 top-0 bg-white p-4 shadow-lg"
+              initial={{ y: -24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -24, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+            >
+              <div className="shell-wide flex items-center gap-3">
+                <SearchBox big autoFocus className="flex-1" onSubmit={() => setSearchOpen(false)} />
+                <button
+                  onClick={() => setSearchOpen(false)}
+                  className="rounded-lg p-2 text-as-ink/50 hover:bg-as-fog hover:text-as-ink"
+                  aria-label="Close search"
+                >
+                  <Icon name="close" className="h-5 w-5" />
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

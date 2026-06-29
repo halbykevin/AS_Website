@@ -48,3 +48,49 @@ body {
     letter-spacing: -0.022em;
   }
 }
+
+/* Dual-handle price range slider (two stacked range inputs over one track).
+   The inputs are transparent and click-through except for their thumbs. */
+.range {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.range:focus {
+  outline: none;
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 2px solid #a41e22; /* as-red */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.range::-moz-range-thumb {
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border: 2px solid #a41e22;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.range::-moz-range-track {
+  background: transparent;
+}

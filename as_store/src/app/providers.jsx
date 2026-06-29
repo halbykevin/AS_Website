@@ -5,6 +5,7 @@ import { Provider as ReduxProvider } from 'react-redux'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { store } from '@/store'
 import { hydrateCart } from '@/store/cartSlice'
+import { AccountProvider } from '@/lib/account'
 
 const CART_KEY = 'as_store_cart'
 
@@ -44,7 +45,9 @@ export default function Providers({ children }) {
 
   return (
     <ReduxProvider store={store}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AccountProvider>{children}</AccountProvider>
+      </QueryClientProvider>
     </ReduxProvider>
   )
 }

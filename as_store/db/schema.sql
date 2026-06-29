@@ -173,3 +173,57 @@ DROP TRIGGER IF EXISTS trg_homepage_sections_updated ON homepage_sections;
 CREATE TRIGGER trg_homepage_sections_updated
   BEFORE UPDATE ON homepage_sections
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Customers (storefront accounts; separate from the single admin) --------
+CREATE TABLE IF NOT EXISTS customers (
+  id            SERIAL PRIMARY KEY,
+  name          TEXT DEFAULT '',
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,             -- scrypt$salt$hash
+  phone         TEXT DEFAULT '',
+  address       TEXT DEFAULT '',           -- default delivery address
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS trg_customers_updated ON customers;
+CREATE TRIGGER trg_customers_updated
+  BEFORE UPDATE ON customers
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Orders ----------------------------------------------------------------
+-- Cash-on-delivery orders. Delivery details + line items are snapshotted so the
+-- order is stable even if the customer's profile or a product later changes.
+CREATE TABLE IF NOT EXISTS orders (
+  id             SERIAL PRIMARY KEY,
+  customer_id    INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  status         TEXT NOT NULL DEFAULT 'pending', -- pending|confirmed|shipped|delivered|cancelled
+  full_name      TEXT DEFAULT '',
+  phone          TEXT DEFAULT '',
+  address        TEXT DEFAULT '',
+  city           TEXT DEFAULT '',
+  notes          TEXT DEFAULT '',
+  subtotal       NUMERIC(10,2) NOT NULL DEFAULT 0,
+  payment_method TEXT DEFAULT 'cod',
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  updated_at     TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id         SERIAL PRIMARY KEY,
+  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  name       TEXT DEFAULT '',          -- snapshot at purchase time
+  price      NUMERIC(10,2) DEFAULT 0,  -- snapshot unit price
+  qty        INTEGER DEFAULT 1,
+  image      TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status   ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+DROP TRIGGER IF EXISTS trg_orders_updated ON orders;
+CREATE TRIGGER trg_orders_updated
+  BEFORE UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();

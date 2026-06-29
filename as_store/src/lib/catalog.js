@@ -33,6 +33,19 @@ export async function loadCategoryProducts(slug) {
   }
 }
 
+// Search products by name (server-side, no cache).
+export async function searchProducts(q) {
+  const term = (q || '').trim()
+  if (!term) return []
+  try {
+    const res = await fetch(`${API}/api/products?search=${encodeURIComponent(term)}`, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 // Single product by slug (full image gallery). Returns null if not found.
 export async function loadProduct(slug) {
   try {

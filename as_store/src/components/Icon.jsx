@@ -12,6 +12,14 @@ const paths = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
+  sort: <path d="M4 6h13M4 12h9M4 18h5" />,
+  filter: <path d="M3 5h18l-7 8v6l-4-2v-4L3 5Z" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+    </>
+  ),
   chevronDown: <path d="M6 9l6 6 6-6" />,
   chevronRight: <path d="M9 6l6 6-6 6" />,
   chevronLeft: <path d="M15 6l-6 6 6 6" />,

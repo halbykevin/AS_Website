@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth, optionalAuth } from './auth.js'
+import { hashPassword, verifyPassword, signCustomerToken, requireCustomer } from './customerAuth.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -98,6 +99,55 @@ const pageJson = (r) => ({
   updatedAt: r.updated_at,
 })
 
+const customerJson = (r) => ({
+  id: r.id,
+  name: r.name || '',
+  email: r.email,
+  phone: r.phone || '',
+  address: r.address || '',
+  createdAt: r.created_at,
+})
+
+const ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+
+const orderItemJson = (r) => ({
+  id: r.id,
+  productId: r.product_id,
+  name: r.name || '',
+  price: r.price,
+  qty: r.qty,
+  image: r.image || '',
+})
+
+const orderJson = (r) => ({
+  id: r.id,
+  status: r.status,
+  fullName: r.full_name || '',
+  phone: r.phone || '',
+  address: r.address || '',
+  city: r.city || '',
+  notes: r.notes || '',
+  subtotal: r.subtotal,
+  paymentMethod: r.payment_method || 'cod',
+  customerId: r.customer_id,
+  customerEmail: r.customer_email, // present on admin queries
+  itemCount: r.item_count, // present on list queries
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+})
+
+async function loadOrderDetail(id) {
+  const { rows } = await query(
+    `SELECT o.*, c.email AS customer_email
+     FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+     WHERE o.id = $1`,
+    [id],
+  )
+  if (!rows[0]) return null
+  const { rows: items } = await query(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY id`, [id])
+  return { ...orderJson(rows[0]), items: items.map(orderItemJson) }
+}
+
 const sectionJson = (r) => ({
   id: r.id,
   type: r.type,
@@ -174,6 +224,206 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, admin: { email } })
 })
 app.get('/api/auth/me', requireAuth, (req, res) => res.json({ email: req.admin.email }))
+
+// ========================= Customer accounts =========================
+app.post(
+  '/api/account/register',
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const email = (b.email || '').trim().toLowerCase()
+    const password = b.password || ''
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
+    const dupe = await query(`SELECT 1 FROM customers WHERE email = $1`, [email])
+    if (dupe.rows[0]) return res.status(409).json({ error: 'An account with this email already exists' })
+    const { rows } = await query(
+      `INSERT INTO customers (name, email, password_hash, phone, address)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [(b.name || '').trim(), email, hashPassword(password), b.phone || '', b.address || ''],
+    )
+    res.status(201).json({ token: signCustomerToken(rows[0]), customer: customerJson(rows[0]) })
+  }),
+)
+
+app.post(
+  '/api/account/login',
+  ah(async (req, res) => {
+    const email = (req.body?.email || '').trim().toLowerCase()
+    const password = req.body?.password || ''
+    const { rows } = await query(`SELECT * FROM customers WHERE email = $1`, [email])
+    const customer = rows[0]
+    if (!customer || !verifyPassword(password, customer.password_hash)) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+    res.json({ token: signCustomerToken(customer), customer: customerJson(customer) })
+  }),
+)
+
+app.get(
+  '/api/account/me',
+  requireCustomer,
+  ah(async (req, res) => {
+    const { rows } = await query(`SELECT * FROM customers WHERE id = $1`, [req.customerId])
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(customerJson(rows[0]))
+  }),
+)
+
+app.put(
+  '/api/account',
+  requireCustomer,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const params = [req.customerId, b.name ?? null, b.phone ?? null, b.address ?? null]
+    let passSet = ''
+    if (b.password) {
+      if (b.password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
+      params.push(hashPassword(b.password))
+      passSet = `, password_hash = $${params.length}`
+    }
+    const { rows } = await query(
+      `UPDATE customers SET
+         name = COALESCE($2, name), phone = COALESCE($3, phone), address = COALESCE($4, address)${passSet}
+       WHERE id = $1 RETURNING *`,
+      params,
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(customerJson(rows[0]))
+  }),
+)
+
+// ========================= Orders =========================
+// Place an order (cash on delivery). Prices/names are taken from the DB, never
+// trusted from the client. Optionally saves the delivery address to the profile.
+app.post(
+  '/api/orders',
+  requireCustomer,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const cleaned = (Array.isArray(b.items) ? b.items : [])
+      .map((i) => ({ productId: Number(i.productId), qty: Math.max(1, Math.floor(Number(i.qty) || 1)) }))
+      .filter((i) => i.productId)
+    if (!cleaned.length) return res.status(400).json({ error: 'Your bag is empty' })
+
+    const fullName = (b.fullName || '').trim()
+    const phone = (b.phone || '').trim()
+    const address = (b.address || '').trim()
+    if (!fullName || !phone || !address) {
+      return res.status(400).json({ error: 'Name, phone and address are required' })
+    }
+
+    const ids = cleaned.map((i) => i.productId)
+    const { rows: prods } = await query(
+      `SELECT p.id, p.name, p.price,
+        (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort, pi.id LIMIT 1) AS image
+       FROM products p WHERE p.id = ANY($1)`,
+      [ids],
+    )
+    const byId = new Map(prods.map((p) => [p.id, p]))
+    const items = []
+    let subtotal = 0
+    for (const it of cleaned) {
+      const p = byId.get(it.productId)
+      if (!p) continue
+      const price = Number(p.price) || 0
+      subtotal += price * it.qty
+      items.push({ productId: p.id, name: p.name, price, qty: it.qty, image: p.image || '' })
+    }
+    if (!items.length) return res.status(400).json({ error: 'None of those items are available' })
+
+    const { rows } = await query(
+      `INSERT INTO orders (customer_id, status, full_name, phone, address, city, notes, subtotal, payment_method)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,'cod') RETURNING id`,
+      [req.customerId, fullName, phone, address, b.city || '', b.notes || '', subtotal],
+    )
+    const orderId = rows[0].id
+    for (const it of items) {
+      await query(
+        `INSERT INTO order_items (order_id, product_id, name, price, qty, image)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [orderId, it.productId, it.name, it.price, it.qty, it.image],
+      )
+    }
+    if (b.saveAddress) {
+      await query(
+        `UPDATE customers SET name = COALESCE(NULLIF($2,''), name), phone = $3, address = $4 WHERE id = $1`,
+        [req.customerId, fullName, phone, address],
+      )
+    }
+    res.status(201).json(await loadOrderDetail(orderId))
+  }),
+)
+
+app.get(
+  '/api/orders',
+  requireCustomer,
+  ah(async (req, res) => {
+    const { rows } = await query(
+      `SELECT o.*, (SELECT count(*) FROM order_items oi WHERE oi.order_id = o.id)::int AS item_count
+       FROM orders o WHERE o.customer_id = $1 ORDER BY o.id DESC`,
+      [req.customerId],
+    )
+    res.json(rows.map(orderJson))
+  }),
+)
+
+app.get(
+  '/api/orders/:id',
+  requireCustomer,
+  ah(async (req, res) => {
+    const order = await loadOrderDetail(req.params.id)
+    if (!order || order.customerId !== req.customerId) return res.status(404).json({ error: 'Not found' })
+    res.json(order)
+  }),
+)
+
+// ---- Admin order management ----
+app.get(
+  '/api/admin/orders',
+  requireAuth,
+  ah(async (req, res) => {
+    const where = []
+    const params = []
+    if (req.query.status && ORDER_STATUSES.includes(req.query.status)) {
+      params.push(req.query.status)
+      where.push(`o.status = $${params.length}`)
+    }
+    const { rows } = await query(
+      `SELECT o.*, c.email AS customer_email,
+        (SELECT count(*) FROM order_items oi WHERE oi.order_id = o.id)::int AS item_count
+       FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       ORDER BY o.id DESC`,
+      params,
+    )
+    res.json(rows.map(orderJson))
+  }),
+)
+
+app.get(
+  '/api/admin/orders/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const order = await loadOrderDetail(req.params.id)
+    if (!order) return res.status(404).json({ error: 'Not found' })
+    res.json(order)
+  }),
+)
+
+app.put(
+  '/api/admin/orders/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const status = req.body?.status
+    if (!ORDER_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status' })
+    const { rows } = await query(`UPDATE orders SET status = $2 WHERE id = $1 RETURNING id`, [
+      req.params.id,
+      status,
+    ])
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(await loadOrderDetail(rows[0].id))
+  }),
+)
 
 // ========================= Categories =========================
 // Public: visible categories. Authed: pass ?all=1 to include hidden.

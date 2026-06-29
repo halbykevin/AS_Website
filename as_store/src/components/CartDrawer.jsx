@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
@@ -10,15 +11,13 @@ import { selectCartOpen, closeCart } from '@/store/uiSlice'
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
 // Slide-over shopping bag. Opens from the nav's bag icon, lists items with
-// quantity steppers, and checks out by opening a pre-filled WhatsApp chat to
-// the store number (settings.contact.whatsapp) — mirroring how the marketing
-// site books events over WhatsApp.
-export default function CartDrawer({ whatsapp = '' }) {
+// quantity steppers, and checks out on-site at /checkout.
+export default function CartDrawer() {
   const open = useSelector(selectCartOpen)
   const items = useSelector(selectCartItems)
   const total = useSelector(selectCartTotal)
   const dispatch = useDispatch()
-  const number = (whatsapp || '').replace(/[^0-9]/g, '')
+  const router = useRouter()
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {
@@ -31,10 +30,8 @@ export default function CartDrawer({ whatsapp = '' }) {
   }, [open])
 
   const checkout = () => {
-    if (!items.length || !number) return
-    const lines = items.map((i) => `• ${i.qty}× ${i.title} — ${money(Number(i.price) * i.qty)}`)
-    const msg = `Hi AS Store, I'd like to order:\n${lines.join('\n')}\n\nTotal: ${money(total)}`
-    window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank', 'noreferrer')
+    dispatch(closeCart())
+    router.push('/checkout')
   }
 
   return (
@@ -130,15 +127,9 @@ export default function CartDrawer({ whatsapp = '' }) {
                     <span className="text-as-ink/60">Subtotal</span>
                     <span className="text-lg font-semibold text-as-ink">{money(total)}</span>
                   </div>
-                  {number ? (
-                    <button onClick={checkout} className="pill w-full justify-center">
-                      Checkout on WhatsApp
-                    </button>
-                  ) : (
-                    <p className="rounded-xl bg-as-fog px-4 py-3 text-center text-sm text-as-ink/50">
-                      Add a WhatsApp number in admin settings to enable checkout.
-                    </p>
-                  )}
+                  <button onClick={checkout} className="pill w-full justify-center">
+                    Checkout
+                  </button>
                   <button
                     onClick={() => dispatch(clearCart())}
                     className="block w-full text-center text-sm text-as-ink/45 hover:text-as-red"
