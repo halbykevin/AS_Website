@@ -95,30 +95,7 @@ export default function SettingsPage() {
         </Field>
       </Card>
 
-      {/* Homepage appearance */}
-      <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-as-ink">Homepage appearance</h3>
-        <Field
-          label="Showcase section background"
-          hint="Background colour behind the big pinned product showcase on the homepage."
-        >
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              value={/^#[0-9a-fA-F]{6}$/.test(form.showcaseBg) ? form.showcaseBg : '#000000'}
-              onChange={(e) => set('showcaseBg', e.target.value)}
-              className="h-10 w-14 shrink-0 cursor-pointer rounded-lg border border-as-ink/15 bg-transparent p-1"
-              aria-label="Pick showcase background colour"
-            />
-            <Input
-              value={form.showcaseBg}
-              onChange={(e) => set('showcaseBg', e.target.value)}
-              placeholder="#000000"
-              className="max-w-[160px] font-mono"
-            />
-          </div>
-        </Field>
-      </Card>
+      {/* Homepage appearance is now edited per-block at /admin/homepage. */}
 
       {/* Contact */}
       <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">

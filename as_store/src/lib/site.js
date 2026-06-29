@@ -10,16 +10,9 @@ export const defaultSettings = {
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},
   showcaseBg: '#000000',
-  navLinks: [
-    { label: 'Store', href: '/' },
-    { label: 'Smartphones', href: '/' },
-    { label: 'Audio', href: '/' },
-    { label: 'Computing', href: '/' },
-    { label: 'Wearables', href: '/' },
-    { label: 'Smart Home', href: '/' },
-    { label: 'Accessories', href: '/' },
-    { label: 'Support', href: '/pages/support' },
-  ],
+  // The category links are built from the categories themselves; these are just
+  // extra custom links appended after them (the nav menu is category-driven).
+  navLinks: [{ label: 'Support', href: '/pages/support' }],
   footerGroups: [
     { title: 'Shop', links: [{ label: 'Smartphones', href: '/' }, { label: 'Audio', href: '/' }, { label: 'Computing', href: '/' }, { label: 'Accessories', href: '/' }] },
     { title: 'Support', links: [{ label: 'Contact us', href: '/pages/contact' }, { label: 'Warranty', href: '/pages/warranty' }] },

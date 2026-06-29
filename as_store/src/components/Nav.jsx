@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
 import { selectCartCount } from '@/store/cartSlice'
+import { openCart } from '@/store/uiSlice'
 import { defaultSettings } from '@/lib/site'
 
 // Renders an internal link with <Link> (instant client nav) and external/hash
@@ -25,12 +26,31 @@ function NavItem({ href = '#', className, onClick, children }) {
   )
 }
 
+// Builds the nav menu: only the categories explicitly flagged "Show in menu"
+// (curated in the Categories admin, ordered by their sort), then any custom
+// links from Settings — minus ones that duplicate a category or just point home
+// (the logo already does). Nothing appears in the menu unless you toggle it on.
+function buildNavLinks(categories, settings) {
+  const cats = Array.isArray(categories) ? categories : []
+  const catLinks = cats
+    .filter((c) => c.showInNav)
+    .map((c) => ({ label: c.name, href: `/category/${c.slug}` }))
+
+  const catNames = new Set(catLinks.map((l) => l.label.toLowerCase()))
+  const custom = (settings?.navLinks?.length ? settings.navLinks : defaultSettings.navLinks).filter(
+    (l) => l?.label && l.href !== '/' && !catNames.has(l.label.toLowerCase()),
+  )
+
+  return [...catLinks, ...custom]
+}
+
 // Apple-style global nav: optional announcement bar, slim translucent-dark bar
-// with minimal links (from CMS settings), full-screen mobile menu.
-export default function Nav({ settings }) {
-  const links = settings?.navLinks?.length ? settings.navLinks : defaultSettings.navLinks
+// with a category-driven menu, full-screen mobile menu.
+export default function Nav({ settings, categories = [] }) {
+  const links = buildNavLinks(categories, settings)
   const announcement = settings?.announcement
   const count = useSelector(selectCartCount)
+  const dispatch = useDispatch()
   const [open, setOpen] = useState(false)
 
   return (
@@ -62,14 +82,18 @@ export default function Nav({ settings }) {
             <button className="transition-colors hover:text-white" aria-label="Search">
               <Icon name="search" className="h-[18px] w-[18px]" />
             </button>
-            <a href="#" className="relative transition-colors hover:text-white" aria-label={`Bag, ${count} items`}>
+            <button
+              onClick={() => dispatch(openCart())}
+              className="relative transition-colors hover:text-white"
+              aria-label={`Bag, ${count} items`}
+            >
               <Icon name="bag" className="h-[18px] w-[18px]" />
               {count > 0 && (
                 <span className="absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-as-red px-1 text-center text-[9px] font-bold leading-[15px] text-white">
                   {count}
                 </span>
               )}
-            </a>
+            </button>
             <button onClick={() => setOpen(true)} className="transition-colors hover:text-white lg:hidden" aria-label="Menu">
               <Icon name="menu" className="h-[18px] w-[18px]" />
             </button>

@@ -21,10 +21,14 @@ CREATE TABLE IF NOT EXISTS categories (
   tagline     TEXT DEFAULT '',
   image_url   TEXT DEFAULT '',
   sort        INTEGER DEFAULT 0,
-  visible     BOOLEAN DEFAULT true,
+  visible     BOOLEAN DEFAULT true,        -- shown publicly at all
+  show_in_nav BOOLEAN DEFAULT false,       -- featured in the top navigation menu
   created_at  TIMESTAMPTZ DEFAULT now(),
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
+
+-- Backfill the nav flag on databases created before it existed.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_in_nav BOOLEAN DEFAULT false;
 
 -- --- Products --------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (
@@ -139,4 +143,33 @@ CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);
 DROP TRIGGER IF EXISTS trg_brands_updated ON brands;
 CREATE TRIGGER trg_brands_updated
   BEFORE UPDATE ON brands
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Homepage sections (CMS-driven homepage blocks) ------------------------
+-- Each row is one block on the storefront homepage. `type` selects which
+-- component renders it; `settings` carries type-specific data (buttons,
+-- product-rail category/limit, bento tiles). Order is `sort`; `visible` shows
+-- or hides it. This is what makes the whole homepage editable.
+CREATE TABLE IF NOT EXISTS homepage_sections (
+  id          SERIAL PRIMARY KEY,
+  type        TEXT NOT NULL,                 -- hero | showcase | productRail | bento | cta | richtext
+  eyebrow     TEXT DEFAULT '',
+  heading     TEXT DEFAULT '',
+  subheading  TEXT DEFAULT '',
+  body        TEXT DEFAULT '',
+  image_url   TEXT DEFAULT '',
+  bg          TEXT DEFAULT '',               -- background colour ('' = component default)
+  text_theme  TEXT DEFAULT 'auto',           -- auto | light | dark (text contrast)
+  settings    JSONB DEFAULT '{}'::jsonb,     -- {buttons:[{label,href}], category, limit, tiles:[...], anchor}
+  visible     BOOLEAN DEFAULT true,
+  sort        INTEGER DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_homepage_sections_sort ON homepage_sections(sort);
+
+DROP TRIGGER IF EXISTS trg_homepage_sections_updated ON homepage_sections;
+CREATE TRIGGER trg_homepage_sections_updated
+  BEFORE UPDATE ON homepage_sections
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();

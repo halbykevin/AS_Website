@@ -34,10 +34,14 @@ const cartSlice = createSlice({
     clearCart(state) {
       state.items = []
     },
+    // Replace the whole cart (used to restore from localStorage on load).
+    hydrateCart(state, { payload }) {
+      state.items = Array.isArray(payload) ? payload : []
+    },
   },
 })
 
-export const { addItem, removeItem, setQty, clearCart } = cartSlice.actions
+export const { addItem, removeItem, setQty, clearCart, hydrateCart } = cartSlice.actions
 
 // Selectors
 export const selectCartItems = (s) => s.cart.items

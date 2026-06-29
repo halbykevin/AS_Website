@@ -5,14 +5,19 @@
 -- ===========================================================================
 
 -- --- Categories ------------------------------------------------------------
-INSERT INTO categories (name, slug, tagline, image_url, sort) VALUES
-  ('Smartphones', 'smartphones', 'The future, in your pocket.', 'https://picsum.photos/seed/bento-phone/1200/800',  1),
-  ('Audio',       'audio',       'Hear the difference.',        'https://picsum.photos/seed/bento-audio/1200/1200', 2),
-  ('Computing',   'computing',   'Built to create.',            'https://picsum.photos/seed/bento-comp/1200/800',   3),
-  ('Wearables',   'wearables',   'Wellness, worn well.',        'https://picsum.photos/seed/bento-wear/1200/1200',  4),
-  ('Smart Home',  'smart-home',  'A home that listens.',        'https://picsum.photos/seed/bento-home/1200/1200',  5),
-  ('Accessories', 'accessories', 'The finishing touch.',        'https://picsum.photos/seed/bento-acc/1200/1200',   6)
+INSERT INTO categories (name, slug, tagline, image_url, sort, show_in_nav) VALUES
+  ('Smartphones', 'smartphones', 'The future, in your pocket.', 'https://picsum.photos/seed/bento-phone/1200/800',  1, true),
+  ('Audio',       'audio',       'Hear the difference.',        'https://picsum.photos/seed/bento-audio/1200/1200', 2, true),
+  ('Computing',   'computing',   'Built to create.',            'https://picsum.photos/seed/bento-comp/1200/800',   3, true),
+  ('Wearables',   'wearables',   'Wellness, worn well.',        'https://picsum.photos/seed/bento-wear/1200/1200',  4, true),
+  ('Smart Home',  'smart-home',  'A home that listens.',        'https://picsum.photos/seed/bento-home/1200/1200',  5, true),
+  ('Accessories', 'accessories', 'The finishing touch.',        'https://picsum.photos/seed/bento-acc/1200/1200',   6, true)
 ON CONFLICT (slug) DO NOTHING;
+
+-- Make sure the standard categories are featured in the nav even on databases
+-- seeded before the show_in_nav flag existed (re-running seed is idempotent).
+UPDATE categories SET show_in_nav = true
+WHERE slug IN ('smartphones','audio','computing','wearables','smart-home','accessories');
 
 -- --- Products (joined to their category by slug) ----------------------------
 INSERT INTO products (name, slug, tagline, price, category_id, colors, is_new, featured, sort)
@@ -61,7 +66,7 @@ VALUES (
   1, 'AS Store', true, 'Free delivery across Lebanon · 12-month warranty',
   'store@ascompany.com', '+961 1 000 000', '+9611000000', 'Beirut, Lebanon',
   '{"instagram":"https://instagram.com","facebook":"https://facebook.com","tiktok":"","x":"","youtube":""}'::jsonb,
-  '[{"label":"Store","href":"/"},{"label":"Smartphones","href":"/"},{"label":"Audio","href":"/"},{"label":"Computing","href":"/"},{"label":"Wearables","href":"/"},{"label":"Smart Home","href":"/"},{"label":"Accessories","href":"/"},{"label":"Support","href":"/pages/support"}]'::jsonb,
+  '[{"label":"Support","href":"/pages/support"}]'::jsonb,
   '[{"title":"Shop","links":[{"label":"Smartphones","href":"/"},{"label":"Audio","href":"/"},{"label":"Computing","href":"/"},{"label":"Accessories","href":"/"}]},{"title":"Support","links":[{"label":"Contact us","href":"/pages/contact"},{"label":"Shipping & Returns","href":"/pages/shipping"},{"label":"Warranty","href":"/pages/warranty"}]},{"title":"Company","links":[{"label":"About AS","href":"/pages/about"},{"label":"Support","href":"/pages/support"}]}]'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
 
@@ -79,3 +84,32 @@ Returns are accepted within 7 days of delivery in original condition.', 3),
   ('warranty','Warranty','All products carry a 12-month warranty unless otherwise stated.', 4),
   ('support','Support','Need help? Visit our contact page or message us on WhatsApp and our team will assist you.', 5)
 ON CONFLICT (slug) DO NOTHING;
+
+-- --- Homepage sections (mirror the original hardcoded homepage) -------------
+-- Seeded only when the table is empty, so the homepage looks identical the
+-- first time and re-seeding never duplicates blocks.
+INSERT INTO homepage_sections (type, eyebrow, heading, subheading, body, image_url, bg, text_theme, settings, sort)
+SELECT * FROM (VALUES
+  ('hero', 'AS Store', 'The best of tech.', 'Curated, genuine and delivered across Lebanon.', '',
+   'https://picsum.photos/seed/as-hero-main/1800/1100', '', 'auto',
+   '{"buttons":[{"label":"Learn more","href":"#showcase"},{"label":"Shop","href":"#latest"}]}'::jsonb, 1),
+  ('showcase', 'Aurora Pro 5G', 'Aurora Pro.', 'Brilliant. In every sense.', '',
+   'https://picsum.photos/seed/as-show-aurora/1800/1100', '#000000', 'dark',
+   '{"buttons":[{"label":"Learn more","href":"#latest"},{"label":"Buy","href":"#latest"}]}'::jsonb, 2),
+  ('productRail', '', 'The latest.', 'Take a look at what''s new, right now.', '', '', '', 'auto',
+   '{"category":"All","anchor":"latest"}'::jsonb, 3),
+  ('bento', '', 'Explore the lineup.', '', '', '', '', 'auto',
+   '{"tiles":[
+      {"title":"Smartphones","copy":"The future, in your pocket.","image":"https://picsum.photos/seed/bento-phone/1800/1100","tone":"dark","span":"lg:col-span-2"},
+      {"title":"Audio","copy":"Hear the difference.","image":"https://picsum.photos/seed/bento-audio/1200/1200"},
+      {"title":"Wearables","copy":"Wellness, worn well.","image":"https://picsum.photos/seed/bento-wear/1200/1200"},
+      {"title":"Computing","copy":"Built to create.","image":"https://picsum.photos/seed/bento-comp/1800/1100","span":"lg:col-span-2"},
+      {"title":"Smart Home","copy":"A home that listens.","image":"https://picsum.photos/seed/bento-home/1200/1200"},
+      {"title":"Accessories","copy":"The finishing touch.","image":"https://picsum.photos/seed/bento-acc/1200/1200"}
+    ]}'::jsonb, 4),
+  ('productRail', '', 'Accessories.', 'Top off your setup.', '', '', '', 'auto',
+   '{"category":"Accessories"}'::jsonb, 5),
+  ('cta', '', 'Shop the entire AS Store.', 'Genuine tech, official warranty, delivered across Lebanon.', '', '', '', 'auto',
+   '{"buttons":[{"label":"Browse all products","href":"#"}]}'::jsonb, 6)
+) AS v(type, eyebrow, heading, subheading, body, image_url, bg, text_theme, settings, sort)
+WHERE NOT EXISTS (SELECT 1 FROM homepage_sections);

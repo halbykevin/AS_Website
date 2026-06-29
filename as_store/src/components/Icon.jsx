@@ -11,6 +11,7 @@ const paths = {
   menu: <path d="M3 7h18M3 12h18M3 17h18" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
   chevronDown: <path d="M6 9l6 6 6-6" />,
   chevronRight: <path d="M9 6l6 6-6 6" />,
   chevronLeft: <path d="M15 6l-6 6 6 6" />,

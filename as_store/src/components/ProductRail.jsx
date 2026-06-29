@@ -5,10 +5,17 @@ import Icon from './Icon.jsx'
 import ProductTile from './ProductTile.jsx'
 import { useProducts } from '@/lib/queries'
 
-// Horizontal product rail (Apple Store "The latest." carousel). Data comes from
-// React Query; arrows smooth-scroll the snap track.
-export default function ProductRail({ id, title, sub, category = 'All' }) {
-  const { data, isLoading } = useProducts(category)
+// Horizontal product rail (Apple Store "The latest." carousel), CMS-driven:
+// heading/subheading, which category to pull, an optional limit and background.
+// Data comes from React Query; arrows smooth-scroll the snap track.
+export default function ProductRail({ section = {} }) {
+  const { heading, subheading, bg } = section
+  const category = section.settings?.category || 'All'
+  const limit = Number(section.settings?.limit) || 0
+  const anchor = section.settings?.anchor || undefined
+  const onDark = section.textTheme === 'dark'
+
+  const { data, isLoading } = useProducts(category, limit)
   const railRef = useRef(null)
 
   const scrollBy = (dir) => {
@@ -17,12 +24,18 @@ export default function ProductRail({ id, title, sub, category = 'All' }) {
   }
 
   return (
-    <section id={id} className="bg-white py-12 sm:py-16">
+    <section id={anchor} className="py-12 sm:py-16" style={{ backgroundColor: bg || '#ffffff' }}>
       <div className="shell-wide">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-semibold tracking-apple text-as-ink sm:text-4xl">{title}</h2>
-            {sub && <p className="mt-1 text-lg text-as-ink/55">{sub}</p>}
+            {heading && (
+              <h2 className={`text-3xl font-semibold tracking-apple sm:text-4xl ${onDark ? 'text-white' : 'text-as-ink'}`}>
+                {heading}
+              </h2>
+            )}
+            {subheading && (
+              <p className={`mt-1 text-lg ${onDark ? 'text-white/60' : 'text-as-ink/55'}`}>{subheading}</p>
+            )}
           </div>
           <div className="hidden items-center gap-2 sm:flex">
             <button

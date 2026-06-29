@@ -10,7 +10,7 @@ import { adminApi } from '@/lib/adminApi'
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', sort: 0, visible: true }
+const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', sort: 0, visible: true, showInNav: false }
 
 export default function CategoriesPage() {
   const qc = useQueryClient()
@@ -59,6 +59,7 @@ export default function CategoriesPage() {
                   <p className="truncate font-medium text-as-ink">{c.name}</p>
                   <p className="truncate text-xs text-as-ink/40">/{c.slug}</p>
                 </div>
+                {c.showInNav && <Badge tone="brand">In menu</Badge>}
                 {c.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
                   <button
@@ -137,6 +138,7 @@ function CategoryModal({ category, onClose, onSaved }) {
       imageUrl: form.imageUrl,
       sort: Number(form.sort) || 0,
       visible: form.visible,
+      showInNav: form.showInNav,
     }
     try {
       if (editing) await adminApi.updateCategory(category.id, payload)
@@ -205,14 +207,20 @@ function CategoryModal({ category, onClose, onSaved }) {
             </div>
           </div>
         </Field>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-6">
           <Field label="Sort">
             <Input type="number" value={form.sort} onChange={(e) => set('sort', e.target.value)} className="w-24" />
           </Field>
           <div className="pt-6">
             <Toggle checked={form.visible} onChange={(v) => set('visible', v)} label="Visible" />
           </div>
+          <div className="pt-6">
+            <Toggle checked={form.showInNav} onChange={(v) => set('showInNav', v)} label="Show in menu" />
+          </div>
         </div>
+        <p className="text-xs text-as-ink/45">
+          “Show in menu” features this category in the top navigation. Order follows the Sort value.
+        </p>
       </div>
     </Modal>
   )

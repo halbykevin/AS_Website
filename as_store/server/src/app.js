@@ -36,6 +36,7 @@ const categoryJson = (r) => ({
   imageUrl: r.image_url || '',
   sort: r.sort,
   visible: r.visible,
+  showInNav: r.show_in_nav,
 })
 
 const brandJson = (r) => ({
@@ -96,6 +97,36 @@ const pageJson = (r) => ({
   sort: r.sort,
   updatedAt: r.updated_at,
 })
+
+const sectionJson = (r) => ({
+  id: r.id,
+  type: r.type,
+  eyebrow: r.eyebrow || '',
+  heading: r.heading || '',
+  subheading: r.subheading || '',
+  body: r.body || '',
+  imageUrl: r.image_url || '',
+  bg: r.bg || '',
+  textTheme: r.text_theme || 'auto',
+  settings: r.settings && typeof r.settings === 'object' ? r.settings : {},
+  visible: r.visible,
+  sort: r.sort,
+})
+
+// Columns that admin create/update accept for homepage sections.
+const SECTION_COLS = {
+  type: 'type',
+  eyebrow: 'eyebrow',
+  heading: 'heading',
+  subheading: 'subheading',
+  body: 'body',
+  imageUrl: 'image_url',
+  bg: 'bg',
+  textTheme: 'text_theme',
+  settings: 'settings',
+  visible: 'visible',
+  sort: 'sort',
+}
 
 // Shared SELECT fragments.
 const LIST_SELECT = `
@@ -167,9 +198,9 @@ app.post(
     if (!name) return res.status(400).json({ error: 'name is required' })
     const slug = (b.slug || '').trim() || slugify(name)
     const { rows } = await query(
-      `INSERT INTO categories (name, slug, tagline, image_url, sort, visible)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [name, slug, b.tagline || '', b.imageUrl || '', b.sort ?? 0, b.visible ?? true],
+      `INSERT INTO categories (name, slug, tagline, image_url, sort, visible, show_in_nav)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [name, slug, b.tagline || '', b.imageUrl || '', b.sort ?? 0, b.visible ?? true, b.showInNav ?? false],
     )
     res.status(201).json(categoryJson(rows[0]))
   }),
@@ -182,12 +213,13 @@ app.put(
     const b = req.body || {}
     const { rows } = await query(
       `UPDATE categories SET
-         name      = COALESCE($2, name),
-         slug      = COALESCE($3, slug),
-         tagline   = COALESCE($4, tagline),
-         image_url = COALESCE($5, image_url),
-         sort      = COALESCE($6, sort),
-         visible   = COALESCE($7, visible)
+         name        = COALESCE($2, name),
+         slug        = COALESCE($3, slug),
+         tagline     = COALESCE($4, tagline),
+         image_url   = COALESCE($5, image_url),
+         sort        = COALESCE($6, sort),
+         visible     = COALESCE($7, visible),
+         show_in_nav = COALESCE($8, show_in_nav)
        WHERE id = $1 RETURNING *`,
       [
         req.params.id,
@@ -197,6 +229,7 @@ app.put(
         b.imageUrl ?? null,
         b.sort ?? null,
         b.visible ?? null,
+        b.showInNav ?? null,
       ],
     )
     if (!rows[0]) return res.status(404).json({ error: 'Not found' })
@@ -555,6 +588,102 @@ app.delete(
   requireAuth,
   ah(async (req, res) => {
     await query(`DELETE FROM pages WHERE id = $1`, [req.params.id])
+    res.json({ ok: true })
+  }),
+)
+
+// ========================= Homepage sections =========================
+// Public: visible blocks in order. Authed + ?all=1 includes hidden ones.
+app.get(
+  '/api/homepage-sections',
+  optionalAuth,
+  ah(async (req, res) => {
+    const all = req.admin && req.query.all === '1'
+    const { rows } = await query(
+      `SELECT * FROM homepage_sections ${all ? '' : 'WHERE visible = true'} ORDER BY sort, id`,
+    )
+    res.json(rows.map(sectionJson))
+  }),
+)
+
+app.post(
+  '/api/homepage-sections',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const type = (b.type || '').trim()
+    if (!type) return res.status(400).json({ error: 'type is required' })
+    // New blocks go to the end unless a sort is given.
+    const { rows: mx } = await query(`SELECT COALESCE(MAX(sort), 0) + 1 AS next FROM homepage_sections`)
+    const { rows } = await query(
+      `INSERT INTO homepage_sections
+         (type, eyebrow, heading, subheading, body, image_url, bg, text_theme, settings, visible, sort)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11) RETURNING *`,
+      [
+        type,
+        b.eyebrow || '',
+        b.heading || '',
+        b.subheading || '',
+        b.body || '',
+        b.imageUrl || '',
+        b.bg || '',
+        b.textTheme || 'auto',
+        JSON.stringify(b.settings && typeof b.settings === 'object' ? b.settings : {}),
+        b.visible ?? true,
+        b.sort ?? mx[0].next,
+      ],
+    )
+    res.status(201).json(sectionJson(rows[0]))
+  }),
+)
+
+// Reorder: body { ids: [...] } -> sort follows array order. Defined as its own
+// path so it never collides with PUT /:id.
+app.post(
+  '/api/homepage-sections/reorder',
+  requireAuth,
+  ah(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
+    for (let i = 0; i < ids.length; i++) {
+      await query(`UPDATE homepage_sections SET sort = $2 WHERE id = $1`, [ids[i], i + 1])
+    }
+    const { rows } = await query(`SELECT * FROM homepage_sections ORDER BY sort, id`)
+    res.json(rows.map(sectionJson))
+  }),
+)
+
+app.put(
+  '/api/homepage-sections/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const sets = []
+    const params = [req.params.id]
+    for (const [key, col] of Object.entries(SECTION_COLS)) {
+      if (!(key in b)) continue
+      if (key === 'settings') {
+        params.push(JSON.stringify(b.settings && typeof b.settings === 'object' ? b.settings : {}))
+        sets.push(`settings = $${params.length}::jsonb`)
+      } else {
+        params.push(b[key])
+        sets.push(`${col} = $${params.length}`)
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' })
+    const { rows } = await query(
+      `UPDATE homepage_sections SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+      params,
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(sectionJson(rows[0]))
+  }),
+)
+
+app.delete(
+  '/api/homepage-sections/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    await query(`DELETE FROM homepage_sections WHERE id = $1`, [req.params.id])
     res.json({ ok: true })
   }),
 )

@@ -69,6 +69,15 @@ export const adminApi = {
   updatePage: (id, data) => req(`/api/pages/${id}`, { method: 'PUT', auth: true, body: data }),
   deletePage: (id) => req(`/api/pages/${id}`, { method: 'DELETE', auth: true }),
 
+  // homepage sections
+  listSections: () => req('/api/homepage-sections?all=1', { auth: true }),
+  createSection: (data) => req('/api/homepage-sections', { method: 'POST', auth: true, body: data }),
+  updateSection: (id, data) =>
+    req(`/api/homepage-sections/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteSection: (id) => req(`/api/homepage-sections/${id}`, { method: 'DELETE', auth: true }),
+  reorderSections: (ids) =>
+    req('/api/homepage-sections/reorder', { method: 'POST', auth: true, body: { ids } }),
+
   // uploads
   upload: (file) => {
     const fd = new FormData()

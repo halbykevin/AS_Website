@@ -55,16 +55,19 @@ export const products = [
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 const toSlug = (s) => String(s).toLowerCase().trim().replace(/\s+/g, '-')
 
-export async function getProducts({ category } = {}) {
+export async function getProducts({ category, limit } = {}) {
   try {
-    const qs =
-      category && category !== 'All' ? `?category=${encodeURIComponent(toSlug(category))}` : ''
+    const params = new URLSearchParams()
+    if (category && category !== 'All') params.set('category', toSlug(category))
+    if (limit) params.set('limit', String(limit))
+    const qs = params.toString() ? `?${params}` : ''
     const res = await fetch(`${API}/api/products${qs}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
     // API down → render the bundled sample so the site never breaks.
-    if (!category || category === 'All') return products
-    return products.filter((p) => p.category === category)
+    const list =
+      !category || category === 'All' ? products : products.filter((p) => p.category === category)
+    return limit ? list.slice(0, limit) : list
   }
 }
