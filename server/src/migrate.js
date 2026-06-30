@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS predictor (
   title TEXT DEFAULT 'Predict & Win',
   subtitle TEXT DEFAULT '',
   intro TEXT DEFAULT '',
+  prize_enabled BOOLEAN DEFAULT true,
   prize_title TEXT DEFAULT '',
   prize_description TEXT DEFAULT '',
   prize_image_url TEXT DEFAULT '',
@@ -244,6 +245,8 @@ CREATE TABLE IF NOT EXISTS predictions (
 DELETE FROM predictions a USING predictions b
   WHERE a.mobile = b.mobile AND a.id > b.id;
 CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobile);
+-- Show/hide the prize block independently of the game (idempotent).
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_enabled BOOLEAN DEFAULT true;
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';

@@ -107,6 +107,7 @@ const solutionJson = (r) => ({
 })
 const predictorJson = (r) => ({
   enabled: r.enabled, title: r.title, subtitle: r.subtitle, intro: r.intro,
+  prizeEnabled: r.prize_enabled,
   prizeTitle: r.prize_title, prizeDescription: r.prize_description, prizeImageUrl: r.prize_image_url,
   deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
 })
@@ -589,12 +590,13 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
     `UPDATE predictor SET
        enabled=$1, title=$2, subtitle=$3, intro=$4,
        prize_title=$5, prize_description=$6, prize_image_url=$7,
-       deadline=$8, closed=$9, success_message=$10, updated_at=now()
+       deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       Boolean(b.enabled), b.title || '', b.subtitle || '', b.intro || '',
       b.prizeTitle || '', b.prizeDescription || '', b.prizeImageUrl || '',
       b.deadline || null, Boolean(b.closed), b.successMessage || '',
+      b.prizeEnabled === undefined ? true : Boolean(b.prizeEnabled),
     ]
   )
   res.json(predictorJson(rows[0]))

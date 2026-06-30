@@ -15,7 +15,7 @@ function toLocalInput(iso) {
 
 const blankSettings = {
   enabled: false, title: '', subtitle: '', intro: '', successMessage: '',
-  prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
+  prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
 }
 const blankMatch = {
   stage: '', teamA: '', teamACode: '', teamAFlag: '', teamB: '', teamBCode: '', teamBFlag: '',
@@ -84,6 +84,7 @@ export default function PredictorAdmin() {
           enabled: p.enabled === true,
           title: p.title || '', subtitle: p.subtitle || '', intro: p.intro || '',
           successMessage: p.successMessage || '',
+          prizeEnabled: p.prizeEnabled !== false,
           prizeTitle: p.prizeTitle || '', prizeDescription: p.prizeDescription || '',
           prizeImageUrl: p.prizeImageUrl || '',
           deadline: toLocalInput(p.deadline), closed: p.closed === true,
@@ -215,6 +216,14 @@ export default function PredictorAdmin() {
 
             <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
               <p className="mb-3 text-sm font-bold text-amber-700">🏆 The prize</p>
+              <div className="mb-4">
+                <Toggle
+                  checked={settings.prizeEnabled}
+                  onChange={(v) => setSettings((s) => ({ ...s, prizeEnabled: v }))}
+                  label={settings.prizeEnabled ? 'Prize shown' : 'Prize hidden'}
+                  description="Turn off to run the game without showing any prize."
+                />
+              </div>
               <div className="grid gap-4">
                 <Field label="Prize title"><TextInput value={settings.prizeTitle} onChange={setS('prizeTitle')} placeholder="e.g. iPhone 16 Pro" /></Field>
                 <Field label="Prize description"><TextArea value={settings.prizeDescription} onChange={setS('prizeDescription')} placeholder="What the lucky winner takes home." /></Field>

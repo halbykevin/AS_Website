@@ -403,6 +403,7 @@ function mapPredictor(meta, matches) {
     subtitle: meta.subtitle || '',
     intro: meta.intro || '',
     prize: {
+      enabled: meta.prizeEnabled !== false,
       title: meta.prizeTitle || '',
       description: meta.prizeDescription || '',
       image: meta.prizeImageUrl || '',

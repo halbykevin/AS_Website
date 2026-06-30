@@ -214,7 +214,7 @@ export default function PredictorModal() {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {step === 'play' && (
             <div className="space-y-4">
-              {(prize.title || prize.description || prize.image) && (
+              {prize.enabled && (prize.title || prize.description || prize.image) && (
                 <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3">
                   {prize.image ? (
                     <img src={prize.image} alt={prize.title} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-amber-200" />
@@ -284,7 +284,7 @@ export default function PredictorModal() {
               <p className="mx-auto mt-2 max-w-xs text-sm text-as-charcoal/70">
                 {predictor.successMessage || "Your predictions are locked in. Good luck — we'll be in touch if you win!"}
               </p>
-              {prize.title && (
+              {prize.enabled && prize.title && (
                 <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-700">
                   🏆 Playing for: {prize.title}
                 </div>
