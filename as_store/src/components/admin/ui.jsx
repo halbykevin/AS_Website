@@ -1,8 +1,26 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 // Small AS-branded UI kit for the admin CMS.
 
 export const cn = (...a) => a.filter(Boolean).join(' ')
+
+// Checkbox with optional indeterminate (mixed) state for "select all" headers.
+export function Checkbox({ indeterminate = false, className = '', ...props }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className={cn('h-4 w-4 shrink-0 cursor-pointer accent-as-red', className)}
+      {...props}
+    />
+  )
+}
 
 export function Button({ variant = 'primary', className = '', as = 'button', ...props }) {
   const base =

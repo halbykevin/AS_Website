@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Button, Card, Badge, Spinner, Input, Toggle } from '@/components/admin/ui.jsx'
+import { Button, Card, Badge, Spinner, Input, Toggle, Checkbox } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
+import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
 
 export default function ProductsPage() {
@@ -35,6 +36,22 @@ export default function ProductsPage() {
     (p) => p.name.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q),
   )
 
+  const sel = useSelection(list)
+  const bulkRemove = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map((id) => adminApi.deleteProduct(id))),
+    onSuccess: (_d, ids) => {
+      invalidate()
+      sel.clear()
+      toast.success(`${ids.length} product${ids.length > 1 ? 's' : ''} deleted`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const onBulkDelete = () => {
+    const ids = sel.selectedIds
+    if (ids.length && confirm(`Delete ${ids.length} selected product${ids.length > 1 ? 's' : ''}? This can't be undone.`))
+      bulkRemove.mutate(ids)
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -63,9 +80,29 @@ export default function ProductsPage() {
         ) : list.length === 0 ? (
           <p className="py-16 text-center text-sm text-as-ink/50">No products found.</p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
-            {list.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-3 py-3 hover:bg-as-fog/50 sm:px-4">
+          <>
+            {/* Bulk-select bar */}
+            <div className="flex items-center justify-between gap-3 border-b border-as-ink/5 bg-as-fog/40 px-3 py-2.5 sm:px-4">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-as-ink/60">
+                <Checkbox checked={sel.all} indeterminate={sel.indeterminate} onChange={sel.toggleAll} />
+                {sel.count > 0 ? `${sel.count} selected` : 'Select all'}
+              </label>
+              {sel.count > 0 && (
+                <Button variant="danger" onClick={onBulkDelete} disabled={bulkRemove.isPending} className="px-3 py-1.5">
+                  <Icon name="trash" className="h-4 w-4" />
+                  {bulkRemove.isPending ? 'Deleting…' : `Delete ${sel.count}`}
+                </Button>
+              )}
+            </div>
+            <ul className="divide-y divide-as-ink/5">
+              {list.map((p) => (
+                <li
+                  key={p.id}
+                  className={`flex items-center gap-3 px-3 py-3 hover:bg-as-fog/50 sm:px-4 ${
+                    sel.has(p.id) ? 'bg-as-red/5' : ''
+                  }`}
+                >
+                  <Checkbox checked={sel.has(p.id)} onChange={() => sel.toggle(p.id)} />
                 {/* Thumb */}
                 <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-as-fog">
                   {p.image && (
@@ -132,9 +169,10 @@ export default function ProductsPage() {
                     <Icon name="trash" className="h-4 w-4" />
                   </button>
                 </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
     </div>

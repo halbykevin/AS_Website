@@ -3,8 +3,9 @@
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Button, Card, Badge, Spinner, Field, Input, Toggle, Modal } from '@/components/admin/ui.jsx'
+import { Button, Card, Badge, Spinner, Field, Input, Toggle, Modal, Checkbox } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
+import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
 
 const slugify = (s) =>
@@ -29,6 +30,23 @@ export default function CategoriesPage() {
     onError: (e) => toast.error(e.message),
   })
 
+  const list = data ?? []
+  const sel = useSelection(list)
+  const bulkRemove = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map((id) => adminApi.deleteCategory(id))),
+    onSuccess: (_d, ids) => {
+      invalidate()
+      sel.clear()
+      toast.success(`${ids.length} categor${ids.length > 1 ? 'ies' : 'y'} deleted`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const onBulkDelete = () => {
+    const ids = sel.selectedIds
+    if (ids.length && confirm(`Delete ${ids.length} selected categor${ids.length > 1 ? 'ies' : 'y'}? Products keep existing but lose the category.`))
+      bulkRemove.mutate(ids)
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex items-center justify-between">
@@ -43,12 +61,30 @@ export default function CategoriesPage() {
           <div className="flex justify-center py-16">
             <Spinner />
           </div>
-        ) : (data ?? []).length === 0 ? (
+        ) : list.length === 0 ? (
           <p className="py-16 text-center text-sm text-as-ink/50">No categories yet.</p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
-            {data.map((c) => (
-              <li key={c.id} className="flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60">
+          <>
+            {/* Bulk-select bar */}
+            <div className="flex items-center justify-between gap-3 border-b border-as-ink/5 bg-as-fog/40 px-5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-as-ink/60">
+                <Checkbox checked={sel.all} indeterminate={sel.indeterminate} onChange={sel.toggleAll} />
+                {sel.count > 0 ? `${sel.count} selected` : 'Select all'}
+              </label>
+              {sel.count > 0 && (
+                <Button variant="danger" onClick={onBulkDelete} disabled={bulkRemove.isPending} className="px-3 py-1.5">
+                  <Icon name="trash" className="h-4 w-4" />
+                  {bulkRemove.isPending ? 'Deleting…' : `Delete ${sel.count}`}
+                </Button>
+              )}
+            </div>
+            <ul className="divide-y divide-as-ink/5">
+              {list.map((c) => (
+                <li
+                  key={c.id}
+                  className={`flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60 ${sel.has(c.id) ? 'bg-as-red/5' : ''}`}
+                >
+                  <Checkbox checked={sel.has(c.id)} onChange={() => sel.toggle(c.id)} />
                 <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-as-fog">
                   {c.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -80,9 +116,10 @@ export default function CategoriesPage() {
                     <Icon name="trash" className="h-4 w-4" />
                   </button>
                 </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
 

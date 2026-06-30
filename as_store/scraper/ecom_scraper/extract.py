@@ -485,13 +485,21 @@ def _long_description(soup: BeautifulSoup, url: str):
 
 
 def _table_specs(table) -> list[list[str]]:
-    """[label, value] rows from a 2-column table (extra columns joined into value)."""
+    """[label, value] rows from a 2-column table (extra columns joined into value).
+
+    A header row (all-<th>, or inside <thead>, e.g. "Feature | Details") is
+    skipped — it labels the columns, it isn't a spec."""
     rows: list[list[str]] = []
     for tr in table.find_all("tr"):
-        cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
+        tcells = tr.find_all(["td", "th"])
+        cells = [c.get_text(" ", strip=True) for c in tcells]
         cells = [c for c in cells if c]
-        if len(cells) >= 2:
-            rows.append([_tidy(cells[0]), _tidy(" ".join(cells[1:]))])
+        if len(cells) < 2:
+            continue
+        is_header = tr.find_parent("thead") is not None or all(c.name == "th" for c in tcells)
+        if is_header:
+            continue
+        rows.append([_tidy(cells[0]), _tidy(" ".join(cells[1:]))])
     return rows
 
 

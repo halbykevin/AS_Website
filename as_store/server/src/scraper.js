@@ -29,6 +29,26 @@ const jobs = new Map()
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
+// Normalize a product URL so re-imports can't create duplicates via trivially
+// different forms of the same address: trailing slash, #fragment, www., host
+// case, and %-encoding (e.g. %e2%80%b3 vs the literal ″). The result is only an
+// identity key for dedupe, never re-fetched.
+export function normalizeUrl(raw) {
+  if (!raw) return ''
+  try {
+    const u = new URL(String(raw).trim())
+    u.hash = ''
+    u.hostname = u.hostname.replace(/^www\./i, '').toLowerCase()
+    let path = u.pathname.replace(/\/+$/, '')
+    try { path = decodeURIComponent(path) } catch { /* malformed — keep raw */ }
+    let search = u.search
+    try { search = decodeURIComponent(search) } catch { /* malformed — keep raw */ }
+    return `${u.protocol}//${u.hostname}${path}${search}`
+  } catch {
+    return String(raw).trim()
+  }
+}
+
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d)
 
 // Decode HTML entities (&amp; &gt; &#39; …) that leak into scraped text. Runs
@@ -161,13 +181,18 @@ export async function ingestProducts(products) {
           .map((r) => [decodeEntities(String(r[0])).trim(), decodeEntities(String(r[1])).trim()])
           .filter((r) => r[0] && r[1])
       : []
-    const sourceUrl = p.url || ''
+    const sourceUrl = normalizeUrl(p.url || '')
     const images = Array.isArray(p.images) ? p.images.filter(Boolean) : []
 
     // Find an existing product by where it was scraped from (idempotent re-runs).
+    // Match the normalized URL, but also the raw form so rows saved before this
+    // normalization still update instead of duplicating.
     let existing = null
     if (sourceUrl) {
-      const { rows } = await query(`SELECT id FROM products WHERE source_url = $1 LIMIT 1`, [sourceUrl])
+      const { rows } = await query(
+        `SELECT id FROM products WHERE source_url = $1 OR source_url = $2 LIMIT 1`,
+        [sourceUrl, p.url || ''],
+      )
       existing = rows[0]
     }
 
@@ -175,9 +200,9 @@ export async function ingestProducts(products) {
     if (existing) {
       await query(
         `UPDATE products SET name=$2, tagline=$3, description=$4, specs=$5::jsonb, price=$6,
-           category_id=COALESCE($7, category_id), brand_id=COALESCE($8, brand_id)
+           category_id=COALESCE($7, category_id), brand_id=COALESCE($8, brand_id), source_url=$9
          WHERE id=$1`,
-        [existing.id, title, tagline, description, JSON.stringify(specs), price, categoryId, brandId],
+        [existing.id, title, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl],
       )
       productId = existing.id
       updated++
