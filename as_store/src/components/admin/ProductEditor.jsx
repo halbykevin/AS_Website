@@ -15,7 +15,8 @@ const slugify = (s) =>
 
 const BLANK = {
   name: '', slug: '', tagline: '', description: '', price: '', oldPrice: '',
-  categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true, colors: [],
+  categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true,
+  colors: [], specs: [],
 }
 
 export default function ProductEditor({ id }) {
@@ -62,6 +63,7 @@ export default function ProductEditor({ id }) {
       brandId: p.brandId != null ? String(p.brandId) : '',
       stock: String(p.stock ?? 0), isNew: !!p.isNew, featured: !!p.featured,
       visible: p.visible !== false, colors: Array.isArray(p.colors) ? p.colors : [],
+      specs: Array.isArray(p.specs) ? p.specs.filter((r) => Array.isArray(r) && r.length >= 2) : [],
     })
   }, [editing, id, products.data])
 
@@ -94,6 +96,12 @@ export default function ProductEditor({ id }) {
     set('colors', [...form.colors, newColor])
   }
   const removeColor = (c) => set('colors', form.colors.filter((x) => x !== c))
+
+  // ---- specs (label/value rows) ----
+  const addSpec = () => set('specs', [...form.specs, ['', '']])
+  const updateSpec = (i, j, v) =>
+    set('specs', form.specs.map((row, idx) => (idx === i ? (j === 0 ? [v, row[1]] : [row[0], v]) : row)))
+  const removeSpec = (i) => set('specs', form.specs.filter((_, idx) => idx !== i))
 
   // ---- images ----
   const addImageUrl = async (url) => {
@@ -158,6 +166,7 @@ export default function ProductEditor({ id }) {
       featured: form.featured,
       visible: form.visible,
       colors: form.colors,
+      specs: form.specs.filter(([k, v]) => String(k).trim() && String(v).trim()),
     }
     try {
       if (editing) {
@@ -291,6 +300,45 @@ export default function ProductEditor({ id }) {
                 Add color
               </Button>
             </div>
+          </Card>
+
+          {/* Specifications table */}
+          <Card className="space-y-3 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-as-ink">Specifications</p>
+              <span className="text-xs text-as-ink/40">Shown in the product&apos;s Specifications tab</span>
+            </div>
+            {form.specs.length === 0 && (
+              <p className="text-sm text-as-ink/40">No specifications yet.</p>
+            )}
+            <div className="space-y-2">
+              {form.specs.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={row[0]}
+                    onChange={(e) => updateSpec(i, 0, e.target.value)}
+                    placeholder="Label (e.g. Processor)"
+                    className="w-1/3"
+                  />
+                  <Input
+                    value={row[1]}
+                    onChange={(e) => updateSpec(i, 1, e.target.value)}
+                    placeholder="Value (e.g. Intel Core i9-14900HX)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSpec(i)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-as-ink/40 transition hover:bg-red-50 hover:text-red-600"
+                    aria-label="Remove specification"
+                  >
+                    <Icon name="trash" className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <Button type="button" variant="secondary" onClick={addSpec}>
+              Add specification
+            </Button>
           </Card>
 
           {/* Images */}

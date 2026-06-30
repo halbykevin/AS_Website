@@ -36,6 +36,18 @@ def parse(html: str, url: str, selectors: dict | None = None) -> Product:
         if found:
             product.merge(found)
 
+    # The "Description" tab usually carries far richer copy than the JSON-LD/OG
+    # blurb (headings, feature lists, a specs table). Prefer it when present, and
+    # split the specifications table out into its own structured field.
+    try:
+        long_desc, specs = _long_description(soup, url)
+        if long_desc:
+            product.description = long_desc
+        if specs:
+            product.specs = specs
+    except Exception as exc:
+        print(f"  [description warn] {exc}")
+
     product.images = [urljoin(url, i) for i in product.images if i]
 
     # Galleries often lazy-load extra images (data-* attrs, <a> links) that the
@@ -420,6 +432,104 @@ def _dedupe_images(urls: list[str]) -> list[str]:
         elif _img_size(u) > _img_size(best[key]):
             best[key] = u
     return [best[k] for k in order]
+
+
+# --------------------------------------------------------------------------
+# Long-form description + specifications table (the product "Description" tab)
+# --------------------------------------------------------------------------
+# Where the full product write-up lives, most-specific (WooCommerce) first.
+DESCRIPTION_CONTAINERS = [
+    "#tab-description",
+    ".woocommerce-Tabs-panel--description",
+    "[id^='tab-description']",
+    "#description.woocommerce-Tabs-panel",
+    ".product-description", "#product-description",
+    ".product__description", ".product-single__description",
+    "[id*='product-description']",
+]
+# A heading that introduces the spec table — dropped from the prose so the table
+# only shows in its own tab.
+_SPEC_HEADING_RX = re.compile(
+    r"^(technical\s+|tech\s+)?(specifications?|specs?)(\s+table)?:?$", re.I,
+)
+# Tag -> markdown heading prefix, so the storefront can render structure.
+_HEADING_LEVEL = {"h1": "##", "h2": "##", "h3": "###", "h4": "####", "h5": "####", "h6": "####"}
+
+
+def _long_description(soup: BeautifulSoup, url: str):
+    """Return (markdown_text, specs) extracted from a product description tab.
+
+    The description is light markdown (## headings, - bullets, blank-line-
+    separated paragraphs). `specs` is a list of [label, value] rows lifted out of
+    the spec table(s); those tables (and their "Specifications" heading) are
+    removed from the prose so they render only in their own tab.
+    """
+    container = None
+    for sel in DESCRIPTION_CONTAINERS:
+        container = soup.select_one(sel)
+        if container:
+            break
+    if container is None:
+        return None, []
+
+    # Pull every 2-column table out as structured specs.
+    specs: list[list[str]] = []
+    for table in container.find_all("table"):
+        rows = _table_specs(table)
+        if rows:
+            specs.extend(rows)
+        table.decompose()  # removed either way so a stray table isn't dumped as text
+
+    md = _blocks_to_markdown(container)
+    return (md or None), specs
+
+
+def _table_specs(table) -> list[list[str]]:
+    """[label, value] rows from a 2-column table (extra columns joined into value)."""
+    rows: list[list[str]] = []
+    for tr in table.find_all("tr"):
+        cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
+        cells = [c for c in cells if c]
+        if len(cells) >= 2:
+            rows.append([_tidy(cells[0]), _tidy(" ".join(cells[1:]))])
+    return rows
+
+
+def _blocks_to_markdown(container) -> str:
+    """Flatten a description container to light markdown, preserving headings and
+    lists. List/heading content nested inside another list item is skipped so it
+    isn't emitted twice."""
+    blocks: list[str] = []
+    for el in container.find_all(["h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol"]):
+        # Skip anything living inside a list item — its parent <ul>/<ol> emits it.
+        if el.find_parent("li") is not None:
+            continue
+        if el.name in _HEADING_LEVEL:
+            text = _tidy(el.get_text(" ", strip=True))
+            if not text or _SPEC_HEADING_RX.match(text):
+                continue
+            blocks.append(f"{_HEADING_LEVEL[el.name]} {text}")
+        elif el.name in ("ul", "ol"):
+            items = []
+            for li in el.find_all("li", recursive=False):
+                t = _tidy(li.get_text(" ", strip=True))
+                if t:
+                    items.append(f"- {t}")
+            if items:
+                blocks.append("\n".join(items))
+        else:  # p
+            text = _tidy(el.get_text(" ", strip=True))
+            if text:
+                blocks.append(text)
+    return "\n\n".join(blocks)
+
+
+def _tidy(text: str) -> str:
+    """Collapse whitespace and fix the stray spaces left when inline tags (bold,
+    links) are unwrapped, e.g. '1TB SSD ,' -> '1TB SSD,'."""
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    return text
 
 
 # --------------------------------------------------------------------------

@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS products (
   slug        TEXT UNIQUE NOT NULL,
   tagline     TEXT DEFAULT '',
   description TEXT DEFAULT '',
+  specs       JSONB DEFAULT '[]'::jsonb,            -- [[label, value], ...] spec-table rows
   price       NUMERIC(10,2) NOT NULL DEFAULT 0,
   old_price   NUMERIC(10,2),                        -- null = not on sale
   category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
@@ -136,6 +137,9 @@ CREATE TABLE IF NOT EXISTS brands (
 -- (so re-scraping updates rather than duplicates).
 ALTER TABLE products ADD COLUMN IF NOT EXISTS brand_id   INTEGER REFERENCES brands(id) ON DELETE SET NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS source_url TEXT DEFAULT '';
+
+-- Backfill the structured specifications table on databases created before it existed.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS specs JSONB DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_products_brand  ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);

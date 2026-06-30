@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useDispatch } from 'react-redux'
 import Icon from './Icon.jsx'
+import ProductTabs from './ProductTabs.jsx'
 import { addItem } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 
@@ -23,8 +24,6 @@ export default function ProductDetail({ product }) {
   const price = Number(product.price) || 0
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
   const onSale = oldPrice && oldPrice > price
-
-  const paragraphs = (product.description || '').split(/\n{2,}/).filter(Boolean)
 
   const add = () => {
     dispatch(addItem({ id: product.id, title: product.name, image: gallery[0] || '', price, qty }))
@@ -138,17 +137,11 @@ export default function ProductDetail({ product }) {
               </p>
             )}
 
-            {paragraphs.length > 0 && (
-              <div className="mt-8 space-y-4 border-t border-as-ink/10 pt-8 text-base leading-relaxed text-as-ink/70">
-                {paragraphs.map((p, i) => (
-                  <p key={i} className="whitespace-pre-line">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Full-width tabbed details: Description + Specifications */}
+        <ProductTabs description={product.description} specs={product.specs} />
       </div>
     </section>
   )

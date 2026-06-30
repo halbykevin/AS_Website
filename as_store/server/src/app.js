@@ -55,6 +55,7 @@ const productJson = (r) => ({
   slug: r.slug,
   tagline: r.tagline || '',
   description: r.description || '',
+  specs: Array.isArray(r.specs) ? r.specs : [],
   price: r.price,
   oldPrice: r.old_price,
   categoryId: r.category_id,
@@ -201,6 +202,7 @@ const PRODUCT_COLS = {
   slug: 'slug',
   tagline: 'tagline',
   description: 'description',
+  specs: 'specs',
   price: 'price',
   oldPrice: 'old_price',
   categoryId: 'category_id',
@@ -548,15 +550,16 @@ app.post(
     const slug = (b.slug || '').trim() || slugify(name)
     const { rows } = await query(
       `INSERT INTO products
-         (name, slug, tagline, description, price, old_price, category_id, brand_id,
+         (name, slug, tagline, description, specs, price, old_price, category_id, brand_id,
           colors, stock, is_new, featured, visible, sort)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         name,
         slug,
         b.tagline || '',
         b.description || '',
+        JSON.stringify(Array.isArray(b.specs) ? b.specs : []),
         b.price ?? 0,
         b.oldPrice ?? null,
         b.categoryId ?? null,
@@ -597,9 +600,9 @@ app.put(
     const params = [req.params.id]
     for (const [key, col] of Object.entries(PRODUCT_COLS)) {
       if (!(key in b)) continue
-      if (key === 'colors') {
-        params.push(JSON.stringify(Array.isArray(b.colors) ? b.colors : []))
-        sets.push(`colors = $${params.length}::jsonb`)
+      if (key === 'colors' || key === 'specs') {
+        params.push(JSON.stringify(Array.isArray(b[key]) ? b[key] : []))
+        sets.push(`${col} = $${params.length}::jsonb`)
       } else {
         params.push(b[key])
         sets.push(`${col} = $${params.length}`)

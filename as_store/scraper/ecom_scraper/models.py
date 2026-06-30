@@ -20,6 +20,9 @@ class Product:
     rating: float | None = None
     review_count: int | None = None
     description: str | None = None
+    # Structured specification rows pulled out of the description tab, as
+    # [label, value] pairs (e.g. ["Processor", "Intel Core i9-14900HX"]).
+    specs: list[list[str]] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
     images: list[str] = field(default_factory=list)
     # Local file paths for downloaded images (populated by --images).
@@ -40,6 +43,9 @@ class Product:
         d["categories"] = " | ".join(self.categories)
         d["images"] = " | ".join(self.images)
         d["image_files"] = " | ".join(self.image_files)
+        d["specs"] = " | ".join(
+            f"{row[0]}: {row[1]}" for row in self.specs if isinstance(row, (list, tuple)) and len(row) >= 2
+        )
         extra = d.pop("extra")
         for k, v in extra.items():
             if isinstance(v, (list, tuple)):

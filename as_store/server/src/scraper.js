@@ -50,6 +50,18 @@ export function decodeEntities(str) {
   return s
 }
 
+// Derive a short tagline from a (now markdown) description: the first real
+// paragraph, skipping ## headings and - bullet lines and stripping any leftover
+// markdown markers.
+export function taglineFromDescription(description) {
+  for (const raw of String(description || '').split('\n')) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#') || line.startsWith('-') || line.startsWith('*')) continue
+    return line.replace(/[*_`]/g, '').slice(0, 90)
+  }
+  return ''
+}
+
 // A scraped category is often a "A > B > C" breadcrumb (HTML-encoded). Decode it
 // and keep the most specific (leaf) segment as the category name.
 export function cleanCategoryName(raw) {
@@ -141,7 +153,14 @@ export async function ingestProducts(products) {
     }
 
     const description = decodeEntities(p.description || '').trim()
-    const tagline = (description.split('\n')[0] || '').slice(0, 90)
+    const tagline = taglineFromDescription(description)
+    // Spec rows arrive as [[label, value], ...]; keep only clean 2-string pairs.
+    const specs = Array.isArray(p.specs)
+      ? p.specs
+          .filter((r) => Array.isArray(r) && r.length >= 2)
+          .map((r) => [decodeEntities(String(r[0])).trim(), decodeEntities(String(r[1])).trim()])
+          .filter((r) => r[0] && r[1])
+      : []
     const sourceUrl = p.url || ''
     const images = Array.isArray(p.images) ? p.images.filter(Boolean) : []
 
@@ -155,19 +174,19 @@ export async function ingestProducts(products) {
     let productId
     if (existing) {
       await query(
-        `UPDATE products SET name=$2, tagline=$3, description=$4, price=$5,
-           category_id=COALESCE($6, category_id), brand_id=COALESCE($7, brand_id)
+        `UPDATE products SET name=$2, tagline=$3, description=$4, specs=$5::jsonb, price=$6,
+           category_id=COALESCE($7, category_id), brand_id=COALESCE($8, brand_id)
          WHERE id=$1`,
-        [existing.id, title, tagline, description, price, categoryId, brandId],
+        [existing.id, title, tagline, description, JSON.stringify(specs), price, categoryId, brandId],
       )
       productId = existing.id
       updated++
     } else {
       const slug = await uniqueSlug(title)
       const { rows } = await query(
-        `INSERT INTO products (name, slug, tagline, description, price, category_id, brand_id, source_url, is_new, visible)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,true) RETURNING id`,
-        [title, slug, tagline, description, price, categoryId, brandId, sourceUrl],
+        `INSERT INTO products (name, slug, tagline, description, specs, price, category_id, brand_id, source_url, is_new, visible)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,true,true) RETURNING id`,
+        [title, slug, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl],
       )
       productId = rows[0].id
       created++
