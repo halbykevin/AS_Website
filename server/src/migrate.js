@@ -238,7 +238,11 @@ CREATE TABLE IF NOT EXISTS predictions (
   picks JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
--- One entry per mobile number (stored normalised, see app.js).
+-- One entry per mobile number (stored normalised, see app.js). Before adding the
+-- unique index, drop any pre-existing duplicate entries, keeping the earliest
+-- (first prediction wins), so the index can be created on existing databases.
+DELETE FROM predictions a USING predictions b
+  WHERE a.mobile = b.mobile AND a.id > b.id;
 CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobile);
 
 -- Upgrades for existing databases (idempotent).
