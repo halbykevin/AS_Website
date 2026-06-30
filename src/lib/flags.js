@@ -25,6 +25,7 @@ export const COUNTRIES = [
   { code: 'hr', name: 'Croatia' },
   { code: 'cz', name: 'Czechia' },
   { code: 'dk', name: 'Denmark' },
+  { code: 'cd', name: 'DR Congo' },
   { code: 'ec', name: 'Ecuador' },
   { code: 'eg', name: 'Egypt' },
   { code: 'gb-eng', name: 'England' },
