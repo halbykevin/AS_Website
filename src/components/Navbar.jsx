@@ -54,7 +54,7 @@ export default function Navbar() {
       >
       <nav className="relative mx-auto flex max-w-7xl items-center justify-between px-5 py-1.5 sm:px-8 sm:py-2">
         {/* Animated football — opens the World Cup predictor (hidden unless enabled) */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%]">
           <div className="pointer-events-auto">
             <FootballButton />
           </div>
