@@ -198,6 +198,47 @@ CREATE TABLE IF NOT EXISTS solutions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- World Cup 2026 score-predictor game: a singleton row of copy + prize, the
+-- admin-created matches (each with two teams + flags), and the public entries.
+CREATE TABLE IF NOT EXISTS predictor (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT false,
+  title TEXT DEFAULT 'Predict & Win',
+  subtitle TEXT DEFAULT '',
+  intro TEXT DEFAULT '',
+  prize_title TEXT DEFAULT '',
+  prize_description TEXT DEFAULT '',
+  prize_image_url TEXT DEFAULT '',
+  deadline TIMESTAMPTZ,
+  closed BOOLEAN DEFAULT false,
+  success_message TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT predictor_singleton CHECK (id = 1)
+);
+
+CREATE TABLE IF NOT EXISTS predictor_matches (
+  id SERIAL PRIMARY KEY,
+  stage TEXT DEFAULT '',
+  team_a TEXT DEFAULT '',
+  team_a_code TEXT DEFAULT '',
+  team_a_flag TEXT DEFAULT '',
+  team_b TEXT DEFAULT '',
+  team_b_code TEXT DEFAULT '',
+  team_b_flag TEXT DEFAULT '',
+  kickoff TIMESTAMPTZ,
+  sort INTEGER DEFAULT 0,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS predictions (
+  id SERIAL PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  picks JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;
@@ -267,6 +308,14 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton popup row exists (disabled by default).
 INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton predictor row exists (disabled by default).
+INSERT INTO predictor (id, enabled, title, subtitle, intro, success_message)
+VALUES (1, false, 'Predict & Win — World Cup 2026',
+  'Call the exact scores and win big.',
+  'Predict the exact score of every match below, drop your name and number, and you could be our lucky winner.',
+  'Your predictions are in! Good luck — we''ll be in touch on WhatsApp if you win.')
+ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton store-showcase row exists with sensible defaults.
 INSERT INTO store_showcase (id, enabled, eyebrow, heading, subheading, visible_count)

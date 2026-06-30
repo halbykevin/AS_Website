@@ -29,6 +29,7 @@ const StoreAdmin = lazy(() => import('./admin/pages/StoreAdmin.jsx'))
 const StoryAdmin = lazy(() => import('./admin/pages/StoryAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
+const PredictorAdmin = lazy(() => import('./admin/pages/PredictorAdmin.jsx'))
 
 // The public website, gated behind the publish flag.
 function PublicSite() {
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="store" element={<StoreAdmin />} />
               <Route path="story" element={<StoryAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
+              <Route path="predictor" element={<PredictorAdmin />} />
               <Route path="scraper" element={<ScraperAdmin />} />
             </Route>
 

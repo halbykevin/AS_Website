@@ -1,5 +1,6 @@
 import * as defaults from '../content/site.js'
 import { events as defaultEvents } from '../data/events.js'
+import { flagUrl } from './flags.js'
 
 // ---------------------------------------------------------------------------
 // Frontend data layer — talks to the AS Company API (Express + PostgreSQL).
@@ -72,6 +73,7 @@ export const defaultContent = {
   categories: [],
   popup: null,
   story: null,
+  predictor: null,
   published: false,
 }
 
@@ -375,9 +377,50 @@ export function mapPopup(p) {
   }
 }
 
+export function mapPredictorMatch(m) {
+  return {
+    id: m.id,
+    stage: m.stage || '',
+    teamA: m.teamA || '',
+    teamB: m.teamB || '',
+    flagA: flagUrl(m.teamACode, m.teamAFlag),
+    flagB: flagUrl(m.teamBCode, m.teamBFlag),
+    kickoff: m.kickoff || null,
+    visible: m.visible !== false,
+  }
+}
+
+// The World Cup predictor game: config row + its visible matches. Hidden (null)
+// unless enabled with at least one visible match. `closed` is true once the
+// admin closes it or the deadline passes — the form then becomes read-only.
+function mapPredictor(meta, matches) {
+  if (!meta || meta.enabled === false) return null
+  const list = Array.isArray(matches) ? matches.map(mapPredictorMatch).filter((m) => m.visible) : []
+  if (!list.length) return null
+  const deadlinePassed = meta.deadline ? new Date(meta.deadline).getTime() < Date.now() : false
+  return {
+    title: meta.title || 'Predict & Win',
+    subtitle: meta.subtitle || '',
+    intro: meta.intro || '',
+    prize: {
+      title: meta.prizeTitle || '',
+      description: meta.prizeDescription || '',
+      image: meta.prizeImageUrl || '',
+    },
+    deadline: meta.deadline || null,
+    closed: meta.closed === true || deadlinePassed,
+    successMessage: meta.successMessage || '',
+    matches: list,
+  }
+}
+
+// Submit a public prediction entry. picks = [{ matchId, scoreA, scoreB }].
+export const submitPrediction = (data) =>
+  request('/api/predictions', { method: 'POST', body: data })
+
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels, whatWeDoMeta, solutionsList] =
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
       await Promise.all([
         request('/api/settings'),
         request('/api/services'),
@@ -392,6 +435,8 @@ export async function loadSite() {
         request('/api/story-panels').catch(() => []),
         request('/api/what-we-do').catch(() => null),
         request('/api/solutions').catch(() => []),
+        request('/api/predictor').catch(() => null),
+        request('/api/predictor-matches').catch(() => []),
       ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -416,6 +461,7 @@ export async function loadSite() {
     content.popup = mapPopup(popup)
     content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
     content.story = mapStory(storyMeta, storyPanels)
+    content.predictor = mapPredictor(predictorMeta, predictorMatches)
     content.whatWeDo = mapWhatWeDo(whatWeDoMeta)
     // Solutions from the DB (visible only); fall back to the static defaults so
     // the What We Do page still has content if the table is empty / API is down.
@@ -489,6 +535,15 @@ export const adminApi = {
   createSolution: (data) => request('/api/solutions', { method: 'POST', body: data, authed: true }),
   updateSolution: (id, data) => request(`/api/solutions/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteSolution: (id) => request(`/api/solutions/${id}`, { method: 'DELETE', authed: true }),
+
+  getPredictor: () => request('/api/predictor'),
+  savePredictor: (data) => request('/api/predictor', { method: 'PUT', body: data, authed: true }),
+  listPredictorMatches: () => request('/api/predictor-matches'),
+  createPredictorMatch: (data) => request('/api/predictor-matches', { method: 'POST', body: data, authed: true }),
+  updatePredictorMatch: (id, data) => request(`/api/predictor-matches/${id}`, { method: 'PUT', body: data, authed: true }),
+  deletePredictorMatch: (id) => request(`/api/predictor-matches/${id}`, { method: 'DELETE', authed: true }),
+  listPredictions: () => request('/api/predictions', { authed: true }),
+  deletePrediction: (id) => request(`/api/predictions/${id}`, { method: 'DELETE', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

@@ -49,8 +49,21 @@ frontend stores in localStorage to show it once),
 mission, divisions JSONB, plus section headings) and `solutions` (the items listed on that page:
 slug/title/summary/icon/image/intro/outro + an `items` JSONB array of `{title, description}`,
 sort/visible — each renders a homepage "What We Do" card and a `/what-we-do/:slug` detail page),
+`predictor` (single row, id=1: the **World Cup 2026 score-prediction game** — enabled/title/subtitle/intro/
+success_message + prize (`prize_title`/`prize_description`/`prize_image_url`) + optional `deadline` and a
+`closed` flag), `predictor_matches` (admin-created matches: two teams each with a name + ISO country code
+`team_a_code`/`team_b_code` → flag from flagcdn.com, optional manual flag override, plus stage/kickoff/sort/visible)
+and `predictions` (public entries: full_name/mobile + a `picks` JSONB array of `{matchId, scoreA, scoreB}`),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
+
+The **World Cup predictor** game: when enabled in `/admin/predictor` with ≥1 visible match, an animated
+football appears in the **middle of the nav bar** ([components/predictor/FootballButton.jsx](src/components/predictor/FootballButton.jsx));
+tapping it opens a colorful multi-step modal ([components/predictor/PredictorModal.jsx](src/components/predictor/PredictorModal.jsx))
+where visitors predict exact scores, then submit their full name + mobile. Open-state is shared via
+[store/predictor.jsx](src/store/predictor.jsx) (provider in `Layout.jsx`). Flags render from flagcdn.com by
+ISO code via [lib/flags.js](src/lib/flags.js). Submissions (`POST /api/predictions`) are public but gated by
+the enabled/closed/deadline checks; the admin reads/deletes entries.
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
 Public can read content; everything else needs a Bearer token.
@@ -125,11 +138,14 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
+  lib/flags.js              # country list + flagcdn.com flag URLs (World Cup predictor)
+  store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
   components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
+  components/predictor/      # Football, FootballButton (nav), PredictorModal (World Cup game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -142,7 +158,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
 at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles

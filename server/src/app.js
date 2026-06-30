@@ -105,6 +105,21 @@ const solutionJson = (r) => ({
   items: Array.isArray(r.items) ? r.items : [],
   sort: r.sort, visible: r.visible,
 })
+const predictorJson = (r) => ({
+  enabled: r.enabled, title: r.title, subtitle: r.subtitle, intro: r.intro,
+  prizeTitle: r.prize_title, prizeDescription: r.prize_description, prizeImageUrl: r.prize_image_url,
+  deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
+})
+const predictorMatchJson = (r) => ({
+  id: r.id, stage: r.stage,
+  teamA: r.team_a, teamACode: r.team_a_code, teamAFlag: r.team_a_flag,
+  teamB: r.team_b, teamBCode: r.team_b_code, teamBFlag: r.team_b_flag,
+  kickoff: r.kickoff, sort: r.sort, visible: r.visible,
+})
+const predictionJson = (r) => ({
+  id: r.id, fullName: r.full_name, mobile: r.mobile,
+  picks: Array.isArray(r.picks) ? r.picks : [], createdAt: r.created_at,
+})
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
@@ -557,6 +572,108 @@ app.put('/api/solutions/:id', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/solutions/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM solutions WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Predictor (World Cup 2026 game) =========================
+// Public reads the config + matches; admin edits the singleton row, manages the
+// matches, and reads the submitted predictions.
+app.get('/api/predictor', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM predictor WHERE id = 1')
+  res.json(rows[0] ? predictorJson(rows[0]) : null)
+}))
+
+app.put('/api/predictor', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const { rows } = await query(
+    `UPDATE predictor SET
+       enabled=$1, title=$2, subtitle=$3, intro=$4,
+       prize_title=$5, prize_description=$6, prize_image_url=$7,
+       deadline=$8, closed=$9, success_message=$10, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [
+      Boolean(b.enabled), b.title || '', b.subtitle || '', b.intro || '',
+      b.prizeTitle || '', b.prizeDescription || '', b.prizeImageUrl || '',
+      b.deadline || null, Boolean(b.closed), b.successMessage || '',
+    ]
+  )
+  res.json(predictorJson(rows[0]))
+}))
+
+app.get('/api/predictor-matches', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM predictor_matches ORDER BY sort ASC, kickoff ASC, id ASC')
+  res.json(rows.map(predictorMatchJson))
+}))
+
+const matchParams = (b) => [
+  b.stage || '',
+  b.teamA || '', b.teamACode || '', b.teamAFlag || '',
+  b.teamB || '', b.teamBCode || '', b.teamBFlag || '',
+  b.kickoff || null, Number(b.sort) || 0,
+  b.visible === undefined ? true : Boolean(b.visible),
+]
+
+app.post('/api/predictor-matches', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `INSERT INTO predictor_matches (stage, team_a, team_a_code, team_a_flag, team_b, team_b_code, team_b_flag, kickoff, sort, visible)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    matchParams(req.body || {})
+  )
+  res.status(201).json(predictorMatchJson(rows[0]))
+}))
+
+app.put('/api/predictor-matches/:id', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    `UPDATE predictor_matches SET stage=$1, team_a=$2, team_a_code=$3, team_a_flag=$4,
+       team_b=$5, team_b_code=$6, team_b_flag=$7, kickoff=$8, sort=$9, visible=$10
+     WHERE id=$11 RETURNING *`,
+    [...matchParams(req.body || {}), req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  res.json(predictorMatchJson(rows[0]))
+}))
+
+app.delete('/api/predictor-matches/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM predictor_matches WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// Public submission. Sanitises the picks to {matchId, scoreA, scoreB} integers,
+// keeping only those that point at a real, currently-visible match.
+app.post('/api/predictions', ah(async (req, res) => {
+  const b = req.body || {}
+  const fullName = String(b.fullName || '').trim()
+  const mobile = String(b.mobile || '').trim()
+  if (!fullName || !mobile) return res.status(400).json({ error: 'Full name and mobile number are required' })
+
+  const cfg = (await query('SELECT enabled, closed, deadline FROM predictor WHERE id = 1')).rows[0]
+  if (!cfg || !cfg.enabled || cfg.closed) return res.status(403).json({ error: 'The game is not currently open' })
+  if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
+    return res.status(403).json({ error: 'The prediction deadline has passed' })
+
+  const validIds = new Set(
+    (await query('SELECT id FROM predictor_matches WHERE visible = true')).rows.map((r) => r.id)
+  )
+  const clampScore = (v) => Math.min(99, Math.max(0, Math.round(Number(v))))
+  const picks = (Array.isArray(b.picks) ? b.picks : [])
+    .map((p) => ({ matchId: Number(p?.matchId), scoreA: clampScore(p?.scoreA), scoreB: clampScore(p?.scoreB) }))
+    .filter((p) => validIds.has(p.matchId) && Number.isFinite(p.scoreA) && Number.isFinite(p.scoreB))
+  if (!picks.length) return res.status(400).json({ error: 'Please predict at least one match' })
+
+  const { rows } = await query(
+    'INSERT INTO predictions (full_name, mobile, picks) VALUES ($1,$2,$3) RETURNING *',
+    [fullName, mobile, JSON.stringify(picks)]
+  )
+  res.status(201).json(predictionJson(rows[0]))
+}))
+
+app.get('/api/predictions', requireAuth, ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM predictions ORDER BY created_at DESC, id DESC')
+  res.json(rows.map(predictionJson))
+}))
+
+app.delete('/api/predictions/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM predictions WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 
