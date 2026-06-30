@@ -36,12 +36,12 @@ export default function ProductDetail({ product }) {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Gallery */}
           <div>
-            <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[28px] bg-white ring-1 ring-as-ink/5">
+            <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[28px] bg-white ring-1 ring-as-ink/10">
               {gallery[active] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={gallery[active]} alt={product.name} className="h-full w-full object-contain p-4" />
+                <img src={gallery[active]} alt={product.name} className="h-full w-full object-contain p-6" />
               ) : (
-                <div className="aspect-square w-full" />
+                <div className="aspect-[4/3] w-full" />
               )}
             </div>
             {gallery.length > 1 && (
@@ -50,15 +50,13 @@ export default function ProductDetail({ product }) {
                   <button
                     key={i}
                     onClick={() => setActive(i)}
-                    className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 transition ${
-                      i === active
-                        ? 'ring-2 ring-as-red'
-                        : 'ring-as-ink/10 hover:ring-as-ink/25'
+                    className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 bg-as-fog transition ${
+                      i === active ? 'border-as-red' : 'border-transparent hover:border-as-ink/20'
                     }`}
                     aria-label={`View image ${i + 1}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="h-full w-full object-contain p-1.5" />
+                    <img src={src} alt="" className="h-full w-full object-contain p-2" />
                   </button>
                 ))}
               </div>

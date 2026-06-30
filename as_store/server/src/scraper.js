@@ -77,7 +77,10 @@ export function taglineFromDescription(description) {
   for (const raw of String(description || '').split('\n')) {
     const line = raw.trim()
     if (!line || line.startsWith('#') || line.startsWith('-') || line.startsWith('*')) continue
-    return line.replace(/[*_`]/g, '').slice(0, 90)
+    const clean = line.replace(/[*_`]/g, '').trim()
+    if (clean.length <= 120) return clean
+    // Cut on a word boundary so it never ends mid-word (e.g. "…and AI-").
+    return clean.slice(0, 120).replace(/\s+\S*$/, '').trim() + '…'
   }
   return ''
 }

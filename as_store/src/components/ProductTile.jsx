@@ -13,6 +13,16 @@ export default function ProductTile({ product, fluid = false }) {
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
 
+  // Card teaser: the description's first real paragraph (skip markdown headings /
+  // bullets), falling back to the tagline. Shown line-clamped so it ends cleanly
+  // at a line break instead of the hard 90-char mid-word cut the tagline has.
+  const teaser =
+    String(product.description || '')
+      .split(/\n{2,}/)
+      .map((b) => b.trim())
+      .find((b) => b && !b.startsWith('#') && !b.startsWith('-') && !b.startsWith('*'))
+      ?.replace(/[*_`]/g, '') || tagline || ''
+
   const add = () => {
     dispatch(addItem({ id, title: name, image, price: Number(price) || 0 }))
     dispatch(openCart())
@@ -22,15 +32,15 @@ export default function ProductTile({ product, fluid = false }) {
 
   return (
     <div
-      className={`flex ${sizing} h-[430px] flex-col items-center overflow-hidden rounded-[28px] bg-white p-5 text-center ring-1 ring-as-ink/5 transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(0,0,0,0.3)]`}
+      className={`flex ${sizing} h-[450px] flex-col items-center overflow-hidden rounded-[28px] bg-white p-5 text-center ring-1 ring-as-red/40 transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.25)] hover:ring-as-red`}
     >
       {/* Fixed-height text block so every card's image starts at the same place */}
-      <div className="flex h-[104px] flex-col">
+      <div className="flex h-[124px] flex-col">
         <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{brand || 'New'}</p>
         <Link href={href} className="mt-1.5">
           <h3 className="line-clamp-2 text-lg font-semibold leading-snug tracking-apple text-as-ink">{name}</h3>
         </Link>
-        {tagline && <p className="mt-1 line-clamp-1 text-sm text-as-ink/55">{tagline}</p>}
+        {teaser && <p className="mt-1 line-clamp-2 text-sm leading-snug text-as-ink/55">{teaser}</p>}
       </div>
 
       <Link href={href} className="mt-3 flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl">
