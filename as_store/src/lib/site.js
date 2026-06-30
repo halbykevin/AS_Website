@@ -10,6 +10,7 @@ export const defaultSettings = {
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},
   showcaseBg: '#000000',
+  navLogoSize: 20,
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],

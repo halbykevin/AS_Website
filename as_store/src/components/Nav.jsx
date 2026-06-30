@@ -51,6 +51,7 @@ function buildNavLinks(categories, settings) {
 export default function Nav({ settings, categories = [] }) {
   const links = buildNavLinks(categories, settings)
   const announcement = settings?.announcement
+  const logoSize = Number(settings?.navLogoSize) || 20
   const count = useSelector(selectCartCount)
   const dispatch = useDispatch()
   const account = useAccount()
@@ -67,10 +68,10 @@ export default function Nav({ settings, categories = [] }) {
       )}
 
       <div className="border-b border-white/10 bg-black/80 backdrop-blur-xl backdrop-saturate-150">
-        <nav className="shell-wide flex h-12 items-center justify-between">
+        <nav className="shell-wide flex min-h-[48px] items-center justify-between py-1">
           <Link href="/" className="flex items-center" aria-label="AS Store">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/as-store-logo.png" alt="AS Store" className="h-5 w-auto" />
+            <img src="/as-store-logo.png" alt="AS Store" style={{ height: `${logoSize}px` }} className="w-auto" />
           </Link>
 
           <ul className="hidden items-center gap-7 lg:flex">
@@ -123,9 +124,9 @@ export default function Nav({ settings, categories = [] }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="shell-wide flex h-12 items-center justify-between">
+            <div className="shell-wide flex min-h-[48px] items-center justify-between py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.png" alt="AS Store" className="h-5 w-auto" />
+              <img src="/as-store-logo.png" alt="AS Store" style={{ height: `${logoSize}px` }} className="w-auto" />
               <button onClick={() => setOpen(false)} className="text-white" aria-label="Close menu">
                 <Icon name="close" className="h-5 w-5" />
               </button>

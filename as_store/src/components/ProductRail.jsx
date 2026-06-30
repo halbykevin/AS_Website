@@ -60,7 +60,7 @@ export default function ProductRail({ section = {} }) {
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-[440px] w-[260px] shrink-0 animate-pulse rounded-[28px] bg-as-fog sm:w-[300px]"
+                  className="h-[430px] w-[280px] shrink-0 animate-pulse rounded-[28px] bg-as-fog sm:w-[300px]"
                 />
               ))
             : (data ?? []).map((p) => <ProductTile key={p.id} product={p} />)}

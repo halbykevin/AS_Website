@@ -87,6 +87,7 @@ const settingsJson = (r) => ({
   navLinks: Array.isArray(r.nav_links) ? r.nav_links : [],
   footerGroups: Array.isArray(r.footer_groups) ? r.footer_groups : [],
   showcaseBg: r.showcase_bg || '#000000',
+  navLogoSize: r.nav_logo_size ?? 20,
   updatedAt: r.updated_at,
 })
 
@@ -757,7 +758,8 @@ app.put(
          socials              = COALESCE($8::jsonb, socials),
          nav_links            = COALESCE($9::jsonb, nav_links),
          footer_groups        = COALESCE($10::jsonb, footer_groups),
-         showcase_bg          = COALESCE($11, showcase_bg)
+         showcase_bg          = COALESCE($11, showcase_bg),
+         nav_logo_size        = COALESCE($12, nav_logo_size)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -771,6 +773,7 @@ app.put(
         b.navLinks ? JSON.stringify(b.navLinks) : null,
         b.footerGroups ? JSON.stringify(b.footerGroups) : null,
         b.showcaseBg ?? null,
+        b.navLogoSize ?? null,
       ],
     )
     res.json(settingsJson(rows[0]))

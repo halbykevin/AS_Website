@@ -15,6 +15,7 @@ const EMPTY = {
   navLinks: [],
   footerGroups: [],
   showcaseBg: '#000000',
+  navLogoSize: 20,
 }
 
 export default function SettingsPage() {
@@ -73,6 +74,24 @@ export default function SettingsPage() {
         <h3 className="font-bold text-as-ink">General</h3>
         <Field label="Store name">
           <Input value={form.storeName} onChange={(e) => set('storeName', e.target.value)} />
+        </Field>
+        <Field label={`Nav bar logo size — ${form.navLogoSize}px`} hint="Height of the logo in the top navigation bar.">
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min={14}
+              max={56}
+              step={1}
+              value={form.navLogoSize}
+              onChange={(e) => set('navLogoSize', Number(e.target.value))}
+              className="h-2 flex-1 cursor-pointer accent-as-red"
+            />
+            {/* Live preview on the dark nav background */}
+            <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-lg bg-black px-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/as-store-logo.png" alt="" style={{ height: `${form.navLogoSize}px` }} className="w-auto" />
+            </div>
+          </div>
         </Field>
       </Card>
 

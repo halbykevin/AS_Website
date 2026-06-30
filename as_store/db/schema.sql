@@ -92,12 +92,15 @@ CREATE TABLE IF NOT EXISTS settings (
   nav_links            JSONB DEFAULT '[]'::jsonb,   -- [{label, href}]
   footer_groups        JSONB DEFAULT '[]'::jsonb,   -- [{title, links:[{label,href}]}]
   showcase_bg          TEXT DEFAULT '#000000',      -- homepage pinned-showcase section background
+  nav_logo_size        INTEGER DEFAULT 20,          -- nav bar logo height in px
   updated_at           TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
 
 -- Backfill the showcase background colour on databases created before it existed.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS showcase_bg TEXT DEFAULT '#000000';
+-- Backfill the nav logo size on databases created before it existed.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS nav_logo_size INTEGER DEFAULT 20;
 
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (

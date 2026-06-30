@@ -18,42 +18,45 @@ export default function ProductTile({ product, fluid = false }) {
     dispatch(openCart())
   }
 
-  const sizing = fluid ? 'w-full' : 'w-[260px] shrink-0 snap-start sm:w-[300px]'
+  const sizing = fluid ? 'w-full' : 'w-[280px] shrink-0 snap-start sm:w-[300px]'
 
   return (
-    <div className={`flex ${sizing} flex-col items-center rounded-[28px] bg-as-fog p-6 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(0,0,0,0.3)]`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{brand || 'New'}</p>
-      <Link href={href} className="mt-2">
-        <h3 className="text-xl font-semibold tracking-apple text-as-ink">{name}</h3>
-      </Link>
-      <p className="mt-1 text-sm text-as-ink/55">{tagline}</p>
+    <div
+      className={`flex ${sizing} h-[430px] flex-col items-center overflow-hidden rounded-[28px] bg-white p-5 text-center ring-1 ring-as-ink/5 transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(0,0,0,0.3)]`}
+    >
+      {/* Fixed-height text block so every card's image starts at the same place */}
+      <div className="flex h-[104px] flex-col">
+        <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{brand || 'New'}</p>
+        <Link href={href} className="mt-1.5">
+          <h3 className="line-clamp-2 text-lg font-semibold leading-snug tracking-apple text-as-ink">{name}</h3>
+        </Link>
+        {tagline && <p className="mt-1 line-clamp-1 text-sm text-as-ink/55">{tagline}</p>}
+      </div>
 
-      <Link href={href} className="mt-5 block w-full overflow-hidden rounded-2xl">
+      <Link href={href} className="mt-3 flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image}
           alt={name}
           loading="lazy"
-          className="aspect-square w-full object-cover transition-transform duration-500 ease-out hover:scale-[1.04]"
+          className="h-full w-full object-contain transition-transform duration-500 ease-out hover:scale-[1.04]"
         />
       </Link>
 
-      {colors.length > 0 && (
-        <div className="mt-4 flex items-center gap-1.5">
-          {colors.map((c, i) => (
-            <span
-              key={i}
-              className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
-              style={{ background: c }}
-            />
-          ))}
-        </div>
-      )}
-
-      <p className="mt-4 text-base font-medium text-as-ink">From ${(Number(price) || 0).toLocaleString()}</p>
-      <button onClick={add} className="pill mt-3 w-full">
-        Add to Bag
-      </button>
+      {/* Footer pinned to the bottom so prices/buttons align across cards */}
+      <div className="mt-auto flex w-full flex-col items-center pt-3">
+        {colors.length > 0 && (
+          <div className="mb-2 flex items-center gap-1.5">
+            {colors.map((c, i) => (
+              <span key={i} className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: c }} />
+            ))}
+          </div>
+        )}
+        <p className="text-base font-medium text-as-ink">From ${(Number(price) || 0).toLocaleString()}</p>
+        <button onClick={add} className="pill mt-3 w-full">
+          Add to Bag
+        </button>
+      </div>
     </div>
   )
 }

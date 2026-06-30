@@ -36,10 +36,10 @@ export default function ProductDetail({ product }) {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Gallery */}
           <div>
-            <div className="overflow-hidden rounded-[28px] bg-as-fog">
+            <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[28px] bg-white ring-1 ring-as-ink/5">
               {gallery[active] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={gallery[active]} alt={product.name} className="aspect-square w-full object-cover" />
+                <img src={gallery[active]} alt={product.name} className="h-full w-full object-contain p-4" />
               ) : (
                 <div className="aspect-square w-full" />
               )}
@@ -50,13 +50,15 @@ export default function ProductDetail({ product }) {
                   <button
                     key={i}
                     onClick={() => setActive(i)}
-                    className={`h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-2 transition ${
-                      i === active ? 'ring-as-red' : 'ring-transparent hover:ring-as-ink/15'
+                    className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 transition ${
+                      i === active
+                        ? 'ring-2 ring-as-red'
+                        : 'ring-as-ink/10 hover:ring-as-ink/25'
                     }`}
                     aria-label={`View image ${i + 1}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <img src={src} alt="" className="h-full w-full object-contain p-1.5" />
                   </button>
                 ))}
               </div>
