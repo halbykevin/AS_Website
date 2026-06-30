@@ -640,10 +640,17 @@ app.delete('/api/predictor-matches/:id', requireAuth, ah(async (req, res) => {
 
 // Public submission. Sanitises the picks to {matchId, scoreA, scoreB} integers,
 // keeping only those that point at a real, currently-visible match.
+// Normalise a phone number so the same number typed with/without spaces, dashes
+// or parentheses counts as one entry (keeps a leading + and the digits).
+const normalizeMobile = (s) => {
+  const cleaned = String(s || '').replace(/[^\d+]/g, '')
+  return cleaned.startsWith('+') ? '+' + cleaned.slice(1).replace(/\+/g, '') : cleaned.replace(/\+/g, '')
+}
+
 app.post('/api/predictions', ah(async (req, res) => {
   const b = req.body || {}
   const fullName = String(b.fullName || '').trim()
-  const mobile = String(b.mobile || '').trim()
+  const mobile = normalizeMobile(b.mobile)
   if (!fullName || !mobile) return res.status(400).json({ error: 'Full name and mobile number are required' })
 
   const cfg = (await query('SELECT enabled, closed, deadline FROM predictor WHERE id = 1')).rows[0]
@@ -660,11 +667,18 @@ app.post('/api/predictions', ah(async (req, res) => {
     .filter((p) => validIds.has(p.matchId) && Number.isFinite(p.scoreA) && Number.isFinite(p.scoreB))
   if (!picks.length) return res.status(400).json({ error: 'Please predict at least one match' })
 
-  const { rows } = await query(
-    'INSERT INTO predictions (full_name, mobile, picks) VALUES ($1,$2,$3) RETURNING *',
-    [fullName, mobile, JSON.stringify(picks)]
-  )
-  res.status(201).json(predictionJson(rows[0]))
+  try {
+    const { rows } = await query(
+      'INSERT INTO predictions (full_name, mobile, picks) VALUES ($1,$2,$3) RETURNING *',
+      [fullName, mobile, JSON.stringify(picks)]
+    )
+    res.status(201).json(predictionJson(rows[0]))
+  } catch (err) {
+    // Unique-violation on the mobile number → this phone already entered.
+    if (err?.code === '23505')
+      return res.status(409).json({ error: 'This mobile number has already submitted a prediction.' })
+    throw err
+  }
 }))
 
 app.get('/api/predictions', requireAuth, ah(async (req, res) => {

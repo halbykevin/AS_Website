@@ -238,6 +238,8 @@ CREATE TABLE IF NOT EXISTS predictions (
   picks JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+-- One entry per mobile number (stored normalised, see app.js).
+CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobile);
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';

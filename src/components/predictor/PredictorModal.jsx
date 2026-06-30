@@ -116,7 +116,7 @@ export default function PredictorModal() {
   const [step, setStep] = useState('play') // play | register | done
   const [scores, setScores] = useState({})
   const [fullName, setFullName] = useState('')
-  const [mobile, setMobile] = useState('')
+  const [mobile, setMobile] = useState('+961 ')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
