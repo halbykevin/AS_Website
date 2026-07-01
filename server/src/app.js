@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
+import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -660,9 +661,8 @@ app.post('/api/predictions', ah(async (req, res) => {
   if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
     return res.status(403).json({ error: 'The prediction deadline has passed' })
 
-  const validIds = new Set(
-    (await query('SELECT id FROM predictor_matches WHERE visible = true')).rows.map((r) => r.id)
-  )
+  const matchRows = (await query('SELECT id, team_a, team_b FROM predictor_matches WHERE visible = true')).rows
+  const validIds = new Set(matchRows.map((r) => r.id))
   const clampScore = (v) => Math.min(99, Math.max(0, Math.round(Number(v))))
   const picks = (Array.isArray(b.picks) ? b.picks : [])
     .map((p) => ({ matchId: Number(p?.matchId), scoreA: clampScore(p?.scoreA), scoreB: clampScore(p?.scoreB) }))
@@ -675,6 +675,21 @@ app.post('/api/predictions', ah(async (req, res) => {
       [fullName, mobile, JSON.stringify(picks)]
     )
     res.status(201).json(predictionJson(rows[0]))
+
+    // Fire-and-forget WhatsApp confirmation. Never blocks or fails the response;
+    // a no-op unless the Cloud API env vars are configured.
+    if (whatsappEnabled()) {
+      const byId = new Map(matchRows.map((m) => [m.id, m]))
+      const picksText = picks
+        .map((p) => {
+          const m = byId.get(p.matchId)
+          return `${m?.team_a || 'Team A'} ${p.scoreA}-${p.scoreB} ${m?.team_b || 'Team B'}`
+        })
+        .join(', ')
+      sendTemplate(mobile, [fullName, picksText]).catch((err) =>
+        console.error('[whatsapp] prediction confirmation failed:', err.message)
+      )
+    }
   } catch (err) {
     // Unique-violation on the mobile number → this phone already entered.
     if (err?.code === '23505')
