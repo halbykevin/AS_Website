@@ -9,6 +9,7 @@ import urllib.robotparser
 from urllib.parse import urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -29,7 +30,7 @@ class Fetcher:
         render: bool = False,
         delay: float = 1.0,
         timeout: int = 30,
-        retries: int = 3,
+        retries: int = 2,
         respect_robots: bool = True,
         headers: dict | None = None,
     ):
@@ -39,6 +40,12 @@ class Fetcher:
         self.retries = retries
         self.respect_robots = respect_robots
         self.session = requests.Session()
+        # The default urllib3 pool holds 10 connections per host — fewer than the
+        # scraper's worker cap, so extra workers would open/close a connection per
+        # request. Size the pool past the cap to keep every worker on keep-alive.
+        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=32)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
         self.session.headers.update(headers or DEFAULT_HEADERS)
         self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
         self._browser = None
@@ -83,8 +90,9 @@ class Fetcher:
             print(f"  [robots] disallowed: {url}")
             return None
         html = self._render(url) if self.render else self._http(url)
-        # Polite throttle with a little jitter.
-        time.sleep(self.delay + random.uniform(0, self.delay * 0.3))
+        # Polite throttle with a little jitter (delay 0 = full speed).
+        if self.delay > 0:
+            time.sleep(self.delay + random.uniform(0, self.delay * 0.3))
         return html
 
     def _http(self, url: str) -> str | None:

@@ -10,43 +10,32 @@ import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { money } from '@/lib/orders'
 
 export default function CheckoutPage() {
-  const { customer, loading, setCustomer } = useAccount()
+  const { customer, setCustomer } = useAccount()
   const router = useRouter()
   const items = useSelector(selectCartItems)
   const total = useSelector(selectCartTotal)
   const dispatch = useDispatch()
 
-  const [form, setForm] = useState({ fullName: '', phone: '', address: '', city: '', notes: '', saveAddress: true })
+  const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const seeded = useRef(false)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  // Require login.
-  useEffect(() => {
-    if (!loading && !customer) router.replace('/login?next=/checkout')
-  }, [loading, customer, router])
-
-  // Prefill from the saved profile once.
+  // No login required — the mobile number identifies (or creates) the account.
+  // Prefill from the saved profile once when a session exists.
   useEffect(() => {
     if (customer && !seeded.current) {
       seeded.current = true
       setForm((f) => ({
         ...f,
         fullName: customer.name || '',
-        phone: customer.phone || '',
+        phone: customer.phone || customer.mobile || '',
+        email: customer.email || '',
         address: customer.address || '',
       }))
     }
   }, [customer])
-
-  if (loading || !customer) {
-    return (
-      <section className="bg-white pt-28 sm:pt-32">
-        <div className="mx-auto max-w-2xl px-6 py-20 text-center text-as-ink/40">Loading…</div>
-      </section>
-    )
-  }
 
   if (items.length === 0) {
     return (
@@ -70,16 +59,18 @@ export default function CheckoutPage() {
         items: items.map((i) => ({ productId: i.id, qty: i.qty })),
         fullName: form.fullName,
         phone: form.phone,
+        email: form.email,
         address: form.address,
         city: form.city,
         notes: form.notes,
         saveAddress: form.saveAddress,
       })
       if (form.saveAddress) {
-        setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, address: form.address } : c))
+        setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
       }
       dispatch(clearCart())
-      router.push(`/account/orders/${order.id}?placed=1`)
+      // The track token lets the confirmation page load without a session.
+      router.push(`/account/orders/${order.id}?placed=1&t=${encodeURIComponent(order.trackToken || '')}`)
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -101,23 +92,33 @@ export default function CheckoutPage() {
                 <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className={inputCls} required />
               </Field>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Phone">
-                  <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputCls} required placeholder="+961 …" />
+                <Field label="Mobile number">
+                  <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputCls} required placeholder="70 123 456" autoComplete="tel" />
                 </Field>
+                <Field label="Email (optional)" hint="For your order confirmation.">
+                  <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className={inputCls} autoComplete="email" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="City / area">
                   <input value={form.city} onChange={(e) => set('city', e.target.value)} className={inputCls} />
                 </Field>
+                <Field label="Address">
+                  <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputCls} required placeholder="Street, building, floor…" />
+                </Field>
               </div>
-              <Field label="Address">
-                <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputCls} required placeholder="Street, building, floor…" />
-              </Field>
               <Field label="Notes (optional)">
                 <input value={form.notes} onChange={(e) => set('notes', e.target.value)} className={inputCls} placeholder="Delivery instructions…" />
               </Field>
               <label className="flex items-center gap-2 text-sm text-as-ink/70">
                 <input type="checkbox" checked={form.saveAddress} onChange={(e) => set('saveAddress', e.target.checked)} className="h-4 w-4 accent-as-red" />
-                Save these details to my account
+                Save these details for next time
               </label>
+              {!customer && (
+                <p className="text-xs text-as-ink/45">
+                  Your order is saved under your mobile number — sign in with it anytime to track your orders.
+                </p>
+              )}
             </div>
 
             <div className="mt-6 rounded-xl bg-as-fog p-4">

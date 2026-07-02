@@ -32,7 +32,7 @@ export default function AccountPage() {
             <h1 className="text-3xl font-semibold tracking-apple text-as-ink sm:text-4xl">
               {customer.name ? `Hi, ${customer.name.split(' ')[0]}` : 'Your account'}
             </h1>
-            <p className="mt-1 text-as-ink/55">{customer.email}</p>
+            <p className="mt-1 text-as-ink/55">{customer.mobile ? `+${customer.mobile}` : customer.email}</p>
           </div>
           <button
             onClick={() => {
@@ -97,8 +97,8 @@ function ProfileForm({ customer, onSaved }) {
   const [form, setForm] = useState({
     name: customer.name || '',
     phone: customer.phone || '',
+    email: customer.email || '',
     address: customer.address || '',
-    password: '',
   })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
@@ -111,11 +111,13 @@ function ProfileForm({ customer, onSaved }) {
     setMsg('')
     setError('')
     try {
-      const payload = { name: form.name, phone: form.phone, address: form.address }
-      if (form.password) payload.password = form.password
-      const updated = await accountApi.update(payload)
+      const updated = await accountApi.update({
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+      })
       onSaved(updated)
-      setForm((f) => ({ ...f, password: '' }))
       setMsg('Saved')
     } catch (err) {
       setError(err.message)
@@ -136,12 +138,12 @@ function ProfileForm({ customer, onSaved }) {
           <Field label="Phone">
             <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputCls} placeholder="+961 …" />
           </Field>
-          <Field label="Address">
-            <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputCls} />
+          <Field label="Email (optional)" hint="For your order confirmations.">
+            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className={inputCls} autoComplete="email" />
           </Field>
         </div>
-        <Field label="New password" hint="Leave blank to keep your current password.">
-          <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className={inputCls} autoComplete="new-password" />
+        <Field label="Address">
+          <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputCls} />
         </Field>
         <div className="flex items-center gap-3">
           <button type="submit" disabled={busy} className="pill px-8">

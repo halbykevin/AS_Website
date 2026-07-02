@@ -13,7 +13,7 @@ export default function OrdersAdmin() {
   const [status, setStatus] = useState('')
   const [viewId, setViewId] = useState(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'orders', status],
     queryFn: () => adminApi.listOrders(status || undefined),
   })
@@ -48,6 +48,11 @@ export default function OrdersAdmin() {
       <Card className="overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
+        ) : error ? (
+          <div className="py-16 text-center text-sm">
+            <p className="font-medium text-red-600">Couldn’t load orders — {error.message}</p>
+            <a href="/admin/login" className="mt-2 inline-block text-as-red underline">Sign in again</a>
+          </div>
         ) : (data ?? []).length === 0 ? (
           <p className="py-16 text-center text-sm text-as-ink/50">No orders here yet.</p>
         ) : (

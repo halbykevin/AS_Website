@@ -70,6 +70,28 @@ export function decodeEntities(str) {
   return s
 }
 
+// Shops often append their own name to product titles (e.g. "MSI Katana …
+// Black Pacmax.me"). Strip a trailing occurrence of the source URL's hostname,
+// or of its bare label when a real separator precedes it.
+export function stripSiteSuffix(name, sourceUrl) {
+  if (!name) return name
+  let host = ''
+  try {
+    host = new URL(String(sourceUrl)).hostname.replace(/^www\./i, '').toLowerCase()
+  } catch {
+    /* no usable URL — nothing to strip */
+  }
+  if (!host) return name
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  let out = String(name).replace(new RegExp(`[\\s\\-–—|,:]*${esc(host)}\\s*$`, 'i'), '')
+  const label = host.split('.')[0]
+  if (label.length >= 3) {
+    out = out.replace(new RegExp(`\\s*[\\-–—|,:]+\\s*${esc(label)}\\s*$`, 'i'), '')
+  }
+  out = out.replace(/[\s,\-–—|:]+$/, '').trim()
+  return out || name
+}
+
 // Derive a short tagline from a (now markdown) description: the first real
 // paragraph, skipping ## headings and - bullet lines and stripping any leftover
 // markdown markers.
@@ -107,7 +129,7 @@ function buildArgs(opts, outDir) {
 
   const limit = Math.floor(num(opts.limit, 0))
   if (limit > 0) args.push('--limit', String(limit))
-  args.push('--workers', String(Math.min(16, Math.max(1, Math.floor(num(opts.workers, 6))))))
+  args.push('--workers', String(Math.min(16, Math.max(1, Math.floor(num(opts.workers, 10))))))
   args.push('--delay', String(Math.max(0, num(opts.delay, 0.2))))
 
   return args
@@ -134,7 +156,7 @@ export async function ingestProducts(products) {
   let skipped = 0
 
   for (const p of Array.isArray(products) ? products : []) {
-    const name = decodeEntities(p?.name || '').trim()
+    const name = stripSiteSuffix(decodeEntities(p?.name || '').trim(), p?.url)
     const price = num(p?.price, 0) || 0
     if (!name && !price) {
       skipped++
@@ -284,7 +306,12 @@ scraperRouter.post('/api/scrape', (req, res) => {
 
   let proc
   try {
-    proc = spawn(PYTHON_BIN, args, { cwd: SCRAPER_DIR })
+    // PYTHONUNBUFFERED: piped stdout is block-buffered by default, which makes
+    // the run log arrive in rare big chunks instead of streaming line by line.
+    proc = spawn(PYTHON_BIN, args, {
+      cwd: SCRAPER_DIR,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    })
   } catch (e) {
     job.status = 'error'
     job.error = `Failed to launch Python: ${e.message}`

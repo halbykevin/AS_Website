@@ -13,7 +13,7 @@ export function Field({ label, children, hint }) {
   )
 }
 
-// Centered card layout for sign in / register.
+// Centered card layout for the sign-in flow.
 export function AuthShell({ title, subtitle, children, footer }) {
   return (
     <section className="bg-white pb-24 pt-28 sm:pt-32">

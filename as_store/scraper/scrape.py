@@ -95,6 +95,7 @@ def collect_urls(args, fetcher, link_pattern, selectors=None) -> list[str]:
             max_pages=args.max_pages,
             link_pattern=link_pattern,
             limit=args.limit,
+            workers=args.workers,
         )
     # --auto: probe the page and decide between single-product and crawl.
     url = args.auto

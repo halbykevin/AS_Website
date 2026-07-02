@@ -82,11 +82,13 @@ def resolve_site_urls(
     log: Log = print,
     link_pattern: str | None = None,
     limit: int = 0,
+    workers: int = 1,
 ) -> list[str]:
     """Given a site's domain, discover every product URL across the whole catalog.
 
     Strategy: sitemap → known product-archive paths (crawled with pagination) →
     fall back to crawling the homepage. `limit` > 0 stops collection early.
+    With workers > 1, category pages are crawled in parallel.
     """
     origin = _origin(domain)
     log(f"Scanning whole site: {origin}")
@@ -105,18 +107,36 @@ def resolve_site_urls(
             log(f"  found {len(cat_urls)} category page(s); crawling each")
             all_urls: list[str] = []
             seen: set[str] = set()
-            for cat in cat_urls:
-                remaining = (limit - len(all_urls)) if limit else 0
-                for u in collect_product_urls(
+
+            def crawl_cat(cat: str) -> list[str]:
+                return collect_product_urls(
                     fetcher, cat, follow_pagination=follow_pagination,
                     max_pages=max_pages, log=log, link_pattern=link_pattern,
-                    limit=remaining,
-                ):
-                    if u not in seen:
-                        seen.add(u)
-                        all_urls.append(u)
-                if limit and len(all_urls) >= limit:
-                    break
+                )
+
+            if workers > 1 and not fetcher.render and not limit:
+                # Pagination within one category is inherently sequential (page N
+                # links page N+1), but separate categories are independent.
+                with ThreadPoolExecutor(max_workers=min(workers, len(cat_urls))) as pool:
+                    per_cat = pool.map(crawl_cat, cat_urls)
+                for lst in per_cat:
+                    for u in lst:
+                        if u not in seen:
+                            seen.add(u)
+                            all_urls.append(u)
+            else:
+                for cat in cat_urls:
+                    remaining = (limit - len(all_urls)) if limit else 0
+                    for u in collect_product_urls(
+                        fetcher, cat, follow_pagination=follow_pagination,
+                        max_pages=max_pages, log=log, link_pattern=link_pattern,
+                        limit=remaining,
+                    ):
+                        if u not in seen:
+                            seen.add(u)
+                            all_urls.append(u)
+                    if limit and len(all_urls) >= limit:
+                        break
             log(f"  total unique products across categories: {len(all_urls)}")
             if all_urls:
                 return all_urls[:limit] if limit else all_urls

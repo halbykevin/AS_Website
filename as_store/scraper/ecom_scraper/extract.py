@@ -64,7 +64,27 @@ def parse(html: str, url: str, selectors: dict | None = None) -> Product:
     # with no real photo should end up with no image, not the shop's logo.
     product.images = _filter_product_images(soup, url, product.images)
 
+    product.name = _strip_site_name(product.name, url)
+
     return product
+
+
+def _strip_site_name(name: str, url: str) -> str:
+    """Shops often append their own name to product titles / og:title
+    (e.g. "MSI Katana ... Black Pacmax.me"). Drop a trailing occurrence of the
+    page's hostname, or of its bare label when a real separator precedes it."""
+    if not name:
+        return name
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if not host:
+        return name
+    cleaned = re.sub(rf"[\s\-–—|,:]*{re.escape(host)}\s*$", "", name, flags=re.IGNORECASE)
+    label = host.split(".")[0]
+    if len(label) >= 3:
+        cleaned = re.sub(
+            rf"\s*[\-–—|,:]+\s*{re.escape(label)}\s*$", "", cleaned, flags=re.IGNORECASE
+        )
+    return cleaned.strip(" \t,-–—|:") or name
 
 
 # --------------------------------------------------------------------------

@@ -7,7 +7,8 @@ import { useProducts } from '@/lib/queries'
 
 // Horizontal product rail (Apple Store "The latest." carousel), CMS-driven:
 // heading/subheading, which category to pull, an optional limit and background.
-// Data comes from React Query; arrows smooth-scroll the snap track.
+// Data comes from React Query; arrows smooth-scroll the snap track, and the
+// track itself can be swiped — touch natively, mouse via drag-to-scroll.
 export default function ProductRail({ section = {} }) {
   const { heading, subheading, bg } = section
   const category = section.settings?.category || 'All'
@@ -17,10 +18,48 @@ export default function ProductRail({ section = {} }) {
 
   const { data, isLoading } = useProducts(category, limit)
   const railRef = useRef(null)
+  // Mouse drag-to-scroll state (touch uses native overflow scrolling).
+  const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: 0 })
 
   const scrollBy = (dir) => {
     const el = railRef.current
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  const onPointerDown = (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    const el = railRef.current
+    drag.current = { down: true, startX: e.clientX, startScroll: el.scrollLeft, moved: 0 }
+    // Snapping fights manual scrollLeft updates while dragging.
+    el.style.scrollSnapType = 'none'
+  }
+
+  const onPointerMove = (e) => {
+    const d = drag.current
+    if (!d.down) return
+    const dx = e.clientX - d.startX
+    d.moved = Math.max(d.moved, Math.abs(dx))
+    // Once it's clearly a drag, capture the pointer so it survives leaving the
+    // rail. (Not on pointerdown — that would retarget normal button clicks.)
+    if (d.moved > 6 && !railRef.current.hasPointerCapture(e.pointerId)) {
+      railRef.current.setPointerCapture(e.pointerId)
+    }
+    railRef.current.scrollLeft = d.startScroll - dx
+  }
+
+  const endDrag = () => {
+    if (!drag.current.down) return
+    drag.current.down = false
+    railRef.current.style.scrollSnapType = ''
+  }
+
+  // After a real drag, swallow the click so cards/buttons underneath don't fire.
+  const onClickCapture = (e) => {
+    if (drag.current.moved > 6) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    drag.current.moved = 0
   }
 
   return (
@@ -55,7 +94,15 @@ export default function ProductRail({ section = {} }) {
           </div>
         </div>
 
-        <div ref={railRef} className="no-scrollbar flex snap-x gap-5 overflow-x-auto pb-3">
+        <div
+          ref={railRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerLeave={endDrag}
+          onClickCapture={onClickCapture}
+          className="no-scrollbar flex cursor-grab snap-x gap-5 overflow-x-auto px-0.5 py-1 pb-3 active:cursor-grabbing"
+        >
           {isLoading
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div

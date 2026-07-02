@@ -25,7 +25,7 @@ export default function ImportPage() {
     url: '',
     mode: 'auto',
     limit: 20,
-    workers: 6,
+    workers: 10,
     ignoreRobots: false,
     render: false,
     allPages: false,

@@ -5,14 +5,16 @@ import Link from 'next/link'
 import { useDispatch } from 'react-redux'
 import Icon from './Icon.jsx'
 import ProductTabs from './ProductTabs.jsx'
-import { addItem } from '@/store/cartSlice'
+import MaxQtyNote from './MaxQtyNote.jsx'
+import ImageLightbox from './ImageLightbox.jsx'
+import { addItem, MAX_QTY } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
 // Product detail: image gallery, name/brand/price (with sale), colour swatches,
 // quantity stepper, Add to Bag (opens the cart drawer), and description.
-export default function ProductDetail({ product }) {
+export default function ProductDetail({ product, whatsapp }) {
   const dispatch = useDispatch()
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : []
   const colors = Array.isArray(product.colors) ? product.colors : []
@@ -20,6 +22,16 @@ export default function ProductDetail({ product }) {
   const [active, setActive] = useState(0)
   const [color, setColor] = useState(0)
   const [qty, setQty] = useState(1)
+  const [maxHit, setMaxHit] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
+
+  const inc = () => {
+    if (qty >= MAX_QTY) {
+      setMaxHit(true)
+      return
+    }
+    setQty((q) => q + 1)
+  }
 
   const price = Number(product.price) || 0
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
@@ -36,14 +48,26 @@ export default function ProductDetail({ product }) {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Gallery */}
           <div>
-            <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[28px] bg-white ring-1 ring-as-ink/10">
+            <button
+              type="button"
+              onClick={() => gallery[active] && setViewerOpen(true)}
+              className="flex aspect-[4/3] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-[28px] bg-white ring-1 ring-as-ink/10"
+              aria-label="View photos fullscreen"
+            >
               {gallery[active] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={gallery[active]} alt={product.name} className="h-full w-full object-contain p-6" />
               ) : (
                 <div className="aspect-[4/3] w-full" />
               )}
-            </div>
+            </button>
+            <ImageLightbox
+              open={viewerOpen}
+              images={gallery}
+              initialIndex={active}
+              alt={product.name}
+              onClose={() => setViewerOpen(false)}
+            />
             {gallery.length > 1 && (
               <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
                 {gallery.map((src, i) => (
@@ -107,7 +131,10 @@ export default function ProductDetail({ product }) {
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <div className="flex items-center rounded-full border border-as-ink/15">
                 <button
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  onClick={() => {
+                    setQty((q) => Math.max(1, q - 1))
+                    setMaxHit(false)
+                  }}
                   className="flex h-11 w-11 items-center justify-center text-as-ink/60 hover:text-as-ink disabled:opacity-30"
                   disabled={qty <= 1}
                   aria-label="Decrease quantity"
@@ -116,8 +143,10 @@ export default function ProductDetail({ product }) {
                 </button>
                 <span className="w-8 text-center font-medium text-as-ink">{qty}</span>
                 <button
-                  onClick={() => setQty((q) => q + 1)}
-                  className="flex h-11 w-11 items-center justify-center text-as-ink/60 hover:text-as-ink"
+                  onClick={inc}
+                  className={`flex h-11 w-11 items-center justify-center hover:text-as-ink ${
+                    qty >= MAX_QTY ? 'text-as-ink/25' : 'text-as-ink/60'
+                  }`}
                   aria-label="Increase quantity"
                 >
                   <Icon name="plus" className="h-4 w-4" />
@@ -127,6 +156,8 @@ export default function ProductDetail({ product }) {
                 Add to Bag
               </button>
             </div>
+
+            {maxHit && <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />}
 
             {product.categorySlug && (
               <p className="mt-5 text-sm text-as-ink/50">

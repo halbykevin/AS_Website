@@ -13,25 +13,43 @@ export default function OrderPage({ params }) {
   const id = params.id
   const { customer, loading } = useAccount()
   const router = useRouter()
-  const placed = useSearchParams().get('placed') === '1'
+  const search = useSearchParams()
+  const placed = search.get('placed') === '1'
+  // Track token from a guest checkout — grants read access to this one order
+  // without a signed-in session.
+  const trackToken = search.get('t') || ''
 
   const [order, setOrder] = useState(null)
   const [state, setState] = useState('loading') // loading | ready | error
 
   useEffect(() => {
     if (loading) return
-    if (!customer) {
+    if (!customer && !trackToken) {
       router.replace(`/login?next=/account/orders/${id}`)
       return
     }
-    accountApi
-      .getOrder(id)
+    const load = customer ? accountApi.getOrder(id) : accountApi.trackOrder(id, trackToken)
+    load
       .then((o) => {
         setOrder(o)
         setState('ready')
       })
-      .catch(() => setState('error'))
-  }, [loading, customer, id, router])
+      .catch(() => {
+        // A signed-in session that doesn't own the order can still view it via
+        // a valid track token (e.g. ordered for someone else while logged out).
+        if (customer && trackToken) {
+          accountApi
+            .trackOrder(id, trackToken)
+            .then((o) => {
+              setOrder(o)
+              setState('ready')
+            })
+            .catch(() => setState('error'))
+        } else {
+          setState('error')
+        }
+      })
+  }, [loading, customer, id, trackToken, router])
 
   if (state === 'loading' || loading) {
     return (

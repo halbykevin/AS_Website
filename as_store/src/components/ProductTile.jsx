@@ -32,7 +32,7 @@ export default function ProductTile({ product, fluid = false }) {
 
   return (
     <div
-      className={`flex ${sizing} h-[450px] flex-col items-center overflow-hidden rounded-[28px] bg-white p-5 text-center ring-1 ring-as-red/40 transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.25)] hover:ring-as-red`}
+      className={`flex ${sizing} h-[450px] flex-col items-center overflow-hidden rounded-[28px] border border-as-red bg-white p-5 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.35)]`}
     >
       {/* Fixed-height text block so every card's image starts at the same place */}
       <div className="flex h-[124px] flex-col">

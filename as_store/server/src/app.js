@@ -6,7 +6,24 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth, optionalAuth } from './auth.js'
-import { hashPassword, verifyPassword, signCustomerToken, requireCustomer } from './customerAuth.js'
+import {
+  normalizeMobile,
+  signCustomerToken,
+  signOrderToken,
+  verifyOrderToken,
+  requireCustomer,
+  optionalCustomer,
+} from './customerAuth.js'
+import {
+  generateOtp,
+  hashOtp,
+  sendOtp,
+  otpDevEcho,
+  OTP_TTL_MINUTES,
+  OTP_MAX_ATTEMPTS,
+  OTP_REQUEST_CAP,
+} from './otp.js'
+import { sendOrderEmails } from './mailer.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -104,7 +121,8 @@ const pageJson = (r) => ({
 const customerJson = (r) => ({
   id: r.id,
   name: r.name || '',
-  email: r.email,
+  mobile: r.mobile || '',
+  email: r.email || '',
   phone: r.phone || '',
   address: r.address || '',
   createdAt: r.created_at,
@@ -126,6 +144,7 @@ const orderJson = (r) => ({
   status: r.status,
   fullName: r.full_name || '',
   phone: r.phone || '',
+  email: r.email || '',
   address: r.address || '',
   city: r.city || '',
   notes: r.notes || '',
@@ -229,35 +248,70 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/me', requireAuth, (req, res) => res.json({ email: req.admin.email }))
 
 // ========================= Customer accounts =========================
+// No registration: an account is created automatically the first time a mobile
+// number places an order (or verifies an OTP). Login is mobile + OTP.
+
+async function findOrCreateCustomerByMobile(mobile, seed = {}) {
+  const { rows } = await query(`SELECT * FROM customers WHERE mobile = $1`, [mobile])
+  if (rows[0]) return { customer: rows[0], created: false }
+  const { rows: made } = await query(
+    `INSERT INTO customers (name, mobile, email, phone, address)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [(seed.name || '').trim(), mobile, seed.email || null, seed.phone || mobile, seed.address || ''],
+  )
+  return { customer: made[0], created: true }
+}
+
 app.post(
-  '/api/account/register',
+  '/api/account/otp/request',
   ah(async (req, res) => {
-    const b = req.body || {}
-    const email = (b.email || '').trim().toLowerCase()
-    const password = b.password || ''
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
-    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
-    const dupe = await query(`SELECT 1 FROM customers WHERE email = $1`, [email])
-    if (dupe.rows[0]) return res.status(409).json({ error: 'An account with this email already exists' })
-    const { rows } = await query(
-      `INSERT INTO customers (name, email, password_hash, phone, address)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [(b.name || '').trim(), email, hashPassword(password), b.phone || '', b.address || ''],
+    const mobile = normalizeMobile(req.body?.mobile)
+    if (!mobile) return res.status(400).json({ error: 'Enter a valid mobile number' })
+
+    const { rows: recent } = await query(
+      `SELECT count(*)::int AS n FROM otp_codes
+       WHERE mobile = $1 AND created_at > now() - interval '15 minutes'`,
+      [mobile],
     )
-    res.status(201).json({ token: signCustomerToken(rows[0]), customer: customerJson(rows[0]) })
+    if (recent[0].n >= OTP_REQUEST_CAP) {
+      return res.status(429).json({ error: 'Too many codes requested — try again in a few minutes' })
+    }
+
+    const code = generateOtp()
+    await query(
+      `INSERT INTO otp_codes (mobile, code_hash, expires_at)
+       VALUES ($1,$2, now() + make_interval(mins => $3))`,
+      [mobile, hashOtp(mobile, code), OTP_TTL_MINUTES],
+    )
+    await sendOtp(mobile, code)
+    res.json({ ok: true, mobile, ...(otpDevEcho() ? { devCode: code } : {}) })
   }),
 )
 
 app.post(
-  '/api/account/login',
+  '/api/account/otp/verify',
   ah(async (req, res) => {
-    const email = (req.body?.email || '').trim().toLowerCase()
-    const password = req.body?.password || ''
-    const { rows } = await query(`SELECT * FROM customers WHERE email = $1`, [email])
-    const customer = rows[0]
-    if (!customer || !verifyPassword(password, customer.password_hash)) {
-      return res.status(401).json({ error: 'Invalid email or password' })
+    const mobile = normalizeMobile(req.body?.mobile)
+    const code = String(req.body?.code || '').trim()
+    if (!mobile || !code) return res.status(400).json({ error: 'Mobile and code are required' })
+
+    const { rows } = await query(
+      `SELECT * FROM otp_codes
+       WHERE mobile = $1 AND consumed = false AND expires_at > now()
+       ORDER BY id DESC LIMIT 1`,
+      [mobile],
+    )
+    const otp = rows[0]
+    if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(400).json({ error: 'Code expired — request a new one' })
     }
+    if (otp.code_hash !== hashOtp(mobile, code)) {
+      await query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otp.id])
+      return res.status(400).json({ error: 'Incorrect code' })
+    }
+    await query(`UPDATE otp_codes SET consumed = true WHERE id = $1`, [otp.id])
+
+    const { customer } = await findOrCreateCustomerByMobile(mobile)
     res.json({ token: signCustomerToken(customer), customer: customerJson(customer) })
   }),
 )
@@ -277,18 +331,12 @@ app.put(
   requireCustomer,
   ah(async (req, res) => {
     const b = req.body || {}
-    const params = [req.customerId, b.name ?? null, b.phone ?? null, b.address ?? null]
-    let passSet = ''
-    if (b.password) {
-      if (b.password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
-      params.push(hashPassword(b.password))
-      passSet = `, password_hash = $${params.length}`
-    }
     const { rows } = await query(
       `UPDATE customers SET
-         name = COALESCE($2, name), phone = COALESCE($3, phone), address = COALESCE($4, address)${passSet}
+         name = COALESCE($2, name), phone = COALESCE($3, phone),
+         address = COALESCE($4, address), email = COALESCE($5, email)
        WHERE id = $1 RETURNING *`,
-      params,
+      [req.customerId, b.name ?? null, b.phone ?? null, b.address ?? null, b.email ?? null],
     )
     if (!rows[0]) return res.status(404).json({ error: 'Not found' })
     res.json(customerJson(rows[0]))
@@ -296,23 +344,46 @@ app.put(
 )
 
 // ========================= Orders =========================
+// Store policy: at most 2 of any product per order (mirrors MAX_QTY in the
+// storefront cart) — larger quantities go through WhatsApp.
+const MAX_ITEM_QTY = 2
+
 // Place an order (cash on delivery). Prices/names are taken from the DB, never
-// trusted from the client. Optionally saves the delivery address to the profile.
+// trusted from the client. Works logged-out: the mobile number finds or creates
+// the customer account. Optionally saves the delivery details to the profile.
 app.post(
   '/api/orders',
-  requireCustomer,
+  optionalCustomer,
   ah(async (req, res) => {
     const b = req.body || {}
     const cleaned = (Array.isArray(b.items) ? b.items : [])
-      .map((i) => ({ productId: Number(i.productId), qty: Math.max(1, Math.floor(Number(i.qty) || 1)) }))
+      .map((i) => ({
+        productId: Number(i.productId),
+        qty: Math.min(MAX_ITEM_QTY, Math.max(1, Math.floor(Number(i.qty) || 1))),
+      }))
       .filter((i) => i.productId)
     if (!cleaned.length) return res.status(400).json({ error: 'Your bag is empty' })
 
     const fullName = (b.fullName || '').trim()
     const phone = (b.phone || '').trim()
     const address = (b.address || '').trim()
+    const email = (b.email || '').trim()
     if (!fullName || !phone || !address) {
-      return res.status(400).json({ error: 'Name, phone and address are required' })
+      return res.status(400).json({ error: 'Name, mobile number and address are required' })
+    }
+
+    // Resolve the account: a signed-in customer, else find-or-create by mobile.
+    let customerId = req.customerId
+    if (!customerId) {
+      const mobile = normalizeMobile(phone)
+      if (!mobile) return res.status(400).json({ error: 'Enter a valid mobile number' })
+      const { customer } = await findOrCreateCustomerByMobile(mobile, {
+        name: fullName,
+        email,
+        phone,
+        address,
+      })
+      customerId = customer.id
     }
 
     const ids = cleaned.map((i) => i.productId)
@@ -335,9 +406,9 @@ app.post(
     if (!items.length) return res.status(400).json({ error: 'None of those items are available' })
 
     const { rows } = await query(
-      `INSERT INTO orders (customer_id, status, full_name, phone, address, city, notes, subtotal, payment_method)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,'cod') RETURNING id`,
-      [req.customerId, fullName, phone, address, b.city || '', b.notes || '', subtotal],
+      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, payment_method)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,'cod') RETURNING id`,
+      [customerId, fullName, phone, email, address, b.city || '', b.notes || '', subtotal],
     )
     const orderId = rows[0].id
     for (const it of items) {
@@ -349,11 +420,33 @@ app.post(
     }
     if (b.saveAddress) {
       await query(
-        `UPDATE customers SET name = COALESCE(NULLIF($2,''), name), phone = $3, address = $4 WHERE id = $1`,
-        [req.customerId, fullName, phone, address],
+        `UPDATE customers SET name = COALESCE(NULLIF($2,''), name), phone = $3, address = $4,
+           email = COALESCE(NULLIF($5,''), email)
+         WHERE id = $1`,
+        [customerId, fullName, phone, address, email],
       )
     }
-    res.status(201).json(await loadOrderDetail(orderId))
+    // The track token lets the confirmation page show this order without a
+    // signed-in session (guest checkout).
+    const detail = await loadOrderDetail(orderId)
+    const trackToken = signOrderToken(orderId)
+    // Fire-and-forget: confirmation to the customer + copy to the shop inbox.
+    sendOrderEmails(detail, trackToken).catch((e) => console.error('[mail]', e?.message || e))
+    res.status(201).json({ ...detail, trackToken })
+  }),
+)
+
+// Public single-order view, authorized by the order's track token.
+app.get(
+  '/api/orders/track/:id',
+  ah(async (req, res) => {
+    const allowedId = verifyOrderToken(req.query.token)
+    if (!allowedId || String(allowedId) !== String(req.params.id)) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    const order = await loadOrderDetail(req.params.id)
+    if (!order) return res.status(404).json({ error: 'Not found' })
+    res.json(order)
   }),
 )
 

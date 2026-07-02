@@ -14,7 +14,7 @@ export default async function StoreLayout({ children }) {
       <Nav settings={settings} categories={categories} />
       <main className="flex-1">{children}</main>
       <Footer settings={settings} />
-      <CartDrawer />
+      <CartDrawer whatsapp={settings?.contact?.whatsapp} />
     </div>
   )
 }

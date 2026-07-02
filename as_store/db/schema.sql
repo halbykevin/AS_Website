@@ -182,21 +182,48 @@ CREATE TRIGGER trg_homepage_sections_updated
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- --- Customers (storefront accounts; separate from the single admin) --------
+-- Identity is the unique mobile number (created on first order, OTP login).
+-- email is optional (order confirmations); password_hash is a legacy leftover
+-- from the removed email/password registration.
 CREATE TABLE IF NOT EXISTS customers (
   id            SERIAL PRIMARY KEY,
   name          TEXT DEFAULT '',
-  email         TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,             -- scrypt$salt$hash
+  mobile        TEXT,                      -- normalized digits, e.g. 96170123456
+  email         TEXT,
+  password_hash TEXT,                      -- legacy; unused
   phone         TEXT DEFAULT '',
   address       TEXT DEFAULT '',           -- default delivery address
   created_at    TIMESTAMPTZ DEFAULT now(),
   updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
+-- Upgrade DBs created when email/password was the identity.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS mobile TEXT;
+ALTER TABLE customers ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE customers ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_email_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_mobile
+  ON customers(mobile) WHERE mobile IS NOT NULL AND mobile <> '';
+
 DROP TRIGGER IF EXISTS trg_customers_updated ON customers;
 CREATE TRIGGER trg_customers_updated
   BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Login OTP codes ---------------------------------------------------------
+-- One-time codes for mobile login. Only the hash is stored; codes expire after
+-- a few minutes and are consumed on success.
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id         SERIAL PRIMARY KEY,
+  mobile     TEXT NOT NULL,               -- normalized, matches customers.mobile
+  code_hash  TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts   INTEGER DEFAULT 0,
+  consumed   BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_otp_codes_mobile ON otp_codes(mobile);
 
 -- --- Orders ----------------------------------------------------------------
 -- Cash-on-delivery orders. Delivery details + line items are snapshotted so the
@@ -207,6 +234,7 @@ CREATE TABLE IF NOT EXISTS orders (
   status         TEXT NOT NULL DEFAULT 'pending', -- pending|confirmed|shipped|delivered|cancelled
   full_name      TEXT DEFAULT '',
   phone          TEXT DEFAULT '',
+  email          TEXT DEFAULT '',          -- optional, for the confirmation email
   address        TEXT DEFAULT '',
   city           TEXT DEFAULT '',
   notes          TEXT DEFAULT '',
@@ -215,6 +243,8 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at     TIMESTAMPTZ DEFAULT now(),
   updated_at     TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS order_items (
   id         SERIAL PRIMARY KEY,

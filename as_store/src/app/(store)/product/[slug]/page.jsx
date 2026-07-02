@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import ProductDetail from '@/components/ProductDetail.jsx'
 import ProductTile from '@/components/ProductTile.jsx'
 import { loadProduct, loadCategoryProducts } from '@/lib/catalog'
+import { loadSettings } from '@/lib/site'
 
 export async function generateMetadata({ params }) {
   const product = await loadProduct(params.slug)
@@ -11,7 +12,7 @@ export async function generateMetadata({ params }) {
 // Single product page: gallery + buy box, then related products from the same
 // category.
 export default async function ProductPage({ params }) {
-  const product = await loadProduct(params.slug)
+  const [product, settings] = await Promise.all([loadProduct(params.slug), loadSettings()])
   if (!product) notFound()
 
   const related = product.categorySlug
@@ -20,7 +21,7 @@ export default async function ProductPage({ params }) {
 
   return (
     <>
-      <ProductDetail product={product} />
+      <ProductDetail product={product} whatsapp={settings?.contact?.whatsapp} />
 
       {related.length > 0 && (
         <section className="bg-white pb-24">

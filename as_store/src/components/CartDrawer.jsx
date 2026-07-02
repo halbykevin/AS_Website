@@ -1,23 +1,26 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
-import { selectCartItems, selectCartTotal, removeItem, setQty, clearCart } from '@/store/cartSlice'
+import MaxQtyNote from './MaxQtyNote.jsx'
+import { selectCartItems, selectCartTotal, removeItem, setQty, clearCart, MAX_QTY } from '@/store/cartSlice'
 import { selectCartOpen, closeCart } from '@/store/uiSlice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
 // Slide-over shopping bag. Opens from the nav's bag icon, lists items with
 // quantity steppers, and checks out on-site at /checkout.
-export default function CartDrawer() {
+export default function CartDrawer({ whatsapp }) {
   const open = useSelector(selectCartOpen)
   const items = useSelector(selectCartItems)
   const total = useSelector(selectCartTotal)
   const dispatch = useDispatch()
   const router = useRouter()
+  // Item whose + was clicked at the cap — shows the WhatsApp note under it.
+  const [maxHitId, setMaxHitId] = useState(null)
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {
@@ -97,7 +100,10 @@ export default function CartDrawer() {
                         <div className="mt-2 flex items-center gap-3">
                           <div className="flex items-center rounded-full border border-as-ink/15">
                             <button
-                              onClick={() => dispatch(setQty({ id: i.id, qty: i.qty - 1 }))}
+                              onClick={() => {
+                                dispatch(setQty({ id: i.id, qty: i.qty - 1 }))
+                                if (maxHitId === i.id) setMaxHitId(null)
+                              }}
                               className="flex h-7 w-7 items-center justify-center text-as-ink/60 hover:text-as-ink disabled:opacity-30"
                               disabled={i.qty <= 1}
                               aria-label="Decrease quantity"
@@ -106,8 +112,13 @@ export default function CartDrawer() {
                             </button>
                             <span className="w-7 text-center text-sm font-medium text-as-ink">{i.qty}</span>
                             <button
-                              onClick={() => dispatch(setQty({ id: i.id, qty: i.qty + 1 }))}
-                              className="flex h-7 w-7 items-center justify-center text-as-ink/60 hover:text-as-ink"
+                              onClick={() => {
+                                if (i.qty >= MAX_QTY) setMaxHitId(i.id)
+                                else dispatch(setQty({ id: i.id, qty: i.qty + 1 }))
+                              }}
+                              className={`flex h-7 w-7 items-center justify-center hover:text-as-ink ${
+                                i.qty >= MAX_QTY ? 'text-as-ink/25' : 'text-as-ink/60'
+                              }`}
                               aria-label="Increase quantity"
                             >
                               <Icon name="plus" className="h-3.5 w-3.5" />
@@ -117,6 +128,9 @@ export default function CartDrawer() {
                             {money(Number(i.price) * i.qty)}
                           </span>
                         </div>
+                        {maxHitId === i.id && (
+                          <MaxQtyNote whatsapp={whatsapp} product={i.title} className="mt-2" />
+                        )}
                       </div>
                     </li>
                   ))}

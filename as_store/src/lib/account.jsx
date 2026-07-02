@@ -32,14 +32,15 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
 }
 
 export const accountApi = {
-  register: (data) => req('/api/account/register', { method: 'POST', body: data }),
-  login: (email, password) => req('/api/account/login', { method: 'POST', body: { email, password } }),
+  requestOtp: (mobile) => req('/api/account/otp/request', { method: 'POST', body: { mobile } }),
+  verifyOtp: (mobile, code) => req('/api/account/otp/verify', { method: 'POST', body: { mobile, code } }),
   me: () => req('/api/account/me', { auth: true }),
   update: (data) => req('/api/account', { method: 'PUT', auth: true, body: data }),
-  // orders
+  // orders (createOrder also works logged-out — the token is attached only if present)
   createOrder: (data) => req('/api/orders', { method: 'POST', auth: true, body: data }),
   listOrders: () => req('/api/orders', { auth: true }),
   getOrder: (id) => req(`/api/orders/${id}`, { auth: true }),
+  trackOrder: (id, token) => req(`/api/orders/track/${id}?token=${encodeURIComponent(token)}`),
 }
 
 const AccountContext = createContext(null)
@@ -61,15 +62,9 @@ export function AccountProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback(async (email, password) => {
-    const { token, customer } = await accountApi.login(email, password)
-    setToken(token)
-    setCustomer(customer)
-    return customer
-  }, [])
-
-  const register = useCallback(async (data) => {
-    const { token, customer } = await accountApi.register(data)
+  // Complete the OTP flow: verify the code, store the session.
+  const loginWithOtp = useCallback(async (mobile, code) => {
+    const { token, customer } = await accountApi.verifyOtp(mobile, code)
     setToken(token)
     setCustomer(customer)
     return customer
@@ -87,7 +82,7 @@ export function AccountProvider({ children }) {
   }, [])
 
   return (
-    <AccountContext.Provider value={{ customer, loading, login, register, logout, refresh, setCustomer }}>
+    <AccountContext.Provider value={{ customer, loading, loginWithOtp, logout, refresh, setCustomer }}>
       {children}
     </AccountContext.Provider>
   )

@@ -178,6 +178,41 @@ export default function PredictorAdmin() {
     return m ? `${m.teamA || 'A'} vs ${m.teamB || 'B'}` : `Match #${id}`
   }
 
+  // Mirror of the server's toWhatsAppNumber (server/src/whatsapp.js): digits-only
+  // international form, defaulting local Lebanese numbers to +961.
+  const toWhatsAppNumber = (mobile, cc = '961') => {
+    let d = String(mobile || '').replace(/\D/g, '')
+    if (!d) return ''
+    if (d.startsWith(cc) && d.length >= cc.length + 7) return d
+    return cc + d.replace(/^0+/, '')
+  }
+
+  // Open WhatsApp (web or app) with a pre-filled recap of the entry's predictions.
+  function sendPrediction(p) {
+    const number = toWhatsAppNumber(p.mobile)
+    if (!number) {
+      setMsg({ kind: 'error', text: `No valid mobile number on ${p.fullName}'s entry.` })
+      return
+    }
+    const firstName = (p.fullName || '').trim().split(/\s+/)[0] || 'there'
+    const picks = p.picks
+      .map((pick) => `• ${matchLabel(pick.matchId)} — ${pick.scoreA} : ${pick.scoreB}`)
+      .join('\n')
+    const text = [
+      `Hello ${firstName}! ⚽`,
+      '',
+      'Thank you for taking part in the AS Company World Cup 2026 Predictor. We’re pleased to confirm your predictions:',
+      '',
+      picks,
+      '',
+      'Good luck — we’ll be in touch if you’re our lucky winner! 🏆',
+      '',
+      'Best regards,',
+      'The AS Company Team',
+    ].join('\n')
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -351,6 +386,7 @@ export default function PredictorAdmin() {
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
+                    <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => sendPrediction(p)}>Send</Button>
                     <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>
                       {expanded === p.id ? 'Hide' : 'View'}
                     </Button>

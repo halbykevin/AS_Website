@@ -1,5 +1,11 @@
 import { createSlice } from '@reduxjs/toolkit'
 
+// Store policy: at most 2 of any product per order — larger quantities go
+// through WhatsApp (the UI shows a note when the cap is hit).
+export const MAX_QTY = 2
+
+const clampQty = (q) => Math.min(MAX_QTY, Math.max(1, Number(q) || 1))
+
 // Cart state. Kept intentionally simple for the UI phase — persistence and the
 // real checkout flow come with the backend prompt.
 const initialState = {
@@ -13,14 +19,14 @@ const cartSlice = createSlice({
     addItem(state, { payload }) {
       const existing = state.items.find((i) => i.id === payload.id)
       if (existing) {
-        existing.qty += payload.qty ?? 1
+        existing.qty = clampQty(existing.qty + (payload.qty ?? 1))
       } else {
         state.items.push({
           id: payload.id,
           title: payload.title,
           image: payload.image,
           price: payload.price,
-          qty: payload.qty ?? 1,
+          qty: clampQty(payload.qty ?? 1),
         })
       }
     },
@@ -29,14 +35,18 @@ const cartSlice = createSlice({
     },
     setQty(state, { payload }) {
       const item = state.items.find((i) => i.id === payload.id)
-      if (item) item.qty = Math.max(1, payload.qty)
+      if (item) item.qty = clampQty(payload.qty)
     },
     clearCart(state) {
       state.items = []
     },
     // Replace the whole cart (used to restore from localStorage on load).
+    // Clamps quantities so carts persisted before the cap still respect it.
     hydrateCart(state, { payload }) {
-      state.items = Array.isArray(payload) ? payload : []
+      state.items = (Array.isArray(payload) ? payload : []).map((i) => ({
+        ...i,
+        qty: clampQty(i.qty),
+      }))
     },
   },
 })
