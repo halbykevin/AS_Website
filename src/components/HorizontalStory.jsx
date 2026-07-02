@@ -147,6 +147,7 @@ function Slide({ panel }) {
           src={panel.image}
           alt=""
           className="absolute inset-0 h-full w-full select-none object-cover"
+          style={{ objectPosition: `${panel.focalX ?? 50}% ${panel.focalY ?? 50}%` }}
           draggable={false}
         />
       ) : (

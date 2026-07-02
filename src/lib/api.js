@@ -295,6 +295,8 @@ export function mapStoryPanel(p) {
     id: p.id,
     image: p.imageUrl || '',
     visible: p.visible !== false,
+    focalX: p.focalX === undefined || p.focalX === null ? 50 : Number(p.focalX),
+    focalY: p.focalY === undefined || p.focalY === null ? 50 : Number(p.focalY),
   }
 }
 

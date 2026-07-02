@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
 import { Card, Field, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
+import FocalPicker from '../FocalPicker.jsx'
 
 const blankStory = { enabled: true, eyebrow: '', heading: '', subheading: '' }
+
+// One payload shape so every update (reorder, show/hide, reposition) keeps the
+// slide's other fields intact — the API resets any field it isn't sent.
+const payloadOf = (r, extra = {}) => ({
+  imageUrl: r.imageUrl,
+  sort: r.sort,
+  visible: r.visible !== false,
+  focalX: r.focalX ?? 50,
+  focalY: r.focalY ?? 50,
+  ...extra,
+})
 
 export default function StoryAdmin() {
   // ---- Section settings (the singleton story row) ----
@@ -12,6 +24,10 @@ export default function StoryAdmin() {
   // ---- Slides (image panels) ----
   const [items, setItems] = useState([])
   const [saving, setSaving] = useState(false)
+
+  // ---- Position editor ----
+  const [editing, setEditing] = useState(null) // the slide being repositioned
+  const [focal, setFocal] = useState({ x: 50, y: 50 })
 
   const [msg, setMsg] = useState(null)
 
@@ -69,7 +85,7 @@ export default function StoryAdmin() {
 
   async function toggleVisible(r) {
     try {
-      await adminApi.updateStoryPanel(r.id, { imageUrl: r.imageUrl, sort: r.sort, visible: !(r.visible !== false) })
+      await adminApi.updateStoryPanel(r.id, payloadOf(r, { visible: !(r.visible !== false) }))
       await load()
     } catch (err) {
       setMsg({ kind: 'error', text: 'Save failed: ' + (err?.message || 'error') })
@@ -84,12 +100,30 @@ export default function StoryAdmin() {
     ;[arr[index], arr[j]] = [arr[j], arr[index]]
     setItems(arr) // optimistic
     try {
-      await Promise.all(
-        arr.map((r, i) => adminApi.updateStoryPanel(r.id, { imageUrl: r.imageUrl, sort: i, visible: r.visible !== false }))
-      )
+      await Promise.all(arr.map((r, i) => adminApi.updateStoryPanel(r.id, payloadOf(r, { sort: i }))))
     } catch {
       setMsg({ kind: 'error', text: 'Could not save the new order.' })
       load()
+    }
+  }
+
+  // ---- Reposition (focal point) ----
+  const startPosition = (r) => {
+    setFocal({ x: r.focalX ?? 50, y: r.focalY ?? 50 })
+    setEditing(r)
+  }
+  async function savePosition() {
+    setSaving(true)
+    setMsg(null)
+    try {
+      await adminApi.updateStoryPanel(editing.id, payloadOf(editing, { focalX: focal.x, focalY: focal.y }))
+      setEditing(null)
+      await load()
+      setMsg({ kind: 'success', text: 'Position saved.' })
+    } catch (err) {
+      setMsg({ kind: 'error', text: 'Save failed: ' + (err?.message || 'error') })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -105,9 +139,10 @@ export default function StoryAdmin() {
 
       <Banner kind="info">
         The image slideshow at the very top of the homepage. Upload wide images (e.g. 1920×800) — they
-        auto-advance and are cropped to a fixed height matching the events banner below. Clicking any
-        slide opens the <strong>AS Store “coming soon”</strong> page. The section stays hidden until
-        it’s enabled and has at least one visible image.
+        auto-advance and are cropped to a fixed height matching the events banner below. Use
+        <strong> Position </strong> to drag each image and choose exactly what stays visible in the
+        frame. Clicking any slide opens the <strong>AS Store “coming soon”</strong> page. The section
+        stays hidden until it’s enabled and has at least one visible image.
       </Banner>
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
@@ -136,8 +171,29 @@ export default function StoryAdmin() {
             className="text-sm"
           />
         </Field>
-        {saving && <p className="mt-2 text-sm text-as-charcoal/55">Uploading…</p>}
+        {saving && !editing && <p className="mt-2 text-sm text-as-charcoal/55">Uploading…</p>}
       </Card>
+
+      {/* ---- Position editor ---- */}
+      {editing && (
+        <Card title="Position in frame">
+          <Field
+            label="Drag to reposition"
+            hint="The homepage strip has a fixed shape and crops the image. Drag to choose what stays visible — preview both the desktop and mobile crops."
+          >
+            <FocalPicker
+              image={editing.imageUrl}
+              focalX={focal.x}
+              focalY={focal.y}
+              onChange={(x, y) => setFocal({ x, y })}
+            />
+          </Field>
+          <div className="mt-4 flex gap-3">
+            <Button onClick={savePosition} disabled={saving}>{saving ? 'Saving…' : 'Save position'}</Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+          </div>
+        </Card>
+      )}
 
       {/* ---- Slides ---- */}
       <Card title={`Slideshow order (${items.length})`}>
@@ -165,13 +221,19 @@ export default function StoryAdmin() {
                 </div>
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   {r.imageUrl
-                    ? <img src={r.imageUrl} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />
+                    ? <img
+                        src={r.imageUrl}
+                        alt=""
+                        className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5"
+                        style={{ objectPosition: `${r.focalX ?? 50}% ${r.focalY ?? 50}%` }}
+                      />
                     : <span className="h-12 w-24 shrink-0 rounded bg-as-gray/20" />}
                   <p className="truncate text-sm text-as-charcoal/55">
                     {r.visible === false ? 'hidden' : 'visible'}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  <Button variant="ghost" onClick={() => startPosition(r)} className="px-3 py-1.5">Position</Button>
                   <Button variant="ghost" onClick={() => toggleVisible(r)} className="px-3 py-1.5">
                     {r.visible === false ? 'Show' : 'Hide'}
                   </Button>

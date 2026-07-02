@@ -273,6 +273,9 @@ ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS gradient_type TEXT DEFAULT 'li
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS button_enabled BOOLEAN DEFAULT false;
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS button_label TEXT DEFAULT 'Explore';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS fit TEXT DEFAULT 'cover';
+-- Per-slide focal point (%) so the admin controls how the image is cropped.
+ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS focal_x INTEGER DEFAULT 50;
+ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS focal_y INTEGER DEFAULT 50;
 -- Events belong to an (optional) category; banners can be driven by an event.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(id) ON DELETE SET NULL;
