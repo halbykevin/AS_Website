@@ -282,7 +282,7 @@ export default function PredictorModal() {
                 <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
                   <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
                   <li className="flex gap-2"><span>2️⃣</span><span>Predict the <span className="font-semibold">exact score</span> of all {matches.length} matches.</span></li>
-                  <li className="flex gap-2"><span>3️⃣</span><span>Get <span className="font-semibold">every score right</span>{prize.enabled && prize.title ? <> to win <span className="font-semibold">{prize.title}</span></> : ''}.</span></li>
+                  <li className="flex gap-2"><span>3️⃣</span><span><span className="font-semibold">Win 250$ Cash</span>.</span></li>
                 </ul>
               </div>
 
