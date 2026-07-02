@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS solutions (
 CREATE TABLE IF NOT EXISTS predictor (
   id INTEGER PRIMARY KEY DEFAULT 1,
   enabled BOOLEAN DEFAULT false,
+  notify_whatsapp BOOLEAN DEFAULT false,
   title TEXT DEFAULT 'Predict & Win',
   subtitle TEXT DEFAULT '',
   intro TEXT DEFAULT '',
@@ -247,6 +248,8 @@ DELETE FROM predictions a USING predictions b
 CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobile);
 -- Show/hide the prize block independently of the game (idempotent).
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_enabled BOOLEAN DEFAULT true;
+-- Admin toggle for the WhatsApp confirmation (off until a real number is live).
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS notify_whatsapp BOOLEAN DEFAULT false;
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';

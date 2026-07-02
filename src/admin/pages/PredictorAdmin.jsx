@@ -14,7 +14,7 @@ function toLocalInput(iso) {
 }
 
 const blankSettings = {
-  enabled: false, title: '', subtitle: '', intro: '', successMessage: '',
+  enabled: false, notifyWhatsapp: false, title: '', subtitle: '', intro: '', successMessage: '',
   prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
 }
 const blankMatch = {
@@ -82,6 +82,7 @@ export default function PredictorAdmin() {
       if (p) {
         setSettings({
           enabled: p.enabled === true,
+          notifyWhatsapp: p.notifyWhatsapp === true,
           title: p.title || '', subtitle: p.subtitle || '', intro: p.intro || '',
           successMessage: p.successMessage || '',
           prizeEnabled: p.prizeEnabled !== false,
@@ -201,6 +202,12 @@ export default function PredictorAdmin() {
               onChange={(v) => setSettings((s) => ({ ...s, closed: v }))}
               label={settings.closed ? 'Entries closed' : 'Entries open'}
               description="Close to stop new submissions while still showing the game."
+            />
+            <Toggle
+              checked={settings.notifyWhatsapp}
+              onChange={(v) => setSettings((s) => ({ ...s, notifyWhatsapp: v }))}
+              label={settings.notifyWhatsapp ? 'WhatsApp confirmation ON' : 'WhatsApp confirmation OFF'}
+              description="Send each player a WhatsApp confirming their predictions. Requires the WhatsApp number to be configured on the server."
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Title"><TextInput value={settings.title} onChange={setS('title')} placeholder="Predict & Win — World Cup 2026" /></Field>

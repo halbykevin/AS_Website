@@ -107,7 +107,8 @@ const solutionJson = (r) => ({
   sort: r.sort, visible: r.visible,
 })
 const predictorJson = (r) => ({
-  enabled: r.enabled, title: r.title, subtitle: r.subtitle, intro: r.intro,
+  enabled: r.enabled, notifyWhatsapp: r.notify_whatsapp,
+  title: r.title, subtitle: r.subtitle, intro: r.intro,
   prizeEnabled: r.prize_enabled,
   prizeTitle: r.prize_title, prizeDescription: r.prize_description, prizeImageUrl: r.prize_image_url,
   deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
@@ -591,13 +592,14 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
     `UPDATE predictor SET
        enabled=$1, title=$2, subtitle=$3, intro=$4,
        prize_title=$5, prize_description=$6, prize_image_url=$7,
-       deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, updated_at=now()
+       deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, notify_whatsapp=$12, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       Boolean(b.enabled), b.title || '', b.subtitle || '', b.intro || '',
       b.prizeTitle || '', b.prizeDescription || '', b.prizeImageUrl || '',
       b.deadline || null, Boolean(b.closed), b.successMessage || '',
       b.prizeEnabled === undefined ? true : Boolean(b.prizeEnabled),
+      Boolean(b.notifyWhatsapp),
     ]
   )
   res.json(predictorJson(rows[0]))
@@ -656,7 +658,7 @@ app.post('/api/predictions', ah(async (req, res) => {
   const mobile = normalizeMobile(b.mobile)
   if (!fullName || !mobile) return res.status(400).json({ error: 'Full name and mobile number are required' })
 
-  const cfg = (await query('SELECT enabled, closed, deadline FROM predictor WHERE id = 1')).rows[0]
+  const cfg = (await query('SELECT enabled, closed, deadline, notify_whatsapp FROM predictor WHERE id = 1')).rows[0]
   if (!cfg || !cfg.enabled || cfg.closed) return res.status(403).json({ error: 'The game is not currently open' })
   if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
     return res.status(403).json({ error: 'The prediction deadline has passed' })
@@ -677,8 +679,8 @@ app.post('/api/predictions', ah(async (req, res) => {
     res.status(201).json(predictionJson(rows[0]))
 
     // Fire-and-forget WhatsApp confirmation. Never blocks or fails the response;
-    // a no-op unless the Cloud API env vars are configured.
-    if (whatsappEnabled()) {
+    // a no-op unless the admin enabled it AND the Cloud API env vars are configured.
+    if (cfg.notify_whatsapp && whatsappEnabled()) {
       const byId = new Map(matchRows.map((m) => [m.id, m]))
       const picksText = picks
         .map((p) => {
