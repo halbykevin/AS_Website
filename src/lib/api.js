@@ -293,33 +293,20 @@ function mapStoreShowcase(meta, products) {
 export function mapStoryPanel(p) {
   return {
     id: p.id,
-    heading: p.heading || '',
-    caption: p.caption || '',
     image: p.imageUrl || '',
-    accent: p.accent || '',
-    accent2: p.accent2 || '',
-    gradientType: p.gradientType || 'linear',
-    link: p.linkUrl || '',
-    buttonEnabled: p.buttonEnabled === true,
-    buttonLabel: p.buttonLabel || 'Explore',
-    size: p.size || 'md',
-    fit: p.fit || 'cover',
-    fontSize: p.fontSize || 'md',
     visible: p.visible !== false,
   }
 }
 
-// The horizontal scroll-story: section copy + its ordered, visible panels.
-// Hidden (null) unless enabled with at least one visible panel.
+// The homepage image slideshow: its ordered, visible panels. Every slide opens
+// the AS Store coming-soon page. Hidden (null) unless enabled with at least one
+// visible panel that has an image.
 function mapStory(meta, panels) {
-  const list = Array.isArray(panels) ? panels.map(mapStoryPanel).filter((p) => p.visible) : []
+  const list = Array.isArray(panels)
+    ? panels.map(mapStoryPanel).filter((p) => p.visible && p.image)
+    : []
   if (!meta || meta.enabled === false || list.length === 0) return null
-  return {
-    eyebrow: meta.eyebrow || '',
-    heading: meta.heading || '',
-    subheading: meta.subheading || '',
-    panels: list,
-  }
+  return { panels: list }
 }
 
 export function mapSolution(s) {

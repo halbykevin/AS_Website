@@ -11,7 +11,7 @@ const links = [
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/categories', label: 'Categories' },
   { to: '/admin/store', label: 'AS Store Showcase' },
-  { to: '/admin/story', label: 'Scroll Story' },
+  { to: '/admin/story', label: 'Store Slideshow' },
   { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/predictor', label: 'World Cup Predictor' },
   { to: '/admin/scraper', label: 'Web Scraper' },
