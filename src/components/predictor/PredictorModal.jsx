@@ -2,9 +2,45 @@ import { useEffect, useMemo, useState } from 'react'
 import { useContent } from '../../store/content.jsx'
 import { usePredictorUI } from '../../store/predictor.jsx'
 import { submitPrediction } from '../../lib/api.js'
-import Football from './Football.jsx'
 
 const CONFETTI_COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
+
+const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
+const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
+const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
+
+function InstagramFollow() {
+  return (
+    <a
+      href={INSTAGRAM_URL}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px] shadow-sm transition hover:shadow-md"
+    >
+      <span className="flex w-full items-center gap-3 rounded-[14px] bg-white px-3 py-2.5">
+        <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 shrink-0" aria-hidden="true">
+          <defs>
+            <linearGradient id="ig-grad" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stopColor="#feda75" />
+              <stop offset="0.45" stopColor="#d62976" />
+              <stop offset="1" stopColor="#4f5bd5" />
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="20" height="20" rx="6" stroke="url(#ig-grad)" strokeWidth="2" />
+          <circle cx="12" cy="12" r="4.2" stroke="url(#ig-grad)" strokeWidth="2" />
+          <circle cx="17.4" cy="6.6" r="1.3" fill="url(#ig-grad)" />
+        </svg>
+        <span className="min-w-0">
+          <span className="block text-sm font-extrabold text-as-charcoal">Follow us on Instagram to enter</span>
+          <span className="block text-xs font-medium text-as-charcoal/60">@ascompany.lb — following is required to win</span>
+        </span>
+        <span className="ml-auto shrink-0 rounded-full bg-gradient-to-r from-[#d62976] to-[#4f5bd5] px-3 py-1.5 text-xs font-bold text-white transition group-hover:brightness-110">
+          Follow
+        </span>
+      </span>
+    </a>
+  )
+}
 
 function Confetti() {
   const pieces = useMemo(
@@ -202,7 +238,9 @@ export default function PredictorModal() {
             </svg>
           </button>
           <div className="flex items-center gap-3">
-            <Football className="h-11 w-11 shrink-0 drop-shadow [animation:spin-slow_7s_linear_infinite]" />
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/90 shadow-md ring-1 ring-white/50">
+              <img src={WORLD_CUP_EMBLEM} alt="" className="h-10 w-auto" />
+            </span>
             <div className="min-w-0">
               <h2 className="text-lg font-extrabold leading-tight drop-shadow-sm sm:text-xl">{predictor.title}</h2>
               {predictor.subtitle && <p className="text-sm font-medium text-white/90">{predictor.subtitle}</p>}
@@ -219,7 +257,9 @@ export default function PredictorModal() {
                   {prize.image ? (
                     <img src={prize.image} alt={prize.title} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-amber-200" />
                   ) : (
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-amber-100 text-2xl">🏆</span>
+                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-amber-200">
+                      <img src={WORLD_CUP_LOGO} alt="" className="h-11 w-11 object-contain" />
+                    </span>
                   )}
                   <div className="min-w-0">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">The prize</p>
@@ -228,6 +268,8 @@ export default function PredictorModal() {
                   </div>
                 </div>
               )}
+
+              <InstagramFollow />
 
               {predictor.intro && <p className="text-sm text-as-charcoal/70">{predictor.intro}</p>}
 
@@ -289,6 +331,9 @@ export default function PredictorModal() {
                   🏆 Playing for: {prize.title}
                 </div>
               )}
+              <div className="mx-auto mt-5 max-w-xs text-left">
+                <InstagramFollow />
+              </div>
             </div>
           )}
 

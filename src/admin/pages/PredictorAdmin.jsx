@@ -244,6 +244,16 @@ export default function PredictorAdmin() {
                       />
                     )}
                     <input type="file" accept="image/*" onChange={(e) => setPrizeFile(e.target.files?.[0] || null)} className="text-sm" />
+                    {(prizeFile || settings.prizeImageUrl) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="px-3 py-1.5"
+                        onClick={() => { setPrizeFile(null); setSettings((s) => ({ ...s, prizeImageUrl: '' })) }}
+                      >
+                        Remove image
+                      </Button>
+                    )}
                   </div>
                 </Field>
               </div>

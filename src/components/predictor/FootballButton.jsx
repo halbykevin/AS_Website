@@ -1,6 +1,7 @@
 import { useContent } from '../../store/content.jsx'
 import { usePredictorUI } from '../../store/predictor.jsx'
-import Football from './Football.jsx'
+
+const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
 
 // The animated football that sits in the middle of the nav bar. Only shown when
 // the admin has enabled the predictor with at least one match. Tapping it opens
@@ -24,7 +25,7 @@ export default function FootballButton() {
       </span>
 
       <span className="animate-ball-bob drop-shadow-md transition-transform duration-300 group-hover:scale-110 group-active:scale-95">
-        <Football className="h-9 w-9 sm:h-10 sm:w-10 [animation:spin-slow_7s_linear_infinite] group-hover:[animation-duration:1.6s]" />
+        <img src={WORLD_CUP_EMBLEM} alt="" className="h-10 w-auto sm:h-11" />
       </span>
 
       <span className="mt-0.5 hidden bg-gradient-to-r from-emerald-600 via-amber-500 to-rose-600 bg-clip-text text-[10px] font-extrabold uppercase tracking-wide text-transparent sm:block">
