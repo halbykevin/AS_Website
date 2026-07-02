@@ -9,12 +9,13 @@ const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
 const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
 const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
 
-function InstagramFollow() {
+function InstagramFollow({ onClick }) {
   return (
     <a
       href={INSTAGRAM_URL}
       target="_blank"
       rel="noreferrer"
+      onClick={onClick}
       className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px] shadow-sm transition hover:shadow-md"
     >
       <span className="flex w-full items-center gap-3 rounded-[14px] bg-white px-3 py-2.5">
@@ -39,6 +40,26 @@ function InstagramFollow() {
         </span>
       </span>
     </a>
+  )
+}
+
+function PrizeCard({ prize }) {
+  if (!(prize.enabled && (prize.title || prize.description || prize.image))) return null
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3">
+      {prize.image ? (
+        <img src={prize.image} alt={prize.title} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-amber-200" />
+      ) : (
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-amber-200">
+          <img src={WORLD_CUP_LOGO} alt="" className="h-11 w-11 object-contain" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">The prize</p>
+        {prize.title && <p className="font-extrabold text-as-charcoal">{prize.title}</p>}
+        {prize.description && <p className="text-sm text-as-charcoal/70">{prize.description}</p>}
+      </div>
+    </div>
   )
 }
 
@@ -149,7 +170,9 @@ function MatchRow({ match, value, onChange, disabled }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('play') // play | register | done
+  const [step, setStep] = useState('follow') // follow | play | register | done
+  const [followedInstagram, setFollowedInstagram] = useState(false)
+  const [confirmedFollow, setConfirmedFollow] = useState(false)
   const [scores, setScores] = useState({})
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
@@ -250,26 +273,44 @@ export default function PredictorModal() {
 
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          {step === 'follow' && (
+            <div className="space-y-4">
+              <PrizeCard prize={prize} />
+
+              <div className="rounded-2xl border border-black/5 bg-as-charcoal/[0.02] p-4">
+                <p className="text-sm font-bold text-as-charcoal">How to win</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
+                  <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
+                  <li className="flex gap-2"><span>2️⃣</span><span>Predict the <span className="font-semibold">exact score</span> of all {matches.length} matches.</span></li>
+                  <li className="flex gap-2"><span>3️⃣</span><span>Get <span className="font-semibold">every score right</span>{prize.enabled && prize.title ? <> to win <span className="font-semibold">{prize.title}</span></> : ''}.</span></li>
+                </ul>
+              </div>
+
+              <p className="text-sm font-semibold text-as-charcoal">Step 1 — follow us to unlock the game:</p>
+              <InstagramFollow onClick={() => setFollowedInstagram(true)} />
+
+              {followedInstagram && (
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
+                  <input
+                    type="checkbox"
+                    checked={confirmedFollow}
+                    onChange={(e) => setConfirmedFollow(e.target.checked)}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-600"
+                  />
+                  <span className="text-sm font-medium text-as-charcoal">
+                    I&apos;m now following <span className="font-bold">@ascompany.lb</span> on Instagram.
+                    <span className="mt-0.5 block text-xs font-normal text-as-charcoal/60">
+                      Winners are checked against our followers list before the prize is paid.
+                    </span>
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
+
           {step === 'play' && (
             <div className="space-y-4">
-              {prize.enabled && (prize.title || prize.description || prize.image) && (
-                <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-3">
-                  {prize.image ? (
-                    <img src={prize.image} alt={prize.title} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-amber-200" />
-                  ) : (
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-amber-200">
-                      <img src={WORLD_CUP_LOGO} alt="" className="h-11 w-11 object-contain" />
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">The prize</p>
-                    {prize.title && <p className="font-extrabold text-as-charcoal">{prize.title}</p>}
-                    {prize.description && <p className="text-sm text-as-charcoal/70">{prize.description}</p>}
-                  </div>
-                </div>
-              )}
-
-              <InstagramFollow />
+              <PrizeCard prize={prize} />
 
               {predictor.intro && <p className="text-sm text-as-charcoal/70">{predictor.intro}</p>}
 
@@ -343,7 +384,17 @@ export default function PredictorModal() {
         {/* Footer actions */}
         {step !== 'done' && (
           <div className="shrink-0 border-t border-black/5 bg-white px-5 py-4">
-            {step === 'play' ? (
+            {step === 'follow' && (
+              <button
+                type="button"
+                onClick={() => { setStep('play'); setError('') }}
+                disabled={!confirmedFollow}
+                className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {confirmedFollow ? 'Start predicting →' : 'Follow us to unlock'}
+              </button>
+            )}
+            {step === 'play' && (
               <button
                 type="button"
                 onClick={goToRegister}
@@ -352,7 +403,8 @@ export default function PredictorModal() {
               >
                 Continue →
               </button>
-            ) : (
+            )}
+            {step === 'register' && (
               <div className="flex gap-3">
                 <button
                   type="button"
