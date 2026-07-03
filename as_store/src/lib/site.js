@@ -6,6 +6,9 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
 export const defaultSettings = {
   storeName: 'AS Store',
+  // Only used when the API is unreachable: never black out a live store over
+  // an API hiccup. The real gate is settings.published from the database.
+  published: true,
   announcement: { enabled: true, text: 'Free delivery across Lebanon · 12-month warranty' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},

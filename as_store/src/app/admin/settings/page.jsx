@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Button, Card, Field, Input, Toggle, Spinner } from '@/components/admin/ui.jsx'
+import { Button, Card, Field, Input, Toggle, Spinner, Badge } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
 import { adminApi } from '@/lib/adminApi'
 
 const EMPTY = {
   storeName: 'AS Store',
+  published: false,
   announcement: { enabled: true, text: '' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: { instagram: '', facebook: '', tiktok: '', x: '', youtube: '' },
@@ -68,6 +69,27 @@ export default function SettingsPage() {
           {save.isPending ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
+
+      {/* Publish gate */}
+      <Card className="space-y-3 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-bold text-as-ink">Site visibility</h3>
+            {form.published ? <Badge tone="green">Live</Badge> : <Badge tone="amber">Coming soon</Badge>}
+          </div>
+          <Toggle
+            checked={form.published}
+            onChange={(v) => set('published', v)}
+            label={form.published ? 'Published' : 'Hidden'}
+          />
+        </div>
+        <p className="text-sm text-as-ink/50">
+          Off = visitors see a branded “Coming soon” page instead of the store. This admin is never
+          hidden, and you can preview the real site while it&apos;s off by opening{' '}
+          <code className="rounded bg-as-fog px-1.5 py-0.5 text-xs">/?preview=1</code>. Remember to
+          press <b>Save changes</b> after flipping the switch.
+        </p>
+      </Card>
 
       {/* General */}
       <Card className="space-y-4 p-5">
