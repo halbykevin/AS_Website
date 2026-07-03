@@ -34,6 +34,20 @@ export function gridClass(cols) {
 const price = (p) => Number(p.price) || 0
 const onSale = (p) => Boolean(p.oldPrice) && Number(p.oldPrice) > price(p)
 
+// Unique categories present in the list, with a product count, sorted by name.
+// Used on /shop where the list spans the whole catalog.
+export function categoryFacets(products) {
+  const map = new Map()
+  for (const p of products) {
+    const slug = (p.categorySlug || '').trim()
+    if (!slug) continue
+    const e = map.get(slug) || { value: slug, label: p.category || slug, count: 0 }
+    e.count++
+    map.set(slug, e)
+  }
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label))
+}
+
 // Unique brands present in the list, with a product count, sorted by name.
 export function brandFacets(products) {
   const map = new Map()
@@ -55,8 +69,9 @@ export function priceBounds(products) {
   return { min: Math.floor(Math.min(...prices)), max: Math.ceil(Math.max(...prices)) }
 }
 
-export function applyFilters(products, { brand = '', min = null, max = null, sale = false } = {}) {
+export function applyFilters(products, { cat = '', brand = '', min = null, max = null, sale = false } = {}) {
   return products.filter((p) => {
+    if (cat && p.categorySlug !== cat) return false
     if (brand && slugify(p.brand) !== brand) return false
     if (min != null && price(p) < min) return false
     if (max != null && price(p) > max) return false

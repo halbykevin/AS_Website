@@ -13,6 +13,13 @@ export default function ProductTile({ product, fluid = false }) {
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
 
+  // Sale pricing: the API returns `price` already discounted with the base in
+  // `oldPrice` (from the sales engine or a manually-set old price).
+  const priceNum = Number(price) || 0
+  const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
+  const onSale = Boolean(oldPrice) && oldPrice > priceNum
+  const pct = onSale ? product.salePercent || Math.round((1 - priceNum / oldPrice) * 100) : 0
+
   // Card teaser: the description's first real paragraph (skip markdown headings /
   // bullets), falling back to the tagline. Shown line-clamped so it ends cleanly
   // at a line break instead of the hard 90-char mid-word cut the tagline has.
@@ -32,8 +39,13 @@ export default function ProductTile({ product, fluid = false }) {
 
   return (
     <div
-      className={`flex ${sizing} h-[450px] flex-col items-center overflow-hidden rounded-[28px] border border-as-red bg-white p-5 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.35)]`}
+      className={`relative flex ${sizing} h-[450px] flex-col items-center overflow-hidden rounded-[28px] border border-as-red bg-white p-5 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.35)]`}
     >
+      {onSale && (
+        <span className="absolute right-4 top-4 rounded-full bg-as-red px-2 py-0.5 text-xs font-bold text-white">
+          −{pct}%
+        </span>
+      )}
       {/* Fixed-height text block so every card's image starts at the same place */}
       <div className="flex h-[124px] flex-col">
         <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{brand || 'New'}</p>
@@ -62,7 +74,14 @@ export default function ProductTile({ product, fluid = false }) {
             ))}
           </div>
         )}
-        <p className="text-base font-medium text-as-ink">From ${(Number(price) || 0).toLocaleString()}</p>
+        {onSale ? (
+          <p className="flex items-baseline gap-2 text-base">
+            <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
+            <span className="text-sm text-as-ink/40 line-through">${oldPrice.toLocaleString()}</span>
+          </p>
+        ) : (
+          <p className="text-base font-medium text-as-ink">From ${priceNum.toLocaleString()}</p>
+        )}
         <button onClick={add} className="pill mt-3 w-full">
           Add to Bag
         </button>

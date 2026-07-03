@@ -1,10 +1,49 @@
-import HomepageSections from '@/components/HomepageSections.jsx'
+import HeroCinema from '@/components/home/HeroCinema.jsx'
+import VelocityBand from '@/components/home/VelocityBand.jsx'
+import HorizontalShowcase from '@/components/home/HorizontalShowcase.jsx'
+import CategoryWall from '@/components/home/CategoryWall.jsx'
+import SaleSpotlight from '@/components/home/SaleSpotlight.jsx'
+import FreshDrops from '@/components/home/FreshDrops.jsx'
+import FinaleCta from '@/components/home/FinaleCta.jsx'
+import { loadAllProducts, loadCategories } from '@/lib/catalog'
 import { loadHomepageSections } from '@/lib/homepage'
 
-// AS Store homepage — fully CMS-driven: an ordered list of editable blocks
-// (hero, pinned showcase, product rails, bento, CTA, rich text) managed at
-// /admin/homepage. Falls back to the original layout if the API is offline.
+// AS Store homepage — a scroll-choreographed experience (Lenis + framer-motion)
+// built from the live catalog: cinematic hero (copy still editable via the
+// hero block in /admin/homepage), velocity marquee, pinned horizontal lineup,
+// category wall, sale spotlight (only when the sales engine has live
+// discounts), newest arrivals, and a scaling finale.
 export default async function HomePage() {
-  const sections = await loadHomepageSections()
-  return <HomepageSections sections={sections} />
+  const [products, categories, sections] = await Promise.all([
+    loadAllProducts(),
+    loadCategories(),
+    loadHomepageSections(),
+  ])
+
+  const heroCms = sections.find((s) => s.type === 'hero') || null
+
+  const withImage = products.filter((p) => p.image)
+  const featured = withImage.filter((p) => p.featured)
+  const lineup = (featured.length >= 3 ? featured : withImage).slice(0, 6)
+  const heroProduct = lineup[0] || null
+
+  const onSale = withImage.filter((p) => p.oldPrice && Number(p.oldPrice) > Number(p.price))
+  const maxPercent = onSale.reduce(
+    (m, p) => Math.max(m, p.salePercent || Math.round((1 - p.price / p.oldPrice) * 100)),
+    0,
+  )
+
+  const newest = [...withImage].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0)).slice(0, 8)
+
+  return (
+    <>
+      <HeroCinema cms={heroCms} product={heroProduct} categories={categories} />
+      <VelocityBand />
+      <HorizontalShowcase products={lineup} />
+      <CategoryWall categories={categories.slice(0, 6)} />
+      <SaleSpotlight products={onSale.slice(0, 8)} maxPercent={maxPercent} />
+      <FreshDrops products={newest} />
+      <FinaleCta />
+    </>
+  )
 }

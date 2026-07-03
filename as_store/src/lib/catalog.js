@@ -33,6 +33,17 @@ export async function loadCategoryProducts(slug) {
   }
 }
 
+// Every visible product (the /shop all-products page).
+export async function loadAllProducts() {
+  try {
+    const res = await fetch(`${API}/api/products`, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 // Search products by name (server-side, no cache).
 export async function searchProducts(q) {
   const term = (q || '').trim()

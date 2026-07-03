@@ -66,15 +66,24 @@ const brandJson = (r) => ({
   visible: r.visible,
 })
 
-const productJson = (r) => ({
+// Discounted unit price for a sale percentage, rounded to cents.
+const salePrice = (base, pct) => Math.round(Number(base) * (100 - pct)) / 100
+
+const productJson = (r) => {
+  // A running promotion (sale_percent from SALE_JOIN) overrides pricing at
+  // read time: `price` becomes the discounted figure, the base price moves to
+  // `oldPrice`. Without one, a manually-set old_price still shows as before.
+  const pct = Number(r.sale_percent) || 0
+  return {
   id: r.id,
   name: r.name,
   slug: r.slug,
   tagline: r.tagline || '',
   description: r.description || '',
   specs: Array.isArray(r.specs) ? r.specs : [],
-  price: r.price,
-  oldPrice: r.old_price,
+  price: pct ? salePrice(r.price, pct) : r.price,
+  oldPrice: pct ? Number(r.price) : r.old_price,
+  salePercent: pct || null,
   categoryId: r.category_id,
   category: r.category_name || '',
   categorySlug: r.category_slug || '',
@@ -89,7 +98,8 @@ const productJson = (r) => ({
   sort: r.sort,
   image: r.image || (Array.isArray(r.images) ? r.images[0] : '') || '',
   images: Array.isArray(r.images) ? r.images : [],
-})
+  }
+}
 
 const settingsJson = (r) => ({
   storeName: r.store_name || 'AS Store',
@@ -199,22 +209,42 @@ const SECTION_COLS = {
   sort: 'sort',
 }
 
+// The product's best running promotion (largest percentage wins) — NULL when
+// none applies. Joined into every query that reads a product price so the
+// storefront, admin and checkout all see the same discounted figure.
+const SALE_JOIN = `
+  LEFT JOIN LATERAL (
+    SELECT s.percent FROM sales s
+    WHERE s.active
+      AND (s.starts_at IS NULL OR s.starts_at <= now())
+      AND (s.ends_at   IS NULL OR s.ends_at   >  now())
+      AND (s.scope = 'all'
+        OR (s.scope = 'category' AND s.category_id = p.category_id)
+        OR (s.scope = 'brand'    AND s.brand_id    = p.brand_id)
+        OR (s.scope = 'products' AND s.product_ids @> to_jsonb(p.id)))
+    ORDER BY s.percent DESC LIMIT 1
+  ) sale ON true`
+
 // Shared SELECT fragments.
 const LIST_SELECT = `
   SELECT p.*, c.name AS category_name, c.slug AS category_slug, b.name AS brand_name,
+    sale.percent AS sale_percent,
     (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id
        ORDER BY pi.sort, pi.id LIMIT 1) AS image
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id
-  LEFT JOIN brands b ON b.id = p.brand_id`
+  LEFT JOIN brands b ON b.id = p.brand_id
+  ${SALE_JOIN}`
 
 const DETAIL_SELECT = `
   SELECT p.*, c.name AS category_name, c.slug AS category_slug, b.name AS brand_name,
+    sale.percent AS sale_percent,
     COALESCE((SELECT json_agg(pi.url ORDER BY pi.sort, pi.id)
               FROM product_images pi WHERE pi.product_id = p.id), '[]') AS images
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id
-  LEFT JOIN brands b ON b.id = p.brand_id`
+  LEFT JOIN brands b ON b.id = p.brand_id
+  ${SALE_JOIN}`
 
 // Columns that admin create/update accept, mapped from camelCase body keys.
 const PRODUCT_COLS = {
@@ -388,9 +418,9 @@ app.post(
 
     const ids = cleaned.map((i) => i.productId)
     const { rows: prods } = await query(
-      `SELECT p.id, p.name, p.price,
+      `SELECT p.id, p.name, p.price, sale.percent AS sale_percent,
         (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort, pi.id LIMIT 1) AS image
-       FROM products p WHERE p.id = ANY($1)`,
+       FROM products p ${SALE_JOIN} WHERE p.id = ANY($1)`,
       [ids],
     )
     const byId = new Map(prods.map((p) => [p.id, p]))
@@ -399,7 +429,8 @@ app.post(
     for (const it of cleaned) {
       const p = byId.get(it.productId)
       if (!p) continue
-      const price = Number(p.price) || 0
+      const pct = Number(p.sale_percent) || 0
+      const price = pct ? salePrice(p.price, pct) : Number(p.price) || 0
       subtotal += price * it.qty
       items.push({ productId: p.id, name: p.name, price, qty: it.qty, image: p.image || '' })
     }
@@ -612,7 +643,8 @@ app.get(
     }
     if (req.query.search) {
       params.push(`%${req.query.search}%`)
-      where.push(`p.name ILIKE $${params.length}`)
+      const n = params.length
+      where.push(`(p.name ILIKE $${n} OR b.name ILIKE $${n} OR c.name ILIKE $${n} OR p.tagline ILIKE $${n})`)
     }
     let sql = `${LIST_SELECT} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY p.sort, p.id`
     if (req.query.limit) {
@@ -819,6 +851,135 @@ app.delete(
   requireAuth,
   ah(async (req, res) => {
     await query(`DELETE FROM brands WHERE id = $1`, [req.params.id])
+    res.json({ ok: true })
+  }),
+)
+
+// ========================= Sales / promotions =========================
+// Admin-only: shoppers never read this table — discounted prices are baked
+// into the product responses via SALE_JOIN.
+const SALE_SCOPES = ['all', 'category', 'brand', 'products']
+
+const saleJson = (r) => ({
+  id: r.id,
+  name: r.name,
+  percent: r.percent,
+  scope: r.scope,
+  categoryId: r.category_id,
+  brandId: r.brand_id,
+  productIds: Array.isArray(r.product_ids) ? r.product_ids : [],
+  startsAt: r.starts_at,
+  endsAt: r.ends_at,
+  active: r.active,
+  createdAt: r.created_at,
+})
+
+// Validate + normalize a sale payload; returns { error } or the clean values.
+function cleanSale(b, { partial = false } = {}) {
+  const out = {}
+  if (!partial || 'name' in b) {
+    out.name = (b.name || '').trim()
+    if (!out.name) return { error: 'name is required' }
+  }
+  if (!partial || 'percent' in b) {
+    const pct = Math.round(Number(b.percent))
+    if (!Number.isFinite(pct) || pct < 1 || pct > 90) {
+      return { error: 'percent must be between 1 and 90' }
+    }
+    out.percent = pct
+  }
+  if (!partial || 'scope' in b) {
+    if (!SALE_SCOPES.includes(b.scope)) return { error: 'Invalid scope' }
+    out.scope = b.scope
+  }
+  if ('categoryId' in b) out.categoryId = b.categoryId || null
+  if ('brandId' in b) out.brandId = b.brandId || null
+  if ('productIds' in b) {
+    out.productIds = (Array.isArray(b.productIds) ? b.productIds : [])
+      .map(Number)
+      .filter(Boolean)
+  }
+  if ('startsAt' in b) out.startsAt = b.startsAt || null
+  if ('endsAt' in b) out.endsAt = b.endsAt || null
+  if ('active' in b) out.active = Boolean(b.active)
+  return { values: out }
+}
+
+app.get(
+  '/api/sales',
+  requireAuth,
+  ah(async (req, res) => {
+    const { rows } = await query(`SELECT * FROM sales ORDER BY id DESC`)
+    res.json(rows.map(saleJson))
+  }),
+)
+
+app.post(
+  '/api/sales',
+  requireAuth,
+  ah(async (req, res) => {
+    const { error, values: v } = cleanSale(req.body || {})
+    if (error) return res.status(400).json({ error })
+    const { rows } = await query(
+      `INSERT INTO sales (name, percent, scope, category_id, brand_id, product_ids, starts_at, ends_at, active)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9) RETURNING *`,
+      [
+        v.name,
+        v.percent,
+        v.scope,
+        v.categoryId ?? null,
+        v.brandId ?? null,
+        JSON.stringify(v.productIds ?? []),
+        v.startsAt ?? null,
+        v.endsAt ?? null,
+        v.active ?? true,
+      ],
+    )
+    res.status(201).json(saleJson(rows[0]))
+  }),
+)
+
+app.put(
+  '/api/sales/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const { error, values: v } = cleanSale(req.body || {}, { partial: true })
+    if (error) return res.status(400).json({ error })
+    const cols = {
+      name: 'name',
+      percent: 'percent',
+      scope: 'scope',
+      categoryId: 'category_id',
+      brandId: 'brand_id',
+      productIds: 'product_ids',
+      startsAt: 'starts_at',
+      endsAt: 'ends_at',
+      active: 'active',
+    }
+    const sets = []
+    const params = [req.params.id]
+    for (const [key, col] of Object.entries(cols)) {
+      if (!(key in v)) continue
+      if (key === 'productIds') {
+        params.push(JSON.stringify(v.productIds))
+        sets.push(`${col} = $${params.length}::jsonb`)
+      } else {
+        params.push(v[key])
+        sets.push(`${col} = $${params.length}`)
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' })
+    const { rows } = await query(`UPDATE sales SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, params)
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(saleJson(rows[0]))
+  }),
+)
+
+app.delete(
+  '/api/sales/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    await query(`DELETE FROM sales WHERE id = $1`, [req.params.id])
     res.json({ ok: true })
   }),
 )

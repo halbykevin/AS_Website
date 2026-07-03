@@ -28,10 +28,11 @@ function NavItem({ href = '#', className, onClick, children }) {
   )
 }
 
-// Builds the nav menu: only the categories explicitly flagged "Show in menu"
-// (curated in the Categories admin, ordered by their sort), then any custom
-// links from Settings — minus ones that duplicate a category or just point home
-// (the logo already does). Nothing appears in the menu unless you toggle it on.
+// Builds the nav menu: a built-in "Shop" (the all-products page), then only the
+// categories explicitly flagged "Show in menu" (curated in the Categories
+// admin, ordered by their sort), then any custom links from Settings — minus
+// ones that duplicate a category, Shop, or just point home (the logo already
+// does). Categories appear in the menu only when you toggle them on.
 function buildNavLinks(categories, settings) {
   const cats = Array.isArray(categories) ? categories : []
   const catLinks = cats
@@ -40,10 +41,10 @@ function buildNavLinks(categories, settings) {
 
   const catNames = new Set(catLinks.map((l) => l.label.toLowerCase()))
   const custom = (settings?.navLinks?.length ? settings.navLinks : defaultSettings.navLinks).filter(
-    (l) => l?.label && l.href !== '/' && !catNames.has(l.label.toLowerCase()),
+    (l) => l?.label && l.href !== '/' && l.href !== '/shop' && !catNames.has(l.label.toLowerCase()),
   )
 
-  return [...catLinks, ...custom]
+  return [{ label: 'Shop', href: '/shop' }, ...catLinks, ...custom]
 }
 
 // Apple-style global nav: optional announcement bar, slim translucent-dark bar
@@ -189,7 +190,7 @@ export default function Nav({ settings, categories = [] }) {
               transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
             >
               <div className="shell-wide flex items-center gap-3">
-                <SearchBox big autoFocus className="flex-1" onSubmit={() => setSearchOpen(false)} />
+                <SearchBox big autoFocus suggest className="flex-1" onSubmit={() => setSearchOpen(false)} />
                 <button
                   onClick={() => setSearchOpen(false)}
                   className="rounded-lg p-2 text-as-ink/50 hover:bg-as-fog hover:text-as-ink"

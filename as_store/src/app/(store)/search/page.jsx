@@ -25,7 +25,7 @@ export default async function SearchPage({ searchParams }) {
     <section className="bg-white pb-24 pt-28 sm:pt-32">
       <div className="shell-wide">
         <div className="mx-auto max-w-xl">
-          <SearchBox key={q} big defaultValue={q} />
+          <SearchBox key={q} big suggest defaultValue={q} />
         </div>
 
         {!q ? (

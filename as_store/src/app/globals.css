@@ -47,6 +47,15 @@ body {
   .tracking-apple {
     letter-spacing: -0.022em;
   }
+  /* Hollow display type for the giant background words on the homepage. */
+  .text-stroke-white {
+    -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.14);
+    color: transparent;
+  }
+  .text-stroke-red {
+    -webkit-text-stroke: 1.5px rgba(164, 30, 34, 0.4);
+    color: transparent;
+  }
 }
 
 /* Dual-handle price range slider (two stacked range inputs over one track).

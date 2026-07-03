@@ -13,7 +13,7 @@ const EASE = [0.22, 0.61, 0.36, 1]
 // (?sort=&brand=&min=&max=&sale=1&cols=) so it's shareable and back-button
 // friendly. Desktop shows an inline pill toolbar; mobile collapses to Sort and
 // Filter buttons that open bottom sheets.
-export default function ProductFilters({ brands = [], bounds = { min: 0, max: 0 }, total = 0 }) {
+export default function ProductFilters({ categories = [], brands = [], bounds = { min: 0, max: 0 }, total = 0 }) {
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
@@ -31,11 +31,12 @@ export default function ProductFilters({ brands = [], bounds = { min: 0, max: 0 
   }
 
   const sort = get('sort') || 'featured'
+  const cat = get('cat')
   const brand = get('brand')
   const saleOn = get('sale') === '1'
   const cols = get('cols') // '' = Auto (responsive)
   const hasPrice = bounds.max > bounds.min
-  const activeCount = (brand ? 1 : 0) + (get('min') || get('max') ? 1 : 0) + (saleOn ? 1 : 0)
+  const activeCount = (cat ? 1 : 0) + (brand ? 1 : 0) + (get('min') || get('max') ? 1 : 0) + (saleOn ? 1 : 0)
   const hasAny = activeCount > 0 || sort !== 'featured'
 
   return (
@@ -51,6 +52,15 @@ export default function ProductFilters({ brands = [], bounds = { min: 0, max: 0 
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </PillSelect>
+
+        {categories.length > 0 && (
+          <PillSelect ariaLabel="Filter by category" value={cat} onChange={(v) => setParams({ cat: v })}>
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.value} value={c.value}>{c.label} ({c.count})</option>
+            ))}
+          </PillSelect>
+        )}
 
         {brands.length > 0 && (
           <PillSelect ariaLabel="Filter by brand" value={brand} onChange={(v) => setParams({ brand: v })}>
@@ -152,6 +162,18 @@ export default function ProductFilters({ brands = [], bounds = { min: 0, max: 0 
         }
       >
         <div className="space-y-6">
+          {categories.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/45">Category</p>
+              <FullSelect value={cat} onChange={(v) => setParams({ cat: v })}>
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label} ({c.count})</option>
+                ))}
+              </FullSelect>
+            </div>
+          )}
+
           {brands.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/45">Brand</p>

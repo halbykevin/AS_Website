@@ -91,6 +91,12 @@ export const adminApi = {
   updateBrand: (id, data) => req(`/api/brands/${id}`, { method: 'PUT', auth: true, body: data }),
   deleteBrand: (id) => req(`/api/brands/${id}`, { method: 'DELETE', auth: true }),
 
+  // sales / promotions
+  listSales: () => req('/api/sales', { auth: true }),
+  createSale: (data) => req('/api/sales', { method: 'POST', auth: true, body: data }),
+  updateSale: (id, data) => req(`/api/sales/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteSale: (id) => req(`/api/sales/${id}`, { method: 'DELETE', auth: true }),
+
   // scraper / import
   startScrape: (opts) => req('/api/scrape', { method: 'POST', auth: true, body: opts }),
   getScrape: (id) => req(`/api/scrape/${id}`, { auth: true }),

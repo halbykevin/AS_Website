@@ -225,6 +225,33 @@ CREATE TABLE IF NOT EXISTS otp_codes (
 
 CREATE INDEX IF NOT EXISTS idx_otp_codes_mobile ON otp_codes(mobile);
 
+-- --- Sales / promotions ------------------------------------------------------
+-- One row per running promotion. Prices are never rewritten on the products
+-- table: the API computes the discounted price at read time from the best
+-- matching active sale, so ending a sale (or it expiring) restores prices
+-- instantly and scraper re-imports can't clobber a promotion.
+CREATE TABLE IF NOT EXISTS sales (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  percent     INTEGER NOT NULL DEFAULT 10,   -- discount percentage, 1..90
+  scope       TEXT NOT NULL DEFAULT 'all',   -- all | category | brand | products
+  category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+  brand_id    INTEGER REFERENCES brands(id) ON DELETE CASCADE,
+  product_ids JSONB DEFAULT '[]'::jsonb,     -- scope=products: [productId, ...]
+  starts_at   TIMESTAMPTZ,                   -- null = already started
+  ends_at     TIMESTAMPTZ,                   -- null = runs until switched off
+  active      BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_active ON sales(active);
+
+DROP TRIGGER IF EXISTS trg_sales_updated ON sales;
+CREATE TRIGGER trg_sales_updated
+  BEFORE UPDATE ON sales
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 -- --- Orders ----------------------------------------------------------------
 -- Cash-on-delivery orders. Delivery details + line items are snapshotted so the
 -- order is stable even if the customer's profile or a product later changes.

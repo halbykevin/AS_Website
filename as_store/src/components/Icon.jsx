@@ -13,6 +13,13 @@ const paths = {
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   sort: <path d="M4 6h13M4 12h9M4 18h5" />,
+  percent: (
+    <>
+      <path d="M19 5 5 19" />
+      <circle cx="7.5" cy="7.5" r="2.5" />
+      <circle cx="16.5" cy="16.5" r="2.5" />
+    </>
+  ),
   filter: <path d="M3 5h18l-7 8v6l-4-2v-4L3 5Z" />,
   user: (
     <>
