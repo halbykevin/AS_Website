@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
+import { serviceIcon } from '../lib/serviceIcon.js'
 
 // Detail page for a single Absolute Solution "solution": its intro, the list of
 // services it covers, an optional closing note, and prev/next navigation.
@@ -85,8 +86,8 @@ export default function SolutionDetail() {
                   className="group rounded-2xl border border-black/5 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-as-red/20 hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-as-red/10 text-sm font-bold text-as-red transition group-hover:bg-as-red group-hover:text-white">
-                      {i + 1}
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-as-red/10 text-as-red transition group-hover:scale-105 group-hover:bg-as-red group-hover:text-white">
+                      <Icon name={serviceIcon(it)} className="h-5 w-5" />
                     </span>
                     <h3 className="text-base font-bold text-as-charcoal transition group-hover:text-as-red">
                       {it.title}
@@ -106,10 +107,10 @@ export default function SolutionDetail() {
                   delay={i * 50}
                   className="group flex items-center gap-3 rounded-xl border border-black/5 bg-white px-5 py-4 shadow-sm transition hover:border-as-red/20 hover:shadow-md"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-as-red/10 text-as-red transition group-hover:bg-as-red group-hover:text-white">
-                    <Icon name="arrow" className="h-4 w-4" />
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-as-red/10 text-as-red transition group-hover:scale-105 group-hover:bg-as-red group-hover:text-white">
+                    <Icon name={serviceIcon(it)} className="h-[18px] w-[18px]" />
                   </span>
-                  <span className="text-sm font-semibold text-as-charcoal">{it.title}</span>
+                  <span className="text-sm font-semibold text-as-charcoal transition group-hover:text-as-red">{it.title}</span>
                 </Reveal>
               ))}
             </div>

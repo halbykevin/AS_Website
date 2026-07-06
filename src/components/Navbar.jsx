@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 import { useScrollEl } from '../store/scroll.jsx'
+import { useLenis } from '../store/lenis.jsx'
 import FootballButton from './predictor/FootballButton.jsx'
 
 export default function Navbar() {
   const { brand, nav } = useContent()
   const logoH = Number(brand.logoSize) || 48
   const scrollRef = useScrollEl()
+  const lenis = useLenis()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
@@ -34,7 +36,9 @@ export default function Navbar() {
     const [path, hash] = href.split('#')
     const scrollToHash = () => {
       const el = document.getElementById(hash)
-      if (el) el.scrollIntoView({ behavior: 'smooth' })
+      if (!el) return
+      if (lenis) lenis.scrollTo(el, { offset: -8 })
+      else el.scrollIntoView({ behavior: 'smooth' })
     }
     if (location.pathname === (path || '/')) {
       scrollToHash()
