@@ -206,6 +206,30 @@ function eventDateLabel(ev) {
   return formatBannerDate(ev.date)
 }
 
+// The last calendar day an event runs: for a multi-day event the latest date in
+// its `dates` array, otherwise its single `date`. Returns '' when undated.
+export function eventLastDate(ev) {
+  if (!ev) return ''
+  const days = Array.isArray(ev.dates) ? ev.dates.map((d) => d?.date).filter(Boolean).sort() : []
+  if (days.length) return days[days.length - 1]
+  return ev.date || ''
+}
+
+// True when an event's last day is already in the past (compared to today).
+// Undated events are never "past" — there's nothing to compare against.
+export function isEventPast(ev) {
+  const last = eventLastDate(ev)
+  if (!last) return false
+  const d = new Date(`${last}T23:59:59`)
+  if (Number.isNaN(d.getTime())) return false
+  return d.getTime() < Date.now()
+}
+
+// Human date label for an event (weekday range for multi-day, single day else).
+export function eventDateText(ev) {
+  return eventDateLabel(ev)
+}
+
 // Build a WhatsApp "click to chat" link for an event: opens a chat with the
 // admin-configured number, pre-filled with the event details so the visitor
 // just hits send. Returns '' when no number is set, so callers can fall back to

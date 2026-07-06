@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { adminApi } from '../../lib/api.js'
+import { adminApi, isEventPast, eventDateText } from '../../lib/api.js'
 import { Card, Field, TextInput, Select, Toggle, Button, Banner, PageHeader } from '../ui.jsx'
 import FocalPicker from '../FocalPicker.jsx'
 
@@ -144,8 +144,10 @@ export default function BannersAdmin() {
             from each event — reorder them in the list below.
           </p>
           <div className="max-h-64 divide-y divide-black/5 overflow-auto rounded-xl border border-black/10">
-            {events.map((ev) => (
-              <label key={ev.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-black/[0.02]">
+            {events.map((ev) => {
+              const past = isEventPast(ev)
+              return (
+              <label key={ev.id} className={`flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-black/[0.02] ${past ? 'bg-as-red/[0.04]' : ''}`}>
                 <input
                   type="checkbox"
                   className="h-4 w-4 accent-as-red"
@@ -153,12 +155,16 @@ export default function BannersAdmin() {
                   onChange={() => togglePick(String(ev.id))}
                 />
                 {ev.imageUrl
-                  ? <img src={ev.imageUrl} alt="" className="h-8 w-12 shrink-0 rounded object-cover ring-1 ring-black/5" />
+                  ? <img src={ev.imageUrl} alt="" className={`h-8 w-12 shrink-0 rounded object-cover ring-1 ring-black/5 ${past ? 'opacity-60 grayscale' : ''}`} />
                   : <span className="h-8 w-12 shrink-0 rounded bg-as-gray/20" />}
-                <span className="min-w-0 flex-1 truncate text-as-charcoal">{ev.title}</span>
-                <span className="shrink-0 text-xs text-as-charcoal/45">{ev.date}</span>
+                <span className="min-w-0 flex-1 truncate text-as-charcoal">
+                  {ev.title}
+                  {past && <span className="ml-2 rounded-full bg-as-red px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Past</span>}
+                </span>
+                <span className={`shrink-0 text-xs ${past ? 'text-as-red/80' : 'text-as-charcoal/45'}`}>{ev.date}</span>
               </label>
-            ))}
+              )
+            })}
           </div>
           <div className="mt-4">
             <Button onClick={addFromEvents} disabled={!picked.length || saving}>
@@ -249,8 +255,13 @@ export default function BannersAdmin() {
               const ev = r.eventId ? evMap.get(r.eventId) : null
               const img = r.imageUrl || ev?.imageUrl || ''
               const title = r.title || ev?.title || 'Untitled banner'
+              const dateText = ev ? eventDateText(ev) : ''
+              const past = ev ? isEventPast(ev) : false
               return (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-3">
+                <li
+                  key={r.id}
+                  className={`flex items-center justify-between gap-3 border-l-4 py-3 pl-3 ${past ? 'border-as-red bg-as-red/[0.04]' : 'border-transparent'}`}
+                >
                   <div className="flex shrink-0 flex-col">
                     <button
                       type="button"
@@ -269,11 +280,19 @@ export default function BannersAdmin() {
                   </div>
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {img
-                      ? <img src={img} alt="" className="h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5" />
+                      ? <img src={img} alt="" className={`h-12 w-24 shrink-0 rounded object-cover ring-1 ring-black/5 ${past ? 'opacity-60 grayscale' : ''}`} />
                       : <span className="h-12 w-24 shrink-0 rounded bg-as-gray/20" />}
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-as-charcoal">{title}</p>
-                      <p className="truncate text-sm text-as-charcoal/55">
+                      <p className="flex items-center gap-2 font-semibold text-as-charcoal">
+                        <span className="truncate">{title}</span>
+                        {past && (
+                          <span className="shrink-0 rounded-full bg-as-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                            Past
+                          </span>
+                        )}
+                      </p>
+                      <p className={`truncate text-sm ${past ? 'text-as-red/80' : 'text-as-charcoal/55'}`}>
+                        {dateText && <span>{dateText} · </span>}
                         {ev ? 'from event' : 'manual'}{r.active === false ? ' · hidden' : ''}
                       </p>
                     </div>

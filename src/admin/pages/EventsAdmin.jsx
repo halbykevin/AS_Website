@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { adminApi } from '../../lib/api.js'
+import { adminApi, isEventPast } from '../../lib/api.js'
 import { Card, Field, TextInput, TextArea, Select, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
 const STATUS = [
@@ -156,13 +156,31 @@ export default function EventsAdmin() {
           <p className="text-sm text-as-charcoal/50">No events yet.</p>
         ) : (
           <ul className="divide-y divide-black/5">
-            {items.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-4 py-3">
+            {items.map((r) => {
+              const past = isEventPast(r)
+              return (
+              <li
+                key={r.id}
+                className={`flex items-center justify-between gap-4 border-l-4 py-3 pl-3 ${past ? 'border-as-red bg-as-red/[0.04]' : 'border-transparent'}`}
+              >
                 <div className="flex min-w-0 items-center gap-3">
-                  {r.imageUrl && <img src={r.imageUrl} alt="" className="h-12 w-16 shrink-0 rounded object-cover ring-1 ring-black/5" />}
+                  {r.imageUrl && (
+                    <img
+                      src={r.imageUrl}
+                      alt=""
+                      className={`h-12 w-16 shrink-0 rounded object-cover ring-1 ring-black/5 ${past ? 'opacity-60 grayscale' : ''}`}
+                    />
+                  )}
                   <div className="min-w-0">
-                    <p className="font-semibold text-as-charcoal">{r.title}</p>
-                    <p className="truncate text-sm text-as-charcoal/55">
+                    <p className="flex items-center gap-2 font-semibold text-as-charcoal">
+                      <span className="truncate">{r.title}</span>
+                      {past && (
+                        <span className="shrink-0 rounded-full bg-as-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          Past
+                        </span>
+                      )}
+                    </p>
+                    <p className={`truncate text-sm ${past ? 'text-as-red/80' : 'text-as-charcoal/55'}`}>
                       {(r.date || 'no date')} · {r.venue} · {r.status}
                     </p>
                   </div>
@@ -172,7 +190,8 @@ export default function EventsAdmin() {
                   <Button variant="danger" onClick={() => remove(r)} className="px-3 py-1.5">Delete</Button>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </Card>
