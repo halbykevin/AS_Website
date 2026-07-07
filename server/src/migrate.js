@@ -335,7 +335,7 @@ VALUES (1,
   'https://www.instagram.com/ascompany.lb/', '@ascompany.lb',
   'AS Store', 'Coming soon',
   'Our dedicated online store where you buy the latest tech. Launching soon — stay tuned.',
-  '', false)
+  'https://store.as.com.lb', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton popup row exists (disabled by default).

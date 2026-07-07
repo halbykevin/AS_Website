@@ -213,7 +213,9 @@ export const store = {
     'Our dedicated online store where you buy the latest tech. Launching soon — stay tuned.',
   logo: '/as-store-logo.png',
   // Update this once the AS Store site is live. Empty string = "coming soon".
-  url: '',
+  // NOTE: the live value is the `storeUrl` site setting (admin dashboard); this is
+  // only the offline fallback / fresh-install default.
+  url: 'https://store.as.com.lb',
   cta: 'Visit AS Store',
 }
 
