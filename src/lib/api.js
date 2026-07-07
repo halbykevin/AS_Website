@@ -421,6 +421,13 @@ function mapPredictor(meta, matches) {
       description: meta.prizeDescription || '',
       image: meta.prizeImageUrl || '',
     },
+    entryFee: meta.entryFee == null ? 5 : Number(meta.entryFee),
+    payment: {
+      enabled: meta.paymentEnabled !== false,
+      recipient: meta.paymentRecipient || 'AS Company',
+      note: meta.paymentNote || '',
+      instructions: meta.paymentInstructions || '',
+    },
     deadline: meta.deadline || null,
     closed: meta.closed === true || deadlinePassed,
     successMessage: meta.successMessage || '',
@@ -428,7 +435,7 @@ function mapPredictor(meta, matches) {
   }
 }
 
-// Submit a public prediction entry. picks = [{ matchId, scoreA, scoreB }].
+// Submit a public prediction entry. picks = [{ matchId, btts:'yes'|'no', qualifier:'A'|'B' }].
 export const submitPrediction = (data) =>
   request('/api/predictions', { method: 'POST', body: data })
 

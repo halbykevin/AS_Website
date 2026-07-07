@@ -16,6 +16,7 @@ function toLocalInput(iso) {
 const blankSettings = {
   enabled: false, notifyWhatsapp: false, title: '', subtitle: '', intro: '', successMessage: '',
   prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
+  entryFee: 5, paymentEnabled: true, paymentRecipient: 'AS Company', paymentNote: '#as.com.lb', paymentInstructions: '',
 }
 const blankMatch = {
   stage: '', teamA: '', teamACode: '', teamAFlag: '', teamB: '', teamBCode: '', teamBFlag: '',
@@ -89,6 +90,11 @@ export default function PredictorAdmin() {
           prizeTitle: p.prizeTitle || '', prizeDescription: p.prizeDescription || '',
           prizeImageUrl: p.prizeImageUrl || '',
           deadline: toLocalInput(p.deadline), closed: p.closed === true,
+          entryFee: p.entryFee ?? 5,
+          paymentEnabled: p.paymentEnabled !== false,
+          paymentRecipient: p.paymentRecipient || 'AS Company',
+          paymentNote: p.paymentNote || '',
+          paymentInstructions: p.paymentInstructions || '',
         })
       }
       setMatches(Array.isArray(m) ? m : [])
@@ -178,6 +184,14 @@ export default function PredictorAdmin() {
     return m ? `${m.teamA || 'A'} vs ${m.teamB || 'B'}` : `Match #${id}`
   }
 
+  // New pick shape: { matchId, btts:'yes'|'no', qualifier:'A'|'B' }.
+  const bttsLabel = (pick) => (pick.btts === 'yes' ? 'Yes' : pick.btts === 'no' ? 'No' : '—')
+  const qualifierName = (pick) => {
+    const m = matches.find((x) => x.id === pick.matchId)
+    if (!m) return pick.qualifier === 'A' ? 'Team A' : pick.qualifier === 'B' ? 'Team B' : '—'
+    return pick.qualifier === 'A' ? m.teamA || 'Team A' : pick.qualifier === 'B' ? m.teamB || 'Team B' : '—'
+  }
+
   // Mirror of the server's toWhatsAppNumber (server/src/whatsapp.js): digits-only
   // international form, defaulting local Lebanese numbers to +961.
   const toWhatsAppNumber = (mobile, cc = '961') => {
@@ -196,7 +210,7 @@ export default function PredictorAdmin() {
     }
     const firstName = (p.fullName || '').trim().split(/\s+/)[0] || 'there'
     const picks = p.picks
-      .map((pick) => `• ${matchLabel(pick.matchId)} — ${pick.scoreA} : ${pick.scoreB}`)
+      .map((pick) => `• ${matchLabel(pick.matchId)} — BTTS ${bttsLabel(pick)}, ${qualifierName(pick)} qualify`)
       .join('\n')
     const text = [
       `Hello ${firstName}! ⚽`,
@@ -217,7 +231,7 @@ export default function PredictorAdmin() {
     <div className="space-y-6">
       <PageHeader
         title="World Cup Predictor"
-        description="Run the score-prediction game: set the prize, add matches, and collect entries."
+        description="Run the predictor game: set the prize & Whish entry payment, add matches, and collect entries."
       />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
@@ -246,9 +260,9 @@ export default function PredictorAdmin() {
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Title"><TextInput value={settings.title} onChange={setS('title')} placeholder="Predict & Win — World Cup 2026" /></Field>
-              <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Call the exact scores and win big." /></Field>
+              <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Call both-teams-to-score and who qualifies to win big." /></Field>
             </div>
-            <Field label="Intro text"><TextArea value={settings.intro} onChange={setS('intro')} placeholder="Predict the exact score of every match below…" /></Field>
+            <Field label="Intro text"><TextArea value={settings.intro} onChange={setS('intro')} placeholder="For each match, pick both-teams-to-score and who qualifies…" /></Field>
             <Field label="Submission deadline (optional)" hint="After this time, entries are automatically closed.">
               <TextInput type="datetime-local" value={settings.deadline} onChange={setS('deadline')} />
             </Field>
@@ -295,6 +309,32 @@ export default function PredictorAdmin() {
             </div>
           </div>
         </Card>
+
+        <Card title="Entry payment (Whish)">
+          <div className="space-y-4">
+            <Toggle
+              checked={settings.paymentEnabled}
+              onChange={(v) => setSettings((s) => ({ ...s, paymentEnabled: v }))}
+              label={settings.paymentEnabled ? 'Payment required to enter' : 'No payment — free entry'}
+              description="When on, players must confirm a Whish payment before they can submit their predictions."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Entry fee (USD)" hint="Shown to players, e.g. 5.">
+                <TextInput type="number" min="0" step="0.5" value={settings.entryFee} onChange={setS('entryFee')} placeholder="5" />
+              </Field>
+              <Field label="Whish recipient / business name" hint="What players search for in the Whish app.">
+                <TextInput value={settings.paymentRecipient} onChange={setS('paymentRecipient')} placeholder="AS Company" />
+              </Field>
+            </div>
+            <Field label="Payment note" hint="Players add this note to their payment so you can match their entry.">
+              <TextInput value={settings.paymentNote} onChange={setS('paymentNote')} placeholder="#as.com.lb" />
+            </Field>
+            <Field label="Extra instructions (optional)">
+              <TextArea value={settings.paymentInstructions} onChange={setS('paymentInstructions')} placeholder="Any extra note shown on the payment step." />
+            </Field>
+          </div>
+        </Card>
+
         <SaveBar saving={savingSettings} label="Save game settings" />
       </form>
 
@@ -398,7 +438,9 @@ export default function PredictorAdmin() {
                     {p.picks.map((pick, i) => (
                       <li key={i} className="flex items-center justify-between gap-2">
                         <span className="truncate text-as-charcoal/70">{matchLabel(pick.matchId)}</span>
-                        <span className="shrink-0 font-bold text-as-charcoal">{pick.scoreA} : {pick.scoreB}</span>
+                        <span className="shrink-0 text-right font-bold text-as-charcoal">
+                          BTTS {bttsLabel(pick)} · {qualifierName(pick)}
+                        </span>
                       </li>
                     ))}
                   </ul>

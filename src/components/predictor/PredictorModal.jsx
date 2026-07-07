@@ -104,41 +104,37 @@ function formatKickoff(kickoff) {
   })
 }
 
-function Flag({ src, name }) {
+function Flag({ src, name, size = 'md' }) {
+  const cls = size === 'sm' ? 'h-4 w-6' : 'h-9 w-12'
   if (!src) {
     return (
-      <div className="flex h-10 w-14 items-center justify-center rounded-md bg-white/15 text-lg font-black text-white/80 ring-1 ring-white/30">
+      <div className={`flex ${cls} items-center justify-center rounded-md bg-as-charcoal/10 text-xs font-black text-as-charcoal/60 ring-1 ring-black/10`}>
         {(name || '?').slice(0, 2).toUpperCase()}
       </div>
     )
   }
+  return <img src={src} alt={name} loading="lazy" className={`${cls} rounded-md object-cover shadow-sm ring-1 ring-black/10`} />
+}
+
+// A segmented-control option button used for BTTS and the qualifier picker.
+function SegButton({ active, onClick, disabled, tone = 'ink', children }) {
+  const activeCls = tone === 'green' ? 'bg-emerald-600 text-white shadow' : 'bg-as-charcoal text-white shadow'
   return (
-    <img
-      src={src}
-      alt={name}
-      loading="lazy"
-      className="h-10 w-14 rounded-md object-cover shadow ring-1 ring-black/10"
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+        active ? activeCls : 'bg-white text-as-charcoal ring-1 ring-black/10 hover:ring-black/25'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 
-// A single match row with two flags + two score inputs.
-function MatchRow({ match, value, onChange, disabled }) {
-  const scoreInput = (side) => (
-    <input
-      type="number"
-      inputMode="numeric"
-      min="0"
-      max="99"
-      disabled={disabled}
-      value={value?.[side] ?? ''}
-      onChange={(e) => onChange(side, e.target.value)}
-      aria-label={`${side === 'a' ? match.teamA : match.teamB} score`}
-      className="h-12 w-12 rounded-xl border-2 border-emerald-200 bg-white text-center text-xl font-extrabold text-as-charcoal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300/60 disabled:opacity-60 sm:h-14 sm:w-14"
-      placeholder="–"
-    />
-  )
-
+// One match: two teams, a Both-Teams-To-Score toggle, and a "who qualifies" pick.
+function MatchRow({ match, value, onBtts, onQualifier, disabled }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white p-3 shadow-sm sm:p-4">
       {(match.stage || match.kickoff) && (
@@ -148,21 +144,96 @@ function MatchRow({ match, value, onChange, disabled }) {
           {match.kickoff && <span>{formatKickoff(match.kickoff)}</span>}
         </div>
       )}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
+
+      <div className="flex items-center justify-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          <span className="line-clamp-1 text-right text-sm font-bold text-as-charcoal">{match.teamA || 'Team A'}</span>
           <Flag src={match.flagA} name={match.teamA} />
-          <span className="line-clamp-1 text-sm font-bold text-as-charcoal">{match.teamA || 'Team A'}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {scoreInput('a')}
-          <span className="text-sm font-black text-as-charcoal/40">:</span>
-          {scoreInput('b')}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
+        <span className="shrink-0 text-xs font-black text-as-charcoal/35">VS</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Flag src={match.flagB} name={match.teamB} />
           <span className="line-clamp-1 text-sm font-bold text-as-charcoal">{match.teamB || 'Team B'}</span>
         </div>
       </div>
+
+      {/* Both teams to score? */}
+      <div className="mt-3">
+        <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
+          Both teams to score?
+        </p>
+        <div className="flex gap-2">
+          <SegButton tone="green" active={value?.btts === 'yes'} onClick={() => onBtts('yes')} disabled={disabled}>Yes</SegButton>
+          <SegButton tone="green" active={value?.btts === 'no'} onClick={() => onBtts('no')} disabled={disabled}>No</SegButton>
+        </div>
+      </div>
+
+      {/* Who qualifies? */}
+      <div className="mt-3">
+        <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
+          Who qualifies?
+        </p>
+        <div className="flex gap-2">
+          <SegButton active={value?.qualifier === 'A'} onClick={() => onQualifier('A')} disabled={disabled}>
+            <Flag src={match.flagA} name={match.teamA} size="sm" />
+            <span className="line-clamp-1">{match.teamA || 'Team A'}</span>
+          </SegButton>
+          <SegButton active={value?.qualifier === 'B'} onClick={() => onQualifier('B')} disabled={disabled}>
+            <Flag src={match.flagB} name={match.teamB} size="sm" />
+            <span className="line-clamp-1">{match.teamB || 'Team B'}</span>
+          </SegButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Whish payment step: pay a small fee to AS Company with a note to enter.
+function WhishPay({ payment, amount, confirmed, onConfirm }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+        <p className="text-sm font-bold text-as-charcoal">Pay {amount} on Whish to enter</p>
+        <ol className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
+          <li className="flex gap-2"><span>1️⃣</span><span>Open the <span className="font-semibold">Whish Money</span> app.</span></li>
+          <li className="flex gap-2"><span>2️⃣</span><span>Search for <span className="font-semibold">{payment.recipient || 'AS Company'}</span> and send <span className="font-semibold">{amount}</span>.</span></li>
+          {payment.note && (
+            <li className="flex gap-2"><span>3️⃣</span><span>Add the note <span className="font-bold text-as-red">{payment.note}</span> so we can match your entry.</span></li>
+          )}
+        </ol>
+        {payment.instructions && <p className="mt-3 text-sm text-as-charcoal/70">{payment.instructions}</p>}
+        {payment.note && (
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-black/10">
+            <span className="truncate text-sm font-bold text-as-charcoal">Note: {payment.note}</span>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(payment.note)}
+              className="shrink-0 rounded-lg bg-as-charcoal/5 px-2.5 py-1 text-xs font-semibold text-as-charcoal transition hover:bg-as-charcoal/10"
+            >
+              Copy
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-as-charcoal/60">
+        Tip: enter with the <span className="font-semibold">same mobile number you paid from</span> — that&apos;s how we verify your payment.
+      </p>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(e) => onConfirm(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-600"
+        />
+        <span className="text-sm font-medium text-as-charcoal">
+          I&apos;ve completed the {amount} Whish payment{payment.note ? ` with the note ${payment.note}` : ''}.
+          <span className="mt-0.5 block text-xs font-normal text-as-charcoal/60">
+            Entries are verified against payments before any prize is paid.
+          </span>
+        </span>
+      </label>
     </div>
   )
 }
@@ -170,10 +241,11 @@ function MatchRow({ match, value, onChange, disabled }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('follow') // follow | play | register | done
+  const [step, setStep] = useState('follow') // follow | play | pay | register | done
   const [followedInstagram, setFollowedInstagram] = useState(false)
   const [confirmedFollow, setConfirmedFollow] = useState(false)
-  const [scores, setScores] = useState({})
+  const [picks, setPicks] = useState({}) // { [matchId]: { btts, qualifier } }
+  const [paidConfirmed, setPaidConfirmed] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
   const [error, setError] = useState('')
@@ -192,21 +264,31 @@ export default function PredictorModal() {
   }, [closeGame])
 
   if (!predictor) return null
-  const { matches, prize, closed } = predictor
+  const { matches, prize, closed, payment = {}, entryFee } = predictor
+  const paymentEnabled = payment.enabled !== false
+  const amount = `$${entryFee ?? 5}`
 
-  const setScore = (matchId) => (side, raw) => {
-    const v = raw === '' ? '' : String(Math.min(99, Math.max(0, Math.floor(Number(raw) || 0))))
-    setScores((s) => ({ ...s, [matchId]: { ...s[matchId], [side]: v } }))
-  }
+  const setBtts = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], btts: v } }))
+  const setQualifier = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], qualifier: v } }))
 
   const allFilled = matches.every((m) => {
-    const v = scores[m.id]
-    return v && v.a !== '' && v.a !== undefined && v.b !== '' && v.b !== undefined
+    const v = picks[m.id]
+    return v && (v.btts === 'yes' || v.btts === 'no') && (v.qualifier === 'A' || v.qualifier === 'B')
   })
 
-  const goToRegister = () => {
+  // From the predictions step: pay first (if the fee is on), else straight to details.
+  const afterPlay = () => {
     if (!allFilled) {
-      setError('Predict a score for every match to continue.')
+      setError('Make both picks for every match to continue.')
+      return
+    }
+    setError('')
+    setStep(paymentEnabled ? 'pay' : 'register')
+  }
+
+  const afterPay = () => {
+    if (!paidConfirmed) {
+      setError('Please confirm your payment to continue.')
       return
     }
     setError('')
@@ -222,12 +304,12 @@ export default function PredictorModal() {
     setSubmitting(true)
     setError('')
     try {
-      const picks = matches.map((m) => ({
+      const body = matches.map((m) => ({
         matchId: m.id,
-        scoreA: Number(scores[m.id]?.a ?? 0),
-        scoreB: Number(scores[m.id]?.b ?? 0),
+        btts: picks[m.id]?.btts,
+        qualifier: picks[m.id]?.qualifier,
       }))
-      await submitPrediction({ fullName: fullName.trim(), mobile: mobile.trim(), picks })
+      await submitPrediction({ fullName: fullName.trim(), mobile: mobile.trim(), picks: body })
       setStep('done')
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.')
@@ -281,8 +363,11 @@ export default function PredictorModal() {
                 <p className="text-sm font-bold text-as-charcoal">How to win</p>
                 <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
                   <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
-                  <li className="flex gap-2"><span>2️⃣</span><span>Predict the <span className="font-semibold">exact score</span> of all {matches.length} matches.</span></li>
-                  <li className="flex gap-2"><span>3️⃣</span><span><span className="font-semibold">Win 250$ Cash</span>.</span></li>
+                  <li className="flex gap-2"><span>2️⃣</span><span>For each match, predict <span className="font-semibold">both teams to score</span> &amp; <span className="font-semibold">who qualifies</span>.</span></li>
+                  {paymentEnabled && (
+                    <li className="flex gap-2"><span>3️⃣</span><span>Pay <span className="font-semibold">{amount}</span> on Whish to <span className="font-semibold">{payment.recipient || 'AS Company'}</span> to enter.</span></li>
+                  )}
+                  <li className="flex gap-2"><span>{paymentEnabled ? '4️⃣' : '3️⃣'}</span><span><span className="font-semibold">Win{prize.enabled && prize.title ? ` ${prize.title}` : ' the prize'}</span>.</span></li>
                 </ul>
               </div>
 
@@ -322,10 +407,21 @@ export default function PredictorModal() {
 
               <div className="space-y-3">
                 {matches.map((m) => (
-                  <MatchRow key={m.id} match={m} value={scores[m.id]} onChange={setScore(m.id)} disabled={closed} />
+                  <MatchRow
+                    key={m.id}
+                    match={m}
+                    value={picks[m.id]}
+                    onBtts={setBtts(m.id)}
+                    onQualifier={setQualifier(m.id)}
+                    disabled={closed}
+                  />
                 ))}
               </div>
             </div>
+          )}
+
+          {step === 'pay' && (
+            <WhishPay payment={payment} amount={amount} confirmed={paidConfirmed} onConfirm={setPaidConfirmed} />
           )}
 
           {step === 'register' && (
@@ -354,6 +450,9 @@ export default function PredictorModal() {
                   placeholder="+961 …"
                   className="w-full rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300/60"
                 />
+                {paymentEnabled && (
+                  <span className="mt-1 block text-xs text-as-charcoal/55">Use the same number you paid with on Whish.</span>
+                )}
               </label>
             </form>
           )}
@@ -397,18 +496,37 @@ export default function PredictorModal() {
             {step === 'play' && (
               <button
                 type="button"
-                onClick={goToRegister}
+                onClick={afterPlay}
                 disabled={closed}
                 className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Continue →
               </button>
             )}
-            {step === 'register' && (
+            {step === 'pay' && (
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => { setStep('play'); setError('') }}
+                  className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-as-charcoal transition hover:border-emerald-400 hover:text-emerald-600"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  onClick={afterPay}
+                  disabled={!paidConfirmed}
+                  className="flex-1 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  I&apos;ve paid — continue →
+                </button>
+              </div>
+            )}
+            {step === 'register' && (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setStep(paymentEnabled ? 'pay' : 'play'); setError('') }}
                   className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-as-charcoal transition hover:border-emerald-400 hover:text-emerald-600"
                 >
                   ← Back

@@ -214,6 +214,11 @@ CREATE TABLE IF NOT EXISTS predictor (
   deadline TIMESTAMPTZ,
   closed BOOLEAN DEFAULT false,
   success_message TEXT DEFAULT '',
+  entry_fee NUMERIC(10,2) DEFAULT 5,
+  payment_enabled BOOLEAN DEFAULT true,
+  payment_recipient TEXT DEFAULT 'AS Company',
+  payment_note TEXT DEFAULT '#as.com.lb',
+  payment_instructions TEXT DEFAULT '',
   updated_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT predictor_singleton CHECK (id = 1)
 );
@@ -250,6 +255,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobil
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_enabled BOOLEAN DEFAULT true;
 -- Admin toggle for the WhatsApp confirmation (off until a real number is live).
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS notify_whatsapp BOOLEAN DEFAULT false;
+-- Whish entry-payment gate: pay a small fee to AS Company with a note to enter.
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS entry_fee NUMERIC(10,2) DEFAULT 5;
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_enabled BOOLEAN DEFAULT true;
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_recipient TEXT DEFAULT 'AS Company';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_note TEXT DEFAULT '#as.com.lb';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT '';
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
@@ -327,8 +338,8 @@ INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 -- Ensure the singleton predictor row exists (disabled by default).
 INSERT INTO predictor (id, enabled, title, subtitle, intro, success_message)
 VALUES (1, false, 'Predict & Win — World Cup 2026',
-  'Call the exact scores and win big.',
-  'Predict the exact score of every match below, drop your name and number, and you could be our lucky winner.',
+  'Call both-teams-to-score and who qualifies to win big.',
+  'For every match below, tell us if both teams will score and which team qualifies. Enter, and you could be our lucky winner.',
   'Your predictions are in! Good luck — we''ll be in touch on WhatsApp if you win.')
 ON CONFLICT (id) DO NOTHING;
 

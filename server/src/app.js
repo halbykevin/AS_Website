@@ -112,6 +112,9 @@ const predictorJson = (r) => ({
   title: r.title, subtitle: r.subtitle, intro: r.intro,
   prizeEnabled: r.prize_enabled,
   prizeTitle: r.prize_title, prizeDescription: r.prize_description, prizeImageUrl: r.prize_image_url,
+  entryFee: r.entry_fee == null ? 5 : Number(r.entry_fee),
+  paymentEnabled: r.payment_enabled, paymentRecipient: r.payment_recipient,
+  paymentNote: r.payment_note, paymentInstructions: r.payment_instructions,
   deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
 })
 const predictorMatchJson = (r) => ({
@@ -593,7 +596,9 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
     `UPDATE predictor SET
        enabled=$1, title=$2, subtitle=$3, intro=$4,
        prize_title=$5, prize_description=$6, prize_image_url=$7,
-       deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, notify_whatsapp=$12, updated_at=now()
+       deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, notify_whatsapp=$12,
+       entry_fee=$13, payment_enabled=$14, payment_recipient=$15, payment_note=$16, payment_instructions=$17,
+       updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       Boolean(b.enabled), b.title || '', b.subtitle || '', b.intro || '',
@@ -601,6 +606,9 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
       b.deadline || null, Boolean(b.closed), b.successMessage || '',
       b.prizeEnabled === undefined ? true : Boolean(b.prizeEnabled),
       Boolean(b.notifyWhatsapp),
+      b.entryFee == null || b.entryFee === '' ? 5 : Number(b.entryFee),
+      b.paymentEnabled === undefined ? true : Boolean(b.paymentEnabled),
+      b.paymentRecipient || 'AS Company', b.paymentNote || '', b.paymentInstructions || '',
     ]
   )
   res.json(predictorJson(rows[0]))
@@ -666,11 +674,15 @@ app.post('/api/predictions', ah(async (req, res) => {
 
   const matchRows = (await query('SELECT id, team_a, team_b FROM predictor_matches WHERE visible = true')).rows
   const validIds = new Set(matchRows.map((r) => r.id))
-  const clampScore = (v) => Math.min(99, Math.max(0, Math.round(Number(v))))
+  // Picks are now { matchId, btts: 'yes'|'no', qualifier: 'A'|'B' }.
   const picks = (Array.isArray(b.picks) ? b.picks : [])
-    .map((p) => ({ matchId: Number(p?.matchId), scoreA: clampScore(p?.scoreA), scoreB: clampScore(p?.scoreB) }))
-    .filter((p) => validIds.has(p.matchId) && Number.isFinite(p.scoreA) && Number.isFinite(p.scoreB))
-  if (!picks.length) return res.status(400).json({ error: 'Please predict at least one match' })
+    .map((p) => ({
+      matchId: Number(p?.matchId),
+      btts: String(p?.btts || '').toLowerCase() === 'yes' ? 'yes' : String(p?.btts || '').toLowerCase() === 'no' ? 'no' : '',
+      qualifier: String(p?.qualifier || '').toUpperCase() === 'A' ? 'A' : String(p?.qualifier || '').toUpperCase() === 'B' ? 'B' : '',
+    }))
+    .filter((p) => validIds.has(p.matchId) && p.btts && p.qualifier)
+  if (!picks.length) return res.status(400).json({ error: 'Please make a prediction for at least one match' })
 
   try {
     const { rows } = await query(
@@ -686,9 +698,10 @@ app.post('/api/predictions', ah(async (req, res) => {
       const picksText = picks
         .map((p) => {
           const m = byId.get(p.matchId)
-          return `${m?.team_a || 'Team A'} ${p.scoreA}-${p.scoreB} ${m?.team_b || 'Team B'}`
+          const qualTeam = p.qualifier === 'A' ? m?.team_a : m?.team_b
+          return `${m?.team_a || 'Team A'} vs ${m?.team_b || 'Team B'} — BTTS ${p.btts === 'yes' ? 'Yes' : 'No'}, ${qualTeam || (p.qualifier === 'A' ? 'Team A' : 'Team B')} qualify`
         })
-        .join(', ')
+        .join('; ')
       sendTemplate(mobile, [fullName, picksText]).catch((err) =>
         console.error('[whatsapp] prediction confirmation failed:', err.message)
       )
