@@ -8,6 +8,7 @@ import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
+import { mailEnabled, sendPredictionEmail } from './mailer.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -672,7 +673,7 @@ app.post('/api/predictions', ah(async (req, res) => {
   const mobile = normalizeMobile(b.mobile)
   if (!fullName || !mobile) return res.status(400).json({ error: 'Full name and mobile number are required' })
 
-  const cfg = (await query('SELECT enabled, closed, deadline, notify_whatsapp FROM predictor WHERE id = 1')).rows[0]
+  const cfg = (await query('SELECT enabled, closed, deadline, notify_whatsapp, title, entry_fee, payment_enabled, payment_recipient, payment_note FROM predictor WHERE id = 1')).rows[0]
   if (!cfg || !cfg.enabled || cfg.closed) return res.status(403).json({ error: 'The game is not currently open' })
   if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
     return res.status(403).json({ error: 'The prediction deadline has passed' })
@@ -696,20 +697,44 @@ app.post('/api/predictions', ah(async (req, res) => {
     )
     res.status(201).json(predictionJson(rows[0]))
 
+    // Enrich picks with team names for the notifications below.
+    const byId = new Map(matchRows.map((m) => [m.id, m]))
+    const enriched = picks.map((p) => {
+      const m = byId.get(p.matchId)
+      const qualTeam = p.qualifier === 'A' ? m?.team_a : m?.team_b
+      return {
+        teamA: m?.team_a || 'Team A',
+        teamB: m?.team_b || 'Team B',
+        btts: p.btts === 'yes' ? 'Yes' : 'No',
+        qualifier: qualTeam || (p.qualifier === 'A' ? 'Team A' : 'Team B'),
+      }
+    })
+
     // Fire-and-forget WhatsApp confirmation. Never blocks or fails the response;
     // a no-op unless the admin enabled it AND the Cloud API env vars are configured.
     if (cfg.notify_whatsapp && whatsappEnabled()) {
-      const byId = new Map(matchRows.map((m) => [m.id, m]))
-      const picksText = picks
-        .map((p) => {
-          const m = byId.get(p.matchId)
-          const qualTeam = p.qualifier === 'A' ? m?.team_a : m?.team_b
-          return `${m?.team_a || 'Team A'} vs ${m?.team_b || 'Team B'} — BTTS ${p.btts === 'yes' ? 'Yes' : 'No'}, ${qualTeam || (p.qualifier === 'A' ? 'Team A' : 'Team B')} qualify`
-        })
+      const picksText = enriched
+        .map((p) => `${p.teamA} vs ${p.teamB} — BTTS ${p.btts}, ${p.qualifier} qualify`)
         .join('; ')
       sendTemplate(mobile, [fullName, picksText]).catch((err) =>
         console.error('[whatsapp] prediction confirmation failed:', err.message)
       )
+    }
+
+    // Fire-and-forget staff email notification. No-op unless SMTP is configured.
+    if (mailEnabled()) {
+      const paymentEnabled = cfg.payment_enabled !== false
+      sendPredictionEmail({
+        playerName: fullName,
+        mobile,
+        createdAt: rows[0].created_at,
+        gameTitle: cfg.title || 'Predict & Win — World Cup 2026',
+        picks: enriched,
+        paymentEnabled,
+        amount: `$${cfg.entry_fee == null ? 5 : Number(cfg.entry_fee)}`,
+        recipient: cfg.payment_recipient || 'AS Company',
+        note: cfg.payment_note || '',
+      }).catch((err) => console.error('[mail] prediction notification failed:', err.message))
     }
   } catch (err) {
     // Unique-violation on the mobile number → this phone already entered.
