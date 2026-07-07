@@ -217,7 +217,7 @@ function WhishPay({ payment, amount, confirmed, onConfirm }) {
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
         <p className="text-sm font-bold text-as-charcoal">Pay {amount} on Whish to enter</p>
         <ol className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
-          <li className="flex gap-2"><span>1️⃣</span><span>Open the <span className="font-semibold">Whish Money</span> app (tap the button below).</span></li>
+          <li className="flex gap-2"><span>1️⃣</span><span>Open the <span className="font-semibold">Whish Money</span> app (don&apos;t have it? get it below).</span></li>
           <li className="flex gap-2"><span>2️⃣</span><span>Search for <span className="font-semibold">{payment.recipient || 'AS Company'}</span> and send <span className="font-semibold">{amount}</span>.</span></li>
           {payment.note && (
             <li className="flex gap-2"><span>3️⃣</span><span>Add the note <span className="font-bold text-as-red">{payment.note}</span> so we can match your entry.</span></li>
@@ -243,7 +243,7 @@ function WhishPay({ payment, amount, confirmed, onConfirm }) {
           rel="noreferrer"
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#00b7a8] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
         >
-          Open the Whish app →
+          Get the Whish app →
         </a>
       </div>
 
