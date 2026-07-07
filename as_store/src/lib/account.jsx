@@ -32,8 +32,8 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
 }
 
 export const accountApi = {
-  requestOtp: (mobile) => req('/api/account/otp/request', { method: 'POST', body: { mobile } }),
-  verifyOtp: (mobile, code) => req('/api/account/otp/verify', { method: 'POST', body: { mobile, code } }),
+  requestOtp: (email) => req('/api/account/otp/request', { method: 'POST', body: { email } }),
+  verifyOtp: (email, code) => req('/api/account/otp/verify', { method: 'POST', body: { email, code } }),
   me: () => req('/api/account/me', { auth: true }),
   update: (data) => req('/api/account', { method: 'PUT', auth: true, body: data }),
   // orders (createOrder also works logged-out — the token is attached only if present)
@@ -62,9 +62,9 @@ export function AccountProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  // Complete the OTP flow: verify the code, store the session.
-  const loginWithOtp = useCallback(async (mobile, code) => {
-    const { token, customer } = await accountApi.verifyOtp(mobile, code)
+  // Complete the OTP flow: verify the emailed code, store the session.
+  const loginWithOtp = useCallback(async (email, code) => {
+    const { token, customer } = await accountApi.verifyOtp(email, code)
     setToken(token)
     setCustomer(customer)
     return customer

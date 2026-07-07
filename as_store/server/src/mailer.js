@@ -1,8 +1,11 @@
-// Order emails over the company mailbox (orders@as.com.lb, SMTP SSL :465).
-// Inert unless SMTP_HOST/SMTP_USER/SMTP_PASS are set. Two mails per order:
-// a confirmation to the customer (when they gave an email) and a copy to the
-// shop inbox (ORDERS_NOTIFY_TO, defaults to the sending account).
+// Transactional emails over the company mailbox (orders@as.com.lb, SMTP SSL :465).
+// Inert unless SMTP_HOST/SMTP_USER/SMTP_PASS are set. Every email shares one
+// branded shell (logo header + footer) via emailShell(). Sends:
+//   - order confirmation (customer) + new-order copy (shop inbox)
+//   - contact-form message (shop inbox)
+//   - login OTP code (customer)
 import nodemailer from 'nodemailer'
+import { OTP_TTL_MINUTES } from './otp.js'
 
 const HOST = process.env.SMTP_HOST || ''
 const PORT = Number(process.env.SMTP_PORT || 465)
@@ -12,6 +15,9 @@ const FROM = process.env.MAIL_FROM || (USER ? `AS Store <${USER}>` : '')
 const NOTIFY = process.env.ORDERS_NOTIFY_TO || USER
 const CONTACT_TO = process.env.CONTACT_TO || NOTIFY
 const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/$/, '')
+// The store logo is a public asset served by the storefront. Emails reference it
+// by absolute URL. Override with MAIL_LOGO_URL if it ever lives elsewhere.
+const LOGO_URL = process.env.MAIL_LOGO_URL || `${STORE_URL}/as-store-logo.png`
 
 export const mailEnabled = () => Boolean(HOST && USER && PASS)
 
@@ -34,8 +40,32 @@ const esc = (s) =>
 
 const RED = '#A41E22'
 const INK = '#1d1d1f'
+const MUTED = '#6e6e73'
 
-function orderHtml(order, { intro, trackUrl }) {
+// Shared branded layout: light-gray page → white card with the AS Store logo at
+// the top → the message body → a small footer. All inline styles for email
+// clients.
+function emailShell(innerHtml) {
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;margin:0;padding:24px">
+    <div style="max-width:560px;margin:0 auto">
+      <div style="background:#ffffff;border-radius:16px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+        <div style="text-align:center;padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid #eee">
+          <a href="${STORE_URL}" style="text-decoration:none">
+            <img src="${LOGO_URL}" alt="AS Store" width="150" style="width:150px;max-width:60%;height:auto;border:0" />
+          </a>
+        </div>
+        ${innerHtml}
+      </div>
+      <p style="margin:20px 0 0;font-size:12px;color:${MUTED};text-align:center;line-height:1.6">
+        AS Company (Absolute Solutions SAL) · Lebanon<br/>
+        <a href="${STORE_URL}" style="color:${RED};text-decoration:none">store.as.com.lb</a>
+      </p>
+    </div>
+  </div>`
+}
+
+function orderBody(order, { intro, trackUrl }) {
   const rows = (order.items || [])
     .map(
       (it) => `
@@ -48,38 +78,32 @@ function orderHtml(order, { intro, trackUrl }) {
     .join('')
 
   return `
-  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;padding:24px">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
-      <h1 style="margin:0;font-size:22px;color:${INK}">AS Store</h1>
-      <p style="margin:16px 0 0;color:${INK}">${intro}</p>
+    <p style="margin:0 0 0;color:${INK};font-size:15px;line-height:1.6">${intro}</p>
 
-      <p style="margin:20px 0 4px;font-size:13px;color:#6e6e73">Order #${order.id} · ${new Date(order.createdAt).toLocaleString('en-GB')}</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
-        ${rows}
-        <tr>
-          <td colspan="2" style="padding:12px 0;font-weight:bold;color:${INK}">Total — cash on delivery</td>
-          <td align="right" style="padding:12px 0;font-weight:bold;color:${INK}">${money(order.subtotal)}</td>
-        </tr>
-      </table>
+    <p style="margin:20px 0 4px;font-size:13px;color:${MUTED}">Order #${order.id} · ${new Date(order.createdAt).toLocaleString('en-GB')}</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
+      ${rows}
+      <tr>
+        <td colspan="2" style="padding:12px 0;font-weight:bold;color:${INK}">Total — cash on delivery</td>
+        <td align="right" style="padding:12px 0;font-weight:bold;color:${INK}">${money(order.subtotal)}</td>
+      </tr>
+    </table>
 
-      <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK}">
-        <strong>Delivery</strong><br/>
-        ${esc(order.fullName)}<br/>
-        ${esc(order.phone)}${order.email ? `<br/>${esc(order.email)}` : ''}<br/>
-        ${esc(order.address)}${order.city ? `, ${esc(order.city)}` : ''}
-        ${order.notes ? `<br/><span style="color:#6e6e73">“${esc(order.notes)}”</span>` : ''}
-      </div>
-
-      ${
-        trackUrl
-          ? `<p style="margin:24px 0 0;text-align:center">
-               <a href="${trackUrl}" style="display:inline-block;background:${RED};color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-size:14px;font-weight:600">Track your order</a>
-             </p>`
-          : ''
-      }
-      <p style="margin:24px 0 0;font-size:12px;color:#6e6e73;text-align:center">AS Company (Absolute Solutions SAL) · Lebanon</p>
+    <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK}">
+      <strong>Delivery</strong><br/>
+      ${esc(order.fullName)}<br/>
+      ${esc(order.phone)}${order.email ? `<br/>${esc(order.email)}` : ''}<br/>
+      ${esc(order.address)}${order.city ? `, ${esc(order.city)}` : ''}
+      ${order.notes ? `<br/><span style="color:${MUTED}">“${esc(order.notes)}”</span>` : ''}
     </div>
-  </div>`
+
+    ${
+      trackUrl
+        ? `<p style="margin:24px 0 0;text-align:center">
+             <a href="${trackUrl}" style="display:inline-block;background:${RED};color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-size:14px;font-weight:600">Track your order</a>
+           </p>`
+        : ''
+    }`
 }
 
 // Fire-and-forget from the order endpoint: never blocks or fails the order.
@@ -97,10 +121,12 @@ export async function sendOrderEmails(order, trackToken) {
         from: FROM,
         to: order.email,
         subject: `Your AS Store order #${order.id} — received`,
-        html: orderHtml(order, {
-          intro: `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. You pay in cash when it arrives.`,
-          trackUrl,
-        }),
+        html: emailShell(
+          orderBody(order, {
+            intro: `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. You pay in cash when it arrives.`,
+            trackUrl,
+          }),
+        ),
       }),
     )
   }
@@ -111,10 +137,12 @@ export async function sendOrderEmails(order, trackToken) {
         from: FROM,
         to: NOTIFY,
         subject: `New order #${order.id} — ${order.fullName} (${money(order.subtotal)})`,
-        html: orderHtml(order, {
-          intro: `New cash-on-delivery order from <strong>${esc(order.fullName)}</strong> (${esc(order.phone)}).`,
-          trackUrl: '',
-        }),
+        html: emailShell(
+          orderBody(order, {
+            intro: `New cash-on-delivery order from <strong>${esc(order.fullName)}</strong> (${esc(order.phone)}).`,
+            trackUrl: '',
+          }),
+        ),
       }),
     )
   }
@@ -133,26 +161,45 @@ export async function sendContactEmail({ name, email, phone, message }) {
     console.log('[contact] (mail disabled) message from', name, email, phone, '\n', message)
     return { delivered: false }
   }
-  const html = `
-  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;padding:24px">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
-      <h1 style="margin:0;font-size:22px;color:${INK}">AS Store — new message</h1>
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:14px;color:${INK}">
-        <tr><td style="padding:4px 0;color:#6e6e73;width:90px">Name</td><td style="padding:4px 0">${esc(name)}</td></tr>
-        <tr><td style="padding:4px 0;color:#6e6e73">Email</td><td style="padding:4px 0">${esc(email) || '—'}</td></tr>
-        <tr><td style="padding:4px 0;color:#6e6e73">Phone</td><td style="padding:4px 0">${esc(phone) || '—'}</td></tr>
-      </table>
-      <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK};white-space:pre-line">${esc(message)}</div>
-      <p style="margin:24px 0 0;font-size:12px;color:#6e6e73">Sent from the store contact form · AS Company (Absolute Solutions SAL)</p>
-    </div>
-  </div>`
+  const body = `
+    <h1 style="margin:0 0 16px;font-size:20px;color:${INK}">New message from the store</h1>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:${INK}">
+      <tr><td style="padding:4px 0;color:${MUTED};width:90px">Name</td><td style="padding:4px 0">${esc(name)}</td></tr>
+      <tr><td style="padding:4px 0;color:${MUTED}">Email</td><td style="padding:4px 0">${esc(email) || '—'}</td></tr>
+      <tr><td style="padding:4px 0;color:${MUTED}">Phone</td><td style="padding:4px 0">${esc(phone) || '—'}</td></tr>
+    </table>
+    <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK};white-space:pre-line">${esc(message)}</div>`
 
   await getTransport().sendMail({
     from: FROM,
     to: CONTACT_TO,
     replyTo: email || undefined,
     subject: `New contact message — ${name || 'Website visitor'}`,
-    html,
+    html: emailShell(body),
+  })
+  return { delivered: true }
+}
+
+// Login OTP code → the customer's email. When SMTP is off (dev) it logs instead
+// (the API also echoes the code in dev via otpDevEcho).
+export async function sendOtpEmail(email, code) {
+  if (!mailEnabled()) {
+    console.log(`[otp] sign-in code for ${email}: ${code}`)
+    return { delivered: false }
+  }
+  const body = `
+    <h1 style="margin:0 0 8px;font-size:20px;color:${INK}">Your sign-in code</h1>
+    <p style="margin:0;color:${MUTED};font-size:14px;line-height:1.6">Enter this code to sign in to AS Store. It expires in ${OTP_TTL_MINUTES} minutes.</p>
+    <div style="margin:26px 0;text-align:center">
+      <span style="display:inline-block;background:#f5f5f7;border-radius:14px;padding:18px 30px;font-size:34px;font-weight:700;letter-spacing:12px;color:${INK}">${esc(code)}</span>
+    </div>
+    <p style="margin:0;color:${MUTED};font-size:13px;line-height:1.6">If you didn't request this, you can safely ignore this email — no one can sign in without the code.</p>`
+
+  await getTransport().sendMail({
+    from: FROM,
+    to: email,
+    subject: `${code} is your AS Store sign-in code`,
+    html: emailShell(body),
   })
   return { delivered: true }
 }

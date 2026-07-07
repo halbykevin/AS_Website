@@ -12,8 +12,8 @@ function LoginInner() {
   const router = useRouter()
   const next = useSearchParams().get('next') || '/account'
 
-  const [step, setStep] = useState('mobile') // 'mobile' | 'code'
-  const [mobile, setMobile] = useState('')
+  const [step, setStep] = useState('email') // 'email' | 'code'
+  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [devCode, setDevCode] = useState('')
   const [error, setError] = useState('')
@@ -33,7 +33,7 @@ function LoginInner() {
     setBusy(true)
     setError('')
     try {
-      const r = await accountApi.requestOtp(mobile)
+      const r = await accountApi.requestOtp(email)
       setDevCode(r.devCode || '')
       setStep('code')
       setCode('')
@@ -51,7 +51,7 @@ function LoginInner() {
     setBusy(true)
     setError('')
     try {
-      await loginWithOtp(mobile, code)
+      await loginWithOtp(email, code)
       router.push(next)
     } catch (err) {
       setError(err.message)
@@ -63,13 +63,13 @@ function LoginInner() {
     <AuthShell
       title="Sign in"
       subtitle={
-        step === 'mobile'
-          ? 'Enter your mobile number and we’ll text you a sign-in code.'
-          : `We sent a 6-digit code to ${mobile}.`
+        step === 'email'
+          ? 'Enter your email and we’ll send you a 6-digit sign-in code.'
+          : `We emailed a 6-digit code to ${email}.`
       }
       footer={
-        step === 'mobile' ? (
-          <>No account needed — one is created with your mobile number on your first order.</>
+        step === 'email' ? (
+          <>No password needed — we email you a one-time code each time you sign in.</>
         ) : (
           <button
             type="button"
@@ -82,18 +82,18 @@ function LoginInner() {
         )
       }
     >
-      {step === 'mobile' ? (
+      {step === 'email' ? (
         <form onSubmit={requestCode} className="space-y-4">
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-          <Field label="Mobile number">
+          <Field label="Email address">
             <input
-              type="tel"
+              type="email"
               required
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className={inputCls}
-              placeholder="70 123 456"
-              autoComplete="tel"
+              placeholder="you@example.com"
+              autoComplete="email"
               autoFocus
             />
           </Field>
@@ -129,12 +129,12 @@ function LoginInner() {
           <button
             type="button"
             onClick={() => {
-              setStep('mobile')
+              setStep('email')
               setError('')
             }}
             className="block w-full text-center text-sm text-as-ink/45 hover:text-as-red"
           >
-            Use a different number
+            Use a different email
           </button>
         </form>
       )}

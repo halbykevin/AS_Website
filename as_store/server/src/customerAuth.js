@@ -19,6 +19,12 @@ export function normalizeMobile(raw) {
   return d.length >= 9 && d.length <= 15 ? d : ''
 }
 
+// Normalize + validate an email for OTP login. Returns '' when invalid.
+export function normalizeEmail(raw) {
+  const e = String(raw || '').trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : ''
+}
+
 export function signCustomerToken(customer) {
   return jwt.sign({ sub: customer.id, kind: 'customer', mobile: customer.mobile || '' }, SECRET, {
     expiresIn: '30d',

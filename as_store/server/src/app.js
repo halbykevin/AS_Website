@@ -8,6 +8,7 @@ import { query } from './db.js'
 import { login, requireAuth, optionalAuth } from './auth.js'
 import {
   normalizeMobile,
+  normalizeEmail,
   signCustomerToken,
   signOrderToken,
   verifyOrderToken,
@@ -17,13 +18,12 @@ import {
 import {
   generateOtp,
   hashOtp,
-  sendOtp,
   otpDevEcho,
   OTP_TTL_MINUTES,
   OTP_MAX_ATTEMPTS,
   OTP_REQUEST_CAP,
 } from './otp.js'
-import { sendOrderEmails, sendContactEmail } from './mailer.js'
+import { sendOrderEmails, sendContactEmail, sendOtpEmail } from './mailer.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -307,8 +307,12 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/me', requireAuth, (req, res) => res.json({ email: req.admin.email }))
 
 // ========================= Customer accounts =========================
-// No registration: an account is created automatically the first time a mobile
-// number places an order (or verifies an OTP). Login is mobile + OTP.
+// No registration. An account is created automatically the first time a mobile
+// number places an order, or the first time an email verifies a sign-in OTP.
+// Login is email + a 6-digit code emailed to that address.
+//
+// OTP codes are keyed by the login identifier; we reuse the otp_codes.mobile
+// column to hold that identifier (now the email), so no schema change is needed.
 
 async function findOrCreateCustomerByMobile(mobile, seed = {}) {
   const { rows } = await query(`SELECT * FROM customers WHERE mobile = $1`, [mobile])
@@ -321,16 +325,30 @@ async function findOrCreateCustomerByMobile(mobile, seed = {}) {
   return { customer: made[0], created: true }
 }
 
+async function findOrCreateCustomerByEmail(email, seed = {}) {
+  const { rows } = await query(
+    `SELECT * FROM customers WHERE lower(email) = $1 ORDER BY id DESC LIMIT 1`,
+    [email],
+  )
+  if (rows[0]) return { customer: rows[0], created: false }
+  const { rows: made } = await query(
+    `INSERT INTO customers (name, email, phone, address)
+     VALUES ($1,$2,$3,$4) RETURNING *`,
+    [(seed.name || '').trim(), email, seed.phone || '', seed.address || ''],
+  )
+  return { customer: made[0], created: true }
+}
+
 app.post(
   '/api/account/otp/request',
   ah(async (req, res) => {
-    const mobile = normalizeMobile(req.body?.mobile)
-    if (!mobile) return res.status(400).json({ error: 'Enter a valid mobile number' })
+    const email = normalizeEmail(req.body?.email)
+    if (!email) return res.status(400).json({ error: 'Enter a valid email address' })
 
     const { rows: recent } = await query(
       `SELECT count(*)::int AS n FROM otp_codes
        WHERE mobile = $1 AND created_at > now() - interval '15 minutes'`,
-      [mobile],
+      [email],
     )
     if (recent[0].n >= OTP_REQUEST_CAP) {
       return res.status(429).json({ error: 'Too many codes requested — try again in a few minutes' })
@@ -340,37 +358,42 @@ app.post(
     await query(
       `INSERT INTO otp_codes (mobile, code_hash, expires_at)
        VALUES ($1,$2, now() + make_interval(mins => $3))`,
-      [mobile, hashOtp(mobile, code), OTP_TTL_MINUTES],
+      [email, hashOtp(email, code), OTP_TTL_MINUTES],
     )
-    await sendOtp(mobile, code)
-    res.json({ ok: true, mobile, ...(otpDevEcho() ? { devCode: code } : {}) })
+    try {
+      await sendOtpEmail(email, code)
+    } catch (e) {
+      console.error('[otp] email send failed:', e?.message || e)
+      return res.status(502).json({ error: "We couldn't email your code. Please try again." })
+    }
+    res.json({ ok: true, email, ...(otpDevEcho() ? { devCode: code } : {}) })
   }),
 )
 
 app.post(
   '/api/account/otp/verify',
   ah(async (req, res) => {
-    const mobile = normalizeMobile(req.body?.mobile)
+    const email = normalizeEmail(req.body?.email)
     const code = String(req.body?.code || '').trim()
-    if (!mobile || !code) return res.status(400).json({ error: 'Mobile and code are required' })
+    if (!email || !code) return res.status(400).json({ error: 'Email and code are required' })
 
     const { rows } = await query(
       `SELECT * FROM otp_codes
        WHERE mobile = $1 AND consumed = false AND expires_at > now()
        ORDER BY id DESC LIMIT 1`,
-      [mobile],
+      [email],
     )
     const otp = rows[0]
     if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) {
       return res.status(400).json({ error: 'Code expired — request a new one' })
     }
-    if (otp.code_hash !== hashOtp(mobile, code)) {
+    if (otp.code_hash !== hashOtp(email, code)) {
       await query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otp.id])
       return res.status(400).json({ error: 'Incorrect code' })
     }
     await query(`UPDATE otp_codes SET consumed = true WHERE id = $1`, [otp.id])
 
-    const { customer } = await findOrCreateCustomerByMobile(mobile)
+    const { customer } = await findOrCreateCustomerByEmail(email)
     res.json({ token: signCustomerToken(customer), customer: customerJson(customer) })
   }),
 )
