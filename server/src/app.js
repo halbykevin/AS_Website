@@ -116,6 +116,7 @@ const predictorJson = (r) => ({
   paymentEnabled: r.payment_enabled, paymentRecipient: r.payment_recipient,
   paymentNote: r.payment_note, paymentInstructions: r.payment_instructions,
   howToWin: Array.isArray(r.how_to_win) ? r.how_to_win : [],
+  repostUrl: r.repost_url || '',
   deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
 })
 const predictorMatchJson = (r) => ({
@@ -599,7 +600,7 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
        prize_title=$5, prize_description=$6, prize_image_url=$7,
        deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, notify_whatsapp=$12,
        entry_fee=$13, payment_enabled=$14, payment_recipient=$15, payment_note=$16, payment_instructions=$17,
-       how_to_win=$18::jsonb,
+       how_to_win=$18::jsonb, repost_url=$19,
        updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
@@ -612,6 +613,7 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
       b.paymentEnabled === undefined ? true : Boolean(b.paymentEnabled),
       b.paymentRecipient || 'AS Company', b.paymentNote || '', b.paymentInstructions || '',
       JSON.stringify((Array.isArray(b.howToWin) ? b.howToWin : []).map((s) => String(s || '').trim()).filter(Boolean).slice(0, 12)),
+      b.repostUrl || '',
     ]
   )
   res.json(predictorJson(rows[0]))

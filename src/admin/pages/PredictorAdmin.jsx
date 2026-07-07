@@ -17,7 +17,7 @@ const blankSettings = {
   enabled: false, notifyWhatsapp: false, title: '', subtitle: '', intro: '', successMessage: '',
   prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
   entryFee: 5, paymentEnabled: true, paymentRecipient: 'AS Company', paymentNote: '#as.com.lb', paymentInstructions: '',
-  howToWin: [],
+  howToWin: [], repostUrl: '',
 }
 const blankMatch = {
   stage: '', teamA: '', teamACode: '', teamAFlag: '', teamB: '', teamBCode: '', teamBFlag: '',
@@ -97,6 +97,7 @@ export default function PredictorAdmin() {
           paymentNote: p.paymentNote || '',
           paymentInstructions: p.paymentInstructions || '',
           howToWin: Array.isArray(p.howToWin) ? p.howToWin : [],
+          repostUrl: p.repostUrl || '',
         })
       }
       setMatches(Array.isArray(m) ? m : [])
@@ -265,11 +266,14 @@ export default function PredictorAdmin() {
               <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Call both-teams-to-score and who qualifies to win big." /></Field>
             </div>
             <Field label="Intro text"><TextArea value={settings.intro} onChange={setS('intro')} placeholder="For each match, pick both-teams-to-score and who qualifies…" /></Field>
+            <Field label="Post to repost (link)" hint="Link to the Instagram/social post players must repost to enter. Shown as the first step of the game. Leave empty to link to the @ascompany.lb profile.">
+              <TextInput value={settings.repostUrl} onChange={setS('repostUrl')} placeholder="https://www.instagram.com/p/…" />
+            </Field>
             <Field label="“How to win” steps (one per line)" hint="Shown as numbered steps on the first screen of the game. Leave empty to use the default steps.">
               <TextArea
                 value={(settings.howToWin || []).join('\n')}
                 onChange={(e) => setSettings((s) => ({ ...s, howToWin: e.target.value.split('\n') }))}
-                placeholder={'Follow @ascompany.lb on Instagram.\nFor each match, predict both teams to score & who qualifies.\nPay $5 on Whish to AS Company to enter.\nPredict & Win iPhone 17e.'}
+                placeholder={'Repost our latest post on Instagram.\nFor each match, predict both teams to score & who qualifies.\nPay $5 on Whish to AS Company to enter.\nPredict & Win iPhone 17e.'}
               />
             </Field>
             <Field label="Submission deadline (optional)" hint="After this time, entries are automatically closed.">

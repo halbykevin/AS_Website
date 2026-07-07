@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS predictor (
   payment_note TEXT DEFAULT '#as.com.lb',
   payment_instructions TEXT DEFAULT '',
   how_to_win JSONB DEFAULT '[]'::jsonb,
+  repost_url TEXT DEFAULT '',
   updated_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT predictor_singleton CHECK (id = 1)
 );
@@ -264,6 +265,8 @@ ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_note TEXT DEFAULT '#as.co
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT '';
 -- Editable "How to win" steps (array of strings). Empty = use the built-in default.
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS how_to_win JSONB DEFAULT '[]'::jsonb;
+-- Link to the post players must repost to enter (replaces the old "follow us" gate).
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS repost_url TEXT DEFAULT '';
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';

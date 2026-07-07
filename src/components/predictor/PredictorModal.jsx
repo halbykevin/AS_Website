@@ -10,10 +10,10 @@ const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
 const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
 const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
 
-function InstagramFollow({ onClick }) {
+function RepostCard({ url, onClick }) {
   return (
     <a
-      href={INSTAGRAM_URL}
+      href={url || INSTAGRAM_URL}
       target="_blank"
       rel="noreferrer"
       onClick={onClick}
@@ -33,11 +33,11 @@ function InstagramFollow({ onClick }) {
           <circle cx="17.4" cy="6.6" r="1.3" fill="url(#ig-grad)" />
         </svg>
         <span className="min-w-0">
-          <span className="block text-sm font-extrabold text-as-charcoal">Follow us on Instagram to enter</span>
-          <span className="block text-xs font-medium text-as-charcoal/60">@ascompany.lb — following is required to win</span>
+          <span className="block text-sm font-extrabold text-as-charcoal">Repost our post to enter</span>
+          <span className="block text-xs font-medium text-as-charcoal/60">@ascompany.lb — reposting is required to win</span>
         </span>
         <span className="ml-auto shrink-0 rounded-full bg-gradient-to-r from-[#d62976] to-[#4f5bd5] px-3 py-1.5 text-xs font-bold text-white transition group-hover:brightness-110">
-          Follow
+          Open post
         </span>
       </span>
     </a>
@@ -242,9 +242,9 @@ function WhishPay({ payment, amount, confirmed, onConfirm }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('follow') // follow | play | pay | register | done
-  const [followedInstagram, setFollowedInstagram] = useState(false)
-  const [confirmedFollow, setConfirmedFollow] = useState(false)
+  const [step, setStep] = useState('repost') // repost | play | pay | register | done
+  const [openedPost, setOpenedPost] = useState(false)
+  const [confirmedRepost, setConfirmedRepost] = useState(false)
   const [picks, setPicks] = useState({}) // { [matchId]: { btts, qualifier } }
   const [paidConfirmed, setPaidConfirmed] = useState(false)
   const [fullName, setFullName] = useState('')
@@ -265,7 +265,7 @@ export default function PredictorModal() {
   }, [closeGame])
 
   if (!predictor) return null
-  const { matches, prize, closed, payment = {}, entryFee } = predictor
+  const { matches, prize, closed, payment = {}, entryFee, repostUrl } = predictor
   const paymentEnabled = payment.enabled !== false
   const amount = `$${entryFee ?? 5}`
   // Admin-customizable "How to win" steps; falls back to the built-in list.
@@ -358,7 +358,7 @@ export default function PredictorModal() {
 
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {step === 'follow' && (
+          {step === 'repost' && (
             <div className="space-y-4">
               <PrizeCard prize={prize} />
 
@@ -372,7 +372,7 @@ export default function PredictorModal() {
                   </ul>
                 ) : (
                   <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
-                    <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
+                    <li className="flex gap-2"><span>1️⃣</span><span>Repost our latest post on <span className="font-semibold">@ascompany.lb</span>.</span></li>
                     <li className="flex gap-2"><span>2️⃣</span><span>For each match, predict <span className="font-semibold">both teams to score</span> &amp; <span className="font-semibold">who qualifies</span>.</span></li>
                     {paymentEnabled && (
                       <li className="flex gap-2"><span>3️⃣</span><span>Pay <span className="font-semibold">{amount}</span> on Whish to <span className="font-semibold">{payment.recipient || 'AS Company'}</span> to enter.</span></li>
@@ -382,21 +382,21 @@ export default function PredictorModal() {
                 )}
               </div>
 
-              <p className="text-sm font-semibold text-as-charcoal">Step 1 — follow us to unlock the game:</p>
-              <InstagramFollow onClick={() => setFollowedInstagram(true)} />
+              <p className="text-sm font-semibold text-as-charcoal">Step 1 — repost our post to unlock the game:</p>
+              <RepostCard url={repostUrl} onClick={() => setOpenedPost(true)} />
 
-              {followedInstagram && (
+              {openedPost && (
                 <label className="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
                   <input
                     type="checkbox"
-                    checked={confirmedFollow}
-                    onChange={(e) => setConfirmedFollow(e.target.checked)}
+                    checked={confirmedRepost}
+                    onChange={(e) => setConfirmedRepost(e.target.checked)}
                     className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-600"
                   />
                   <span className="text-sm font-medium text-as-charcoal">
-                    I&apos;m now following <span className="font-bold">@ascompany.lb</span> on Instagram.
+                    I&apos;ve reposted <span className="font-bold">@ascompany.lb</span>&apos;s post.
                     <span className="mt-0.5 block text-xs font-normal text-as-charcoal/60">
-                      Winners are checked against our followers list before the prize is paid.
+                      Winners are checked for the repost before the prize is paid.
                     </span>
                   </span>
                 </label>
@@ -483,7 +483,7 @@ export default function PredictorModal() {
                 </div>
               )}
               <div className="mx-auto mt-5 max-w-xs text-left">
-                <InstagramFollow />
+                <RepostCard url={repostUrl} />
               </div>
             </div>
           )}
@@ -494,14 +494,14 @@ export default function PredictorModal() {
         {/* Footer actions */}
         {step !== 'done' && (
           <div className="shrink-0 border-t border-black/5 bg-white px-5 py-4">
-            {step === 'follow' && (
+            {step === 'repost' && (
               <button
                 type="button"
                 onClick={() => { setStep('play'); setError('') }}
-                disabled={!confirmedFollow}
+                disabled={!confirmedRepost}
                 className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {confirmedFollow ? 'Start predicting →' : 'Follow us to unlock'}
+                {confirmedRepost ? 'Start predicting →' : 'Repost to unlock'}
               </button>
             )}
             {step === 'play' && (
