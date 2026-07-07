@@ -134,7 +134,32 @@ function SegButton({ active, onClick, disabled, tone = 'ink', children }) {
   )
 }
 
-// One match: two teams, a Both-Teams-To-Score toggle, and a "who qualifies" pick.
+// A tappable team in the match header — picking it = choosing who qualifies.
+function TeamPick({ name, flag, align = 'left', active, onClick, disabled }) {
+  const label = name || (align === 'left' ? 'Team A' : 'Team B')
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`group flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2.5 py-2 transition disabled:cursor-not-allowed disabled:opacity-60 ${
+        align === 'right' ? 'flex-row justify-start' : 'flex-row-reverse justify-start'
+      } ${
+        active
+          ? 'bg-emerald-50 ring-2 ring-emerald-500'
+          : 'ring-1 ring-black/10 hover:ring-black/25'
+      }`}
+    >
+      <Flag src={flag} name={name} />
+      <span className={`line-clamp-1 text-sm font-bold ${align === 'left' ? 'text-right' : ''} ${active ? 'text-emerald-700' : 'text-as-charcoal'}`}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
+// One match: tap a team to pick who qualifies, plus a Both-Teams-To-Score toggle.
 function MatchRow({ match, value, onBtts, onQualifier, disabled }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white p-3 shadow-sm sm:p-4">
@@ -146,16 +171,27 @@ function MatchRow({ match, value, onBtts, onQualifier, disabled }) {
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3">
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <span className="line-clamp-1 text-right text-sm font-bold text-as-charcoal">{match.teamA || 'Team A'}</span>
-          <Flag src={match.flagA} name={match.teamA} />
-        </div>
+      <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
+        Who qualifies? — tap a team
+      </p>
+      <div className="flex items-center justify-center gap-2">
+        <TeamPick
+          name={match.teamA}
+          flag={match.flagA}
+          align="left"
+          active={value?.qualifier === 'A'}
+          onClick={() => onQualifier('A')}
+          disabled={disabled}
+        />
         <span className="shrink-0 text-xs font-black text-as-charcoal/35">VS</span>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Flag src={match.flagB} name={match.teamB} />
-          <span className="line-clamp-1 text-sm font-bold text-as-charcoal">{match.teamB || 'Team B'}</span>
-        </div>
+        <TeamPick
+          name={match.teamB}
+          flag={match.flagB}
+          align="right"
+          active={value?.qualifier === 'B'}
+          onClick={() => onQualifier('B')}
+          disabled={disabled}
+        />
       </div>
 
       {/* Both teams to score? */}
@@ -166,23 +202,6 @@ function MatchRow({ match, value, onBtts, onQualifier, disabled }) {
         <div className="flex gap-2">
           <SegButton tone="green" active={value?.btts === 'yes'} onClick={() => onBtts('yes')} disabled={disabled}>Yes</SegButton>
           <SegButton tone="green" active={value?.btts === 'no'} onClick={() => onBtts('no')} disabled={disabled}>No</SegButton>
-        </div>
-      </div>
-
-      {/* Who qualifies? */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
-          Who qualifies?
-        </p>
-        <div className="flex gap-2">
-          <SegButton active={value?.qualifier === 'A'} onClick={() => onQualifier('A')} disabled={disabled}>
-            <Flag src={match.flagA} name={match.teamA} size="sm" />
-            <span className="line-clamp-1">{match.teamA || 'Team A'}</span>
-          </SegButton>
-          <SegButton active={value?.qualifier === 'B'} onClick={() => onQualifier('B')} disabled={disabled}>
-            <Flag src={match.flagB} name={match.teamB} size="sm" />
-            <span className="line-clamp-1">{match.teamB || 'Team B'}</span>
-          </SegButton>
         </div>
       </div>
     </div>
