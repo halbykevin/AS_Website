@@ -20,6 +20,17 @@ export async function loadCategory(slug) {
   return cats.find((c) => c.slug === slug) || null
 }
 
+// Visible brands, sorted by the API. Used on the About page's brand wall.
+export async function loadBrands() {
+  try {
+    const res = await fetch(`${API}/api/brands`, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 // Visible products in one category (by slug).
 export async function loadCategoryProducts(slug) {
   try {

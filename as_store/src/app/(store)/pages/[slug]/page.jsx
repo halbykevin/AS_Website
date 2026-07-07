@@ -1,19 +1,29 @@
 import { notFound } from 'next/navigation'
 import ContactBody from '@/components/ContactBody.jsx'
+import AboutContent from '@/components/AboutContent.jsx'
 import { loadPage, loadSettings } from '@/lib/site'
+import { loadBrands } from '@/lib/catalog'
 
 // Slugs that render the contact block (form + WhatsApp) instead of CMS text.
 const CONTACT_SLUGS = new Set(['support', 'contact'])
 
 // Renders a CMS content page at /pages/<slug>. Body paragraphs are split on
-// blank lines. The "support" slug renders the contact form + WhatsApp instead.
+// blank lines. Some slugs render bespoke pages instead of CMS text: "support"/
+// "contact" → the contact form, "about" → the full About page.
 export async function generateMetadata({ params }) {
   if (CONTACT_SLUGS.has(params.slug)) return { title: 'Support — AS Store' }
+  if (params.slug === 'about') return { title: 'About AS Store' }
   const page = await loadPage(params.slug)
   return { title: page ? `${page.title} — AS Store` : 'AS Store' }
 }
 
 export default async function ContentPage({ params }) {
+  // About = the bespoke brand/story page with the brand wall.
+  if (params.slug === 'about') {
+    const [settings, brands] = await Promise.all([loadSettings(), loadBrands()])
+    return <AboutContent settings={settings} brands={brands} />
+  }
+
   // Support = the contact/help page: email form + WhatsApp button.
   if (CONTACT_SLUGS.has(params.slug)) {
     const settings = await loadSettings()
