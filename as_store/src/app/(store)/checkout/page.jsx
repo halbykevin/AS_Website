@@ -19,21 +19,51 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [addrId, setAddrId] = useState(null) // selected saved-address id | 'new' | null
   const seeded = useRef(false)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
+  const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : []
+
+  // Fill the form from a saved address.
+  const applyAddress = (a) => {
+    setAddrId(a.id)
+    setForm((f) => ({
+      ...f,
+      fullName: a.fullName || f.fullName,
+      phone: a.phone || f.phone,
+      address: a.address || '',
+      city: a.city || '',
+    }))
+  }
+
   // No login required — the mobile number identifies (or creates) the account.
-  // Prefill from the saved profile once when a session exists.
+  // Prefill once when a session exists: from the default saved address if there
+  // is one, else from the flat profile fields.
   useEffect(() => {
     if (customer && !seeded.current) {
       seeded.current = true
-      setForm((f) => ({
-        ...f,
-        fullName: customer.name || '',
-        phone: customer.phone || customer.mobile || '',
-        email: customer.email || '',
-        address: customer.address || '',
-      }))
+      const addrs = Array.isArray(customer.addresses) ? customer.addresses : []
+      const def = addrs.find((a) => a.isDefault) || addrs[0]
+      if (def) {
+        setAddrId(def.id)
+        setForm((f) => ({
+          ...f,
+          fullName: def.fullName || customer.name || '',
+          phone: def.phone || customer.phone || customer.mobile || '',
+          email: customer.email || '',
+          address: def.address || '',
+          city: def.city || '',
+        }))
+      } else {
+        setForm((f) => ({
+          ...f,
+          fullName: customer.name || '',
+          phone: customer.phone || customer.mobile || '',
+          email: customer.email || '',
+          address: customer.address || '',
+        }))
+      }
     }
   }, [customer])
 
@@ -86,6 +116,45 @@ export default function CheckoutPage() {
           {/* Delivery details */}
           <div className="rounded-2xl border border-as-ink/10 p-6">
             <h2 className="text-lg font-semibold text-as-ink">Delivery details</h2>
+
+            {savedAddresses.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-sm font-medium text-as-ink/70">Deliver to</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {savedAddresses.map((a) => (
+                    <button
+                      type="button"
+                      key={a.id}
+                      onClick={() => applyAddress(a)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        addrId === a.id ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-as-ink">
+                        {a.title || 'Address'}
+                        {a.isDefault ? ' · Default' : ''}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-as-ink/55">
+                        {[a.address, a.city].filter(Boolean).join(', ')}
+                      </span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddrId('new')
+                      setForm((f) => ({ ...f, address: '', city: '' }))
+                    }}
+                    className={`rounded-xl border border-dashed p-3 text-left text-sm font-medium transition ${
+                      addrId === 'new' ? 'border-as-red text-as-red ring-1 ring-as-red' : 'border-as-ink/25 text-as-ink/60 hover:border-as-ink/40'
+                    }`}
+                  >
+                    + Use a new address
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-4 space-y-4">
               {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
               <Field label="Full name">

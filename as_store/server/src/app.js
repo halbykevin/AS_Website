@@ -136,8 +136,33 @@ const customerJson = (r) => ({
   email: r.email || '',
   phone: r.phone || '',
   address: r.address || '',
+  addresses: Array.isArray(r.addresses) ? r.addresses : [],
   createdAt: r.created_at,
 })
+
+// Sanitize a saved-address book: trim/limit fields, drop empty rows, cap the
+// count, and guarantee exactly one default.
+const genAddrId = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+function normalizeAddresses(input) {
+  const cleaned = (Array.isArray(input) ? input : [])
+    .slice(0, 20)
+    .map((a) => ({
+      id: (String(a?.id || '').trim() || genAddrId()).slice(0, 40),
+      title: String(a?.title || '').trim().slice(0, 60),
+      fullName: String(a?.fullName || '').trim().slice(0, 120),
+      phone: String(a?.phone || '').trim().slice(0, 40),
+      address: String(a?.address || '').trim().slice(0, 300),
+      city: String(a?.city || '').trim().slice(0, 120),
+      isDefault: Boolean(a?.isDefault),
+    }))
+    .filter((a) => a.address)
+  if (cleaned.length) {
+    let d = cleaned.findIndex((a) => a.isDefault)
+    if (d < 0) d = 0
+    cleaned.forEach((a, i) => (a.isDefault = i === d))
+  }
+  return cleaned
+}
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
 
@@ -419,6 +444,31 @@ app.put(
          address = COALESCE($4, address), email = COALESCE($5, email)
        WHERE id = $1 RETURNING *`,
       [req.customerId, b.name ?? null, b.phone ?? null, b.address ?? null, b.email ?? null],
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(customerJson(rows[0]))
+  }),
+)
+
+// Saved address book. GET returns the list; PUT replaces it wholesale (the
+// client edits the array and saves it) and returns the updated customer.
+app.get(
+  '/api/account/addresses',
+  requireCustomer,
+  ah(async (req, res) => {
+    const { rows } = await query(`SELECT addresses FROM customers WHERE id = $1`, [req.customerId])
+    res.json(Array.isArray(rows[0]?.addresses) ? rows[0].addresses : [])
+  }),
+)
+
+app.put(
+  '/api/account/addresses',
+  requireCustomer,
+  ah(async (req, res) => {
+    const addresses = normalizeAddresses(req.body?.addresses)
+    const { rows } = await query(
+      `UPDATE customers SET addresses = $2::jsonb WHERE id = $1 RETURNING *`,
+      [req.customerId, JSON.stringify(addresses)],
     )
     if (!rows[0]) return res.status(404).json({ error: 'Not found' })
     res.json(customerJson(rows[0]))

@@ -16,7 +16,8 @@ export const generateOtp = () => String(crypto.randomInt(0, 1_000_000)).padStart
 export const hashOtp = (key, code) =>
   crypto.createHash('sha256').update(`${key}:${code}:${SECRET}`).digest('hex')
 
-// True when the API should echo the code back in the response so login can be
-// tested without checking an inbox. Never enable in production.
-export const otpDevEcho = () =>
-  process.env.OTP_DEV_ECHO === '1' || process.env.NODE_ENV !== 'production'
+// True only when explicitly opted in (OTP_DEV_ECHO=1): the API echoes the code
+// back in the response for local testing without an inbox. It is OFF by default
+// — the code must never be exposed to the client in production (security). Set
+// OTP_DEV_ECHO=1 in your LOCAL .env if you want the convenience during dev.
+export const otpDevEcho = () => process.env.OTP_DEV_ECHO === '1'

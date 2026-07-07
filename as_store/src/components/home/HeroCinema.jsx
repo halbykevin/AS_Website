@@ -166,6 +166,8 @@ export default function HeroCinema({ cms, product, categories = [] }) {
               <motion.img
                 src={product.image}
                 alt={product.name}
+                fetchpriority="high"
+                decoding="async"
                 animate={{ y: [0, -16, 0] }}
                 transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
                 style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}

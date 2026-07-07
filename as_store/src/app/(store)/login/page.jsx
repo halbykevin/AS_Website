@@ -15,7 +15,6 @@ function LoginInner() {
   const [step, setStep] = useState('email') // 'email' | 'code'
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
-  const [devCode, setDevCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [cooldown, setCooldown] = useState(0)
@@ -33,8 +32,7 @@ function LoginInner() {
     setBusy(true)
     setError('')
     try {
-      const r = await accountApi.requestOtp(email)
-      setDevCode(r.devCode || '')
+      await accountApi.requestOtp(email)
       setStep('code')
       setCode('')
       setCooldown(RESEND_SECONDS)
@@ -118,11 +116,6 @@ function LoginInner() {
               autoComplete="one-time-code"
             />
           </Field>
-          {devCode && (
-            <p className="text-center text-xs text-as-ink/40">
-              Dev mode — your code is <span className="font-semibold">{devCode}</span>
-            </p>
-          )}
           <button type="submit" disabled={busy || code.length < 6} className="pill w-full justify-center">
             {busy ? 'Signing in…' : 'Sign in'}
           </button>

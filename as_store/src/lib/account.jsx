@@ -36,6 +36,8 @@ export const accountApi = {
   verifyOtp: (email, code) => req('/api/account/otp/verify', { method: 'POST', body: { email, code } }),
   me: () => req('/api/account/me', { auth: true }),
   update: (data) => req('/api/account', { method: 'PUT', auth: true, body: data }),
+  saveAddresses: (addresses) =>
+    req('/api/account/addresses', { method: 'PUT', auth: true, body: { addresses } }),
   // orders (createOrder also works logged-out — the token is attached only if present)
   createOrder: (data) => req('/api/orders', { method: 'POST', auth: true, body: data }),
   listOrders: () => req('/api/orders', { auth: true }),

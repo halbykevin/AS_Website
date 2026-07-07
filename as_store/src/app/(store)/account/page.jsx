@@ -47,6 +47,8 @@ export default function AccountPage() {
 
         <OrdersList />
 
+        <AddressBook customer={customer} onSaved={setCustomer} />
+
         <ProfileForm customer={customer} onSaved={setCustomer} />
       </div>
     </section>
@@ -90,6 +92,168 @@ function OrdersList() {
         </ul>
       )}
     </div>
+  )
+}
+
+function AddressBook({ customer, onSaved }) {
+  const [list, setList] = useState(Array.isArray(customer.addresses) ? customer.addresses : [])
+  const [editing, setEditing] = useState(null) // address id | 'new' | null
+  const [draft, setDraft] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const blank = () => ({
+    id: '',
+    title: '',
+    fullName: customer.name || '',
+    phone: customer.phone || customer.mobile || '',
+    address: '',
+    city: '',
+    isDefault: list.length === 0,
+  })
+  const setD = (k, v) => setDraft((d) => ({ ...d, [k]: v }))
+
+  const persist = async (next) => {
+    setBusy(true)
+    setError('')
+    try {
+      const updated = await accountApi.saveAddresses(next)
+      setList(Array.isArray(updated.addresses) ? updated.addresses : [])
+      onSaved(updated)
+      setEditing(null)
+      setDraft(null)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startAdd = () => {
+    setError('')
+    setDraft(blank())
+    setEditing('new')
+  }
+  const startEdit = (a) => {
+    setError('')
+    setDraft({ ...a })
+    setEditing(a.id)
+  }
+  const remove = (id) => persist(list.filter((a) => a.id !== id))
+  const makeDefault = (id) => persist(list.map((a) => ({ ...a, isDefault: a.id === id })))
+
+  const saveDraft = (e) => {
+    e.preventDefault()
+    if (!draft.address.trim()) {
+      setError('Please enter the address.')
+      return
+    }
+    const id = draft.id || 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    const entry = { ...draft, id }
+    const exists = list.some((a) => a.id === id)
+    let next = exists ? list.map((a) => (a.id === id ? entry : a)) : [...list, entry]
+    if (entry.isDefault) next = next.map((a) => ({ ...a, isDefault: a.id === id }))
+    else if (!next.some((a) => a.isDefault) && next.length) next = next.map((a, i) => ({ ...a, isDefault: i === 0 }))
+    persist(next)
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-as-ink/10 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-as-ink">Saved addresses</h2>
+        {editing !== 'new' && (
+          <button onClick={startAdd} className="inline-flex items-center gap-1.5 text-sm font-medium text-as-red hover:opacity-80">
+            <Icon name="plus" className="h-4 w-4" /> Add address
+          </button>
+        )}
+      </div>
+
+      {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+      {list.length === 0 && editing == null && (
+        <p className="mt-2 text-sm text-as-ink/50">
+          No saved addresses yet. Add one to check out faster next time.
+        </p>
+      )}
+
+      {list.length > 0 && (
+        <ul className="mt-4 space-y-3">
+          {list.map((a) => (
+            <li key={a.id} className="rounded-xl border border-as-ink/10 p-4">
+              {editing === a.id ? (
+                <AddressForm draft={draft} setD={setD} onSave={saveDraft} onCancel={() => { setEditing(null); setDraft(null) }} busy={busy} />
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-as-ink">{a.title || 'Address'}</span>
+                      {a.isDefault && (
+                        <span className="rounded-full bg-as-red/10 px-2 py-0.5 text-[11px] font-semibold text-as-red">Default</span>
+                      )}
+                    </div>
+                    <p className="mt-1 break-words text-sm text-as-ink/70">
+                      {[a.fullName, a.phone].filter(Boolean).join(' · ')}
+                    </p>
+                    <p className="break-words text-sm text-as-ink/70">
+                      {[a.address, a.city].filter(Boolean).join(', ')}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                      {!a.isDefault && (
+                        <button onClick={() => makeDefault(a.id)} disabled={busy} className="font-medium text-as-red hover:opacity-80">
+                          Set as default
+                        </button>
+                      )}
+                      <button onClick={() => startEdit(a)} className="text-as-ink/60 hover:text-as-ink">Edit</button>
+                      <button onClick={() => remove(a.id)} disabled={busy} className="text-as-ink/60 hover:text-red-600">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {editing === 'new' && (
+        <div className="mt-4 rounded-xl border border-as-ink/10 p-4">
+          <AddressForm draft={draft} setD={setD} onSave={saveDraft} onCancel={() => { setEditing(null); setDraft(null) }} busy={busy} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AddressForm({ draft, setD, onSave, onCancel, busy }) {
+  return (
+    <form onSubmit={onSave} className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Label" hint="e.g. Home, Office">
+          <input value={draft.title} onChange={(e) => setD('title', e.target.value)} className={inputCls} placeholder="Home" />
+        </Field>
+        <Field label="Full name">
+          <input value={draft.fullName} onChange={(e) => setD('fullName', e.target.value)} className={inputCls} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Phone">
+          <input value={draft.phone} onChange={(e) => setD('phone', e.target.value)} className={inputCls} placeholder="70 123 456" />
+        </Field>
+        <Field label="City / area">
+          <input value={draft.city} onChange={(e) => setD('city', e.target.value)} className={inputCls} />
+        </Field>
+      </div>
+      <Field label="Address">
+        <input value={draft.address} onChange={(e) => setD('address', e.target.value)} className={inputCls} placeholder="Street, building, floor…" required />
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-as-ink/70">
+        <input type="checkbox" checked={draft.isDefault} onChange={(e) => setD('isDefault', e.target.checked)} className="h-4 w-4 accent-as-red" />
+        Use as my default address
+      </label>
+      <div className="flex items-center gap-3 pt-1">
+        <button type="submit" disabled={busy} className="pill px-6">{busy ? 'Saving…' : 'Save address'}</button>
+        <button type="button" onClick={onCancel} className="text-sm text-as-ink/50 hover:text-as-ink">Cancel</button>
+      </div>
+    </form>
   )
 }
 

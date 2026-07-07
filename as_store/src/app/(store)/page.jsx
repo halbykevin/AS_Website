@@ -1,3 +1,4 @@
+import ReactDOM from 'react-dom'
 import HeroCinema from '@/components/home/HeroCinema.jsx'
 import VelocityBand from '@/components/home/VelocityBand.jsx'
 import HorizontalShowcase from '@/components/home/HorizontalShowcase.jsx'
@@ -26,6 +27,12 @@ export default async function HomePage() {
   const featured = withImage.filter((p) => p.featured)
   const lineup = (featured.length >= 3 ? featured : withImage).slice(0, 6)
   const heroProduct = lineup[0] || null
+
+  // Preload the hero product image (the LCP element) so it starts downloading
+  // immediately with high priority instead of after the JS hydrates.
+  if (heroProduct?.image) {
+    ReactDOM.preload(heroProduct.image, { as: 'image', fetchPriority: 'high' })
+  }
 
   const onSale = withImage.filter((p) => p.oldPrice && Number(p.oldPrice) > Number(p.price))
   const maxPercent = onSale.reduce(

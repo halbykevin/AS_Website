@@ -208,6 +208,9 @@ ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_email_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_mobile
   ON customers(mobile) WHERE mobile IS NOT NULL AND mobile <> '';
 
+-- Saved address book: [{ id, title, fullName, phone, address, city, isDefault }].
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS addresses JSONB DEFAULT '[]'::jsonb;
+
 DROP TRIGGER IF EXISTS trg_customers_updated ON customers;
 CREATE TRIGGER trg_customers_updated
   BEFORE UPDATE ON customers
