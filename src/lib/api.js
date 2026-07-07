@@ -428,6 +428,7 @@ function mapPredictor(meta, matches) {
       note: meta.paymentNote || '',
       instructions: meta.paymentInstructions || '',
     },
+    howToWin: Array.isArray(meta.howToWin) ? meta.howToWin.filter(Boolean) : [],
     deadline: meta.deadline || null,
     closed: meta.closed === true || deadlinePassed,
     successMessage: meta.successMessage || '',

@@ -17,6 +17,7 @@ const blankSettings = {
   enabled: false, notifyWhatsapp: false, title: '', subtitle: '', intro: '', successMessage: '',
   prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
   entryFee: 5, paymentEnabled: true, paymentRecipient: 'AS Company', paymentNote: '#as.com.lb', paymentInstructions: '',
+  howToWin: [],
 }
 const blankMatch = {
   stage: '', teamA: '', teamACode: '', teamAFlag: '', teamB: '', teamBCode: '', teamBFlag: '',
@@ -95,6 +96,7 @@ export default function PredictorAdmin() {
           paymentRecipient: p.paymentRecipient || 'AS Company',
           paymentNote: p.paymentNote || '',
           paymentInstructions: p.paymentInstructions || '',
+          howToWin: Array.isArray(p.howToWin) ? p.howToWin : [],
         })
       }
       setMatches(Array.isArray(m) ? m : [])
@@ -263,6 +265,13 @@ export default function PredictorAdmin() {
               <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Call both-teams-to-score and who qualifies to win big." /></Field>
             </div>
             <Field label="Intro text"><TextArea value={settings.intro} onChange={setS('intro')} placeholder="For each match, pick both-teams-to-score and who qualifies…" /></Field>
+            <Field label="“How to win” steps (one per line)" hint="Shown as numbered steps on the first screen of the game. Leave empty to use the default steps.">
+              <TextArea
+                value={(settings.howToWin || []).join('\n')}
+                onChange={(e) => setSettings((s) => ({ ...s, howToWin: e.target.value.split('\n') }))}
+                placeholder={'Follow @ascompany.lb on Instagram.\nFor each match, predict both teams to score & who qualifies.\nPay $5 on Whish to AS Company to enter.\nPredict & Win iPhone 17e.'}
+              />
+            </Field>
             <Field label="Submission deadline (optional)" hint="After this time, entries are automatically closed.">
               <TextInput type="datetime-local" value={settings.deadline} onChange={setS('deadline')} />
             </Field>

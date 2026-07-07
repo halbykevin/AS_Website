@@ -5,6 +5,7 @@ import { submitPrediction } from '../../lib/api.js'
 
 const CONFETTI_COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
 
+const STEP_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
 const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
 const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
@@ -267,6 +268,8 @@ export default function PredictorModal() {
   const { matches, prize, closed, payment = {}, entryFee } = predictor
   const paymentEnabled = payment.enabled !== false
   const amount = `$${entryFee ?? 5}`
+  // Admin-customizable "How to win" steps; falls back to the built-in list.
+  const customSteps = Array.isArray(predictor.howToWin) ? predictor.howToWin.filter(Boolean) : []
 
   const setBtts = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], btts: v } }))
   const setQualifier = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], qualifier: v } }))
@@ -361,14 +364,22 @@ export default function PredictorModal() {
 
               <div className="rounded-2xl border border-black/5 bg-as-charcoal/[0.02] p-4">
                 <p className="text-sm font-bold text-as-charcoal">How to win</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
-                  <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
-                  <li className="flex gap-2"><span>2️⃣</span><span>For each match, predict <span className="font-semibold">both teams to score</span> &amp; <span className="font-semibold">who qualifies</span>.</span></li>
-                  {paymentEnabled && (
-                    <li className="flex gap-2"><span>3️⃣</span><span>Pay <span className="font-semibold">{amount}</span> on Whish to <span className="font-semibold">{payment.recipient || 'AS Company'}</span> to enter.</span></li>
-                  )}
-                  <li className="flex gap-2"><span>{paymentEnabled ? '4️⃣' : '3️⃣'}</span><span><span className="font-semibold">Win{prize.enabled && prize.title ? ` ${prize.title}` : ' the prize'}</span>.</span></li>
-                </ul>
+                {customSteps.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
+                    {customSteps.map((s, i) => (
+                      <li key={i} className="flex gap-2"><span>{STEP_EMOJI[i] || '•'}</span><span>{s}</span></li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
+                    <li className="flex gap-2"><span>1️⃣</span><span>Follow <span className="font-semibold">@ascompany.lb</span> on Instagram.</span></li>
+                    <li className="flex gap-2"><span>2️⃣</span><span>For each match, predict <span className="font-semibold">both teams to score</span> &amp; <span className="font-semibold">who qualifies</span>.</span></li>
+                    {paymentEnabled && (
+                      <li className="flex gap-2"><span>3️⃣</span><span>Pay <span className="font-semibold">{amount}</span> on Whish to <span className="font-semibold">{payment.recipient || 'AS Company'}</span> to enter.</span></li>
+                    )}
+                    <li className="flex gap-2"><span>{paymentEnabled ? '4️⃣' : '3️⃣'}</span><span className="font-semibold">{prize.enabled && prize.title ? prize.title : 'Win the prize'}.</span></li>
+                  </ul>
+                )}
               </div>
 
               <p className="text-sm font-semibold text-as-charcoal">Step 1 — follow us to unlock the game:</p>

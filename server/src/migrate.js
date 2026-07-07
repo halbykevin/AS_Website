@@ -219,6 +219,7 @@ CREATE TABLE IF NOT EXISTS predictor (
   payment_recipient TEXT DEFAULT 'AS Company',
   payment_note TEXT DEFAULT '#as.com.lb',
   payment_instructions TEXT DEFAULT '',
+  how_to_win JSONB DEFAULT '[]'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT predictor_singleton CHECK (id = 1)
 );
@@ -261,6 +262,8 @@ ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_enabled BOOLEAN DEFAULT t
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_recipient TEXT DEFAULT 'AS Company';
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_note TEXT DEFAULT '#as.com.lb';
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT '';
+-- Editable "How to win" steps (array of strings). Empty = use the built-in default.
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS how_to_win JSONB DEFAULT '[]'::jsonb;
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
