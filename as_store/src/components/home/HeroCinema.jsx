@@ -148,18 +148,28 @@ export default function HeroCinema({ cms, product, categories = [] }) {
         <div className="relative flex items-center justify-center [perspective:1200px]">
           {product?.image && (
             <motion.div
-              style={{ y: imgY, rotateX, rotateY, opacity: fade }}
+              style={{ y: imgY, rotateX, rotateY, opacity: fade, willChange: 'transform' }}
               initial={{ opacity: 0, scale: 0.85 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1.1, delay: 0.4, ease: EASE }}
               className="relative"
             >
+              {/* Static soft glow behind the image. Previously the red halo was a
+                  CSS drop-shadow filter ON the floating image — Samsung/Android
+                  re-rasterizes a filtered element every animation frame, which
+                  made the image flash. A separate un-animated blur layer keeps
+                  the look without any per-frame filter repaint. */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-6 bottom-0 top-1/3 -z-10 rounded-full bg-as-red/30 blur-[70px]"
+              />
               <motion.img
                 src={product.image}
                 alt={product.name}
                 animate={{ y: [0, -16, 0] }}
                 transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                className="h-[34vh] w-auto max-w-[80vw] object-contain drop-shadow-[0_50px_80px_rgba(164,30,34,0.35)] sm:h-[46vh]"
+                style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
+                className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
               />
               {product.slug && (
                 <motion.div

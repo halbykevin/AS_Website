@@ -23,7 +23,7 @@ import {
   OTP_MAX_ATTEMPTS,
   OTP_REQUEST_CAP,
 } from './otp.js'
-import { sendOrderEmails } from './mailer.js'
+import { sendOrderEmails, sendContactEmail } from './mailer.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -268,6 +268,34 @@ const PRODUCT_COLS = {
 
 // ========================= Health =========================
 app.get('/api/health', (req, res) => res.json({ ok: true }))
+
+// ========================= Contact form =========================
+// Public: emails the shop inbox with a visitor's message. Kept simple — light
+// validation, no persistence (the email is the record).
+app.post(
+  '/api/contact',
+  ah(async (req, res) => {
+    const name = String(req.body?.name || '').trim()
+    const email = String(req.body?.email || '').trim()
+    const phone = String(req.body?.phone || '').trim()
+    const message = String(req.body?.message || '').trim()
+
+    if (!name || !message) return res.status(400).json({ error: 'Please add your name and a message.' })
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ error: 'Please enter a valid email address.' })
+    if (!email && !phone)
+      return res.status(400).json({ error: 'Add an email or phone number so we can reply.' })
+    if (message.length > 4000) return res.status(400).json({ error: 'Message is too long.' })
+
+    try {
+      const { delivered } = await sendContactEmail({ name, email, phone, message })
+      res.json({ ok: true, delivered })
+    } catch (e) {
+      console.error('[contact] send failed:', e?.message || e)
+      res.status(502).json({ error: "We couldn't send your message. Please try WhatsApp instead." })
+    }
+  }),
+)
 
 // ========================= Auth =========================
 app.post('/api/auth/login', (req, res) => {
@@ -654,6 +682,17 @@ app.get(
     }
     const { rows } = await query(sql, params)
     res.json(rows.map(productJson))
+  }),
+)
+
+// Single product by numeric id — two-segment path so it never collides with
+// the by-slug route below. Used to backfill the slug for older cart items.
+app.get(
+  '/api/products/id/:id',
+  ah(async (req, res) => {
+    const { rows } = await query(`${DETAIL_SELECT} WHERE p.id = $1`, [req.params.id])
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.json(productJson(rows[0]))
   }),
 )
 

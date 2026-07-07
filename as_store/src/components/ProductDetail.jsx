@@ -38,7 +38,7 @@ export default function ProductDetail({ product, whatsapp }) {
   const onSale = oldPrice && oldPrice > price
 
   const add = () => {
-    dispatch(addItem({ id: product.id, title: product.name, image: gallery[0] || '', price, qty }))
+    dispatch(addItem({ id: product.id, title: product.name, image: gallery[0] || '', price, qty, slug: product.slug }))
     dispatch(openCart())
   }
 
@@ -92,7 +92,7 @@ export default function ProductDetail({ product, whatsapp }) {
             {product.brand && (
               <p className="text-sm font-semibold uppercase tracking-wide text-as-red">{product.brand}</p>
             )}
-            <h1 className="mt-1 text-4xl font-semibold tracking-apple text-as-ink sm:text-5xl">
+            <h1 className="mt-1 break-words text-4xl font-semibold tracking-apple text-as-ink sm:text-5xl">
               {product.name}
             </h1>
             {product.tagline && <p className="mt-3 text-xl text-as-ink/60">{product.tagline}</p>}

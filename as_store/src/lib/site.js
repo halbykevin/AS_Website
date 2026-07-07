@@ -19,7 +19,7 @@ export const defaultSettings = {
   navLinks: [{ label: 'Support', href: '/pages/support' }],
   footerGroups: [
     { title: 'Shop', links: [{ label: 'Smartphones', href: '/' }, { label: 'Audio', href: '/' }, { label: 'Computing', href: '/' }, { label: 'Accessories', href: '/' }] },
-    { title: 'Support', links: [{ label: 'Contact us', href: '/pages/contact' }, { label: 'Warranty', href: '/pages/warranty' }] },
+    { title: 'Support', links: [{ label: 'Contact us', href: '/contact' }, { label: 'Warranty', href: '/pages/warranty' }] },
     { title: 'Company', links: [{ label: 'About AS', href: '/pages/about' }] },
   ],
 }

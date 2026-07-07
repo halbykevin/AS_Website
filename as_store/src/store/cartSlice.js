@@ -9,7 +9,7 @@ const clampQty = (q) => Math.min(MAX_QTY, Math.max(1, Number(q) || 1))
 // Cart state. Kept intentionally simple for the UI phase — persistence and the
 // real checkout flow come with the backend prompt.
 const initialState = {
-  items: [], // { id, title, image, price, qty }
+  items: [], // { id, title, image, price, qty, slug }
 }
 
 const cartSlice = createSlice({
@@ -26,6 +26,7 @@ const cartSlice = createSlice({
           title: payload.title,
           image: payload.image,
           price: payload.price,
+          slug: payload.slug || null,
           qty: clampQty(payload.qty ?? 1),
         })
       }
@@ -36,6 +37,12 @@ const cartSlice = createSlice({
     setQty(state, { payload }) {
       const item = state.items.find((i) => i.id === payload.id)
       if (item) item.qty = clampQty(payload.qty)
+    },
+    // Backfill the product slug on an item that was saved before slugs were
+    // tracked, so the cart drawer can link it to its product page.
+    setItemSlug(state, { payload }) {
+      const item = state.items.find((i) => i.id === payload.id)
+      if (item) item.slug = payload.slug
     },
     clearCart(state) {
       state.items = []
@@ -51,7 +58,7 @@ const cartSlice = createSlice({
   },
 })
 
-export const { addItem, removeItem, setQty, clearCart, hydrateCart } = cartSlice.actions
+export const { addItem, removeItem, setQty, setItemSlug, clearCart, hydrateCart } = cartSlice.actions
 
 // Selectors
 export const selectCartItems = (s) => s.cart.items

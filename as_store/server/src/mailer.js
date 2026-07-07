@@ -10,6 +10,7 @@ const USER = process.env.SMTP_USER || ''
 const PASS = process.env.SMTP_PASS || ''
 const FROM = process.env.MAIL_FROM || (USER ? `AS Store <${USER}>` : '')
 const NOTIFY = process.env.ORDERS_NOTIFY_TO || USER
+const CONTACT_TO = process.env.CONTACT_TO || NOTIFY
 const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/$/, '')
 
 export const mailEnabled = () => Boolean(HOST && USER && PASS)
@@ -122,4 +123,36 @@ export async function sendOrderEmails(order, trackToken) {
   for (const r of results) {
     if (r.status === 'rejected') console.error('[mail] send failed:', r.reason?.message || r.reason)
   }
+}
+
+// Contact-form message → the shop inbox (CONTACT_TO, defaults to the orders
+// notify address). Replies go straight to the visitor via reply-to. When SMTP
+// isn't configured (e.g. local dev) it just logs the message so nothing is lost.
+export async function sendContactEmail({ name, email, phone, message }) {
+  if (!mailEnabled()) {
+    console.log('[contact] (mail disabled) message from', name, email, phone, '\n', message)
+    return { delivered: false }
+  }
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;padding:24px">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
+      <h1 style="margin:0;font-size:22px;color:${INK}">AS Store — new message</h1>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:14px;color:${INK}">
+        <tr><td style="padding:4px 0;color:#6e6e73;width:90px">Name</td><td style="padding:4px 0">${esc(name)}</td></tr>
+        <tr><td style="padding:4px 0;color:#6e6e73">Email</td><td style="padding:4px 0">${esc(email) || '—'}</td></tr>
+        <tr><td style="padding:4px 0;color:#6e6e73">Phone</td><td style="padding:4px 0">${esc(phone) || '—'}</td></tr>
+      </table>
+      <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK};white-space:pre-line">${esc(message)}</div>
+      <p style="margin:24px 0 0;font-size:12px;color:#6e6e73">Sent from the store contact form · AS Company (Absolute Solutions SAL)</p>
+    </div>
+  </div>`
+
+  await getTransport().sendMail({
+    from: FROM,
+    to: CONTACT_TO,
+    replyTo: email || undefined,
+    subject: `New contact message — ${name || 'Website visitor'}`,
+    html,
+  })
+  return { delivered: true }
 }
