@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-
-// Every story slide sends visitors to the AS Store "coming soon" page.
-const STORE_PATH = '/store'
+import { useContent } from '../store/content.jsx'
 
 // Homepage image slideshow — the same simple, image-only carousel as the events
-// BannerSlider, but every slide opens the AS Store coming-soon page. Panels are
-// admin-managed images (uploaded in /admin/story); no captions, headings or
-// animations — just the picture cropped to fill.
+// BannerSlider, but every slide opens the AS Store (settings.storeUrl, default
+// https://store.as.com.lb; the in-site coming-soon page only if the URL is
+// cleared). Panels are admin-managed images (uploaded in /admin/story); no
+// captions, headings or animations — just the picture cropped to fill.
 
 const INTERVAL = 5000
 
@@ -16,6 +15,8 @@ const INTERVAL = 5000
 const ASPECT = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
 
 export default function HorizontalStory({ story }) {
+  const { store } = useContent()
+  const storeHref = store?.url || '/store'
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [drag, setDrag] = useState(0)
@@ -104,7 +105,7 @@ export default function HorizontalStory({ story }) {
           onClickCapture={onClickCapture}
         >
           {panels.map((p, i) => (
-            <Slide key={p.id ?? i} panel={p} />
+            <Slide key={p.id ?? i} panel={p} href={storeHref} />
           ))}
         </div>
 
@@ -138,21 +139,28 @@ export default function HorizontalStory({ story }) {
 }
 
 // A single full-bleed slide: the cropped image. The whole slide opens the AS
-// Store coming-soon page.
-function Slide({ panel }) {
-  return (
-    <Link to={STORE_PATH} aria-label="AS Store — coming soon" className="relative block h-full w-full shrink-0">
-      {panel.image ? (
-        <img
-          src={panel.image}
-          alt=""
-          className="absolute inset-0 h-full w-full select-none object-cover"
-          style={{ objectPosition: `${panel.focalX ?? 50}% ${panel.focalY ?? 50}%` }}
-          draggable={false}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-as-charcoal" />
-      )}
+// Store — external URL in a new tab, or the in-site coming-soon page.
+function Slide({ panel, href }) {
+  const external = /^https?:\/\//i.test(href)
+  const cls = 'relative block h-full w-full shrink-0'
+  const inner = panel.image ? (
+    <img
+      src={panel.image}
+      alt=""
+      className="absolute inset-0 h-full w-full select-none object-cover"
+      style={{ objectPosition: `${panel.focalX ?? 50}% ${panel.focalY ?? 50}%` }}
+      draggable={false}
+    />
+  ) : (
+    <div className="absolute inset-0 bg-as-charcoal" />
+  )
+  return external ? (
+    <a href={href} target="_blank" rel="noreferrer" aria-label="AS Store" className={cls}>
+      {inner}
+    </a>
+  ) : (
+    <Link to={href} aria-label="AS Store — coming soon" className={cls}>
+      {inner}
     </Link>
   )
 }
