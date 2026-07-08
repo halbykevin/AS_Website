@@ -567,6 +567,9 @@ export const adminApi = {
   deletePredictorMatch: (id) => request(`/api/predictor-matches/${id}`, { method: 'DELETE', authed: true }),
   listPredictions: () => request('/api/predictions', { authed: true }),
   deletePrediction: (id) => request(`/api/predictions/${id}`, { method: 'DELETE', authed: true }),
+  archivePrediction: (id, archived = true) =>
+    request(`/api/predictions/${id}/archive`, { method: 'PUT', body: { archived }, authed: true }),
+  archiveAllPredictions: () => request('/api/predictions/archive-all', { method: 'POST', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

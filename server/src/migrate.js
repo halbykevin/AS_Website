@@ -247,12 +247,19 @@ CREATE TABLE IF NOT EXISTS predictions (
   picks JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
--- One entry per mobile number (stored normalised, see app.js). Before adding the
--- unique index, drop any pre-existing duplicate entries, keeping the earliest
--- (first prediction wins), so the index can be created on existing databases.
+-- Entries can be archived (kept for the record) instead of deleted; archiving an
+-- entry frees its mobile number so the same player can enter the next round.
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+-- One ACTIVE entry per mobile number (stored normalised, see app.js). Before adding
+-- the unique index, drop any pre-existing duplicate active entries, keeping the
+-- earliest (first prediction wins), so the index can be created on existing databases.
 DELETE FROM predictions a USING predictions b
-  WHERE a.mobile = b.mobile AND a.id > b.id;
-CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_unique ON predictions(mobile);
+  WHERE a.mobile = b.mobile AND a.id > b.id
+    AND NOT a.archived AND NOT b.archived;
+DROP INDEX IF EXISTS predictions_mobile_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_active_unique
+  ON predictions(mobile) WHERE NOT archived;
 -- Show/hide the prize block independently of the game (idempotent).
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_enabled BOOLEAN DEFAULT true;
 -- Admin toggle for the WhatsApp confirmation (off until a real number is live).

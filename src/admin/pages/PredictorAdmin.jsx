@@ -74,6 +74,7 @@ export default function PredictorAdmin() {
   const [savingMatch, setSavingMatch] = useState(false)
   const [msg, setMsg] = useState(null)
   const [expanded, setExpanded] = useState(null)
+  const [entriesTab, setEntriesTab] = useState('active')
 
   const setS = (key) => (e) => setSettings((s) => ({ ...s, [key]: e.target.value }))
   const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -177,10 +178,41 @@ export default function PredictorAdmin() {
   }
 
   async function removePrediction(p) {
-    if (!confirm(`Delete ${p.fullName}'s entry?`)) return
+    if (!confirm(`Permanently delete ${p.fullName}'s entry? Use Archive instead if you may need it later.`)) return
     await adminApi.deletePrediction(p.id)
     setPredictions((list) => list.filter((x) => x.id !== p.id))
   }
+
+  // Archive keeps the entry on record but frees the mobile number, so the same
+  // player can enter the next round. Restore puts it back among the active ones.
+  async function archivePrediction(p, archived) {
+    setMsg(null)
+    try {
+      const updated = await adminApi.archivePrediction(p.id, archived)
+      setPredictions((list) => list.map((x) => (x.id === p.id ? updated : x)))
+    } catch (err) {
+      setMsg({ kind: 'error', text: err?.message || 'Could not update the entry.' })
+    }
+  }
+
+  async function archiveAll() {
+    const count = predictions.filter((p) => !p.archived).length
+    if (!count) return
+    if (!confirm(`Archive all ${count} active entries? They stay visible under "Archived", and everyone can enter again.`)) return
+    setMsg(null)
+    try {
+      await adminApi.archiveAllPredictions()
+      setPredictions(await adminApi.listPredictions())
+      setEntriesTab('archived')
+      setMsg({ kind: 'success', text: `Archived ${count} entries — the game is ready for a new round.` })
+    } catch (err) {
+      setMsg({ kind: 'error', text: err?.message || 'Could not archive the entries.' })
+    }
+  }
+
+  const activeEntries = predictions.filter((p) => !p.archived)
+  const archivedEntries = predictions.filter((p) => p.archived)
+  const shownEntries = entriesTab === 'archived' ? archivedEntries : activeEntries
 
   const matchLabel = (id) => {
     const m = matches.find((x) => x.id === id)
@@ -424,24 +456,56 @@ export default function PredictorAdmin() {
       </Card>
 
       {/* Submissions */}
-      <Card title={`Entries (${predictions.length})`}>
-        {predictions.length === 0 ? (
-          <p className="text-sm text-as-charcoal/50">No entries yet.</p>
+      <Card
+        title="Entries"
+        actions={
+          entriesTab === 'active' && activeEntries.length > 0 && (
+            <Button variant="ghost" type="button" onClick={archiveAll}>Archive all</Button>
+          )
+        }
+      >
+        <div className="mb-4 flex gap-2">
+          {[
+            ['active', `Active (${activeEntries.length})`],
+            ['archived', `Archived (${archivedEntries.length})`],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setEntriesTab(key)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                entriesTab === key
+                  ? 'bg-as-red text-white'
+                  : 'bg-as-charcoal/5 text-as-charcoal/60 hover:bg-as-charcoal/10'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {shownEntries.length === 0 ? (
+          <p className="text-sm text-as-charcoal/50">
+            {entriesTab === 'archived' ? 'No archived entries.' : 'No entries yet.'}
+          </p>
         ) : (
           <ul className="divide-y divide-black/5">
-            {predictions.map((p) => (
+            {shownEntries.map((p) => (
               <li key={p.id} className="py-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-semibold text-as-charcoal">{p.fullName}</p>
                     <p className="truncate text-sm text-as-charcoal/55">
                       {p.mobile} · {p.picks.length} picks · {new Date(p.createdAt).toLocaleString('en-GB')}
+                      {p.archived && p.archivedAt ? ` · archived ${new Date(p.archivedAt).toLocaleDateString('en-GB')}` : ''}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => sendPrediction(p)}>Send</Button>
                     <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>
                       {expanded === p.id ? 'Hide' : 'View'}
+                    </Button>
+                    <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => archivePrediction(p, !p.archived)}>
+                      {p.archived ? 'Restore' : 'Archive'}
                     </Button>
                     <Button variant="danger" type="button" className="px-3 py-1.5" onClick={() => removePrediction(p)}>Delete</Button>
                   </div>

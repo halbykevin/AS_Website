@@ -129,6 +129,7 @@ const predictorMatchJson = (r) => ({
 const predictionJson = (r) => ({
   id: r.id, fullName: r.full_name, mobile: r.mobile,
   picks: Array.isArray(r.picks) ? r.picks : [], createdAt: r.created_at,
+  archived: r.archived === true, archivedAt: r.archived_at,
 })
 
 // ========================= Health =========================
@@ -747,6 +748,30 @@ app.post('/api/predictions', ah(async (req, res) => {
 app.get('/api/predictions', requireAuth, ah(async (req, res) => {
   const { rows } = await query('SELECT * FROM predictions ORDER BY created_at DESC, id DESC')
   res.json(rows.map(predictionJson))
+}))
+
+// Archive / restore one entry. Archiving keeps it on record but frees the mobile
+// number for a new entry; restoring fails if that number entered again meanwhile.
+app.put('/api/predictions/:id/archive', requireAuth, ah(async (req, res) => {
+  const archived = req.body?.archived !== false
+  try {
+    const { rows } = await query(
+      'UPDATE predictions SET archived=$1, archived_at=CASE WHEN $1 THEN now() ELSE NULL END WHERE id=$2 RETURNING *',
+      [archived, req.params.id]
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Entry not found' })
+    res.json(predictionJson(rows[0]))
+  } catch (err) {
+    if (err?.code === '23505')
+      return res.status(409).json({ error: 'This mobile number already has an active entry — the archived one cannot be restored.' })
+    throw err
+  }
+}))
+
+// Archive every active entry in one go (start a fresh round).
+app.post('/api/predictions/archive-all', requireAuth, ah(async (req, res) => {
+  const { rowCount } = await query('UPDATE predictions SET archived=true, archived_at=now() WHERE NOT archived')
+  res.json({ archived: rowCount })
 }))
 
 app.delete('/api/predictions/:id', requireAuth, ah(async (req, res) => {
