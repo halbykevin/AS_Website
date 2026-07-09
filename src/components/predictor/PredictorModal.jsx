@@ -217,8 +217,7 @@ export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
   const [step, setStep] = useState('repost') // repost | play | register | done
-  const [openedPost, setOpenedPost] = useState(false)
-  const [confirmedRepost, setConfirmedRepost] = useState(true)
+  const [confirmedRepost, setConfirmedRepost] = useState(false)
   const [champion, setChampion] = useState(null) // selected team id
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
@@ -336,21 +335,19 @@ export default function PredictorModal() {
             <div className="space-y-4">
               <PrizeHero prize={prize} />
 
-              <RepostCard url={repostUrl} onClick={() => setOpenedPost(true)} />
+              <RepostCard url={repostUrl} />
 
-              {openedPost && (
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
-                  <input
-                    type="checkbox"
-                    checked={confirmedRepost}
-                    onChange={(e) => setConfirmedRepost(e.target.checked)}
-                    className="h-5 w-5 shrink-0 accent-emerald-600"
-                  />
-                  <span className="text-sm font-medium text-as-charcoal">
-                    I&apos;ve reposted <span className="font-bold">@ascompany.lb</span>&apos;s post.
-                  </span>
-                </label>
-              )}
+              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
+                <input
+                  type="checkbox"
+                  checked={confirmedRepost}
+                  onChange={(e) => setConfirmedRepost(e.target.checked)}
+                  className="h-5 w-5 shrink-0 accent-emerald-600"
+                />
+                <span className="text-sm font-medium text-as-charcoal">
+                  I&apos;ve reposted <span className="font-bold">@ascompany.lb</span>&apos;s post.
+                </span>
+              </label>
             </div>
           )}
 
