@@ -5,32 +5,33 @@ import BannerSlider from '../components/BannerSlider.jsx'
 import HorizontalStory from '../components/HorizontalStory.jsx'
 import { useContent } from '../store/content.jsx'
 
-// The same full-bleed aspect ratio used by the HorizontalStory and the events
-// BannerSlider — so all three homepage strips are exactly the same height and
-// width at every breakpoint. The shorter mobile ratio lets all three panels fit
-// on one phone screen without vertical scrolling.
-const STRIP = 'aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5]'
-
 // Smooth shadow + a gentle "clickable" breathing pulse (pauses on hover, off for
 // reduced-motion). Shared by all three homepage panels.
 const PANEL =
   'rounded-[28px] shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px]'
 
+// The three homepage strips share one height, set by the admin as the aspect
+// ratio 16 : N (bannerHeight). Higher N = taller. Falls back to 6 if unset.
+export function stripStyle(bannerHeight) {
+  const n = Number(bannerHeight) > 0 ? Number(bannerHeight) : 6
+  return { aspectRatio: `16 / ${n}` }
+}
+
 // Minimal homepage landing: three equally sized, softly-rounded panels with
 // smooth gaps. No footer here (hidden in Layout for the home route).
 export default function Home() {
-  const { story, banners, services } = useContent()
+  const { story, banners, services, bannerHeight } = useContent()
 
   return (
     <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5">
       {/* 1 — Horizontal scroll-story */}
-      <HorizontalStory story={story} />
+      <HorizontalStory story={story} height={bannerHeight} />
 
       {/* 2 — Events banner (click any slide → /events) */}
-      <BannerSlider banners={banners} />
+      <BannerSlider banners={banners} height={bannerHeight} />
 
       {/* 3 — What We Do */}
-      <WhatWeDoSection services={services} />
+      <WhatWeDoSection services={services} height={bannerHeight} />
     </div>
   )
 }
@@ -38,7 +39,7 @@ export default function Home() {
 // A light, lively "What We Do" panel — same size as the other two. An animated
 // red→white particle-line field sits behind centered animated typography, and
 // the whole panel is a clickable link into the full What We Do page.
-function WhatWeDoSection({ services }) {
+function WhatWeDoSection({ services, height }) {
   const reduce = useReducedMotion()
   const words = (Array.isArray(services.items) ? services.items : [])
     .map((i) => i?.title)
@@ -49,7 +50,8 @@ function WhatWeDoSection({ services }) {
       <Link
         to="/what-we-do"
         aria-label={`${services.heading || 'What We Do'} — explore`}
-        className={`relative block w-full overflow-hidden ${PANEL} ${STRIP}`}
+        className={`relative block w-full overflow-hidden ${PANEL}`}
+        style={stripStyle(height)}
       >
         {/* Soft off-white base (not pure white) */}
         <div

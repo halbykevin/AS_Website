@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS settings (
   tagline TEXT DEFAULT '',
   logo_url TEXT DEFAULT '',
   logo_size INTEGER DEFAULT 48,
+  banner_height NUMERIC(4,1) DEFAULT 6,
   favicon_url TEXT DEFAULT '',
   hero_eyebrow TEXT DEFAULT '',
   hero_title TEXT DEFAULT '',
@@ -305,6 +306,9 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS contact_subheading TEXT DEFAULT ''
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsapp_number TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS favicon_url TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS logo_size INTEGER DEFAULT 48;
+-- Homepage banner height: the shared aspect-ratio denominator (16 : N) for the
+-- three homepage strips. Higher = taller. NUMERIC so half-steps like 6.5 work.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS banner_height NUMERIC(4,1) DEFAULT 6;
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';

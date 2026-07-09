@@ -89,6 +89,7 @@ export const defaultContent = {
   story: null,
   predictor: null,
   published: false,
+  bannerHeight: 6,
 }
 
 const pick = (value, fallback) =>
@@ -99,6 +100,8 @@ function mergeSettings(s) {
   return {
     ...d,
     published: Boolean(s.published),
+    // Shared aspect-ratio denominator (16 : N) for the three homepage strips.
+    bannerHeight: Number(pick(s.bannerHeight, d.bannerHeight)) || 6,
     // Global WhatsApp number (international digits) used to build event/banner
     // "reserve" links — see whatsappBookingUrl().
     whatsappNumber: pick(s.whatsappNumber, ''),

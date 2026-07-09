@@ -7,6 +7,7 @@ import {
 
 const SECTIONS = [
   { value: 'publish', label: 'Publish' },
+  { value: 'home', label: 'Home' },
   { value: 'brand', label: 'Brand' },
   { value: 'hero', label: 'Hero' },
   { value: 'services', label: 'Services' },
@@ -18,6 +19,7 @@ const SECTIONS = [
 
 const empty = {
   brandName: '', legalName: '', tagline: '', logoUrl: '', logoSize: 48, faviconUrl: '',
+  bannerHeight: 6,
   heroEyebrow: '', heroTitle: '', heroSubtitle: '',
   heroPrimaryLabel: '', heroSecondaryLabel: '',
   servicesHeading: '', servicesSubheading: '',
@@ -50,6 +52,7 @@ export default function SettingsEditor() {
         setForm({
           brandName: s.brandName || '', legalName: s.legalName || '', tagline: s.tagline || '',
           logoUrl: s.logoUrl || '', logoSize: s.logoSize || 48, faviconUrl: s.faviconUrl || '',
+          bannerHeight: s.bannerHeight || 6,
           heroEyebrow: s.heroEyebrow || '', heroTitle: s.heroTitle || '', heroSubtitle: s.heroSubtitle || '',
           heroPrimaryLabel: s.heroPrimaryLabel || '', heroSecondaryLabel: s.heroSecondaryLabel || '',
           servicesHeading: s.servicesHeading || '', servicesSubheading: s.servicesSubheading || '',
@@ -137,6 +140,35 @@ export default function SettingsEditor() {
           label={form.published ? 'Website is published' : 'Website is hidden (Coming Soon)'}
           description="When off, visitors see the Coming Soon page. Turn on to make the full site public."
         />
+      </Card>
+      )}
+
+      {section === 'home' && (
+      <Card title="Homepage banners">
+        <Field
+          label="Banner height"
+          hint="Sets the height of all three homepage strips (the story, the events banner, and What We Do). Drag right for taller banners."
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-as-charcoal/45">Short</span>
+            <input
+              type="range"
+              min="4"
+              max="10"
+              step="0.5"
+              value={Number(form.bannerHeight) || 6}
+              onChange={set('bannerHeight')}
+              className="w-56 accent-as-red"
+              aria-label="Banner height"
+            />
+            <span className="text-xs font-semibold text-as-charcoal/45">Tall</span>
+            <TextInput type="number" min="4" max="10" step="0.5" value={form.bannerHeight} onChange={set('bannerHeight')} className="max-w-[90px]" />
+          </div>
+          <div className="mt-3 overflow-hidden rounded-lg border border-black/10 bg-as-charcoal/[0.03]">
+            <div className="w-full bg-as-charcoal/70" style={{ aspectRatio: `16 / ${Number(form.bannerHeight) || 6}` }} />
+          </div>
+          <p className="mt-1.5 text-xs text-as-charcoal/50">Preview of one strip at the current height.</p>
+        </Field>
       </Card>
       )}
 

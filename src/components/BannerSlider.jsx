@@ -14,11 +14,10 @@ const EVENTS_PATH = '/events'
 const INTERVAL = 5000
 
 // One fixed aspect ratio per breakpoint — every banner is cropped to fit, so
-// the strip never changes height between slides. Taller on phones, wide and
-// cinematic on larger screens.
-const ASPECT = 'aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5]'
-
-export default function BannerSlider({ banners }) {
+// the strip never changes height between slides. Height is admin-set via the
+// aspect ratio 16 : N (the `height` prop). Matches the HorizontalStory.
+export default function BannerSlider({ banners, height }) {
+  const ratio = Number(height) > 0 ? Number(height) : 6
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [drag, setDrag] = useState(0)
@@ -86,10 +85,10 @@ export default function BannerSlider({ banners }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Fixed aspect ratio, softly rounded so the strips read as separate panels */}
+      {/* Admin-set aspect ratio, softly rounded so the strips read as separate panels */}
       <div
-        className={`relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${ASPECT}`}
-        style={{ animationDelay: '-1.3s' }}
+        className="relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px]"
+        style={{ animationDelay: '-1.3s', aspectRatio: `16 / ${ratio}` }}
       >
         <div
           className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
@@ -127,12 +126,12 @@ export default function BannerSlider({ banners }) {
                 type="button"
                 aria-label={`Go to slide ${i + 1}`}
                 onClick={() => go(i)}
-                // 24×24 tap target (accessibility) with the small pill centered inside.
-                className="group/dot flex h-6 w-6 items-center justify-center"
+                // Compact tap target with a small pill centered inside.
+                className="group/dot flex h-4 w-3 items-center justify-center"
               >
                 <span
                   className={`block h-1.5 rounded-full transition-all ${
-                    i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/50 group-hover/dot:bg-white/80'
+                    i === index ? 'w-3 bg-white' : 'w-1.5 bg-white/50 group-hover/dot:bg-white/80'
                   }`}
                 />
               </button>
