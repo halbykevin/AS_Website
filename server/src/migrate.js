@@ -260,6 +260,14 @@ DELETE FROM predictions a USING predictions b
 DROP INDEX IF EXISTS predictions_mobile_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS predictions_mobile_active_unique
   ON predictions(mobile) WHERE NOT archived;
+-- Every entry gets a unique, sequential draw number (its "ticket"): shown to the
+-- player on submit and included in the admin WhatsApp recap. Assigned from a
+-- sequence so numbers never repeat, even across rounds. Backfill existing rows.
+CREATE SEQUENCE IF NOT EXISTS predictions_draw_number_seq;
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS draw_number INTEGER;
+ALTER TABLE predictions ALTER COLUMN draw_number SET DEFAULT nextval('predictions_draw_number_seq');
+UPDATE predictions SET draw_number = nextval('predictions_draw_number_seq') WHERE draw_number IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS predictions_draw_number_unique ON predictions(draw_number);
 -- Show/hide the prize block independently of the game (idempotent).
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_enabled BOOLEAN DEFAULT true;
 -- Admin toggle for the WhatsApp confirmation (off until a real number is live).
@@ -351,9 +359,9 @@ INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 -- Ensure the singleton predictor row exists (disabled by default).
 INSERT INTO predictor (id, enabled, title, subtitle, intro, success_message)
 VALUES (1, false, 'Predict & Win — World Cup 2026',
-  'Call both-teams-to-score and who qualifies to win big.',
-  'For every match below, tell us if both teams will score and which team qualifies. Enter, and you could be our lucky winner.',
-  'Your predictions are in! Good luck — we''ll be in touch on WhatsApp if you win.')
+  'Pick the World Cup winner and win big.',
+  'Pick the team you think will lift the trophy, enter your details, and you could be our lucky winner.',
+  'You''re in the draw! Good luck — we''ll be in touch on WhatsApp if you win.')
 ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton store-showcase row exists with sensible defaults.

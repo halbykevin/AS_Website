@@ -417,9 +417,9 @@ export function mapPredictorMatch(m) {
   }
 }
 
-// The World Cup predictor game: config row + its visible matches. Hidden (null)
-// unless enabled with at least one visible match. `closed` is true once the
-// admin closes it or the deadline passes — the form then becomes read-only.
+// The World Cup predictor game: config row + its visible team pool. Hidden (null)
+// unless enabled with at least one visible team. `closed` is true once the admin
+// closes it or the deadline passes — the pick then becomes read-only.
 function mapPredictor(meta, matches) {
   if (!meta || meta.enabled === false) return null
   const list = Array.isArray(matches) ? matches.map(mapPredictorMatch).filter((m) => m.visible) : []
@@ -435,23 +435,17 @@ function mapPredictor(meta, matches) {
       description: meta.prizeDescription || '',
       image: meta.prizeImageUrl || '',
     },
-    entryFee: meta.entryFee == null ? 5 : Number(meta.entryFee),
-    payment: {
-      enabled: meta.paymentEnabled !== false,
-      recipient: meta.paymentRecipient || 'AS Company',
-      note: meta.paymentNote || '',
-      instructions: meta.paymentInstructions || '',
-    },
     howToWin: Array.isArray(meta.howToWin) ? meta.howToWin.filter(Boolean) : [],
     repostUrl: meta.repostUrl || '',
     deadline: meta.deadline || null,
     closed: meta.closed === true || deadlinePassed,
     successMessage: meta.successMessage || '',
-    matches: list,
+    teams: list,
   }
 }
 
-// Submit a public prediction entry. picks = [{ matchId, btts:'yes'|'no', qualifier:'A'|'B' }].
+// Submit a public prediction entry. body = { fullName, mobile, champion: <teamId> }
+// where champion is the team the player picked to win the World Cup.
 export const submitPrediction = (data) =>
   request('/api/predictions', { method: 'POST', body: data })
 

@@ -2,10 +2,10 @@
 // (orders@as.com.lb, SMTP SSL :465 by default). Inert unless SMTP_HOST/SMTP_USER/
 // SMTP_PASS are set, so nothing sends until the mailbox is configured.
 //
-// Currently sends one email: a detailed "new Predict & Win entry" notification to
-// the staff inbox after every public prediction submission. The email includes a
+// Currently sends one email: a "new Predict & Win entry" notification to the
+// staff inbox after every public prediction submission. The email includes a
 // one-tap WhatsApp button that opens a chat with the player, pre-filled with a
-// confirmation + Whish payment message.
+// confirmation of their World Cup winner pick.
 import nodemailer from 'nodemailer'
 import { toWhatsAppNumber } from './whatsapp.js'
 
@@ -16,10 +16,6 @@ const PASS = process.env.SMTP_PASS || ''
 const FROM = process.env.MAIL_FROM || (USER ? `AS Company <${USER}>` : '')
 // Where the entry notifications land. Defaults to the staff address on file.
 const NOTIFY_TO = process.env.PREDICTOR_NOTIFY_TO || 'kevinhalby70199@gmail.com'
-// Link the player taps to open / download the Whish app to pay the entry fee.
-const WHISH_APP_URL =
-  process.env.WHISH_APP_URL ||
-  'https://www.whish.money/download?utm_source=whish_website&utm_medium=whish_website'
 
 export const mailEnabled = () => Boolean(HOST && USER && PASS)
 
@@ -43,6 +39,9 @@ const MUTED = '#6e6e73'
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
+// A draw number as a padded ticket, e.g. 7 → "#0007". Empty when unassigned.
+const formatDraw = (n) => (n == null || n === '' ? '' : `#${String(n).padStart(4, '0')}`)
+
 // Branded email shell — a light-gray page with a white card, a text logo header,
 // and a small footer. All-inline styles for email-client compatibility.
 function emailShell(innerHtml) {
@@ -64,21 +63,19 @@ function emailShell(innerHtml) {
 }
 
 // Build the pre-filled WhatsApp message the player receives (plain text).
-function whatsappText({ playerName, gameTitle, picks, paymentEnabled, amount, recipient, note }) {
+function whatsappText({ playerName, gameTitle, champion, drawNumber }) {
+  const draw = formatDraw(drawNumber)
   const lines = []
   lines.push(`Hi ${playerName || 'there'}! 👋`)
   lines.push('')
-  lines.push(`Thanks for entering ${gameTitle}. We've received your predictions:`)
-  picks.forEach((p, i) => {
-    lines.push(`${i + 1}. ${p.teamA} vs ${p.teamB} — Both teams to score: ${p.btts}; Qualifies: ${p.qualifier}`)
-  })
-  if (paymentEnabled) {
+  lines.push(`Thanks for entering ${gameTitle}. Your pick to win the World Cup:`)
+  lines.push(`🏆 ${champion}`)
+  if (draw) {
     lines.push('')
-    lines.push(`To confirm your entry, please pay ${amount} on Whish to ${recipient}${note ? ` with the note ${note}` : ''}.`)
-    lines.push(`Open / download Whish here: ${WHISH_APP_URL}`)
+    lines.push(`Your draw number is ${draw} — keep it safe!`)
   }
   lines.push('')
-  lines.push('Good luck! 🍀 — AS Company')
+  lines.push("You're in the draw — good luck! 🍀 — AS Company")
   return lines.join('\n')
 }
 
@@ -88,30 +85,21 @@ export async function sendPredictionEmail(entry) {
   if (!mailEnabled()) return { skipped: true }
   const {
     playerName, mobile, createdAt, gameTitle = 'Predict & Win — World Cup 2026',
-    picks = [], paymentEnabled = false, amount = '', recipient = 'AS Company', note = '',
+    champion = '', drawNumber = null,
   } = entry
 
+  const draw = formatDraw(drawNumber)
   const waNumber = toWhatsAppNumber(mobile)
-  const waText = whatsappText({ playerName, gameTitle, picks, paymentEnabled, amount, recipient, note })
+  const waText = whatsappText({ playerName, gameTitle, champion, drawNumber })
   const waHref = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waText)}` : ''
   const when = createdAt ? new Date(createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : ''
 
-  const rows = picks
-    .map(
-      (p) => `
-      <tr>
-        <td style="padding:10px 8px;border-bottom:1px solid #eee;color:${INK}">${esc(p.teamA)} <span style="color:${MUTED}">vs</span> ${esc(p.teamB)}</td>
-        <td align="center" style="padding:10px 8px;border-bottom:1px solid #eee;color:${INK};white-space:nowrap">${esc(p.btts)}</td>
-        <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee;color:${INK};font-weight:700;white-space:nowrap">${esc(p.qualifier)}</td>
-      </tr>`
-    )
-    .join('')
-
-  const paymentBlock = paymentEnabled
-    ? `<p style="margin:18px 0 0;font-size:14px;color:${INK}">
-         💳 <strong>Entry fee:</strong> ${esc(amount)} on Whish to <strong>${esc(recipient)}</strong>${note ? ` · note <strong style="color:${RED}">${esc(note)}</strong>` : ''}
-       </p>`
-    : ''
+  const championBlock = `
+    <div style="margin:22px 0;padding:18px;border:1px solid #eee;border-radius:12px;background:#fafafa;text-align:center">
+      ${draw ? `<div style="margin-bottom:12px;font-size:15px;font-weight:800;color:${RED}">Draw number ${esc(draw)}</div>` : ''}
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:${MUTED}">Pick to win the World Cup</div>
+      <div style="margin-top:6px;font-size:20px;font-weight:800;color:${INK}">🏆 ${esc(champion || '—')}</div>
+    </div>`
 
   const waButton = waHref
     ? `<div style="text-align:center;margin:26px 0 6px">
@@ -120,13 +108,13 @@ export async function sendPredictionEmail(entry) {
          </a>
        </div>
        <p style="margin:8px 0 0;font-size:12px;color:${MUTED};text-align:center">
-         Opens WhatsApp with a confirmation + Whish payment link, pre-filled to ${esc(mobile)}.
+         Opens WhatsApp with a confirmation of their pick, pre-filled to ${esc(mobile)}.
        </p>`
     : `<p style="margin:20px 0 0;font-size:13px;color:${MUTED}">No valid WhatsApp number to build a chat link for ${esc(mobile)}.</p>`
 
   const inner = `
     <h2 style="margin:0 0 4px;font-size:20px;color:${INK}">New Predict &amp; Win entry ⚽</h2>
-    <p style="margin:0 0 20px;font-size:14px;color:${MUTED}">A visitor just submitted their World Cup predictions.</p>
+    <p style="margin:0 0 20px;font-size:14px;color:${MUTED}">A visitor just entered the World Cup draw.</p>
 
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px">
       <tr><td style="padding:6px 0;color:${MUTED};width:120px">Player</td><td style="padding:6px 0;color:${INK};font-weight:700">${esc(playerName)}</td></tr>
@@ -134,23 +122,9 @@ export async function sendPredictionEmail(entry) {
       ${when ? `<tr><td style="padding:6px 0;color:${MUTED}">Submitted</td><td style="padding:6px 0;color:${INK}">${esc(when)}</td></tr>` : ''}
     </table>
 
-    ${paymentBlock}
+    ${championBlock}
 
-    <h3 style="margin:24px 0 8px;font-size:15px;color:${INK}">Predictions (${picks.length})</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <tr>
-        <th align="left" style="padding:8px;border-bottom:2px solid #eee;color:${MUTED};font-weight:600;text-transform:uppercase;font-size:11px">Match</th>
-        <th align="center" style="padding:8px;border-bottom:2px solid #eee;color:${MUTED};font-weight:600;text-transform:uppercase;font-size:11px">BTTS</th>
-        <th align="right" style="padding:8px;border-bottom:2px solid #eee;color:${MUTED};font-weight:600;text-transform:uppercase;font-size:11px">Qualifies</th>
-      </tr>
-      ${rows}
-    </table>
-
-    ${waButton}
-
-    <p style="margin:24px 0 0;font-size:13px;color:${MUTED}">
-      💳 Whish app link: <a href="${WHISH_APP_URL}" style="color:${RED}">${esc(WHISH_APP_URL)}</a>
-    </p>`
+    ${waButton}`
 
   return getTransport().sendMail({
     from: FROM,

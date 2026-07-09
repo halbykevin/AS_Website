@@ -7,8 +7,8 @@ const CONFETTI_COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', 
 
 const STEP_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
-// Link the player taps to open / download the Whish Money app to pay the entry fee.
-const WHISH_APP_URL = 'https://www.whish.money/download?utm_source=whish_website&utm_medium=whish_website'
+// A draw number as a padded ticket, e.g. 7 → "#0007".
+const formatDraw = (n) => (n == null || n === '' ? '' : `#${String(n).padStart(4, '0')}`)
 const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
 const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
 
@@ -98,187 +98,51 @@ function Confetti() {
   )
 }
 
-function formatKickoff(kickoff) {
-  if (!kickoff) return ''
-  const d = new Date(kickoff)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-GB', {
-    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function Flag({ src, name, size = 'md' }) {
-  const cls = size === 'sm' ? 'h-4 w-6' : 'h-9 w-12'
+function Flag({ src, name }) {
   if (!src) {
     return (
-      <div className={`flex ${cls} items-center justify-center rounded-md bg-as-charcoal/10 text-xs font-black text-as-charcoal/60 ring-1 ring-black/10`}>
+      <div className="flex h-9 w-12 items-center justify-center rounded-md bg-as-charcoal/10 text-xs font-black text-as-charcoal/60 ring-1 ring-black/10">
         {(name || '?').slice(0, 2).toUpperCase()}
       </div>
     )
   }
-  return <img src={src} alt={name} loading="lazy" className={`${cls} rounded-md object-cover shadow-sm ring-1 ring-black/10`} />
+  return <img src={src} alt={name} loading="lazy" className="h-9 w-12 rounded-md object-cover shadow-sm ring-1 ring-black/10" />
 }
 
-// A segmented-control option button used for BTTS and the qualifier picker.
-function SegButton({ active, onClick, disabled, tone = 'ink', children }) {
-  const activeCls = tone === 'green' ? 'bg-emerald-600 text-white shadow' : 'bg-as-charcoal text-white shadow'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        active ? activeCls : 'bg-white text-as-charcoal ring-1 ring-black/10 hover:ring-black/25'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-// A tappable team in the match header — picking it = choosing who qualifies.
-function TeamPick({ name, flag, align = 'left', active, onClick, disabled }) {
-  const label = name || (align === 'left' ? 'Team A' : 'Team B')
+// One candidate team in the "who will win the World Cup?" picker. Tapping it
+// selects that team as the player's champion pick.
+function ChampionCard({ team, active, onClick, disabled }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`group flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2.5 py-2 transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        align === 'right' ? 'flex-row justify-start' : 'flex-row-reverse justify-start'
-      } ${
-        active
-          ? 'bg-emerald-50 ring-2 ring-emerald-500'
-          : 'ring-1 ring-black/10 hover:ring-black/25'
+      className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+        active ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500' : 'border-black/10 bg-white hover:border-black/25'
       }`}
     >
-      <Flag src={flag} name={name} />
-      <span className={`line-clamp-1 text-sm font-bold ${align === 'left' ? 'text-right' : ''} ${active ? 'text-emerald-700' : 'text-as-charcoal'}`}>
-        {label}
+      <Flag src={team.flagA} name={team.teamA} />
+      <span className={`line-clamp-1 min-w-0 flex-1 text-sm font-bold ${active ? 'text-emerald-700' : 'text-as-charcoal'}`}>
+        {team.teamA || 'Team'}
       </span>
-    </button>
-  )
-}
-
-// One match: tap a team to pick who qualifies, plus a Both-Teams-To-Score toggle.
-function MatchRow({ match, value, onBtts, onQualifier, disabled }) {
-  return (
-    <div className="rounded-2xl border border-black/5 bg-white p-3 shadow-sm sm:p-4">
-      {(match.stage || match.kickoff) && (
-        <div className="mb-2 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-as-charcoal/45">
-          {match.stage && <span>{match.stage}</span>}
-          {match.stage && match.kickoff && <span className="text-as-charcoal/25">•</span>}
-          {match.kickoff && <span>{formatKickoff(match.kickoff)}</span>}
-        </div>
+      {active && (
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-600 text-xs text-white">✓</span>
       )}
-
-      <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
-        Who qualifies? — tap a team
-      </p>
-      <div className="flex items-center justify-center gap-2">
-        <TeamPick
-          name={match.teamA}
-          flag={match.flagA}
-          align="left"
-          active={value?.qualifier === 'A'}
-          onClick={() => onQualifier('A')}
-          disabled={disabled}
-        />
-        <span className="shrink-0 text-xs font-black text-as-charcoal/35">VS</span>
-        <TeamPick
-          name={match.teamB}
-          flag={match.flagB}
-          align="right"
-          active={value?.qualifier === 'B'}
-          onClick={() => onQualifier('B')}
-          disabled={disabled}
-        />
-      </div>
-
-      {/* Both teams to score? */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-as-charcoal/50">
-          Both teams to score?
-        </p>
-        <div className="flex gap-2">
-          <SegButton tone="green" active={value?.btts === 'yes'} onClick={() => onBtts('yes')} disabled={disabled}>Yes</SegButton>
-          <SegButton tone="green" active={value?.btts === 'no'} onClick={() => onBtts('no')} disabled={disabled}>No</SegButton>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Whish payment step: pay a small fee to AS Company with a note to enter.
-function WhishPay({ payment, amount, confirmed, onConfirm }) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
-        <p className="text-sm font-bold text-as-charcoal">Pay {amount} on Whish to enter</p>
-        <ol className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
-          <li className="flex gap-2"><span>1️⃣</span><span>Open the <span className="font-semibold">Whish Money</span> app (don&apos;t have it? get it below).</span></li>
-          <li className="flex gap-2"><span>2️⃣</span><span>Search for <span className="font-semibold">{payment.recipient || 'AS Company'}</span> and send <span className="font-semibold">{amount}</span>.</span></li>
-          {payment.note && (
-            <li className="flex gap-2"><span>3️⃣</span><span>Add the note <span className="font-bold text-as-red">{payment.note}</span> so we can match your entry.</span></li>
-          )}
-        </ol>
-        {payment.instructions && <p className="mt-3 text-sm text-as-charcoal/70">{payment.instructions}</p>}
-        {payment.note && (
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-black/10">
-            <span className="truncate text-sm font-bold text-as-charcoal">Note: {payment.note}</span>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard?.writeText(payment.note)}
-              className="shrink-0 rounded-lg bg-as-charcoal/5 px-2.5 py-1 text-xs font-semibold text-as-charcoal transition hover:bg-as-charcoal/10"
-            >
-              Copy
-            </button>
-          </div>
-        )}
-
-        <a
-          href={WHISH_APP_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#00b7a8] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
-        >
-          Get the Whish app →
-        </a>
-      </div>
-
-      <p className="text-xs text-as-charcoal/60">
-        Tip: enter with the <span className="font-semibold">same mobile number you paid from</span> — that&apos;s how we verify your payment.
-      </p>
-
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => onConfirm(e.target.checked)}
-          className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-600"
-        />
-        <span className="text-sm font-medium text-as-charcoal">
-          I&apos;ve completed the {amount} Whish payment{payment.note ? ` with the note ${payment.note}` : ''}.
-          <span className="mt-0.5 block text-xs font-normal text-as-charcoal/60">
-            Entries are verified against payments before any prize is paid.
-          </span>
-        </span>
-      </label>
-    </div>
+    </button>
   )
 }
 
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('repost') // repost | play | pay | register | done
+  const [step, setStep] = useState('repost') // repost | play | register | done
   const [openedPost, setOpenedPost] = useState(false)
   const [confirmedRepost, setConfirmedRepost] = useState(false)
-  const [picks, setPicks] = useState({}) // { [matchId]: { btts, qualifier } }
-  const [paidConfirmed, setPaidConfirmed] = useState(false)
+  const [champion, setChampion] = useState(null) // selected team id
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
+  const [drawNumber, setDrawNumber] = useState(null) // assigned on submit
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -295,33 +159,15 @@ export default function PredictorModal() {
   }, [closeGame])
 
   if (!predictor) return null
-  const { matches, prize, closed, payment = {}, entryFee, repostUrl } = predictor
-  const paymentEnabled = payment.enabled !== false
-  const amount = `$${entryFee ?? 5}`
+  const { teams, prize, closed, repostUrl } = predictor
   // Admin-customizable "How to win" steps; falls back to the built-in list.
   const customSteps = Array.isArray(predictor.howToWin) ? predictor.howToWin.filter(Boolean) : []
+  const championTeam = teams.find((t) => t.id === champion) || null
 
-  const setBtts = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], btts: v } }))
-  const setQualifier = (matchId) => (v) => setPicks((s) => ({ ...s, [matchId]: { ...s[matchId], qualifier: v } }))
-
-  const allFilled = matches.every((m) => {
-    const v = picks[m.id]
-    return v && (v.btts === 'yes' || v.btts === 'no') && (v.qualifier === 'A' || v.qualifier === 'B')
-  })
-
-  // From the predictions step: pay first (if the fee is on), else straight to details.
+  // From the pick step: a champion must be chosen to continue.
   const afterPlay = () => {
-    if (!allFilled) {
-      setError('Make both picks for every match to continue.')
-      return
-    }
-    setError('')
-    setStep(paymentEnabled ? 'pay' : 'register')
-  }
-
-  const afterPay = () => {
-    if (!paidConfirmed) {
-      setError('Please confirm your payment to continue.')
+    if (!champion) {
+      setError('Tap the team you think will win the World Cup to continue.')
       return
     }
     setError('')
@@ -337,12 +183,8 @@ export default function PredictorModal() {
     setSubmitting(true)
     setError('')
     try {
-      const body = matches.map((m) => ({
-        matchId: m.id,
-        btts: picks[m.id]?.btts,
-        qualifier: picks[m.id]?.qualifier,
-      }))
-      await submitPrediction({ fullName: fullName.trim(), mobile: mobile.trim(), picks: body })
+      const entry = await submitPrediction({ fullName: fullName.trim(), mobile: mobile.trim(), champion })
+      setDrawNumber(entry?.drawNumber ?? null)
       setStep('done')
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.')
@@ -403,11 +245,9 @@ export default function PredictorModal() {
                 ) : (
                   <ul className="mt-2 space-y-1.5 text-sm text-as-charcoal/75">
                     <li className="flex gap-2"><span>1️⃣</span><span>Repost our latest post on <span className="font-semibold">@ascompany.lb</span>.</span></li>
-                    <li className="flex gap-2"><span>2️⃣</span><span>For each match, predict <span className="font-semibold">both teams to score</span> &amp; <span className="font-semibold">who qualifies</span>.</span></li>
-                    {paymentEnabled && (
-                      <li className="flex gap-2"><span>3️⃣</span><span>Pay <span className="font-semibold">{amount}</span> on Whish to <span className="font-semibold">{payment.recipient || 'AS Company'}</span> to enter.</span></li>
-                    )}
-                    <li className="flex gap-2"><span>{paymentEnabled ? '4️⃣' : '3️⃣'}</span><span className="font-semibold">{prize.enabled && prize.title ? prize.title : 'Win the prize'}.</span></li>
+                    <li className="flex gap-2"><span>2️⃣</span><span>Pick the team you think will <span className="font-semibold">win the World Cup</span>.</span></li>
+                    <li className="flex gap-2"><span>3️⃣</span><span>Enter your name &amp; mobile to join the draw.</span></li>
+                    <li className="flex gap-2"><span>4️⃣</span><span className="font-semibold">{prize.enabled && prize.title ? prize.title : 'Win the prize'}.</span></li>
                   </ul>
                 )}
               </div>
@@ -442,33 +282,42 @@ export default function PredictorModal() {
 
               {closed && (
                 <div className="rounded-xl bg-as-red/10 px-4 py-3 text-sm font-semibold text-as-red">
-                  This game is now closed — predictions are no longer accepted. Thanks for playing!
+                  This game is now closed — entries are no longer accepted. Thanks for playing!
                 </div>
               )}
 
-              <div className="space-y-3">
-                {matches.map((m) => (
-                  <MatchRow
-                    key={m.id}
-                    match={m}
-                    value={picks[m.id]}
-                    onBtts={setBtts(m.id)}
-                    onQualifier={setQualifier(m.id)}
-                    disabled={closed}
-                  />
-                ))}
+              <div>
+                <p className="mb-2 text-center text-sm font-bold uppercase tracking-wide text-as-charcoal/60">
+                  Who will win the World Cup?
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {teams.map((t) => (
+                    <ChampionCard
+                      key={t.id}
+                      team={t}
+                      active={champion === t.id}
+                      onClick={() => { setChampion(t.id); setError('') }}
+                      disabled={closed}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
-          {step === 'pay' && (
-            <WhishPay payment={payment} amount={amount} confirmed={paidConfirmed} onConfirm={setPaidConfirmed} />
-          )}
-
           {step === 'register' && (
             <form id="predictor-register" onSubmit={submit} className="space-y-4">
+              {championTeam && (
+                <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
+                  <Flag src={championTeam.flagA} name={championTeam.teamA} />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Your pick to win</p>
+                    <p className="line-clamp-1 font-extrabold text-as-charcoal">🏆 {championTeam.teamA}</p>
+                  </div>
+                </div>
+              )}
               <p className="text-sm text-as-charcoal/70">
-                Almost there! Enter your details so we can reach you on WhatsApp if you win.
+                Almost there! Enter your details so we can reach you on WhatsApp if you win the draw.
               </p>
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-as-charcoal">Full name</span>
@@ -491,9 +340,6 @@ export default function PredictorModal() {
                   placeholder="+961 …"
                   className="w-full rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300/60"
                 />
-                {paymentEnabled && (
-                  <span className="mt-1 block text-xs text-as-charcoal/55">Use the same number you paid with on Whish.</span>
-                )}
               </label>
             </form>
           )}
@@ -503,13 +349,25 @@ export default function PredictorModal() {
               <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-600 text-4xl shadow-lg">
                 🎉
               </div>
-              <h3 className="text-xl font-extrabold text-as-charcoal">You&apos;re in the game!</h3>
+              <h3 className="text-xl font-extrabold text-as-charcoal">You&apos;re in the draw!</h3>
               <p className="mx-auto mt-2 max-w-xs text-sm text-as-charcoal/70">
-                {predictor.successMessage || "Your predictions are locked in. Good luck — we'll be in touch if you win!"}
+                {predictor.successMessage || "Your pick is locked in. Good luck — we'll be in touch if you win!"}
               </p>
+              {drawNumber != null && (
+                <div className="mx-auto mt-5 max-w-[16rem] rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Your draw number</p>
+                  <p className="text-3xl font-black tracking-wider text-as-charcoal">{formatDraw(drawNumber)}</p>
+                  <p className="mt-1 text-xs text-as-charcoal/60">Screenshot this — it&apos;s your entry into the draw.</p>
+                </div>
+              )}
+              {championTeam && (
+                <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700">
+                  🏆 Your pick: {championTeam.teamA}
+                </div>
+              )}
               {prize.enabled && prize.title && (
-                <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-700">
-                  🏆 Playing for: {prize.title}
+                <div className="mx-auto mt-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-700">
+                  🎁 Playing for: {prize.title}
                 </div>
               )}
               <div className="mx-auto mt-5 max-w-xs text-left">
@@ -531,7 +389,7 @@ export default function PredictorModal() {
                 disabled={!confirmedRepost}
                 className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {confirmedRepost ? 'Start predicting →' : 'Repost to unlock'}
+                {confirmedRepost ? 'Make my pick →' : 'Repost to unlock'}
               </button>
             )}
             {step === 'play' && (
@@ -544,30 +402,11 @@ export default function PredictorModal() {
                 Continue →
               </button>
             )}
-            {step === 'pay' && (
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setStep('play'); setError('') }}
-                  className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-as-charcoal transition hover:border-emerald-400 hover:text-emerald-600"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={afterPay}
-                  disabled={!paidConfirmed}
-                  className="flex-1 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  I&apos;ve paid — continue →
-                </button>
-              </div>
-            )}
             {step === 'register' && (
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setStep(paymentEnabled ? 'pay' : 'play'); setError('') }}
+                  onClick={() => { setStep('play'); setError('') }}
                   className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-as-charcoal transition hover:border-emerald-400 hover:text-emerald-600"
                 >
                   ← Back
@@ -578,7 +417,7 @@ export default function PredictorModal() {
                   disabled={submitting}
                   className="flex-1 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:opacity-60"
                 >
-                  {submitting ? 'Submitting…' : 'Submit my predictions 🏆'}
+                  {submitting ? 'Submitting…' : 'Enter the draw 🏆'}
                 </button>
               </div>
             )}

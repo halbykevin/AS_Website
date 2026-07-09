@@ -132,6 +132,7 @@ const predictorMatchJson = (r) => ({
 })
 const predictionJson = (r) => ({
   id: r.id, fullName: r.full_name, mobile: r.mobile,
+  drawNumber: r.draw_number == null ? null : Number(r.draw_number),
   picks: Array.isArray(r.picks) ? r.picks : [], createdAt: r.created_at,
   archived: r.archived === true, archivedAt: r.archived_at,
 })
@@ -663,8 +664,8 @@ app.delete('/api/predictor-matches/:id', requireAuth, ah(async (req, res) => {
   res.status(204).end()
 }))
 
-// Public submission. Sanitises the picks to {matchId, scoreA, scoreB} integers,
-// keeping only those that point at a real, currently-visible match.
+// Public submission. The game is a single pick — the team the player thinks
+// will win the World Cup — validated against the visible team pool.
 // Normalise a phone number so the same number typed with/without spaces, dashes
 // or parentheses counts as one entry (keeps a leading + and the digits).
 const normalizeMobile = (s) => {
@@ -678,22 +679,22 @@ app.post('/api/predictions', ah(async (req, res) => {
   const mobile = normalizeMobile(b.mobile)
   if (!fullName || !mobile) return res.status(400).json({ error: 'Full name and mobile number are required' })
 
-  const cfg = (await query('SELECT enabled, closed, deadline, notify_whatsapp, title, entry_fee, payment_enabled, payment_recipient, payment_note FROM predictor WHERE id = 1')).rows[0]
+  const cfg = (await query('SELECT enabled, closed, deadline, notify_whatsapp, title FROM predictor WHERE id = 1')).rows[0]
   if (!cfg || !cfg.enabled || cfg.closed) return res.status(403).json({ error: 'The game is not currently open' })
   if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
     return res.status(403).json({ error: 'The prediction deadline has passed' })
 
-  const matchRows = (await query('SELECT id, team_a, team_b FROM predictor_matches WHERE visible = true')).rows
-  const validIds = new Set(matchRows.map((r) => r.id))
-  // Picks are now { matchId, btts: 'yes'|'no', qualifier: 'A'|'B' }.
-  const picks = (Array.isArray(b.picks) ? b.picks : [])
-    .map((p) => ({
-      matchId: Number(p?.matchId),
-      btts: String(p?.btts || '').toLowerCase() === 'yes' ? 'yes' : String(p?.btts || '').toLowerCase() === 'no' ? 'no' : '',
-      qualifier: String(p?.qualifier || '').toUpperCase() === 'A' ? 'A' : String(p?.qualifier || '').toUpperCase() === 'B' ? 'B' : '',
-    }))
-    .filter((p) => validIds.has(p.matchId) && p.btts && p.qualifier)
-  if (!picks.length) return res.status(400).json({ error: 'Please make a prediction for at least one match' })
+  // Candidate teams are the visible predictor_matches rows (team_a is the team).
+  const teamRows = (await query('SELECT id, team_a FROM predictor_matches WHERE visible = true')).rows
+  const byId = new Map(teamRows.map((r) => [r.id, r]))
+  // A single pick: the team the player thinks will win the World Cup. Accept it
+  // as `champion` (a team id) or as the first entry of a `picks` array.
+  const championId = Number(b.champion ?? (Array.isArray(b.picks) ? b.picks[0]?.teamId : undefined))
+  const champTeam = byId.get(championId)
+  if (!champTeam) return res.status(400).json({ error: 'Please pick who you think will win the World Cup' })
+  const championName = champTeam.team_a || 'Their pick'
+  // Stored as a one-entry picks array so existing entry tooling keeps working.
+  const picks = [{ teamId: championId, team: championName }]
 
   try {
     const { rows } = await query(
@@ -702,43 +703,23 @@ app.post('/api/predictions', ah(async (req, res) => {
     )
     res.status(201).json(predictionJson(rows[0]))
 
-    // Enrich picks with team names for the notifications below.
-    const byId = new Map(matchRows.map((m) => [m.id, m]))
-    const enriched = picks.map((p) => {
-      const m = byId.get(p.matchId)
-      const qualTeam = p.qualifier === 'A' ? m?.team_a : m?.team_b
-      return {
-        teamA: m?.team_a || 'Team A',
-        teamB: m?.team_b || 'Team B',
-        btts: p.btts === 'yes' ? 'Yes' : 'No',
-        qualifier: qualTeam || (p.qualifier === 'A' ? 'Team A' : 'Team B'),
-      }
-    })
-
     // Fire-and-forget WhatsApp confirmation. Never blocks or fails the response;
     // a no-op unless the admin enabled it AND the Cloud API env vars are configured.
     if (cfg.notify_whatsapp && whatsappEnabled()) {
-      const picksText = enriched
-        .map((p) => `${p.teamA} vs ${p.teamB} — BTTS ${p.btts}, ${p.qualifier} qualify`)
-        .join('; ')
-      sendTemplate(mobile, [fullName, picksText]).catch((err) =>
+      sendTemplate(mobile, [fullName, championName]).catch((err) =>
         console.error('[whatsapp] prediction confirmation failed:', err.message)
       )
     }
 
     // Fire-and-forget staff email notification. No-op unless SMTP is configured.
     if (mailEnabled()) {
-      const paymentEnabled = cfg.payment_enabled !== false
       sendPredictionEmail({
         playerName: fullName,
         mobile,
         createdAt: rows[0].created_at,
         gameTitle: cfg.title || 'Predict & Win — World Cup 2026',
-        picks: enriched,
-        paymentEnabled,
-        amount: `$${cfg.entry_fee == null ? 5 : Number(cfg.entry_fee)}`,
-        recipient: cfg.payment_recipient || 'AS Company',
-        note: cfg.payment_note || '',
+        champion: championName,
+        drawNumber: rows[0].draw_number,
       }).catch((err) => console.error('[mail] prediction notification failed:', err.message))
     }
   } catch (err) {
