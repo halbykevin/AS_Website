@@ -4,6 +4,7 @@ import { useContent } from '../store/content.jsx'
 import { useScrollEl } from '../store/scroll.jsx'
 import { useLenis } from '../store/lenis.jsx'
 import FootballButton from './predictor/FootballButton.jsx'
+import { optimizedImage } from '../lib/api'
 
 export default function Navbar() {
   const { brand, nav } = useContent()
@@ -66,7 +67,7 @@ export default function Navbar() {
 
         <Link to="/" className="flex items-center gap-2" aria-label={brand.name}>
           <img
-            src={brand.logo}
+            src={optimizedImage(brand.logo, { w: 320 })}
             alt={brand.name}
             fetchpriority="high"
             decoding="async"

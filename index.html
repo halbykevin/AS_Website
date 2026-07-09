@@ -32,6 +32,10 @@
     />
     <meta name="twitter:image" content="https://as.com.lb/ASCompanyLogo.jpg" />
 
+    <!-- Warm up the API + event-image CDN early: the homepage data and the LCP
+         banner image come from these origins (Lighthouse "preconnect candidates"). -->
+    <link rel="preconnect" href="https://asapi.as.com.lb" crossorigin />
+    <link rel="preconnect" href="https://cdn.ticketingboxoffice.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Load fonts without blocking render: fetch as "print", then swap to "all" on load -->

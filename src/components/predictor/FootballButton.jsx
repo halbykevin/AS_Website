@@ -25,7 +25,7 @@ export default function FootballButton() {
       </span>
 
       <span className="animate-ball-bob drop-shadow-md transition-transform duration-300 group-hover:scale-110 group-active:scale-95">
-        <img src={WORLD_CUP_EMBLEM} alt="" className="h-10 w-auto sm:h-11" />
+        <img src={WORLD_CUP_EMBLEM} alt="" width="104" height="160" className="h-10 w-auto sm:h-11" />
       </span>
 
       <span className="mt-0.5 hidden bg-gradient-to-r from-emerald-600 via-amber-500 to-rose-600 bg-clip-text text-[10px] font-extrabold uppercase tracking-wide text-transparent sm:block">
