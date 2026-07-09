@@ -7,8 +7,9 @@ import { useContent } from '../store/content.jsx'
 
 // The same full-bleed aspect ratio used by the HorizontalStory and the events
 // BannerSlider — so all three homepage strips are exactly the same height and
-// width at every breakpoint.
-const STRIP = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
+// width at every breakpoint. The shorter mobile ratio lets all three panels fit
+// on one phone screen without vertical scrolling.
+const STRIP = 'aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5]'
 
 // Smooth shadow + a gentle "clickable" breathing pulse (pauses on hover, off for
 // reduced-motion). Shared by all three homepage panels.

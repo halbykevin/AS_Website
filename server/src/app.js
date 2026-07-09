@@ -122,6 +122,9 @@ const predictorJson = (r) => ({
   paymentNote: r.payment_note, paymentInstructions: r.payment_instructions,
   howToWin: Array.isArray(r.how_to_win) ? r.how_to_win : [],
   repostUrl: r.repost_url || '',
+  autoOpen: r.auto_open === true, triggerType: r.trigger_type || 'load',
+  delaySeconds: r.delay_seconds == null ? 1 : Number(r.delay_seconds),
+  scrollPercent: r.scroll_percent == null ? 40 : Number(r.scroll_percent),
   deadline: r.deadline, closed: r.closed, successMessage: r.success_message, updatedAt: r.updated_at,
 })
 const predictorMatchJson = (r) => ({
@@ -608,6 +611,7 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
        deadline=$8, closed=$9, success_message=$10, prize_enabled=$11, notify_whatsapp=$12,
        entry_fee=$13, payment_enabled=$14, payment_recipient=$15, payment_note=$16, payment_instructions=$17,
        how_to_win=$18::jsonb, repost_url=$19,
+       auto_open=$20, trigger_type=$21, delay_seconds=$22, scroll_percent=$23,
        updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
@@ -621,6 +625,9 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
       b.paymentRecipient || 'AS Company', b.paymentNote || '', b.paymentInstructions || '',
       JSON.stringify((Array.isArray(b.howToWin) ? b.howToWin : []).map((s) => String(s || '').trim()).filter(Boolean).slice(0, 12)),
       b.repostUrl || '',
+      Boolean(b.autoOpen), b.triggerType === 'scroll' ? 'scroll' : 'load',
+      b.delaySeconds == null || b.delaySeconds === '' ? 1 : Number(b.delaySeconds),
+      b.scrollPercent == null || b.scrollPercent === '' ? 40 : Number(b.scrollPercent),
     ]
   )
   res.json(predictorJson(rows[0]))

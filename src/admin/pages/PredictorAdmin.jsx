@@ -21,6 +21,7 @@ const blankSettings = {
   prizeEnabled: true, prizeTitle: '', prizeDescription: '', prizeImageUrl: '', deadline: '', closed: false,
   entryFee: 5, paymentEnabled: true, paymentRecipient: 'AS Company', paymentNote: '#as.com.lb', paymentInstructions: '',
   howToWin: [], repostUrl: '',
+  autoOpen: false, triggerType: 'load', delaySeconds: 0.5, scrollPercent: 40,
 }
 const blankMatch = {
   stage: '', teamA: '', teamACode: '', teamAFlag: '', teamB: '', teamBCode: '', teamBFlag: '',
@@ -102,6 +103,10 @@ export default function PredictorAdmin() {
           paymentInstructions: p.paymentInstructions || '',
           howToWin: Array.isArray(p.howToWin) ? p.howToWin : [],
           repostUrl: p.repostUrl || '',
+          autoOpen: p.autoOpen === true,
+          triggerType: p.triggerType === 'scroll' ? 'scroll' : 'load',
+          delaySeconds: p.delaySeconds ?? 0.5,
+          scrollPercent: p.scrollPercent ?? 40,
         })
       }
       setMatches(Array.isArray(m) ? m : [])
@@ -342,6 +347,36 @@ export default function PredictorAdmin() {
                 </Field>
               </div>
             </div>
+          </div>
+        </Card>
+
+        <Card title="Auto-popup">
+          <div className="space-y-4">
+            <Toggle
+              checked={settings.autoOpen}
+              onChange={(v) => setSettings((s) => ({ ...s, autoOpen: v }))}
+              label={settings.autoOpen ? 'Auto-popup ON' : 'Auto-popup OFF'}
+              description="When on, the game opens on its own once per visit — visitors don't have to tap the football."
+            />
+            <Field label="When should it appear?">
+              <select
+                value={settings.triggerType}
+                onChange={setS('triggerType')}
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm text-as-charcoal outline-none transition focus:border-as-red focus:ring-2 focus:ring-as-red/20"
+              >
+                <option value="load">After the page opens</option>
+                <option value="scroll">After scrolling down</option>
+              </select>
+            </Field>
+            {settings.triggerType === 'scroll' ? (
+              <Field label="Show after scrolling (%)" hint="e.g. 40 = once the visitor has scrolled 40% down the page.">
+                <TextInput type="number" min="1" max="100" step="1" value={settings.scrollPercent} onChange={setS('scrollPercent')} placeholder="40" />
+              </Field>
+            ) : (
+              <Field label="Delay (seconds)" hint="e.g. 0.5 = half a second after the page opens.">
+                <TextInput type="number" min="0" step="0.5" value={settings.delaySeconds} onChange={setS('delaySeconds')} placeholder="0.5" />
+              </Field>
+            )}
           </div>
         </Card>
 

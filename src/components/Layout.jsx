@@ -8,6 +8,7 @@ import { ScrollContext } from '../store/scroll.jsx'
 import { LenisProvider, useLenis } from '../store/lenis.jsx'
 import { PredictorUIProvider, usePredictorUI } from '../store/predictor.jsx'
 import PredictorModal from './predictor/PredictorModal.jsx'
+import PredictorAutoOpen from './predictor/PredictorAutoOpen.jsx'
 
 // Mounts the predictor modal only while open (so its state resets each time).
 function PredictorMount() {
@@ -53,6 +54,7 @@ export default function Layout({ children }) {
             </div>
             <SitePopup />
             <ScrollToTopButton />
+            <PredictorAutoOpen />
             <PredictorMount />
           </div>
         </LenisProvider>

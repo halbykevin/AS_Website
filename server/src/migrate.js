@@ -282,6 +282,13 @@ ALTER TABLE predictor ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS how_to_win JSONB DEFAULT '[]'::jsonb;
 -- Link to the post players must repost to enter (replaces the old "follow us" gate).
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS repost_url TEXT DEFAULT '';
+-- Auto-popup: open the game by itself (like an ad popup), on page load after a
+-- delay or once the visitor scrolls a set amount. delay_seconds is NUMERIC so a
+-- fractional delay like 0.5s is allowed.
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS auto_open BOOLEAN DEFAULT false;
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS trigger_type TEXT DEFAULT 'load';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS delay_seconds NUMERIC(5,2) DEFAULT 1;
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS scroll_percent INTEGER DEFAULT 40;
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';

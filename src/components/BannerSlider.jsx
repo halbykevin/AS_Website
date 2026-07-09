@@ -16,7 +16,7 @@ const INTERVAL = 5000
 // One fixed aspect ratio per breakpoint — every banner is cropped to fit, so
 // the strip never changes height between slides. Taller on phones, wide and
 // cinematic on larger screens.
-const ASPECT = 'aspect-[16/9] sm:aspect-[16/6] lg:aspect-[16/5]'
+const ASPECT = 'aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5]'
 
 export default function BannerSlider({ banners }) {
   const [index, setIndex] = useState(0)
