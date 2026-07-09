@@ -42,16 +42,10 @@ export default function HeroCinema({ cms, product, categories = [] }) {
   const heading = cms?.heading || 'Tech that moves you.'
   const eyebrow = cms?.eyebrow || 'AS Store — Lebanon'
   const subheading = cms?.subheading || ''
-  const buttons = Array.isArray(cms?.settings?.buttons) && cms.settings.buttons.length
-    ? cms.settings.buttons
-    : [
-        { label: 'Shop now', href: '/shop' },
-        { label: 'Browse categories', href: '#categories' },
-      ]
-  // Single call-to-action: the "Shop" button jumps straight to the flagship
-  // product shown in the hero (falls back to the CMS/shop link if none).
-  const primaryBtn = buttons[0] || { label: 'Shop now', href: '/shop' }
-  const shopHref = product?.slug ? `/product/${product.slug}` : primaryBtn.href || '/shop'
+  // Single call-to-action: a "Shop" button that jumps straight to the flagship
+  // product shown in the hero (falls back to the CMS button link or /shop).
+  const cmsHref = Array.isArray(cms?.settings?.buttons) && cms.settings.buttons[0]?.href
+  const shopHref = product?.slug ? `/product/${product.slug}` : cmsHref || '/shop'
 
   const ref = useRef(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
@@ -131,59 +125,63 @@ export default function HeroCinema({ cms, product, categories = [] }) {
             className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start"
           >
             <Link href={shopHref} className="pill px-8 py-3 text-base">
-              {primaryBtn.label || 'Shop now'}
+              Shop
             </Link>
           </motion.div>
         </motion.div>
 
-        {/* Flagship product — floats, tilts with the pointer, parallaxes away */}
-        <div className="relative flex items-center justify-center [perspective:1200px]">
+        {/* Flagship product — floats + tilts, with its name/price bar below it */}
+        <div className="relative flex flex-col items-center justify-center [perspective:1200px]">
           {product?.image && (
-            <motion.div
-              style={{ y: imgY, rotateX, rotateY, opacity: fade, willChange: 'transform' }}
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1.1, delay: 0.4, ease: EASE }}
-              className="relative"
-            >
-              {/* Static soft glow behind the image. Previously the red halo was a
-                  CSS drop-shadow filter ON the floating image — Samsung/Android
-                  re-rasterizes a filtered element every animation frame, which
-                  made the image flash. A separate un-animated blur layer keeps
-                  the look without any per-frame filter repaint. */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-6 bottom-0 top-1/3 -z-10 rounded-full bg-as-red/30 blur-[70px]"
-              />
-              <motion.img
-                src={product.image}
-                alt={product.name}
-                fetchpriority="high"
-                decoding="async"
-                animate={{ y: [0, -16, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
-                className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
-              />
+            <>
+              <motion.div
+                style={{ y: imgY, rotateX, rotateY, opacity: fade, willChange: 'transform' }}
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1.1, delay: 0.4, ease: EASE }}
+                className="relative"
+              >
+                {/* Static soft glow behind the image. Previously the red halo was a
+                    CSS drop-shadow filter ON the floating image — Samsung/Android
+                    re-rasterizes a filtered element every animation frame, which
+                    made the image flash. A separate un-animated blur layer keeps
+                    the look without any per-frame filter repaint. */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-6 bottom-0 top-1/3 -z-10 rounded-full bg-as-red/30 blur-[70px]"
+                />
+                <motion.img
+                  src={product.image}
+                  alt={product.name}
+                  fetchpriority="high"
+                  decoding="async"
+                  animate={{ y: [0, -16, 0] }}
+                  transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
+                  className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
+                />
+              </motion.div>
+
+              {/* Full-width name + price bar, sitting cleanly under the image */}
               {product.slug && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.7, delay: 1.1, ease: EASE }}
-                  className="absolute -bottom-4 left-1/2 -translate-x-1/2"
+                  className="mt-8 w-full px-4"
                 >
                   <Link
                     href={`/product/${product.slug}`}
-                    className="flex max-w-[85vw] flex-col items-center gap-x-3 gap-y-0.5 rounded-2xl bg-white/10 px-5 py-2.5 text-center text-sm text-white backdrop-blur-md transition hover:bg-white/20 sm:max-w-none sm:flex-row sm:whitespace-nowrap sm:rounded-full sm:text-left"
+                    className="flex w-full flex-col items-center justify-center gap-1 rounded-2xl bg-white/[0.06] px-5 py-3 text-center text-sm text-white ring-1 ring-white/10 backdrop-blur-md transition hover:bg-white/10 sm:flex-row sm:gap-3"
                   >
-                    <span className="font-medium sm:max-w-[180px] sm:truncate">{product.name}</span>
+                    <span className="font-medium">{product.name}</span>
                     <span className="font-semibold text-as-red-light">
                       ${Number(product.price || 0).toLocaleString()}
                     </span>
                   </Link>
                 </motion.div>
               )}
-            </motion.div>
+            </>
           )}
         </div>
       </div>
