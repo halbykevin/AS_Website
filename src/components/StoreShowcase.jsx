@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Reveal from './Reveal.jsx'
+import { optimizedImage } from '../lib/api'
 
 // ---------------------------------------------------------------------------
 // AS Store showcase — the eye-catching product strip at the very top of the
@@ -243,7 +244,7 @@ function StackCard({ product, href, external, interactive }) {
       <div className="relative flex-1 overflow-hidden">
         {product.image ? (
           <img
-            src={product.image}
+            src={optimizedImage(product.image, { w: 768 })}
             alt={product.name}
             draggable={false}
             className="h-full w-full object-cover"
@@ -296,7 +297,7 @@ function ProductCard({ product, href, external, ...rest }) {
       <div className="relative aspect-square overflow-hidden">
         {product.image ? (
           <img
-            src={product.image}
+            src={optimizedImage(product.image, { w: 768 })}
             alt={product.name}
             loading="lazy"
             draggable={false}

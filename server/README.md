@@ -29,6 +29,7 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | GET | `/api/reservations` | admin | List reservations |
 | PATCH/DELETE | `/api/reservations/:id` | admin | Update status / delete |
 | POST | `/api/uploads` | admin | Upload an image → returns its URL |
+| GET | `/uploads/:file` | — | Serve an uploaded image. Add `?w=<px>&format=webp&q=<1-100>` to get an on-the-fly resized/re-encoded variant (originals are never modified; variants cached under `uploads/.cache`). Widths bucket to 320–2000; unknown params serve the original. |
 
 ## Run locally
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { optimizedImage } from '../lib/api'
 
 // Every banner sends visitors to the events listing page
 // (www.as.com.lb/events in production) rather than each banner's own link.
@@ -104,8 +105,8 @@ export default function BannerSlider({ banners }) {
           onMouseLeave={() => dragging && dragEnd()}
           onClickCapture={onClickCapture}
         >
-          {banners.map((b) => (
-            <Slide key={b.id} banner={b} />
+          {banners.map((b, i) => (
+            <Slide key={b.id} banner={b} eager={i === 0} />
           ))}
         </div>
 
@@ -140,15 +141,23 @@ export default function BannerSlider({ banners }) {
 
 // A single full-bleed slide: the cropped image, positioned by its focal point.
 // The whole slide links to the events page. Details live in the bar below.
-function Slide({ banner }) {
+function Slide({ banner, eager }) {
   return (
     <Link to={EVENTS_PATH} aria-label={banner.title || 'Browse events'} className="relative block h-full w-full shrink-0">
       <img
-        src={banner.image}
+        src={optimizedImage(banner.image, { w: 1600 })}
+        srcSet={[640, 1024, 1600]
+          .map((w) => `${optimizedImage(banner.image, { w })} ${w}w`)
+          .join(', ')}
+        sizes="100vw"
         alt={banner.title || 'Banner'}
         className="absolute inset-0 h-full w-full select-none object-cover"
         style={{ objectPosition: `${banner.focalX ?? 50}% ${banner.focalY ?? 50}%` }}
         draggable={false}
+        // First slide is the LCP element: load it eagerly at high priority.
+        // The rest defer until the visitor swipes to them, saving initial bytes.
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : 'auto'}
       />
     </Link>
   )

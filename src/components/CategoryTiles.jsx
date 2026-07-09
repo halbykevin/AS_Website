@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { optimizedImage } from '../lib/api'
 
 // Responsive grid of event-category tiles (image + label), like a box-office
 // "browse by category" strip. Clicking a tile filters the Events page; the first
@@ -25,7 +26,7 @@ export default function CategoryTiles({ categories, activeSlug = '', includeAll 
           >
             {c.image ? (
               <img
-                src={c.image}
+                src={optimizedImage(c.image, { w: 480 })}
                 alt=""
                 loading="lazy"
                 className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"

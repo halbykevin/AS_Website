@@ -9,6 +9,7 @@ import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail } from './mailer.js'
+import { imageResizer } from './images.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -21,6 +22,9 @@ export const app = express()
 const origins = (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim())
 app.use(cors({ origin: origins.includes('*') ? true : origins }))
 app.use(express.json({ limit: '1mb' }))
+// Resize/re-encode on the fly when ?w=/?format=/?q= are present, then fall
+// through to the untouched originals. Cached variants live in UPLOAD_DIR/.cache.
+app.use('/uploads', imageResizer(UPLOAD_DIR))
 app.use('/uploads', express.static(UPLOAD_DIR))
 
 // Wrap async handlers so thrown errors hit the error middleware.

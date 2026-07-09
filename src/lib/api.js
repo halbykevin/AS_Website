@@ -12,6 +12,20 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replac
 const TOKEN_KEY = 'as_admin_token'
 const EMAIL_KEY = 'as_admin_email'
 
+// Ask the API to resize/re-encode an uploaded image on the fly (see
+// server/src/images.js). Only rewrites our own /uploads URLs — external URLs
+// (flagcdn, etc.), data URIs and bundled /public assets pass through untouched.
+export function optimizedImage(url, { w, format = 'webp', q = 80 } = {}) {
+  if (!url || typeof url !== 'string') return url
+  if (!url.includes('/uploads/')) return url
+  const sep = url.includes('?') ? '&' : '?'
+  const parts = []
+  if (w) parts.push(`w=${w}`)
+  if (format) parts.push(`format=${format}`)
+  if (q) parts.push(`q=${q}`)
+  return parts.length ? `${url}${sep}${parts.join('&')}` : url
+}
+
 export const auth = {
   token: () => localStorage.getItem(TOKEN_KEY),
   email: () => localStorage.getItem(EMAIL_KEY),

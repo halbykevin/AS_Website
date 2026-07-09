@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
+import { optimizedImage } from '../lib/api'
 
 // Homepage image slideshow — the same simple, image-only carousel as the events
 // BannerSlider, but every slide opens the AS Store (settings.storeUrl, default
@@ -145,7 +146,11 @@ function Slide({ panel, href }) {
   const cls = 'relative block h-full w-full shrink-0'
   const inner = panel.image ? (
     <img
-      src={panel.image}
+      src={optimizedImage(panel.image, { w: 1600 })}
+      srcSet={[640, 1024, 1600]
+        .map((w) => `${optimizedImage(panel.image, { w })} ${w}w`)
+        .join(', ')}
+      sizes="100vw"
       alt=""
       className="absolute inset-0 h-full w-full select-none object-cover"
       style={{ objectPosition: `${panel.focalX ?? 50}% ${panel.focalY ?? 50}%` }}

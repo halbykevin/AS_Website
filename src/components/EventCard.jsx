@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Icon from './Icon.jsx'
+import { optimizedImage } from '../lib/api'
 
 const statusStyles = {
   open: { label: 'Reserve now', className: 'bg-green-50 text-green-700 ring-green-600/20' },
@@ -24,7 +25,11 @@ export default function EventCard({ event }) {
     <>
       <div className="relative aspect-[16/10] overflow-hidden bg-as-gray/10">
         <img
-          src={event.image}
+          src={optimizedImage(event.image, { w: 768 })}
+          srcSet={[480, 768]
+            .map((w) => `${optimizedImage(event.image, { w })} ${w}w`)
+            .join(', ')}
+          sizes="(max-width: 640px) 100vw, 400px"
           alt={event.title}
           loading="lazy"
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
