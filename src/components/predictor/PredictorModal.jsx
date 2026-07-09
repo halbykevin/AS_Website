@@ -424,17 +424,9 @@ export default function PredictorModal() {
           )}
 
           {step === 'done' && (
-            <div className="relative py-4 text-center">
-              <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-600 text-4xl shadow-lg">
-                🎉
-              </div>
-              <h3 className="text-xl font-extrabold text-as-charcoal">You&apos;re in the draw!</h3>
-              <p className="mx-auto mt-2 max-w-xs text-sm text-as-charcoal/70">
-                {predictor.successMessage || "Your pick is locked in. Good luck — we'll be in touch if you win!"}
-              </p>
-
+            <div className="relative py-2 text-center">
               {drawNumber != null && (
-                <div className="mt-5">
+                <div className="mt-1">
                   <DrawTicket number={drawNumber} team={championTeam?.teamA} />
                   <p className="mt-2 text-xs text-as-charcoal/60">📸 Screenshot your ticket — it&apos;s your entry into the draw.</p>
                 </div>
@@ -445,10 +437,6 @@ export default function PredictorModal() {
                   🎁 Playing for: {prize.title}
                 </div>
               )}
-
-              <div className="mx-auto mt-5 max-w-xs text-left">
-                <RepostCard url={repostUrl} />
-              </div>
             </div>
           )}
 
@@ -505,7 +493,7 @@ export default function PredictorModal() {
             <button
               type="button"
               onClick={finishToStore}
-              className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+              className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4 text-base font-bold text-white shadow-lg shadow-emerald-500/40 ring-1 ring-emerald-400/40 transition hover:shadow-xl hover:shadow-emerald-500/50 hover:brightness-105"
             >
               Check our store →
             </button>
