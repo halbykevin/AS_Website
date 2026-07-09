@@ -120,17 +120,22 @@ export default function HorizontalStory({ story }) {
 
         {/* Dots */}
         {count > 1 && (
-          <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
+          <div className="absolute bottom-2 left-1/2 z-20 flex max-w-[90%] -translate-x-1/2 flex-wrap items-center justify-center gap-0.5">
             {panels.map((p, i) => (
               <button
                 key={p.id ?? i}
                 type="button"
                 aria-label={`Go to slide ${i + 1}`}
                 onClick={() => go(i)}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
-                }`}
-              />
+                // 24×24 tap target (accessibility) with the small pill centered inside.
+                className="group/dot flex h-6 w-6 items-center justify-center"
+              >
+                <span
+                  className={`block h-1.5 rounded-full transition-all ${
+                    i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/50 group-hover/dot:bg-white/80'
+                  }`}
+                />
+              </button>
             ))}
           </div>
         )}
