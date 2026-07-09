@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Keep the admin dashboard out of search results
+Disallow: /admin
+Disallow: /admin/
+
+Sitemap: https://as.com.lb/sitemap.xml

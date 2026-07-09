@@ -1,0 +1,17 @@
+# AS Company (Absolute Solutions SAL)
+
+> AS Company (Absolute Solutions SAL) is Lebanon's market leader in telecommunication and electronics since 2008. The website showcases the company's services, promotes upcoming events (reservations happen over WhatsApp), and hosts a World Cup 2026 score-prediction game.
+
+AS Company delivers telecommunication products, electronics and tech, and a trusted retail and after-sales experience across Lebanon. It also promotes live events — visitors reserve a spot by opening a pre-filled WhatsApp chat.
+
+## Pages
+
+- [Home](https://as.com.lb/): Overview of AS Company, featured events and what the company does.
+- [What We Do](https://as.com.lb/what-we-do): The Absolute Solution division — about, vision, mission and company divisions.
+- [Events](https://as.com.lb/events): Upcoming events; reserve a spot over WhatsApp.
+
+## About
+
+- [Telecommunication](https://as.com.lb/what-we-do): Telecom products and solutions that keep Lebanon connected.
+- [Electronics & Tech](https://as.com.lb/what-we-do): The latest electronics, gadgets and accessories.
+- [Retail & Support](https://as.com.lb/what-we-do): Retail experience backed by expert advice and after-sales support.
