@@ -218,7 +218,7 @@ export default function PredictorModal() {
   const { closeGame } = usePredictorUI()
   const [step, setStep] = useState('repost') // repost | play | register | done
   const [openedPost, setOpenedPost] = useState(false)
-  const [confirmedRepost, setConfirmedRepost] = useState(false)
+  const [confirmedRepost, setConfirmedRepost] = useState(true)
   const [champion, setChampion] = useState(null) // selected team id
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
