@@ -48,6 +48,10 @@ export default function HeroCinema({ cms, product, categories = [] }) {
         { label: 'Shop now', href: '/shop' },
         { label: 'Browse categories', href: '#categories' },
       ]
+  // Single call-to-action: the "Shop" button jumps straight to the flagship
+  // product shown in the hero (falls back to the CMS/shop link if none).
+  const primaryBtn = buttons[0] || { label: 'Shop now', href: '/shop' }
+  const shopHref = product?.slug ? `/product/${product.slug}` : primaryBtn.href || '/shop'
 
   const ref = useRef(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
@@ -126,21 +130,9 @@ export default function HeroCinema({ cms, product, categories = [] }) {
             transition={{ duration: 0.8, delay: 0.75, ease: EASE }}
             className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start"
           >
-            {buttons.map((b, i) =>
-              i === 0 ? (
-                <Link key={i} href={b.href || '/shop'} className="pill px-8 py-3 text-base">
-                  {b.label}
-                </Link>
-              ) : (
-                <a
-                  key={i}
-                  href={b.href || '#'}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/20 px-8 py-3 text-base font-medium text-white/90 transition hover:border-white/50 hover:text-white"
-                >
-                  {b.label}
-                </a>
-              ),
-            )}
+            <Link href={shopHref} className="pill px-8 py-3 text-base">
+              {primaryBtn.label || 'Shop now'}
+            </Link>
           </motion.div>
         </motion.div>
 
@@ -182,9 +174,9 @@ export default function HeroCinema({ cms, product, categories = [] }) {
                 >
                   <Link
                     href={`/product/${product.slug}`}
-                    className="flex items-center gap-3 whitespace-nowrap rounded-full bg-white/10 px-5 py-2.5 text-sm text-white backdrop-blur-md transition hover:bg-white/20"
+                    className="flex max-w-[85vw] flex-col items-center gap-x-3 gap-y-0.5 rounded-2xl bg-white/10 px-5 py-2.5 text-center text-sm text-white backdrop-blur-md transition hover:bg-white/20 sm:max-w-none sm:flex-row sm:whitespace-nowrap sm:rounded-full sm:text-left"
                   >
-                    <span className="max-w-[180px] truncate font-medium">{product.name}</span>
+                    <span className="font-medium sm:max-w-[180px] sm:truncate">{product.name}</span>
                     <span className="font-semibold text-as-red-light">
                       ${Number(product.price || 0).toLocaleString()}
                     </span>
