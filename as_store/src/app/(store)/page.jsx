@@ -1,4 +1,3 @@
-import ReactDOM from 'react-dom'
 import HeroCinema from '@/components/home/HeroCinema.jsx'
 import VelocityBand from '@/components/home/VelocityBand.jsx'
 import CategoryWall from '@/components/home/CategoryWall.jsx'
@@ -25,12 +24,8 @@ export default async function HomePage() {
   const withImage = products.filter((p) => p.image)
   const featured = withImage.filter((p) => p.featured)
   const heroProduct = (featured.length >= 3 ? featured : withImage)[0] || null
-
-  // Preload the hero product image (the LCP element) so it starts downloading
-  // immediately with high priority instead of after the JS hydrates.
-  if (heroProduct?.image) {
-    ReactDOM.preload(heroProduct.image, { as: 'image', fetchPriority: 'high' })
-  }
+  // (The hero image preload is handled by next/image `priority` in HeroCinema,
+  // which preloads the optimizer-resized variant instead of the full original.)
 
   const onSale = withImage.filter((p) => p.oldPrice && Number(p.oldPrice) > Number(p.price))
   const maxPercent = onSale.reduce(

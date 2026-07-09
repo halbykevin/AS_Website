@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useDispatch } from 'react-redux'
 import { addItem } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
@@ -57,13 +58,15 @@ export default function ProductTile({ product, fluid = false }) {
         {teaser && <p className="mt-1 line-clamp-1 break-words text-xs leading-snug text-as-ink/55 sm:line-clamp-2 sm:text-sm">{teaser}</p>}
       </div>
 
-      <Link href={href} className="mt-2 flex h-32 w-full items-center justify-center overflow-hidden rounded-2xl sm:mt-3 sm:h-44">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <Link href={href} className="relative mt-2 block h-32 w-full overflow-hidden rounded-2xl sm:mt-3 sm:h-44">
+        {/* next/image resizes the (often 1000×1000) source down to the card's
+            real display size and serves WebP/AVIF via the Vercel optimizer. */}
+        <Image
           src={image}
           alt={name}
-          loading="lazy"
-          className="h-full w-full object-contain transition-transform duration-500 ease-out hover:scale-[1.04]"
+          fill
+          sizes="(max-width: 640px) 45vw, 300px"
+          className="object-contain transition-transform duration-500 ease-out hover:scale-[1.04]"
         />
       </Link>
 

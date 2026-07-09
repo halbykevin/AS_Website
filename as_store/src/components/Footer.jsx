@@ -25,7 +25,7 @@ export default function Footer({ settings }) {
             {contact.email && (
               <>
                 Or email{' '}
-                <a href={`mailto:${contact.email}`} className="text-as-red hover:underline">
+                <a href={`mailto:${contact.email}`} className="text-as-red underline hover:no-underline">
                   {contact.email}
                 </a>
                 .
@@ -37,7 +37,8 @@ export default function Footer({ settings }) {
         <div className="grid grid-cols-2 gap-8 py-8 sm:grid-cols-4">
           {groups.map((g, gi) => (
             <div key={gi}>
-              <h4 className="mb-3 text-xs font-semibold text-as-ink">{g.title}</h4>
+              {/* h2 keeps heading order sequential (page h1 → footer h2). */}
+              <h2 className="mb-3 text-xs font-semibold text-as-ink">{g.title}</h2>
               <ul className="space-y-2.5">
                 {(g.links || []).map((l, li) => (
                   <li key={li}>

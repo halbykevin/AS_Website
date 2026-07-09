@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRef } from 'react'
 import {
   motion,
@@ -136,9 +137,10 @@ export default function HeroCinema({ cms, product, categories = [] }) {
             <>
               <motion.div
                 style={{ y: imgY, rotateX, rotateY, opacity: fade, willChange: 'transform' }}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 1.1, delay: 0.4, ease: EASE }}
+                // No hidden initial state: the image is the LCP element, so it
+                // must be visible in the server-rendered HTML instead of waiting
+                // ~1s for JS to hydrate and fade it in.
+                initial={false}
                 className="relative"
               >
                 {/* Static soft glow behind the image. Previously the red halo was a
@@ -150,16 +152,23 @@ export default function HeroCinema({ cms, product, categories = [] }) {
                   aria-hidden
                   className="pointer-events-none absolute inset-x-6 bottom-0 top-1/3 -z-10 rounded-full bg-as-red/30 blur-[70px]"
                 />
-                <motion.img
-                  src={product.image}
-                  alt={product.name}
-                  fetchpriority="high"
-                  decoding="async"
+                <motion.div
                   animate={{ y: [0, -16, 0] }}
                   transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
                   style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
-                  className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
-                />
+                >
+                  {/* Optimizer-resized LCP image; `priority` emits a preload
+                      for the responsive (not full 1000×1000) variant. */}
+                  <Image
+                    src={product.image}
+                    alt={product.name}
+                    width={1000}
+                    height={1000}
+                    priority
+                    sizes="(max-width: 640px) 80vw, 45vw"
+                    className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
+                  />
+                </motion.div>
               </motion.div>
 
               {/* Full-width name + price bar, sitting cleanly under the image */}

@@ -2,8 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    // Placeholder product images during the UI phase.
-    remotePatterns: [{ protocol: 'https', hostname: 'picsum.photos' }],
+    // Product photos are hotlinked from scraped shops (pacmax.me today, others
+    // tomorrow) plus our own API uploads — allow any https host so next/image
+    // can resize them all down to their display size and serve WebP/AVIF.
+    remotePatterns: [{ protocol: 'https', hostname: '**' }],
   },
 }
 
