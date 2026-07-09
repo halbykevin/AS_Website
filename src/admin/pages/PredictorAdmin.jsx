@@ -298,13 +298,6 @@ export default function PredictorAdmin() {
             <Field label="Post to repost (link)" hint="Link to the Instagram/social post players must repost to enter. Shown as the first step of the game. Leave empty to link to the @ascompany.lb profile.">
               <TextInput value={settings.repostUrl} onChange={setS('repostUrl')} placeholder="https://www.instagram.com/p/…" />
             </Field>
-            <Field label="“How to win” steps (one per line)" hint="Shown as numbered steps on the first screen of the game. Leave empty to use the default steps.">
-              <TextArea
-                value={(settings.howToWin || []).join('\n')}
-                onChange={(e) => setSettings((s) => ({ ...s, howToWin: e.target.value.split('\n') }))}
-                placeholder={'Repost our latest post on Instagram.\nPick the team you think will win the World Cup.\nEnter your name & mobile to join the draw.\nWin a 50" 4K UHD Smart Android TV.'}
-              />
-            </Field>
             <Field label="Submission deadline (optional)" hint="After this time, entries are automatically closed.">
               <TextInput type="datetime-local" value={settings.deadline} onChange={setS('deadline')} />
             </Field>
