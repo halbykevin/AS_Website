@@ -64,7 +64,7 @@ export default function Footer({ settings }) {
           <div className="flex items-center gap-2">
             <span className="rounded bg-as-ink px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.png" alt="AS Store" className="h-5 w-auto" />
+              <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="h-5 w-auto" />
             </span>
             <span>© {new Date().getFullYear()} AS Company — Absolute Solutions SAL.</span>
           </div>

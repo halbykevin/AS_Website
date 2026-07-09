@@ -25,7 +25,7 @@ module.exports = {
         'as-fog': '#F5F5F7', // Apple-style light gray
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgba(15,17,17,.15)',

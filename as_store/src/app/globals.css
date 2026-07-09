@@ -7,7 +7,7 @@ html {
 }
 
 body {
-  @apply bg-white text-as-ink antialiased;
+  @apply bg-white font-sans text-as-ink antialiased;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

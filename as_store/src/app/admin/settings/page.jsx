@@ -111,7 +111,7 @@ export default function SettingsPage() {
             {/* Live preview on the dark nav background */}
             <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-lg bg-black px-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.png" alt="" style={{ height: `${form.navLogoSize}px` }} className="w-auto" />
+              <img src="/as-store-logo.webp" alt="" width={300} height={200} style={{ height: `${form.navLogoSize}px` }} className="w-auto" />
             </div>
           </div>
         </Field>

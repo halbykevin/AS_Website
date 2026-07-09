@@ -72,7 +72,7 @@ export default function Nav({ settings, categories = [] }) {
         <nav className="shell-wide flex min-h-[48px] items-center justify-between py-1">
           <Link href="/" className="flex items-center" aria-label="AS Store">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/as-store-logo.png" alt="AS Store" style={{ height: `${logoSize}px` }} className="w-auto" />
+            <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSize}px` }} className="w-auto" />
           </Link>
 
           <ul className="hidden items-center gap-7 lg:flex">
@@ -127,7 +127,7 @@ export default function Nav({ settings, categories = [] }) {
           >
             <div className="shell-wide flex min-h-[48px] items-center justify-between py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.png" alt="AS Store" style={{ height: `${logoSize}px` }} className="w-auto" />
+              <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSize}px` }} className="w-auto" />
               <button onClick={() => setOpen(false)} className="text-white" aria-label="Close menu">
                 <Icon name="close" className="h-5 w-5" />
               </button>

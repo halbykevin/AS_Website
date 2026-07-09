@@ -35,7 +35,7 @@ export default function LoginPage() {
         <div className="mb-6 flex flex-col items-center">
           <span className="rounded-lg bg-as-ink px-3 py-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/as-store-logo.png" alt="AS Store" className="h-7 w-auto" />
+            <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="h-7 w-auto" />
           </span>
           <h1 className="mt-4 text-xl font-bold text-as-ink">AS Store CMS</h1>
           <p className="mt-1 text-sm text-as-ink/50">Sign in to manage the store</p>

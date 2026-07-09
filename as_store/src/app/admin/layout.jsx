@@ -108,7 +108,7 @@ function Sidebar({ pathname, onLogout, drawer, setDrawer }) {
       <div className="flex h-14 items-center gap-2 border-b border-white/10 px-5">
         <span className="rounded bg-white/95 px-1.5 py-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/as-store-logo.png" alt="AS Store" className="h-5 w-auto" />
+          <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="h-5 w-auto" />
         </span>
         <span className="text-xs font-semibold uppercase tracking-widest text-white/50">CMS</span>
       </div>

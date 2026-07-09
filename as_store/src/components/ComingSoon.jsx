@@ -36,7 +36,7 @@ export default function ComingSoon({ settings }) {
         className="relative"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/as-store-logo.png" alt="AS Store" className="mx-auto h-12 w-auto" />
+        <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="mx-auto h-12 w-auto" />
         <h1 className="mt-8 text-4xl font-bold tracking-apple text-white sm:text-6xl">
           Something big is coming.
         </h1>
