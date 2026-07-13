@@ -11,7 +11,12 @@ import {
   gridClass,
 } from '@/lib/catalogFilters'
 
-export const metadata = { title: 'Shop — AS Store' }
+export const metadata = {
+  title: 'Shop all products',
+  description:
+    'Browse the full AS Store catalog — smartphones, audio, computing, smart home and accessories. Genuine products, fast delivery across Lebanon.',
+  alternates: { canonical: '/shop' },
+}
 
 // The whole catalog on one browsable page: same sort/filter bar as a category
 // page, plus a category facet since the list spans everything.

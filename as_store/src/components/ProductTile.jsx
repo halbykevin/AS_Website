@@ -48,9 +48,11 @@ export default function ProductTile({ product, fluid = false }) {
         </span>
       )}
       {/* Fixed-height text block, overflow-hidden so a 2-line name + teaser can
-          never bleed over the image below. break-words so long scraped names
-          (e.g. "SFP+,10G,Multimode") wrap instead of being clipped by the card. */}
-      <div className="flex h-[92px] flex-col overflow-hidden sm:h-[124px]">
+          never bleed over the image below. w-full is required: the card is
+          items-center, so without it this block sizes to its content width (the
+          whole name on one line) and overflows the card sideways — w-full pins it
+          to the card width so break-words + line-clamp actually wrap the text. */}
+      <div className="flex h-[92px] w-full flex-col overflow-hidden sm:h-[124px]">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-as-red sm:text-xs">{brand || 'New'}</p>
         <Link href={href} className="mt-1">
           <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug tracking-apple text-as-ink sm:text-lg">{name}</h3>

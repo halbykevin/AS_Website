@@ -24,6 +24,10 @@ class Product:
     # [label, value] pairs (e.g. ["Processor", "Intel Core i9-14900HX"]).
     specs: list[list[str]] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
+    # Ordered category trail from the page breadcrumb (parent → leaf), e.g.
+    # ["Networking", "Switches"]. Drives the 2-level category hierarchy on ingest;
+    # `categories` (flat, from JSON-LD) is the fallback.
+    category_path: list[str] = field(default_factory=list)
     images: list[str] = field(default_factory=list)
     # Local file paths for downloaded images (populated by --images).
     image_files: list[str] = field(default_factory=list)
@@ -41,6 +45,7 @@ class Product:
         """Spreadsheet-friendly: lists joined with ' | ', extras flattened."""
         d = self.to_dict()
         d["categories"] = " | ".join(self.categories)
+        d["category_path"] = " > ".join(self.category_path)
         d["images"] = " | ".join(self.images)
         d["image_files"] = " | ".join(self.image_files)
         d["specs"] = " | ".join(

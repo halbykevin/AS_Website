@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS categories (
   slug        TEXT UNIQUE NOT NULL,
   tagline     TEXT DEFAULT '',
   image_url   TEXT DEFAULT '',
+  parent_id   INTEGER REFERENCES categories(id) ON DELETE SET NULL,  -- 2-level tree: NULL = top-level department, else a subcategory of that parent
   sort        INTEGER DEFAULT 0,
   visible     BOOLEAN DEFAULT true,        -- shown publicly at all
   show_in_nav BOOLEAN DEFAULT false,       -- featured in the top navigation menu
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS categories (
 
 -- Backfill the nav flag on databases created before it existed.
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_in_nav BOOLEAN DEFAULT false;
+-- Backfill the parent link (subcategories) on older databases.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
 
 -- --- Products --------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (

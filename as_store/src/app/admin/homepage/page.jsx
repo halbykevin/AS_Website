@@ -19,7 +19,7 @@ const TYPE_LABELS = {
 
 // What each block type carries, so the editor only shows relevant fields.
 const HAS = {
-  hero: { eyebrow: true, sub: true, image: true, buttons: true },
+  hero: { eyebrow: true, sub: true, product: true, buttons: true },
   showcase: { eyebrow: true, sub: true, image: true, buttons: true },
   productRail: { sub: true, rail: true },
   bento: { tiles: true },
@@ -183,6 +183,11 @@ function SectionModal({ section, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
 
   const { data: categories } = useQuery({ queryKey: ['admin', 'categories'], queryFn: adminApi.listCategories })
+  const { data: products } = useQuery({
+    queryKey: ['admin', 'products'],
+    queryFn: adminApi.listProducts,
+    enabled: Boolean(has.product),
+  })
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const setS = (k, v) => setForm((f) => ({ ...f, settings: { ...f.settings, [k]: v } }))
@@ -252,6 +257,14 @@ function SectionModal({ section, onClose, onSaved }) {
           </Field>
         )}
         {has.image && <ImageField label="Image" value={form.imageUrl} onChange={(v) => set('imageUrl', v)} />}
+
+        {has.product && (
+          <HeroProductPicker
+            value={form.settings.productId}
+            onChange={(v) => setS('productId', v)}
+            products={products ?? []}
+          />
+        )}
 
         {has.rail && (
           <div className="grid grid-cols-2 gap-4">
@@ -352,6 +365,60 @@ function ColorField({ label, value, onChange }) {
           </button>
         )}
       </div>
+    </Field>
+  )
+}
+
+// Searchable picker for the hero's featured product. Stores the product id in
+// settings.productId; the hero's image, name, price and Shop link all follow it.
+function HeroProductPicker({ value, onChange, products }) {
+  const [q, setQ] = useState('')
+  const selected = products.find((p) => String(p.id) === String(value)) || null
+  const matches = q.trim()
+    ? products.filter((p) => (p.name || '').toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8)
+    : []
+  return (
+    <Field
+      label="Featured product"
+      hint="The product shown floating in the hero — its image, name, price and Shop link all follow it. Leave empty to auto-pick."
+    >
+      {selected ? (
+        <div className="flex items-center gap-3 rounded-lg border border-as-ink/10 bg-as-fog/40 p-2">
+          {selected.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={selected.image} alt="" className="h-10 w-10 shrink-0 rounded bg-white object-contain" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-as-ink">{selected.name}</p>
+            <p className="text-xs text-as-ink/50">${Number(selected.price || 0).toLocaleString()}</p>
+          </div>
+          <Button variant="secondary" onClick={() => onChange(null)}>Change</Button>
+        </div>
+      ) : (
+        <>
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products by name…" />
+          {matches.length > 0 && (
+            <ul className="mt-1 max-h-56 divide-y divide-as-ink/5 overflow-auto rounded-lg border border-as-ink/10">
+              {matches.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => { onChange(p.id); setQ('') }}
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-as-fog"
+                  >
+                    {p.image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="h-8 w-8 shrink-0 rounded bg-white object-contain" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-sm text-as-ink">{p.name}</span>
+                    <span className="shrink-0 text-xs text-as-ink/50">${Number(p.price || 0).toLocaleString()}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </Field>
   )
 }

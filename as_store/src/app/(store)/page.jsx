@@ -23,7 +23,12 @@ export default async function HomePage() {
 
   const withImage = products.filter((p) => p.image)
   const featured = withImage.filter((p) => p.featured)
-  const heroProduct = (featured.length >= 3 ? featured : withImage)[0] || null
+  // Admin can pin a specific hero product (settings.productId on the hero block,
+  // set in /admin/homepage). Falls back to a featured/first product with an image
+  // if none is pinned or the pinned one no longer exists.
+  const pinnedId = heroCms?.settings?.productId
+  const pinnedHero = pinnedId ? products.find((p) => String(p.id) === String(pinnedId)) : null
+  const heroProduct = pinnedHero || (featured.length >= 3 ? featured : withImage)[0] || null
   // (The hero image preload is handled by next/image `priority` in HeroCinema,
   // which preloads the optimizer-resized variant instead of the full original.)
 

@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { query } from './db.js'
 import { requireAuth } from './auth.js'
 
@@ -17,6 +17,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCRAPER_DIR = path.resolve(process.env.SCRAPER_DIR || path.join(__dirname, '..', '..', 'scraper'))
 const SCRAPE_DIR = path.resolve(process.env.SCRAPE_DIR || path.join(__dirname, '..', 'scrapes'))
 const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3')
+
+// Where downloaded product photos land — same disk + public base the /api/uploads
+// endpoint uses (app.js), so they're served by the existing /uploads static route.
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
+const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:8081').replace(/\/$/, '')
+fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const LOG_CAP = 120_000
 const KEEP_JOBS = 20
@@ -46,6 +52,76 @@ export function normalizeUrl(raw) {
     return `${u.protocol}//${u.hostname}${path}${search}`
   } catch {
     return String(raw).trim()
+  }
+}
+
+// --- Image self-hosting ----------------------------------------------------
+// Product photos are scraped from other shops (pacmax.me etc.). Hotlinking them
+// is fragile (they can break/block) and blocks Google Merchant Center, which
+// won't accept another merchant's images. So at ingest time we download each
+// image onto our own disk (/uploads) and store THAT url instead of the hotlink.
+
+const MIME_EXT = {
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/avif': '.avif',
+}
+
+// A file is already ours if it lives under our public origin or the /uploads path.
+export const isLocalImage = (url) =>
+  !!url && (url.startsWith(`${PUBLIC_URL}/uploads/`) || url.startsWith('/uploads/'))
+
+// Filenames are content-addressed by the REMOTE url, so re-runs (and the
+// backfill) resolve the same local file — idempotent, no re-download, no dupes.
+// Cache the uploads listing once per process so the "already downloaded?" check
+// is a Set lookup, not a stat per image.
+let uploadListing = null
+function existingForHash(hash) {
+  if (!uploadListing) {
+    try { uploadListing = new Set(fs.readdirSync(UPLOAD_DIR)) } catch { uploadListing = new Set() }
+  }
+  for (const name of uploadListing) if (name.startsWith(`scrape-${hash}.`)) return name
+  return null
+}
+
+const extFromUrl = (u) => {
+  try {
+    const e = path.extname(new URL(u).pathname).toLowerCase()
+    return /^\.(jpe?g|png|webp|gif|avif)$/.test(e) ? (e === '.jpeg' ? '.jpg' : e) : ''
+  } catch { return '' }
+}
+
+// Download a remote image into /uploads and return its local public url.
+// Returns null on any failure so the caller can fall back to the hotlink and
+// never lose a product's photo over one bad fetch.
+export async function localizeImage(remoteUrl) {
+  const url = String(remoteUrl || '').trim()
+  if (!url || isLocalImage(url)) return url || null
+  try {
+    const hash = createHash('sha1').update(url).digest('hex').slice(0, 16)
+    const cached = existingForHash(hash)
+    if (cached) return `${PUBLIC_URL}/uploads/${cached}`
+
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AS-Store-image-fetch)' },
+    })
+    if (!res.ok) return null
+    const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+    if (type && !type.startsWith('image/')) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (!buf.length) return null
+
+    const ext = MIME_EXT[type] || extFromUrl(url) || '.jpg'
+    const filename = `scrape-${hash}${ext}`
+    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf)
+    if (uploadListing) uploadListing.add(filename)
+    return `${PUBLIC_URL}/uploads/${filename}`
+  } catch {
+    return null
   }
 }
 
@@ -180,21 +256,43 @@ export async function ingestProducts(products) {
       }
     }
 
-    // category (first one the scraper found)
+    // Category hierarchy: prefer the breadcrumb path (parent → leaf), fall back
+    // to the flat JSON-LD category. Build each level (2 max), link child→parent,
+    // and assign the product to the LEAF (most specific) category.
     let categoryId = null
-    const catName =
-      Array.isArray(p.categories) && p.categories.length ? cleanCategoryName(p.categories[0]) : ''
-    if (catName) {
-      const cslug = slugify(catName)
-      if (cslug) {
-        const { rows } = await query(
-          `INSERT INTO categories (name, slug) VALUES ($1,$2)
-           ON CONFLICT (slug) DO UPDATE SET name = categories.name RETURNING id`,
-          [catName, cslug],
-        )
-        categoryId = rows[0].id
-        catSlugs.add(cslug)
+    const rawPath =
+      Array.isArray(p.category_path) && p.category_path.length
+        ? p.category_path
+        : Array.isArray(p.categories) && p.categories.length
+          ? [cleanCategoryName(p.categories[0])]
+          : []
+    // Clean, drop blanks, de-dupe by slug (avoids a self-parent), cap at 2 levels.
+    const pathNames = []
+    const seenSlugs = new Set()
+    for (const nm of rawPath) {
+      const clean = cleanCategoryName(nm)
+      const s = slugify(clean)
+      if (clean && s && !seenSlugs.has(s)) {
+        seenSlugs.add(s)
+        pathNames.push(clean)
       }
+      if (pathNames.length >= 2) break
+    }
+    let parentId = null
+    for (const nm of pathNames) {
+      const cslug = slugify(nm)
+      const { rows } = await query(
+        `INSERT INTO categories (name, slug, parent_id) VALUES ($1,$2,$3)
+         ON CONFLICT (slug) DO UPDATE SET
+            name = categories.name,
+            parent_id = COALESCE(categories.parent_id, EXCLUDED.parent_id)
+         RETURNING id`,
+        [nm, cslug, parentId],
+      )
+      const id = rows[0].id
+      catSlugs.add(cslug)
+      parentId = id
+      categoryId = id // leaf so far
     }
 
     const description = decodeEntities(p.description || '').trim()
@@ -242,9 +340,13 @@ export async function ingestProducts(products) {
       created++
     }
 
-    // images (cap to keep galleries sane)
+    // images (cap to keep galleries sane) — download each onto our own /uploads
+    // so we never hotlink the source shop. Falls back to the remote url if a
+    // download fails so a product still shows a photo. Non-destructive
+    // (ON CONFLICT DO NOTHING) so admin-added images survive a re-scrape.
     let sort = 0
-    for (const url of images.slice(0, 8)) {
+    for (const remote of images.slice(0, 8)) {
+      const url = (await localizeImage(remote)) || remote
       await query(
         `INSERT INTO product_images (product_id, url, alt, sort)
          VALUES ($1,$2,$3,$4) ON CONFLICT (product_id, url) DO NOTHING`,

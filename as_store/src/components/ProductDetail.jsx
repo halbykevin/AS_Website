@@ -7,6 +7,7 @@ import Icon from './Icon.jsx'
 import ProductTabs from './ProductTabs.jsx'
 import MaxQtyNote from './MaxQtyNote.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
+import Breadcrumbs from './Breadcrumbs.jsx'
 import { addItem, MAX_QTY } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 
@@ -14,7 +15,7 @@ const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
 // Product detail: image gallery, name/brand/price (with sale), colour swatches,
 // quantity stepper, Add to Bag (opens the cart drawer), and description.
-export default function ProductDetail({ product, whatsapp }) {
+export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   const dispatch = useDispatch()
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : []
   const colors = Array.isArray(product.colors) ? product.colors : []
@@ -45,6 +46,7 @@ export default function ProductDetail({ product, whatsapp }) {
   return (
     <section className="bg-white pb-20 pt-24 sm:pt-28">
       <div className="shell-wide">
+        <Breadcrumbs items={breadcrumb} className="mb-6" />
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Gallery */}
           <div>

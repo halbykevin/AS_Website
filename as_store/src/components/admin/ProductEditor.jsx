@@ -9,6 +9,7 @@ import ProductTile from '@/components/ProductTile.jsx'
 import { Button, Card, Field, Input, Textarea, Select, Toggle, Spinner } from './ui.jsx'
 import { useToast } from './toast.jsx'
 import { adminApi } from '@/lib/adminApi'
+import { orderedCategoryOptions } from '@/lib/categoryTree'
 
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -247,8 +248,9 @@ export default function ProductEditor({ id }) {
             <Field label="Category">
               <Select value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
                 <option value="">— None —</option>
-                {(categories.data ?? []).map((c) => (
+                {orderedCategoryOptions(categories.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
+                    {c.depth ? ' ↳ ' : ''}
                     {c.name}
                   </option>
                 ))}

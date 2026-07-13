@@ -52,6 +52,7 @@ const categoryJson = (r) => ({
   slug: r.slug,
   tagline: r.tagline || '',
   imageUrl: r.image_url || '',
+  parentId: r.parent_id ?? null,
   sort: r.sort,
   visible: r.visible,
   showInNav: r.show_in_nav,
@@ -677,9 +678,9 @@ app.post(
     if (!name) return res.status(400).json({ error: 'name is required' })
     const slug = (b.slug || '').trim() || slugify(name)
     const { rows } = await query(
-      `INSERT INTO categories (name, slug, tagline, image_url, sort, visible, show_in_nav)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [name, slug, b.tagline || '', b.imageUrl || '', b.sort ?? 0, b.visible ?? true, b.showInNav ?? false],
+      `INSERT INTO categories (name, slug, tagline, image_url, parent_id, sort, visible, show_in_nav)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [name, slug, b.tagline || '', b.imageUrl || '', b.parentId ?? null, b.sort ?? 0, b.visible ?? true, b.showInNav ?? false],
     )
     res.status(201).json(categoryJson(rows[0]))
   }),
@@ -690,6 +691,14 @@ app.put(
   requireAuth,
   ah(async (req, res) => {
     const b = req.body || {}
+    // Guard against a category becoming its own parent (a trivial cycle).
+    if (b.parentId != null && String(b.parentId) === String(req.params.id)) {
+      return res.status(400).json({ error: 'A category cannot be its own parent' })
+    }
+    // parent_id is set only when the request actually carries `parentId` (so a
+    // partial update can't clobber it) — but when it does, `null` means "make
+    // top-level", which COALESCE can't express, hence the explicit flag.
+    const setsParent = Object.prototype.hasOwnProperty.call(b, 'parentId')
     const { rows } = await query(
       `UPDATE categories SET
          name        = COALESCE($2, name),
@@ -698,7 +707,8 @@ app.put(
          image_url   = COALESCE($5, image_url),
          sort        = COALESCE($6, sort),
          visible     = COALESCE($7, visible),
-         show_in_nav = COALESCE($8, show_in_nav)
+         show_in_nav = COALESCE($8, show_in_nav),
+         parent_id   = CASE WHEN $10 THEN $9 ELSE parent_id END
        WHERE id = $1 RETURNING *`,
       [
         req.params.id,
@@ -709,6 +719,8 @@ app.put(
         b.sort ?? null,
         b.visible ?? null,
         b.showInNav ?? null,
+        b.parentId ?? null,
+        setsParent,
       ],
     )
     if (!rows[0]) return res.status(404).json({ error: 'Not found' })
@@ -737,8 +749,13 @@ app.get(
     const includeHidden = req.admin && req.query.all === '1'
     if (!includeHidden) where.push('p.visible = true')
     if (req.query.category) {
+      // A parent (department) slug also matches products in its subcategories,
+      // since products are assigned to the leaf. Leaf slugs match only their own.
       params.push(req.query.category)
-      where.push(`c.slug = $${params.length}`)
+      const n = params.length
+      where.push(
+        `(c.slug = $${n} OR c.parent_id = (SELECT id FROM categories WHERE slug = $${n}))`,
+      )
     }
     if (req.query.featured === '1' || req.query.featured === 'true') {
       where.push('p.featured = true')

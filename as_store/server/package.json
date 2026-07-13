@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
-    "clean": "node src/cleanup.js"
+    "clean": "node src/cleanup.js",
+    "backfill-images": "node src/backfill-images.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

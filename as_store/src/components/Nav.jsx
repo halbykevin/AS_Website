@@ -35,16 +35,31 @@ function NavItem({ href = '#', className, onClick, children }) {
 // does). Categories appear in the menu only when you toggle them on.
 function buildNavLinks(categories, settings) {
   const cats = Array.isArray(categories) ? categories : []
+  // Map each parent id → its subcategories (for the dropdown).
+  const childrenByParent = new Map()
+  for (const c of cats) {
+    if (c.parentId) {
+      if (!childrenByParent.has(c.parentId)) childrenByParent.set(c.parentId, [])
+      childrenByParent.get(c.parentId).push(c)
+    }
+  }
   const catLinks = cats
     .filter((c) => c.showInNav)
-    .map((c) => ({ label: c.name, href: `/category/${c.slug}` }))
+    .map((c) => ({
+      label: c.name,
+      href: `/category/${c.slug}`,
+      children: (childrenByParent.get(c.id) || []).map((ch) => ({
+        label: ch.name,
+        href: `/category/${ch.slug}`,
+      })),
+    }))
 
   const catNames = new Set(catLinks.map((l) => l.label.toLowerCase()))
   const custom = (settings?.navLinks?.length ? settings.navLinks : defaultSettings.navLinks).filter(
     (l) => l?.label && l.href !== '/' && l.href !== '/shop' && !catNames.has(l.label.toLowerCase()),
   )
 
-  return [{ label: 'Shop', href: '/shop' }, ...catLinks, ...custom]
+  return [{ label: 'Shop', href: '/shop', children: [] }, ...catLinks, ...custom]
 }
 
 // Apple-style global nav: optional announcement bar, slim translucent-dark bar
@@ -77,10 +92,33 @@ export default function Nav({ settings, categories = [] }) {
 
           <ul className="hidden items-center gap-7 lg:flex">
             {links.map((l, i) => (
-              <li key={`${l.href}-${i}`}>
-                <NavItem href={l.href} className="text-[12px] text-white/80 transition-colors hover:text-white">
+              <li key={`${l.href}-${i}`} className="group relative">
+                <NavItem
+                  href={l.href}
+                  className="flex items-center gap-1 text-[12px] text-white/80 transition-colors hover:text-white"
+                >
                   {l.label}
+                  {l.children?.length > 0 && (
+                    <Icon name="chevronDown" className="h-3 w-3 text-white/40 transition group-hover:text-white/70" />
+                  )}
                 </NavItem>
+                {l.children?.length > 0 && (
+                  // pt-3 bridges the gap so hover survives moving onto the menu
+                  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition duration-150 group-hover:visible group-hover:opacity-100">
+                    <ul className="min-w-[200px] rounded-xl border border-white/10 bg-black/90 p-2 shadow-xl backdrop-blur-xl">
+                      {l.children.map((ch) => (
+                        <li key={ch.href}>
+                          <Link
+                            href={ch.href}
+                            className="block whitespace-nowrap rounded-lg px-3 py-2 text-[13px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            {ch.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -152,6 +190,21 @@ export default function Nav({ settings, categories = [] }) {
                     {l.label}
                     <Icon name="chevronRight" className="h-5 w-5 text-white/40" />
                   </NavItem>
+                  {l.children?.length > 0 && (
+                    <ul className="mb-2 space-y-0.5 pl-4">
+                      {l.children.map((ch) => (
+                        <li key={ch.href}>
+                          <Link
+                            href={ch.href}
+                            onClick={() => setOpen(false)}
+                            className="block py-2 text-base text-white/60 transition-colors hover:text-white"
+                          >
+                            {ch.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </motion.li>
               ))}
               <motion.li

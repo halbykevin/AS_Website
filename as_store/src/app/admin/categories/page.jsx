@@ -1,9 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Button, Card, Badge, Spinner, Field, Input, Toggle, Modal, Checkbox } from '@/components/admin/ui.jsx'
+import { Button, Card, Badge, Spinner, Field, Input, Select, Toggle, Modal, Checkbox } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
 import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
@@ -11,7 +11,32 @@ import { adminApi } from '@/lib/adminApi'
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', sort: 0, visible: true, showInNav: false }
+const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', parentId: null, sort: 0, visible: true, showInNav: false }
+
+// Flatten the flat category list into display order: each department followed by
+// its subcategories (depth 1). Categories whose parent is missing render as
+// top-level so nothing disappears.
+function orderForDisplay(list) {
+  const byId = new Map(list.map((c) => [c.id, c]))
+  const byOrder = (a, b) =>
+    (Number(a.sort) || 0) - (Number(b.sort) || 0) || String(a.name).localeCompare(String(b.name))
+  const kids = new Map()
+  const roots = []
+  for (const c of list) {
+    if (c.parentId && byId.has(c.parentId)) {
+      if (!kids.has(c.parentId)) kids.set(c.parentId, [])
+      kids.get(c.parentId).push(c)
+    } else {
+      roots.push(c)
+    }
+  }
+  const out = []
+  for (const r of roots.sort(byOrder)) {
+    out.push({ cat: r, depth: 0 })
+    for (const k of (kids.get(r.id) || []).sort(byOrder)) out.push({ cat: k, depth: 1 })
+  }
+  return out
+}
 
 export default function CategoriesPage() {
   const qc = useQueryClient()
@@ -79,12 +104,13 @@ export default function CategoriesPage() {
               )}
             </div>
             <ul className="divide-y divide-as-ink/5">
-              {list.map((c) => (
+              {orderForDisplay(list).map(({ cat: c, depth }) => (
                 <li
                   key={c.id}
-                  className={`flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60 ${sel.has(c.id) ? 'bg-as-red/5' : ''}`}
+                  className={`flex items-center gap-4 py-3 pr-5 hover:bg-as-fog/60 ${sel.has(c.id) ? 'bg-as-red/5' : ''} ${depth ? 'pl-10' : 'pl-5'}`}
                 >
                   <Checkbox checked={sel.has(c.id)} onChange={() => sel.toggle(c.id)} />
+                {depth > 0 && <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-as-ink/25" />}
                 <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-as-fog">
                   {c.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -95,6 +121,7 @@ export default function CategoriesPage() {
                   <p className="truncate font-medium text-as-ink">{c.name}</p>
                   <p className="truncate text-xs text-as-ink/40">/{c.slug}</p>
                 </div>
+                {depth === 0 && <Badge tone="gray">Department</Badge>}
                 {c.showInNav && <Badge tone="brand">In menu</Badge>}
                 {c.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
@@ -126,6 +153,7 @@ export default function CategoriesPage() {
       {editing && (
         <CategoryModal
           category={editing}
+          categories={list}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null)
@@ -137,7 +165,7 @@ export default function CategoriesPage() {
   )
 }
 
-function CategoryModal({ category, onClose, onSaved }) {
+function CategoryModal({ category, categories = [], onClose, onSaved }) {
   const toast = useToast()
   const editing = Boolean(category?.id)
   const [form, setForm] = useState({ ...BLANK, ...category })
@@ -145,6 +173,18 @@ function CategoryModal({ category, onClose, onSaved }) {
   const [uploading, setUploading] = useState(false)
   const slugTouched = useRef(editing)
   const fileRef = useRef(null)
+
+  // Parent options = top-level departments (2-level model), excluding self.
+  const parentOptions = useMemo(
+    () => categories.filter((c) => !c.parentId && c.id !== category?.id),
+    [categories, category],
+  )
+  // A category that already has subcategories can't itself be nested (would make
+  // 3 levels) — move its children out first.
+  const hasChildren = useMemo(
+    () => categories.some((c) => c.parentId === category?.id),
+    [categories, category],
+  )
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const onName = (v) => {
@@ -173,6 +213,7 @@ function CategoryModal({ category, onClose, onSaved }) {
       slug: form.slug.trim() || slugify(form.name),
       tagline: form.tagline,
       imageUrl: form.imageUrl,
+      parentId: form.parentId ? Number(form.parentId) : null,
       sort: Number(form.sort) || 0,
       visible: form.visible,
       showInNav: form.showInNav,
@@ -217,6 +258,25 @@ function CategoryModal({ category, onClose, onSaved }) {
             }}
             placeholder="smartphones"
           />
+        </Field>
+        <Field label="Parent category">
+          <Select
+            value={form.parentId ?? ''}
+            onChange={(e) => set('parentId', e.target.value || null)}
+            disabled={hasChildren}
+          >
+            <option value="">— None (top-level department) —</option>
+            {parentOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+          <p className="mt-1 text-xs text-as-ink/45">
+            {hasChildren
+              ? 'This category has subcategories, so it stays a top-level department. Move its subcategories elsewhere to nest it.'
+              : 'Leave as “None” for a department, or pick a parent to make this a subcategory.'}
+          </p>
         </Field>
         <Field label="Tagline">
           <Input value={form.tagline} onChange={(e) => set('tagline', e.target.value)} placeholder="The future, in your pocket." />

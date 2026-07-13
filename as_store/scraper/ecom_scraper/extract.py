@@ -66,7 +66,102 @@ def parse(html: str, url: str, selectors: dict | None = None) -> Product:
 
     product.name = _strip_site_name(product.name, url)
 
+    # Category hierarchy from the page breadcrumb (parent → leaf), e.g.
+    # ["Networking", "Switches"]. Drives the 2-level category tree on ingest.
+    try:
+        product.category_path = _category_path(soup, url, product.name)
+    except Exception as exc:
+        print(f"  [breadcrumb warn] {exc}")
+
     return product
+
+
+# --------------------------------------------------------------------------
+# Category breadcrumb → hierarchy path
+# --------------------------------------------------------------------------
+# Crumbs that are navigation chrome, not real categories.
+_CRUMB_SKIP = {
+    "home", "shop", "store", "all", "products", "product", "catalog",
+    "categories", "category", "all products",
+}
+
+# Breadcrumb containers, most-specific platform selectors first.
+BREADCRUMB_SELECTORS = [
+    "nav.woocommerce-breadcrumb", ".woocommerce-breadcrumb",
+    "nav[aria-label='breadcrumb']", "nav[aria-label='Breadcrumb']",
+    ".breadcrumbs", "ol.breadcrumb", ".breadcrumb",
+    "[class*='breadcrumb']",
+]
+
+
+def _trim_trail(names: list[str], product_name: str | None, url: str) -> list[str]:
+    """Drop Home/Shop chrome, the shop's own name, and the product's own name
+    (the last crumb), then keep the top two levels (department → subcategory).
+
+    We keep the FIRST two real crumbs (not the deepest) so every product in a
+    department lands under the same 2-level pair consistently — e.g. both
+    "Computers & Gear > Laptops > Macbook Air" and "Computers & Gear > Laptops"
+    collapse to ["Computers & Gear", "Laptops"]. Deeper site levels are folded
+    into the subcategory."""
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    label = host.split(".")[0] if host else ""
+    pname = (product_name or "").strip().lower()
+    out: list[str] = []
+    for raw in names:
+        n = (raw or "").strip()
+        low = n.lower()
+        if not n or low in _CRUMB_SKIP:
+            continue
+        if label and low == label:
+            continue
+        if pname and low == pname:
+            continue  # the trailing crumb is usually the product itself
+        out.append(n)
+    # De-dupe adjacent repeats, then keep the top two levels.
+    deduped: list[str] = []
+    for n in out:
+        if not deduped or deduped[-1].lower() != n.lower():
+            deduped.append(n)
+    return deduped[:2]
+
+
+def _category_path(soup: BeautifulSoup, url: str, product_name: str | None) -> list[str]:
+    """Ordered category trail for a product. Prefers a JSON-LD BreadcrumbList
+    (structured/reliable), then a breadcrumb nav in the HTML."""
+    # 1) JSON-LD BreadcrumbList
+    for tag in soup.find_all("script", type="application/ld+json"):
+        raw = tag.string or tag.get_text() or ""
+        for node in _iter_jsonld_nodes(raw):
+            t = node.get("@type", "")
+            types = t if isinstance(t, list) else [t]
+            if not any(str(x).lower() == "breadcrumblist" for x in types):
+                continue
+            names = []
+            for it in node.get("itemListElement") or []:
+                if not isinstance(it, dict):
+                    continue
+                name = it.get("name")
+                if not name and isinstance(it.get("item"), dict):
+                    name = it["item"].get("name")
+                if name:
+                    names.append(_clean(str(name)))
+            trail = _trim_trail(names, product_name, url)
+            if trail:
+                return trail
+
+    # 2) HTML breadcrumb nav — take link text plus the trailing current crumb.
+    for sel in BREADCRUMB_SELECTORS:
+        el = soup.select_one(sel)
+        if not el:
+            continue
+        names = [a.get_text(strip=True) for a in el.find_all("a")]
+        # The last crumb (current page) is often plain text, not a link — the
+        # separator text between links pollutes get_text, so read links only and
+        # let product-name trimming handle the tail.
+        trail = _trim_trail(names, product_name, url)
+        if trail:
+            return trail
+    return []
 
 
 def _strip_site_name(name: str, url: str) -> str:
