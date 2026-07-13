@@ -12,9 +12,9 @@ import {
 } from '@/lib/catalogFilters'
 
 export const metadata = {
-  title: 'Shop all products',
+  title: 'Shop Tech & Electronics in Lebanon — All Products',
   description:
-    'Browse the full AS Store catalog — smartphones, audio, computing, smart home and accessories. Genuine products, fast delivery across Lebanon.',
+    'Buy tech & electronics online in Lebanon — laptops, smartphones, audio, gaming, smart home and accessories. Genuine products, cash on delivery, fast delivery across Lebanon.',
   alternates: { canonical: '/shop' },
 }
 

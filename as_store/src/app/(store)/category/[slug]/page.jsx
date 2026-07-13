@@ -20,11 +20,14 @@ export async function generateMetadata({ params }) {
   const name = cat?.name || prettify(params.slug)
   const description = metaDescription(
     cat?.tagline,
-    `Shop ${name} at AS Store — genuine tech & electronics with fast delivery across Lebanon.`,
+    `Buy ${name} in Lebanon at AS Store — genuine products, 12-month warranty, cash on delivery and fast delivery across Lebanon.`,
   )
   const url = `/category/${params.slug}`
   return {
-    title: name,
+    // "in Lebanon — Buy Online" matches how people actually search
+    // ("laptops buy lebanon") — the competitors ranking for those queries all
+    // carry the country in the title. Template appends "| AS Store".
+    title: `${name} in Lebanon — Buy Online`,
     description,
     // Canonical drops ?brand/?sort/?sale filter params so filtered views don't
     // compete with the clean category page as duplicate content.
