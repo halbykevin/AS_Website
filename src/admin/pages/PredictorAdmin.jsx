@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
 import { COUNTRIES, flagUrl, countryName } from '../../lib/flags.js'
 import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader, SaveBar } from '../ui.jsx'
@@ -67,6 +67,75 @@ function TeamPicker({ label, code, name, flag, onCode, onName, onFlag }) {
   )
 }
 
+// A single headline metric for the insights row.
+function StatTile({ label, value, sub }) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-as-charcoal/45">{label}</p>
+      <p className="mt-1 text-3xl font-extrabold tabular-nums text-as-charcoal">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-as-charcoal/50">{sub}</p>}
+    </div>
+  )
+}
+
+// Horizontal ranking of champion picks. One measure (# of picks) across teams →
+// a single-hue magnitude chart: brand red bars anchored to the left baseline,
+// each directly labelled with its count and share.
+function RankedTeams({ rows }) {
+  const max = rows.reduce((m, r) => Math.max(m, r.count), 0) || 1
+  return (
+    <ul className="space-y-2.5">
+      {rows.map((r) => (
+        <li key={r.team} className="flex items-center gap-3">
+          <div className="flex w-28 shrink-0 items-center gap-2 sm:w-40">
+            {r.flag ? (
+              <img src={r.flag} alt="" className="h-4 w-6 shrink-0 rounded-sm object-cover ring-1 ring-black/10" />
+            ) : (
+              <span className="h-4 w-6 shrink-0 rounded-sm bg-as-charcoal/10" />
+            )}
+            <span className="truncate text-sm font-semibold text-as-charcoal">{r.team}</span>
+          </div>
+          <div className="flex flex-1 items-center gap-2">
+            <div className="h-3 flex-1 overflow-hidden rounded-full bg-as-charcoal/[0.06]">
+              <div
+                className="h-full rounded-full bg-as-red transition-[width] duration-500"
+                style={{ width: `${r.count ? Math.max((r.count / max) * 100, 4) : 0}%` }}
+              />
+            </div>
+            <span className="w-8 shrink-0 text-right text-sm font-bold tabular-nums text-as-charcoal">{r.count}</span>
+            <span className="w-10 shrink-0 text-right text-xs tabular-nums text-as-charcoal/45">{r.pct}%</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// Compact bars of entries per day. Single series → the same brand red; each bar
+// carries its date + count in a native tooltip on hover.
+function EntriesPerDay({ data }) {
+  const max = data.reduce((m, d) => Math.max(m, d.count), 0) || 1
+  return (
+    <div>
+      <div className="flex h-24 items-end gap-1.5">
+        {data.map((d) => (
+          <div key={d.date} className="group flex flex-1 flex-col items-center justify-end" title={`${d.label}: ${d.count} ${d.count === 1 ? 'entry' : 'entries'}`}>
+            <span className="mb-1 text-[10px] font-bold tabular-nums text-as-charcoal/50 opacity-0 transition group-hover:opacity-100">{d.count || ''}</span>
+            <div
+              className="w-full rounded-t bg-as-red/80 transition group-hover:bg-as-red"
+              style={{ height: `${d.count ? Math.max((d.count / max) * 100, 6) : 0}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[10px] text-as-charcoal/40">
+        <span>{data[0]?.label}</span>
+        <span>{data[data.length - 1]?.label}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function PredictorAdmin() {
   const [settings, setSettings] = useState(blankSettings)
   const [matches, setMatches] = useState([])
@@ -79,6 +148,7 @@ export default function PredictorAdmin() {
   const [msg, setMsg] = useState(null)
   const [expanded, setExpanded] = useState(null)
   const [entriesTab, setEntriesTab] = useState('active')
+  const [showAllTeams, setShowAllTeams] = useState(false)
 
   const setS = (key) => (e) => setSettings((s) => ({ ...s, [key]: e.target.value }))
   const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -231,6 +301,61 @@ export default function PredictorAdmin() {
   }
   const championOf = (p) => pickTeam(Array.isArray(p.picks) ? p.picks[0] : null)
 
+  // All-time dashboard numbers, recomputed whenever entries or teams change.
+  const insights = useMemo(() => {
+    const pad = (n) => String(n).padStart(2, '0')
+    const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+    const all = predictions
+    const totalEntries = all.length
+    const activeCount = all.filter((p) => !p.archived).length
+    const uniqueParticipants = new Set(
+      all.map((p) => String(p.mobile || '').replace(/\D/g, '')).filter(Boolean),
+    ).size
+
+    // Flag lookup by team display name, from the current team list.
+    const flagByTeam = new Map()
+    for (const m of matches) if (m.teamA) flagByTeam.set(m.teamA, flagUrl(m.teamACode, m.teamAFlag))
+
+    // Tally champion picks by team name.
+    const counts = new Map()
+    for (const p of all) {
+      const team = championOf(p)
+      if (team) counts.set(team, (counts.get(team) || 0) + 1)
+    }
+    const teamRows = [...counts.entries()]
+      .map(([team, count]) => ({
+        team,
+        count,
+        flag: flagByTeam.get(team) || '',
+        pct: totalEntries ? Math.round((count / totalEntries) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count || a.team.localeCompare(b.team))
+
+    // Entries per day across the 14 days ending on the most recent entry.
+    const dayCounts = new Map()
+    let maxTime = 0
+    for (const p of all) {
+      const t = new Date(p.createdAt)
+      if (Number.isNaN(t.getTime())) continue
+      dayCounts.set(dayKey(t), (dayCounts.get(dayKey(t)) || 0) + 1)
+      maxTime = Math.max(maxTime, t.getTime())
+    }
+    const end = maxTime ? new Date(maxTime) : new Date()
+    const byDay = []
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(end)
+      d.setDate(d.getDate() - i)
+      byDay.push({
+        date: dayKey(d),
+        label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+        count: dayCounts.get(dayKey(d)) || 0,
+      })
+    }
+
+    return { totalEntries, activeCount, uniqueParticipants, teamRows, byDay, topTeam: teamRows[0] || null }
+  }, [predictions, matches])
+
   // Mirror of the server's toWhatsAppNumber (server/src/whatsapp.js): digits-only
   // international form, defaulting local Lebanese numbers to +961.
   const toWhatsAppNumber = (mobile, cc = '961') => {
@@ -272,6 +397,53 @@ export default function PredictorAdmin() {
       />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
+
+      {/* Dashboard — who entered and which teams they backed */}
+      <Card title="Insights">
+        {insights.totalEntries === 0 ? (
+          <p className="text-sm text-as-charcoal/50">
+            Entries and team picks will appear here once players start submitting.
+          </p>
+        ) : (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatTile
+                label="Total entries"
+                value={insights.totalEntries}
+                sub={`${insights.activeCount} active · ${insights.totalEntries - insights.activeCount} archived`}
+              />
+              <StatTile label="Participants" value={insights.uniqueParticipants} sub="unique mobile numbers" />
+              <StatTile label="Teams backed" value={insights.teamRows.length} sub="different champions picked" />
+              <StatTile
+                label="Most-picked"
+                value={insights.topTeam ? insights.topTeam.team : '—'}
+                sub={insights.topTeam ? `${insights.topTeam.count} picks · ${insights.topTeam.pct}%` : ''}
+              />
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-as-charcoal">Most-picked champions</h3>
+                {insights.teamRows.length > 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTeams((v) => !v)}
+                    className="text-xs font-semibold text-as-red hover:underline"
+                  >
+                    {showAllTeams ? 'Show top 10' : `Show all ${insights.teamRows.length}`}
+                  </button>
+                )}
+              </div>
+              <RankedTeams rows={showAllTeams ? insights.teamRows : insights.teamRows.slice(0, 10)} />
+            </div>
+
+            <div>
+              <h3 className="mb-3 text-sm font-bold text-as-charcoal">Entries over the last 14 days</h3>
+              <EntriesPerDay data={insights.byDay} />
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Settings + prize */}
       <form onSubmit={saveSettings} className="space-y-6">
