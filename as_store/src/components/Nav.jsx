@@ -74,6 +74,7 @@ export default function Nav({ settings, categories = [] }) {
   const customer = account?.customer
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [openMenu, setOpenMenu] = useState(null) // which mobile department is expanded
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
@@ -146,7 +147,7 @@ export default function Nav({ settings, categories = [] }) {
                 </span>
               )}
             </button>
-            <button onClick={() => setOpen(true)} className="transition-colors hover:text-white lg:hidden" aria-label="Menu">
+            <button onClick={() => { setOpen(true); setOpenMenu(null) }} className="transition-colors hover:text-white lg:hidden" aria-label="Menu">
               <Icon name="menu" className="h-[18px] w-[18px]" />
             </button>
           </div>
@@ -176,37 +177,77 @@ export default function Nav({ settings, categories = [] }) {
               animate="show"
               variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } } }}
             >
-              {links.map((l, i) => (
-                <motion.li
-                  key={`${l.href}-${i}`}
-                  variants={{ hidden: { opacity: 0, x: -24 }, show: { opacity: 1, x: 0 } }}
-                  transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
-                >
-                  <NavItem
-                    href={l.href}
-                    onClick={() => setOpen(false)}
-                    className="flex items-center justify-between border-b border-white/10 py-3 text-2xl font-semibold tracking-apple text-white"
+              {links.map((l, i) => {
+                const hasChildren = l.children?.length > 0
+                const key = `${l.href}-${i}`
+                const isOpen = openMenu === key
+                return (
+                  <motion.li
+                    key={key}
+                    variants={{ hidden: { opacity: 0, x: -24 }, show: { opacity: 1, x: 0 } }}
+                    transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
                   >
-                    {l.label}
-                    <Icon name="chevronRight" className="h-5 w-5 text-white/40" />
-                  </NavItem>
-                  {l.children?.length > 0 && (
-                    <ul className="mb-2 space-y-0.5 pl-4">
-                      {l.children.map((ch) => (
-                        <li key={ch.href}>
-                          <Link
-                            href={ch.href}
-                            onClick={() => setOpen(false)}
-                            className="block py-2 text-base text-white/60 transition-colors hover:text-white"
-                          >
-                            {ch.label}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </motion.li>
-              ))}
+                    {hasChildren ? (
+                      // Tap to expand/collapse the subcategories (chevron rotates).
+                      <button
+                        onClick={() => setOpenMenu(isOpen ? null : key)}
+                        aria-expanded={isOpen}
+                        className="flex w-full items-center justify-between border-b border-white/10 py-3 text-2xl font-semibold tracking-apple text-white"
+                      >
+                        {l.label}
+                        <motion.span
+                          animate={{ rotate: isOpen ? 90 : 0 }}
+                          transition={{ duration: 0.25, ease: 'easeOut' }}
+                          className="text-white/40"
+                        >
+                          <Icon name="chevronRight" className="h-5 w-5" />
+                        </motion.span>
+                      </button>
+                    ) : (
+                      <NavItem
+                        href={l.href}
+                        onClick={() => setOpen(false)}
+                        className="flex items-center justify-between border-b border-white/10 py-3 text-2xl font-semibold tracking-apple text-white"
+                      >
+                        {l.label}
+                        <Icon name="chevronRight" className="h-5 w-5 text-white/40" />
+                      </NavItem>
+                    )}
+                    <AnimatePresence initial={false}>
+                      {hasChildren && isOpen && (
+                        <motion.ul
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.22, 0.61, 0.36, 1] }}
+                          className="overflow-hidden pl-4"
+                        >
+                          <li>
+                            <Link
+                              href={l.href}
+                              onClick={() => setOpen(false)}
+                              className="block py-2 pt-3 text-base font-medium text-as-red-light transition-colors hover:text-white"
+                            >
+                              All {l.label}
+                            </Link>
+                          </li>
+                          {l.children.map((ch) => (
+                            <li key={ch.href}>
+                              <Link
+                                href={ch.href}
+                                onClick={() => setOpen(false)}
+                                className="block py-2 text-base text-white/60 transition-colors hover:text-white"
+                              >
+                                {ch.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </motion.ul>
+                      )}
+                    </AnimatePresence>
+                  </motion.li>
+                )
+              })}
               <motion.li
                 variants={{ hidden: { opacity: 0, x: -24 }, show: { opacity: 1, x: 0 } }}
                 transition={{ duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
