@@ -11,3 +11,4 @@ yarn-debug.log*
 yarn-error.log*
 # Database dumps prepared for deployment (data - never commit)
 db/as_store-full-*.sql
+db/*.tar.gz
