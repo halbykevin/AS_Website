@@ -74,17 +74,9 @@ export default function HeroCinema({ cms, product, categories = [] }) {
       onMouseMove={onMove}
       className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#0B0D0E] pt-24 sm:pt-28"
     >
-      {/* Breathing red glows */}
-      <motion.div
-        className="pointer-events-none absolute -left-40 top-[-10%] h-[60vh] w-[60vh] rounded-full bg-as-red/25 blur-[140px]"
-        animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.85, 0.5] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="pointer-events-none absolute -right-40 bottom-[-20%] h-[70vh] w-[70vh] rounded-full bg-as-red-dark/30 blur-[160px]"
-        animate={{ scale: [1.2, 1, 1.2], opacity: [0.6, 0.35, 0.6] }}
-        transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-      />
+      {/* Breathing red glows — pure CSS keyframes (compositor), not JS loops. */}
+      <div className="animate-breathe pointer-events-none absolute -left-40 top-[-10%] h-[60vh] w-[60vh] rounded-full bg-as-red/25 blur-[140px]" />
+      <div className="animate-breathe-slow pointer-events-none absolute -right-40 bottom-[-20%] h-[70vh] w-[70vh] rounded-full bg-as-red-dark/30 blur-[160px]" />
 
       {/* Giant hollow backdrop word, drifting slower than the scroll */}
       <motion.p
@@ -152,10 +144,10 @@ export default function HeroCinema({ cms, product, categories = [] }) {
                   aria-hidden
                   className="pointer-events-none absolute inset-x-6 bottom-0 top-1/3 -z-10 rounded-full bg-as-red/30 blur-[70px]"
                 />
-                <motion.div
-                  animate={{ y: [0, -16, 0] }}
-                  transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ willChange: 'transform', backfaceVisibility: 'hidden', transform: 'translateZ(0)' }}
+                {/* Float loop is CSS (animate-float) — no per-frame JS. */}
+                <div
+                  className="animate-float"
+                  style={{ willChange: 'transform', backfaceVisibility: 'hidden' }}
                 >
                   {/* Optimizer-resized LCP image; `priority` emits a preload
                       for the responsive (not full 1000×1000) variant. */}
@@ -168,7 +160,7 @@ export default function HeroCinema({ cms, product, categories = [] }) {
                     sizes="(max-width: 640px) 80vw, 45vw"
                     className="h-[34vh] w-auto max-w-[80vw] object-contain sm:h-[46vh]"
                   />
-                </motion.div>
+                </div>
               </motion.div>
 
               {/* Full-width name + price bar, sitting cleanly under the image */}

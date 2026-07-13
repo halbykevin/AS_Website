@@ -7,7 +7,8 @@ import FinaleCta from '@/components/home/FinaleCta.jsx'
 import { loadAllProducts, loadCategories } from '@/lib/catalog'
 import { loadHomepageSections } from '@/lib/homepage'
 
-// AS Store homepage — a scroll-choreographed experience (Lenis + framer-motion)
+// AS Store homepage — a scroll-choreographed experience (framer-motion for
+// scroll-linked + entrance moves; continuous loops are CSS keyframes)
 // built from the live catalog: cinematic hero (copy still editable via the
 // hero block in /admin/homepage), velocity marquee,
 // category wall, sale spotlight (only when the sales engine has live

@@ -40,10 +40,24 @@ module.exports = {
           '0%': { transform: 'translateX(-50%)' },
           '100%': { transform: 'translateX(0)' },
         },
+        // Compositor-only (transform/opacity) replacements for what used to be
+        // infinite framer-motion loops — JS wrote styles every frame forever,
+        // which dominated main-thread time on phones.
+        breathe: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.5' },
+          '50%': { transform: 'scale(1.25)', opacity: '0.85' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-16px)' },
+        },
       },
       animation: {
         marquee: 'marquee 30s linear infinite',
         'marquee-reverse': 'marquee-reverse 34s linear infinite',
+        breathe: 'breathe 9s ease-in-out infinite',
+        'breathe-slow': 'breathe 11s ease-in-out infinite reverse',
+        float: 'float 6s ease-in-out infinite',
       },
     },
   },

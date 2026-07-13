@@ -11,17 +11,9 @@ export default function ComingSoon({ settings }) {
   const contact = settings?.contact || {}
   return (
     <main className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden bg-[#0B0D0E] px-6 text-center">
-      {/* Breathing red glows */}
-      <motion.div
-        className="pointer-events-none absolute -left-40 top-[-10%] h-[60vh] w-[60vh] rounded-full bg-as-red/25 blur-[140px]"
-        animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.85, 0.5] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="pointer-events-none absolute -right-40 bottom-[-20%] h-[70vh] w-[70vh] rounded-full bg-as-red-dark/30 blur-[160px]"
-        animate={{ scale: [1.2, 1, 1.2], opacity: [0.6, 0.35, 0.6] }}
-        transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-      />
+      {/* Breathing red glows — CSS keyframes (compositor), not JS loops. */}
+      <div className="animate-breathe pointer-events-none absolute -left-40 top-[-10%] h-[60vh] w-[60vh] rounded-full bg-as-red/25 blur-[140px]" />
+      <div className="animate-breathe-slow pointer-events-none absolute -right-40 bottom-[-20%] h-[70vh] w-[70vh] rounded-full bg-as-red-dark/30 blur-[160px]" />
       <p
         aria-hidden
         className="text-stroke-white pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap text-[24vw] font-black leading-none sm:text-[18vw]"

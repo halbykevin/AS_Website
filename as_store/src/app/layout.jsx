@@ -81,9 +81,10 @@ export default async function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={jsonLdScript(organizationJsonLd(settings))}
         />
-        {/* Google tag (gtag.js) — loads after the page is interactive */}
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-        <Script id="gtag-init" strategy="afterInteractive">
+        {/* Google tag (gtag.js) — lazyOnload keeps its ~157KB out of the
+            critical window; analytics still fires, just during idle time. */}
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="lazyOnload" />
+        <Script id="gtag-init" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
