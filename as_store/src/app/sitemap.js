@@ -19,6 +19,8 @@ export default async function sitemap() {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/shop`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.3 },
+    // Bespoke code page (always exists) — not gated by loadPage below.
+    { url: `${SITE_URL}/pages/privacy`, changeFrequency: 'yearly', priority: 0.3 },
   ].map((r) => ({ lastModified: now, ...r }))
 
   const [products, categories] = await Promise.all([loadAllProducts(), loadCategories()])

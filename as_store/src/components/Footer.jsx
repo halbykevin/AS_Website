@@ -72,6 +72,7 @@ export default function Footer({ settings }) {
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <FooterLink href="/pages/shipping">Shipping &amp; Returns</FooterLink>
             <FooterLink href="/pages/warranty">Warranty</FooterLink>
+            <FooterLink href="/pages/privacy">Privacy Policy</FooterLink>
             <FooterLink href="/pages/contact">Contact</FooterLink>
           </div>
         </div>

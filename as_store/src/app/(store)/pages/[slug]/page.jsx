@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import ContactBody from '@/components/ContactBody.jsx'
 import AboutContent from '@/components/AboutContent.jsx'
+import PrivacyPolicy from '@/components/PrivacyPolicy.jsx'
 import { loadPage, loadSettings } from '@/lib/site'
 import { loadBrands } from '@/lib/catalog'
 
@@ -13,6 +14,11 @@ const CONTACT_SLUGS = new Set(['support', 'contact'])
 export async function generateMetadata({ params }) {
   if (CONTACT_SLUGS.has(params.slug)) return { title: 'Support — AS Store' }
   if (params.slug === 'about') return { title: 'About AS Store' }
+  if (params.slug === 'privacy')
+    return {
+      title: 'Privacy Policy — AS Store',
+      description: 'How AS Store collects, uses, and protects your information.',
+    }
   const page = await loadPage(params.slug)
   return { title: page ? `${page.title} — AS Store` : 'AS Store' }
 }
@@ -22,6 +28,13 @@ export default async function ContentPage({ params }) {
   if (params.slug === 'about') {
     const [settings, brands] = await Promise.all([loadSettings(), loadBrands()])
     return <AboutContent settings={settings} brands={brands} />
+  }
+
+  // Privacy = the bespoke legal page (kept in code, not the CMS) so it's always
+  // live — Google Ads requires a reachable privacy policy.
+  if (params.slug === 'privacy') {
+    const settings = await loadSettings()
+    return <PrivacyPolicy settings={settings} />
   }
 
   // Support = the contact/help page: email form + WhatsApp button.

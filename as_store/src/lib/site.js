@@ -18,9 +18,9 @@ export const defaultSettings = {
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
   footerGroups: [
-    { title: 'Shop', links: [{ label: 'Smartphones', href: '/' }, { label: 'Audio', href: '/' }, { label: 'Computing', href: '/' }, { label: 'Accessories', href: '/' }] },
-    { title: 'Support', links: [{ label: 'Contact us', href: '/contact' }, { label: 'Warranty', href: '/pages/warranty' }] },
-    { title: 'Company', links: [{ label: 'About AS', href: '/pages/about' }] },
+    { title: 'Shop', links: [{ label: 'All products', href: '/shop' }, { label: 'New arrivals', href: '/shop?sort=newest' }, { label: 'On sale', href: '/shop?sale=1' }] },
+    { title: 'Support', links: [{ label: 'Contact us', href: '/pages/contact' }, { label: 'Warranty', href: '/pages/warranty' }, { label: 'Shipping & Returns', href: '/pages/shipping' }] },
+    { title: 'Company', links: [{ label: 'About AS', href: '/pages/about' }, { label: 'Privacy Policy', href: '/pages/privacy' }] },
   ],
 }
 
