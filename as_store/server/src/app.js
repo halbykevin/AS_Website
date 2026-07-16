@@ -116,6 +116,15 @@ const settingsJson = (r) => ({
   footerGroups: Array.isArray(r.footer_groups) ? r.footer_groups : [],
   showcaseBg: r.showcase_bg || '#000000',
   navLogoSize: r.nav_logo_size ?? 20,
+  navLogoSizeMobile: r.nav_logo_size_mobile ?? 18,
+  homeNew: {
+    enabled: r.home_new_enabled ?? true,
+    eyebrow: r.home_new_eyebrow ?? 'Just landed',
+    heading: r.home_new_heading ?? 'New in.',
+    source: r.home_new_source || 'newest',
+    categoryId: r.home_new_category_id ?? null,
+    count: r.home_new_count ?? 8,
+  },
   published: r.published ?? false,
   updatedAt: r.updated_at,
 })
@@ -1144,7 +1153,14 @@ app.put(
          footer_groups        = COALESCE($10::jsonb, footer_groups),
          showcase_bg          = COALESCE($11, showcase_bg),
          nav_logo_size        = COALESCE($12, nav_logo_size),
-         published            = COALESCE($13, published)
+         published            = COALESCE($13, published),
+         nav_logo_size_mobile = COALESCE($14, nav_logo_size_mobile),
+         home_new_enabled     = COALESCE($15, home_new_enabled),
+         home_new_eyebrow     = COALESCE($16, home_new_eyebrow),
+         home_new_heading     = COALESCE($17, home_new_heading),
+         home_new_source      = COALESCE($18, home_new_source),
+         home_new_category_id = CASE WHEN $19::boolean THEN $20 ELSE home_new_category_id END,
+         home_new_count       = COALESCE($21, home_new_count)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -1160,6 +1176,16 @@ app.put(
         b.showcaseBg ?? null,
         b.navLogoSize ?? null,
         b.published ?? null,
+        b.navLogoSizeMobile ?? null,
+        b.homeNew?.enabled ?? null,
+        b.homeNew?.eyebrow ?? null,
+        b.homeNew?.heading ?? null,
+        b.homeNew?.source ?? null,
+        // $19 = whether homeNew.categoryId was provided (so null can clear it);
+        // $20 = the value (may be null).
+        b.homeNew && 'categoryId' in b.homeNew,
+        b.homeNew?.categoryId ?? null,
+        b.homeNew?.count ?? null,
       ],
     )
     res.json(settingsJson(rows[0]))

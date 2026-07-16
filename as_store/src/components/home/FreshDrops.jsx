@@ -5,28 +5,40 @@ import Icon from '@/components/Icon.jsx'
 import ProductTile from '@/components/ProductTile.jsx'
 import Reveal from '@/components/Reveal.jsx'
 
-// "New in." — the latest arrivals in a staggered reveal grid on white, a
-// breather between the dark acts.
-export default function FreshDrops({ products = [] }) {
+// A product strip on white — the latest arrivals in a staggered reveal grid.
+// Reused for both the admin-controlled homepage "New arrivals" section (heading,
+// eyebrow, source + link come from settings) and the standard "New in." block.
+export default function FreshDrops({
+  products = [],
+  eyebrow = 'Just landed',
+  heading = 'New in.',
+  seeAllHref = '/shop?sort=newest',
+  seeAllLabel = 'See all new arrivals',
+  // `first` = this is the top block on the homepage → extra top padding so it
+  // clears the fixed nav + announcement bar (no hero above it anymore).
+  first = false,
+}) {
   if (!products.length) return null
   return (
-    <section className="bg-white py-24 sm:py-32">
+    <section className={`bg-white ${first ? 'pb-24 pt-36 sm:pb-32 sm:pt-44' : 'py-24 sm:py-32'}`}>
       <div className="shell-wide">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <Reveal>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">
-              Just landed
-            </p>
+            {eyebrow && (
+              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">
+                {eyebrow}
+              </p>
+            )}
             <h2 className="mt-2 text-4xl font-bold tracking-apple text-as-ink sm:text-6xl">
-              New in.
+              {heading}
             </h2>
           </Reveal>
           <Reveal delay={0.15}>
             <Link
-              href="/shop?sort=newest"
+              href={seeAllHref}
               className="inline-flex items-center gap-1.5 text-base font-medium text-as-ink/60 transition hover:text-as-red"
             >
-              See all new arrivals <Icon name="chevronRight" className="h-4 w-4 text-as-red" />
+              {seeAllLabel} <Icon name="chevronRight" className="h-4 w-4 text-as-red" />
             </Link>
           </Reveal>
         </div>

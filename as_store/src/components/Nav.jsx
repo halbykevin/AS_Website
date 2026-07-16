@@ -68,6 +68,7 @@ export default function Nav({ settings, categories = [] }) {
   const links = buildNavLinks(categories, settings)
   const announcement = settings?.announcement
   const logoSize = Number(settings?.navLogoSize) || 20
+  const logoSizeMobile = Number(settings?.navLogoSizeMobile) || 18
   const count = useSelector(selectCartCount)
   const dispatch = useDispatch()
   const account = useAccount()
@@ -87,8 +88,12 @@ export default function Nav({ settings, categories = [] }) {
       <div className="border-b border-white/10 bg-black/80 backdrop-blur-xl backdrop-saturate-150">
         <nav className="shell-wide flex min-h-[48px] items-center justify-between py-1">
           <Link href="/" className="flex items-center" aria-label="AS Store">
+            {/* Mobile logo (own size) */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSize}px` }} className="w-auto" />
+            <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSizeMobile}px` }} className="w-auto lg:hidden" />
+            {/* Desktop logo (own size) */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSize}px` }} className="hidden w-auto lg:block" />
           </Link>
 
           <ul className="hidden items-center gap-7 lg:flex">
@@ -166,7 +171,7 @@ export default function Nav({ settings, categories = [] }) {
           >
             <div className="shell-wide flex min-h-[48px] items-center justify-between py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSize}px` }} className="w-auto" />
+              <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} style={{ height: `${logoSizeMobile}px` }} className="w-auto" />
               <button onClick={() => setOpen(false)} className="text-white" aria-label="Close menu">
                 <Icon name="close" className="h-5 w-5" />
               </button>

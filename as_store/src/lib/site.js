@@ -9,11 +9,14 @@ export const defaultSettings = {
   // Only used when the API is unreachable: never black out a live store over
   // an API hiccup. The real gate is settings.published from the database.
   published: true,
-  announcement: { enabled: true, text: 'Free delivery across Lebanon · 12-month warranty' },
+  announcement: { enabled: true, text: 'Free delivery on orders over $100 · 12 months warranty' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},
   showcaseBg: '#000000',
   navLogoSize: 20,
+  navLogoSizeMobile: 18,
+  // Homepage "New arrivals" section (the first block on the homepage).
+  homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
@@ -34,6 +37,7 @@ export async function loadSettings() {
       ...s,
       announcement: { ...defaultSettings.announcement, ...(s.announcement || {}) },
       contact: { ...defaultSettings.contact, ...(s.contact || {}) },
+      homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
       socials: s.socials || {},
       navLinks: s.navLinks?.length ? s.navLinks : defaultSettings.navLinks,
       footerGroups: s.footerGroups?.length ? s.footerGroups : defaultSettings.footerGroups,

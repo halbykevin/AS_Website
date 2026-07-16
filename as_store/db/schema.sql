@@ -96,8 +96,16 @@ CREATE TABLE IF NOT EXISTS settings (
   nav_links            JSONB DEFAULT '[]'::jsonb,   -- [{label, href}]
   footer_groups        JSONB DEFAULT '[]'::jsonb,   -- [{title, links:[{label,href}]}]
   showcase_bg          TEXT DEFAULT '#000000',      -- homepage pinned-showcase section background
-  nav_logo_size        INTEGER DEFAULT 20,          -- nav bar logo height in px
+  nav_logo_size        INTEGER DEFAULT 20,          -- nav bar logo height (desktop) in px
+  nav_logo_size_mobile INTEGER DEFAULT 18,          -- nav bar logo height (mobile) in px
   published            BOOLEAN DEFAULT false,       -- false = public site shows Coming Soon
+  -- Homepage "New arrivals" section (first block, replaces the old hero)
+  home_new_enabled     BOOLEAN DEFAULT true,
+  home_new_eyebrow     TEXT DEFAULT 'Just landed',
+  home_new_heading     TEXT DEFAULT 'New in.',
+  home_new_source      TEXT DEFAULT 'newest',       -- newest | featured | category
+  home_new_category_id INTEGER,                     -- when source = category
+  home_new_count       INTEGER DEFAULT 8,
   updated_at           TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
@@ -106,8 +114,16 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS showcase_bg TEXT DEFAULT '#000000';
 -- Backfill the nav logo size on databases created before it existed.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS nav_logo_size INTEGER DEFAULT 20;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS nav_logo_size_mobile INTEGER DEFAULT 18;
 -- Backfill the publish gate on databases created before it existed.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT false;
+-- Homepage "New arrivals" section controls.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_enabled     BOOLEAN DEFAULT true;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_eyebrow     TEXT DEFAULT 'Just landed';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_heading     TEXT DEFAULT 'New in.';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_source      TEXT DEFAULT 'newest';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_category_id INTEGER;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_count       INTEGER DEFAULT 8;
 
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (

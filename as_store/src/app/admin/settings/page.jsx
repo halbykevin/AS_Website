@@ -17,12 +17,15 @@ const EMPTY = {
   footerGroups: [],
   showcaseBg: '#000000',
   navLogoSize: 20,
+  navLogoSizeMobile: 18,
+  homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
 }
 
 export default function SettingsPage() {
   const qc = useQueryClient()
   const toast = useToast()
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'settings'], queryFn: adminApi.getSettings })
+  const { data: categories = [] } = useQuery({ queryKey: ['admin', 'categories'], queryFn: adminApi.listCategories })
   const [form, setForm] = useState(EMPTY)
   const seeded = useState(() => ({ done: false }))[0]
 
@@ -34,6 +37,7 @@ export default function SettingsPage() {
         ...data,
         announcement: { ...EMPTY.announcement, ...(data.announcement || {}) },
         contact: { ...EMPTY.contact, ...(data.contact || {}) },
+        homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
         navLinks: data.navLinks || [],
         footerGroups: data.footerGroups || [],
@@ -97,21 +101,39 @@ export default function SettingsPage() {
         <Field label="Store name">
           <Input value={form.storeName} onChange={(e) => set('storeName', e.target.value)} />
         </Field>
-        <Field label={`Nav bar logo size — ${form.navLogoSize}px`} hint="Height of the logo in the top navigation bar.">
+        <Field label={`Desktop logo size — ${form.navLogoSize}px`} hint="Height of the logo in the top navigation bar on computers (large screens).">
           <div className="flex items-center gap-4">
             <input
               type="range"
               min={14}
-              max={56}
+              max={80}
               step={1}
               value={form.navLogoSize}
               onChange={(e) => set('navLogoSize', Number(e.target.value))}
               className="h-2 flex-1 cursor-pointer accent-as-red"
             />
             {/* Live preview on the dark nav background */}
-            <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-lg bg-black px-2">
+            <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-lg bg-black px-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/as-store-logo.webp" alt="" width={300} height={200} style={{ height: `${form.navLogoSize}px` }} className="w-auto" />
+            </div>
+          </div>
+        </Field>
+        <Field label={`Mobile logo size — ${form.navLogoSizeMobile}px`} hint="Height of the logo in the top navigation bar on phones and tablets.">
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min={14}
+              max={56}
+              step={1}
+              value={form.navLogoSizeMobile}
+              onChange={(e) => set('navLogoSizeMobile', Number(e.target.value))}
+              className="h-2 flex-1 cursor-pointer accent-as-red"
+            />
+            {/* Live preview on the dark nav background */}
+            <div className="flex h-14 w-28 shrink-0 items-center justify-center rounded-lg bg-black px-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/as-store-logo.webp" alt="" width={300} height={200} style={{ height: `${form.navLogoSizeMobile}px` }} className="w-auto" />
             </div>
           </div>
         </Field>
@@ -131,12 +153,69 @@ export default function SettingsPage() {
           <Input
             value={form.announcement.text}
             onChange={(e) => setNested('announcement', 'text', e.target.value)}
-            placeholder="Free delivery across Lebanon · 12-month warranty"
+            placeholder="Free delivery on orders over $100 · 12 months warranty"
           />
         </Field>
       </Card>
 
-      {/* Homepage appearance is now edited per-block at /admin/homepage. */}
+      {/* Homepage — New arrivals (the first block on the homepage) */}
+      <Card className="space-y-4 p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-as-ink">Homepage — New arrivals</h3>
+          <Toggle
+            checked={form.homeNew.enabled}
+            onChange={(v) => setNested('homeNew', 'enabled', v)}
+            label="Shown"
+          />
+        </div>
+        <p className="text-sm text-as-ink/50">
+          The first section on the homepage — a strip of products under the nav.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Eyebrow" hint="Small label above the heading.">
+            <Input value={form.homeNew.eyebrow} onChange={(e) => setNested('homeNew', 'eyebrow', e.target.value)} placeholder="Just landed" />
+          </Field>
+          <Field label="Heading">
+            <Input value={form.homeNew.heading} onChange={(e) => setNested('homeNew', 'heading', e.target.value)} placeholder="New in." />
+          </Field>
+          <Field label="Show products from" hint="Which products to feature.">
+            <select
+              value={form.homeNew.source}
+              onChange={(e) => setNested('homeNew', 'source', e.target.value)}
+              className="w-full rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm text-as-ink focus:border-as-red focus:outline-none"
+            >
+              <option value="newest">Newest arrivals</option>
+              <option value="featured">Featured products</option>
+              <option value="category">A specific category</option>
+            </select>
+          </Field>
+          {form.homeNew.source === 'category' && (
+            <Field label="Category">
+              <select
+                value={form.homeNew.categoryId ?? ''}
+                onChange={(e) => setNested('homeNew', 'categoryId', e.target.value ? Number(e.target.value) : null)}
+                className="w-full rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm text-as-ink focus:border-as-red focus:outline-none"
+              >
+                <option value="">Select a category…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.parentId ? '↳ ' : ''}{c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field label="How many to show">
+            <Input
+              type="number"
+              min={2}
+              max={12}
+              value={form.homeNew.count}
+              onChange={(e) => setNested('homeNew', 'count', Number(e.target.value) || 8)}
+            />
+          </Field>
+        </div>
+      </Card>
 
       {/* Contact */}
       <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">

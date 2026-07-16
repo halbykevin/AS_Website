@@ -223,7 +223,7 @@ export default function CheckoutPage() {
             <button type="submit" disabled={busy} className="pill mt-5 w-full justify-center">
               {busy ? 'Placing order…' : 'Place order'}
             </button>
-            <p className="mt-3 text-center text-xs text-as-ink/45">Free delivery across Lebanon · 12-month warranty</p>
+            <p className="mt-3 text-center text-xs text-as-ink/45">Free delivery on orders over $100 · 12 months warranty</p>
           </div>
         </form>
       </div>

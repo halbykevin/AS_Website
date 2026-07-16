@@ -6,7 +6,7 @@
 export default function VelocityBand({ phrases }) {
   const items = (Array.isArray(phrases) && phrases.length
     ? phrases
-    : ['Free delivery across Lebanon', '12-month warranty', 'Cash on delivery', '100% genuine tech']
+    : ['Free delivery on orders over $100', '12 months warranty', 'Cash on delivery', '100% genuine tech']
   ).map((s) => s.toUpperCase())
 
   const row = (key) =>

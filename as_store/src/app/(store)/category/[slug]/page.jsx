@@ -20,7 +20,7 @@ export async function generateMetadata({ params }) {
   const name = cat?.name || prettify(params.slug)
   const description = metaDescription(
     cat?.tagline,
-    `Buy ${name} in Lebanon at AS Store — genuine products, 12-month warranty, cash on delivery and fast delivery across Lebanon.`,
+    `Buy ${name} in Lebanon at AS Store — genuine products, 12 months warranty, cash on delivery and fast delivery across Lebanon.`,
   )
   const url = `/category/${params.slug}`
   return {
