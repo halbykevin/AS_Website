@@ -4,7 +4,7 @@ import multer from 'multer'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { query } from './db.js'
+import { query, withTransaction } from './db.js'
 import { login, requireAuth, optionalAuth } from './auth.js'
 import {
   normalizeMobile,
@@ -24,6 +24,7 @@ import {
   OTP_REQUEST_CAP,
 } from './otp.js'
 import { sendOrderEmails, sendContactEmail, sendOtpEmail } from './mailer.js'
+import { sendOtpWhatsApp, whatsappOtpEnabled, whatsappRouter } from './whatsapp.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -36,7 +37,16 @@ export const app = express()
 // CORS — lock to the storefront/admin origins in production.
 const origins = (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim())
 app.use(cors({ origin: origins.includes('*') ? true : origins }))
-app.use(express.json({ limit: '2mb' }))
+// rawBody is kept so the WhatsApp webhook can verify Meta's X-Hub-Signature-256,
+// which is computed over the exact bytes sent — a re-serialized body won't match.
+app.use(
+  express.json({
+    limit: '2mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf
+    },
+  }),
+)
 app.use('/uploads', express.static(UPLOAD_DIR))
 
 // Wrap async handlers so thrown errors hit the error middleware.
@@ -343,11 +353,82 @@ app.get('/api/auth/me', requireAuth, (req, res) => res.json({ email: req.admin.e
 
 // ========================= Customer accounts =========================
 // No registration. An account is created automatically the first time a mobile
-// number places an order, or the first time an email verifies a sign-in OTP.
-// Login is email + a 6-digit code emailed to that address.
+// number places an order, or the first time an identifier verifies a sign-in OTP.
+// Login is a 6-digit code sent to the channel the shopper picks: their email, or
+// their WhatsApp number (only offered when the Cloud API is configured).
 //
 // OTP codes are keyed by the login identifier; we reuse the otp_codes.mobile
-// column to hold that identifier (now the email), so no schema change is needed.
+// column to hold that identifier (an email or a mobile), so no schema change is
+// needed. See otp.js on why the two key spaces can't collide.
+
+// Which channels can actually deliver right now. Email needs SMTP (mailer.js
+// falls back to logging in dev, so it's always offered); WhatsApp needs the
+// token/phone/template trio, so it stays hidden until Meta is wired up.
+const otpChannels = () => ['email', ...(whatsappOtpEnabled() ? ['whatsapp'] : [])]
+
+// Resolve { channel, identifier } from a request body, or null when invalid.
+// Accepts either a channel-specific field (email/mobile) or a generic
+// `identifier`, so the client can stay simple.
+function otpTarget(body) {
+  const channel = String(body?.channel || 'email').toLowerCase()
+  if (channel === 'whatsapp') {
+    const mobile = normalizeMobile(body?.mobile ?? body?.identifier)
+    return mobile ? { channel, identifier: mobile } : null
+  }
+  const email = normalizeEmail(body?.email ?? body?.identifier)
+  return email ? { channel: 'email', identifier: email } : null
+}
+
+const badTargetMessage = (body) =>
+  String(body?.channel || '').toLowerCase() === 'whatsapp'
+    ? 'Enter a valid mobile number'
+    : 'Enter a valid email address'
+
+// Generate + store a code for a target and deliver it on its channel. Throws if
+// delivery fails so the caller can answer 502 rather than silently swallowing.
+async function issueOtp(target) {
+  const code = generateOtp()
+  await query(
+    `INSERT INTO otp_codes (mobile, code_hash, expires_at)
+     VALUES ($1,$2, now() + make_interval(mins => $3))`,
+    [target.identifier, hashOtp(target.identifier, code), OTP_TTL_MINUTES],
+  )
+  if (target.channel === 'whatsapp') await sendOtpWhatsApp(target.identifier, code)
+  else await sendOtpEmail(target.identifier, code)
+  return code
+}
+
+// True when this identifier has burned through the request cap recently.
+async function otpRateLimited(identifier) {
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM otp_codes
+     WHERE mobile = $1 AND created_at > now() - interval '15 minutes'`,
+    [identifier],
+  )
+  return rows[0].n >= OTP_REQUEST_CAP
+}
+
+// Consume a code for a target. Returns an error string, or '' when it verified.
+async function consumeOtp(target, code) {
+  const { rows } = await query(
+    `SELECT * FROM otp_codes
+     WHERE mobile = $1 AND consumed = false AND expires_at > now()
+     ORDER BY id DESC LIMIT 1`,
+    [target.identifier],
+  )
+  const otp = rows[0]
+  if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) return 'Code expired — request a new one'
+  if (otp.code_hash !== hashOtp(target.identifier, code)) {
+    await query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otp.id])
+    return 'Incorrect code'
+  }
+  await query(`UPDATE otp_codes SET consumed = true WHERE id = $1`, [otp.id])
+  return ''
+}
+
+// The channel this customer hasn't given us yet, so the client can offer to link
+// it. Null once both an email and a mobile are on the row.
+const missingChannel = (c) => (!c.email ? 'email' : !c.mobile ? 'whatsapp' : null)
 
 async function findOrCreateCustomerByMobile(mobile, seed = {}) {
   const { rows } = await query(`SELECT * FROM customers WHERE mobile = $1`, [mobile])
@@ -374,61 +455,176 @@ async function findOrCreateCustomerByEmail(email, seed = {}) {
   return { customer: made[0], created: true }
 }
 
+// Which sign-in channels the storefront should offer. Public: the login page
+// calls this before rendering so it never shows an option that can't deliver.
+app.get('/api/account/otp/channels', (_req, res) => res.json({ channels: otpChannels() }))
+
+// Attach a verified identifier to a customer. When a DIFFERENT row already holds
+// it, the same person owns both accounts — they just proved it by verifying a
+// code on each — so the rows are merged into the older one (it owns the earliest
+// order history) and the newer is retired. Returns { customer } or { error }.
+async function linkIdentifier(customerId, target) {
+  const col = target.channel === 'whatsapp' ? 'mobile' : 'email'
+  const label = col === 'mobile' ? 'mobile number' : 'email address'
+  return withTransaction(async (client) => {
+    const { rows: mine } = await client.query(`SELECT * FROM customers WHERE id = $1`, [customerId])
+    const me = mine[0]
+    if (!me) return { error: 'Account not found' }
+
+    // Linking only ever ADDS a channel. If this account already carries a
+    // different value here, the merge below would delete a row without actually
+    // linking (COALESCE keeps the survivor's existing value) — so refuse instead.
+    const current = String(me[col] || '').toLowerCase()
+    if (current && current !== target.identifier) {
+      return { error: `This account already uses a different ${label}.` }
+    }
+
+    const { rows: others } = await client.query(
+      col === 'mobile'
+        ? `SELECT * FROM customers WHERE mobile = $1 AND id <> $2 ORDER BY id ASC`
+        : `SELECT * FROM customers WHERE lower(email) = $1 AND id <> $2 ORDER BY id ASC`,
+      [target.identifier, customerId],
+    )
+    const other = others[0]
+
+    // Nobody else holds this identifier — just claim it.
+    if (!other) {
+      const { rows } = await client.query(
+        `UPDATE customers SET ${col} = $1 WHERE id = $2 RETURNING *`,
+        [target.identifier, customerId],
+      )
+      return { customer: rows[0] }
+    }
+
+    const [keep, drop] = me.id < other.id ? [me, other] : [other, me]
+    // Orders move first (the FK is ON DELETE SET NULL — deleting the loser while
+    // its orders still point at it would orphan them), then the loser goes, and
+    // only THEN does the survivor take the identifier: mobile carries a unique
+    // index, so writing it while the loser still holds the same value would
+    // collide.
+    await client.query(`UPDATE orders SET customer_id = $1 WHERE customer_id = $2`, [keep.id, drop.id])
+    await client.query(`DELETE FROM customers WHERE id = $1`, [drop.id])
+    const { rows } = await client.query(
+      `UPDATE customers SET
+         name      = COALESCE(NULLIF(name, ''), $2),
+         mobile    = COALESCE(mobile, $3),
+         email     = COALESCE(email, $4),
+         phone     = COALESCE(NULLIF(phone, ''), $5),
+         address   = COALESCE(NULLIF(address, ''), $6),
+         addresses = COALESCE(NULLIF(addresses, '[]'::jsonb), $7::jsonb)
+       WHERE id = $1 RETURNING *`,
+      [
+        keep.id,
+        drop.name || '',
+        drop.mobile,
+        drop.email,
+        drop.phone || '',
+        drop.address || '',
+        JSON.stringify(drop.addresses || []),
+      ],
+    )
+    return { customer: rows[0] }
+  })
+}
+
 app.post(
   '/api/account/otp/request',
   ah(async (req, res) => {
-    const email = normalizeEmail(req.body?.email)
-    if (!email) return res.status(400).json({ error: 'Enter a valid email address' })
-
-    const { rows: recent } = await query(
-      `SELECT count(*)::int AS n FROM otp_codes
-       WHERE mobile = $1 AND created_at > now() - interval '15 minutes'`,
-      [email],
-    )
-    if (recent[0].n >= OTP_REQUEST_CAP) {
+    const target = otpTarget(req.body)
+    if (!target) return res.status(400).json({ error: badTargetMessage(req.body) })
+    if (!otpChannels().includes(target.channel)) {
+      return res.status(400).json({ error: 'WhatsApp sign-in isn’t available right now' })
+    }
+    if (await otpRateLimited(target.identifier)) {
       return res.status(429).json({ error: 'Too many codes requested — try again in a few minutes' })
     }
 
-    const code = generateOtp()
-    await query(
-      `INSERT INTO otp_codes (mobile, code_hash, expires_at)
-       VALUES ($1,$2, now() + make_interval(mins => $3))`,
-      [email, hashOtp(email, code), OTP_TTL_MINUTES],
-    )
+    let code
     try {
-      await sendOtpEmail(email, code)
+      code = await issueOtp(target)
     } catch (e) {
-      console.error('[otp] email send failed:', e?.message || e)
-      return res.status(502).json({ error: "We couldn't email your code. Please try again." })
+      console.error(`[otp] ${target.channel} send failed:`, e?.message || e)
+      return res.status(502).json({ error: "We couldn't send your code. Please try again." })
     }
-    res.json({ ok: true, email, ...(otpDevEcho() ? { devCode: code } : {}) })
+    res.json({
+      ok: true,
+      channel: target.channel,
+      identifier: target.identifier,
+      ...(otpDevEcho() ? { devCode: code } : {}),
+    })
   }),
 )
 
 app.post(
   '/api/account/otp/verify',
   ah(async (req, res) => {
-    const email = normalizeEmail(req.body?.email)
+    const target = otpTarget(req.body)
     const code = String(req.body?.code || '').trim()
-    if (!email || !code) return res.status(400).json({ error: 'Email and code are required' })
+    if (!target || !code) return res.status(400).json({ error: 'Identifier and code are required' })
 
-    const { rows } = await query(
-      `SELECT * FROM otp_codes
-       WHERE mobile = $1 AND consumed = false AND expires_at > now()
-       ORDER BY id DESC LIMIT 1`,
-      [email],
-    )
-    const otp = rows[0]
-    if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(400).json({ error: 'Code expired — request a new one' })
-    }
-    if (otp.code_hash !== hashOtp(email, code)) {
-      await query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otp.id])
-      return res.status(400).json({ error: 'Incorrect code' })
-    }
-    await query(`UPDATE otp_codes SET consumed = true WHERE id = $1`, [otp.id])
+    const error = await consumeOtp(target, code)
+    if (error) return res.status(400).json({ error })
 
-    const { customer } = await findOrCreateCustomerByEmail(email)
+    const { customer } =
+      target.channel === 'whatsapp'
+        ? await findOrCreateCustomerByMobile(target.identifier)
+        : await findOrCreateCustomerByEmail(target.identifier)
+
+    res.json({
+      token: signCustomerToken(customer),
+      customer: customerJson(customer),
+      // Non-blocking hint: the client may offer to link this channel so the
+      // shopper ends up with one account instead of two.
+      linkChannel: otpChannels().includes(missingChannel(customer)) ? missingChannel(customer) : null,
+    })
+  }),
+)
+
+// ---- Linking a second sign-in channel to an existing account ---------------
+// Both identifiers must be OTP-verified by the same session: you prove the first
+// by signing in, the second by this code. Without that second proof anyone could
+// claim a stranger's email and merge into their account.
+
+app.post(
+  '/api/account/link/request',
+  requireCustomer,
+  ah(async (req, res) => {
+    const target = otpTarget(req.body)
+    if (!target) return res.status(400).json({ error: badTargetMessage(req.body) })
+    if (!otpChannels().includes(target.channel)) {
+      return res.status(400).json({ error: 'That sign-in method isn’t available right now' })
+    }
+    if (await otpRateLimited(target.identifier)) {
+      return res.status(429).json({ error: 'Too many codes requested — try again in a few minutes' })
+    }
+
+    let code
+    try {
+      code = await issueOtp(target)
+    } catch (e) {
+      console.error(`[link] ${target.channel} send failed:`, e?.message || e)
+      return res.status(502).json({ error: "We couldn't send your code. Please try again." })
+    }
+    res.json({ ok: true, channel: target.channel, ...(otpDevEcho() ? { devCode: code } : {}) })
+  }),
+)
+
+app.post(
+  '/api/account/link/verify',
+  requireCustomer,
+  ah(async (req, res) => {
+    const target = otpTarget(req.body)
+    const code = String(req.body?.code || '').trim()
+    if (!target || !code) return res.status(400).json({ error: 'Identifier and code are required' })
+
+    const error = await consumeOtp(target, code)
+    if (error) return res.status(400).json({ error })
+
+    const { customer, error: linkError } = await linkIdentifier(req.customerId, target)
+    if (linkError) return res.status(400).json({ error: linkError })
+
+    // The merge may have retired the row this session's token pointed at, so
+    // always hand back a token for the surviving account.
     res.json({ token: signCustomerToken(customer), customer: customerJson(customer) })
   }),
 )
@@ -1374,6 +1570,10 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
 
 // ========================= Scraper =========================
 // Spawns the Python scraper and ingests its output into the catalog.
+// Public (Meta calls it): /api/whatsapp/webhook — guarded by the verify token
+// on subscribe and the app-secret signature on delivery. MUST be mounted before
+// scraperRouter, whose router-level requireAuth 401s everything reaching it.
+app.use(whatsappRouter)
 app.use(scraperRouter)
 
 // ========================= Errors =========================

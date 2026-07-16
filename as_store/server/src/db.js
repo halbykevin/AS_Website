@@ -12,3 +12,21 @@ export const pool = new Pool({
 })
 
 export const query = (text, params) => pool.query(text, params)
+
+// Run several statements on one connection inside a transaction, rolling back
+// if any of them throws. `fn` receives a client whose .query has the same shape
+// as the exported one.
+export async function withTransaction(fn) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    client.release()
+  }
+}

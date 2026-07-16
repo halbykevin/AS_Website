@@ -1,5 +1,10 @@
-// Login OTPs: generation and hashing. Delivery is by email (see mailer.js
-// sendOtpEmail) — the code is keyed by the login identifier (the email address).
+// Login OTPs: generation and hashing. Delivery is by email (mailer.js
+// sendOtpEmail) or WhatsApp (whatsapp.js sendOtpWhatsApp) — the shopper picks.
+//
+// A code is keyed by the login identifier itself: an email address for the email
+// channel, a normalized mobile (digits + country code) for WhatsApp. The two can
+// never collide — an email always contains '@', a mobile is always digits — so no
+// channel prefix is needed and existing email codes keep working.
 import crypto from 'node:crypto'
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'

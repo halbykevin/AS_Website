@@ -32,8 +32,18 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
 }
 
 export const accountApi = {
-  requestOtp: (email) => req('/api/account/otp/request', { method: 'POST', body: { email } }),
-  verifyOtp: (email, code) => req('/api/account/otp/verify', { method: 'POST', body: { email, code } }),
+  // Sign-in codes. `channel` is 'email' or 'whatsapp'; `identifier` is the email
+  // address or the mobile number to send to.
+  otpChannels: () => req('/api/account/otp/channels'),
+  requestOtp: (channel, identifier) =>
+    req('/api/account/otp/request', { method: 'POST', body: { channel, identifier } }),
+  verifyOtp: (channel, identifier, code) =>
+    req('/api/account/otp/verify', { method: 'POST', body: { channel, identifier, code } }),
+  // Linking a second sign-in channel onto the account you're already signed into.
+  requestLink: (channel, identifier) =>
+    req('/api/account/link/request', { method: 'POST', auth: true, body: { channel, identifier } }),
+  verifyLink: (channel, identifier, code) =>
+    req('/api/account/link/verify', { method: 'POST', auth: true, body: { channel, identifier, code } }),
   me: () => req('/api/account/me', { auth: true }),
   update: (data) => req('/api/account', { method: 'PUT', auth: true, body: data }),
   saveAddresses: (addresses) =>
@@ -64,9 +74,20 @@ export function AccountProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  // Complete the OTP flow: verify the emailed code, store the session.
-  const loginWithOtp = useCallback(async (email, code) => {
-    const { token, customer } = await accountApi.verifyOtp(email, code)
+  // Complete the OTP flow: verify the code, store the session. Resolves to the
+  // customer plus `linkChannel` — the sign-in method they haven't added yet, so
+  // the caller can offer to link it (null when there's nothing to offer).
+  const loginWithOtp = useCallback(async (channel, identifier, code) => {
+    const { token, customer, linkChannel: offer } = await accountApi.verifyOtp(channel, identifier, code)
+    setToken(token)
+    setCustomer(customer)
+    return { customer, linkChannel: offer }
+  }, [])
+
+  // Attach a second sign-in channel to the current account. The server may merge
+  // two rows and return a token for the survivor, so always take the new token.
+  const linkChannel = useCallback(async (channel, identifier, code) => {
+    const { token, customer } = await accountApi.verifyLink(channel, identifier, code)
     setToken(token)
     setCustomer(customer)
     return customer
@@ -84,7 +105,9 @@ export function AccountProvider({ children }) {
   }, [])
 
   return (
-    <AccountContext.Provider value={{ customer, loading, loginWithOtp, logout, refresh, setCustomer }}>
+    <AccountContext.Provider
+      value={{ customer, loading, loginWithOtp, linkChannel, logout, refresh, setCustomer }}
+    >
       {children}
     </AccountContext.Provider>
   )
