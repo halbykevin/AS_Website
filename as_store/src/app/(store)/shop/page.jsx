@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import ProductTile from '@/components/ProductTile.jsx'
 import ProductFilters from '@/components/ProductFilters.jsx'
+import Pagination from '@/components/Pagination.jsx'
 import { loadAllProducts } from '@/lib/catalog'
 import {
   categoryFacets,
@@ -8,6 +9,7 @@ import {
   priceBounds,
   applyFilters,
   sortProducts,
+  paginate,
   gridClass,
 } from '@/lib/catalogFilters'
 
@@ -34,6 +36,7 @@ export default async function ShopPage({ searchParams }) {
     sale: searchParams.sale === '1',
   })
   const products = sortProducts(filtered, searchParams.sort || '')
+  const { items, page, totalPages } = paginate(products, searchParams.page)
 
   return (
     <section className="bg-white pb-24 pt-28 sm:pt-32">
@@ -55,11 +58,14 @@ export default async function ShopPage({ searchParams }) {
         )}
 
         {products.length > 0 ? (
-          <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
-            {products.map((p) => (
-              <ProductTile key={p.id} product={p} fluid />
-            ))}
-          </div>
+          <>
+            <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
+              {items.map((p) => (
+                <ProductTile key={p.id} product={p} fluid />
+              ))}
+            </div>
+            <Pagination page={page} totalPages={totalPages} basePath="/shop" searchParams={searchParams} />
+          </>
         ) : all.length > 0 ? (
           <p className="mt-16 text-center text-as-ink/40">No products match these filters.</p>
         ) : (

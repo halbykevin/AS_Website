@@ -4,8 +4,9 @@ import { notFound } from 'next/navigation'
 import ProductTile from '@/components/ProductTile.jsx'
 import ProductFilters from '@/components/ProductFilters.jsx'
 import Breadcrumbs from '@/components/Breadcrumbs.jsx'
+import Pagination from '@/components/Pagination.jsx'
 import { loadCategories, loadCategoryProducts } from '@/lib/catalog'
-import { brandFacets, priceBounds, applyFilters, sortProducts, gridClass } from '@/lib/catalogFilters'
+import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass } from '@/lib/catalogFilters'
 import { childrenOf, categoryTrail } from '@/lib/categoryTree'
 import { metaDescription, breadcrumbJsonLd, jsonLdScript } from '@/lib/seo'
 
@@ -64,6 +65,7 @@ export default async function CategoryPage({ params, searchParams }) {
     sale: searchParams.sale === '1',
   })
   const products = sortProducts(filtered, searchParams.sort || '')
+  const { items, page, totalPages } = paginate(products, searchParams.page)
 
   return (
     <section className="bg-white pb-24 pt-28 sm:pt-32">
@@ -119,11 +121,14 @@ export default async function CategoryPage({ params, searchParams }) {
         )}
 
         {products.length > 0 ? (
-          <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
-            {products.map((p) => (
-              <ProductTile key={p.id} product={p} fluid />
-            ))}
-          </div>
+          <>
+            <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
+              {items.map((p) => (
+                <ProductTile key={p.id} product={p} fluid />
+              ))}
+            </div>
+            <Pagination page={page} totalPages={totalPages} basePath={`/category/${slug}`} searchParams={searchParams} />
+          </>
         ) : all.length > 0 ? (
           <p className="mt-16 text-center text-as-ink/40">No products match these filters.</p>
         ) : (

@@ -26,6 +26,9 @@ export default function ProductFilters({ categories = [], brands = [], bounds = 
       if (v === '' || v == null) next.delete(k)
       else next.set(k, String(v))
     }
+    // Changing what's in the list invalidates the current page — go back to
+    // the first one. Density only changes the layout, so it keeps the page.
+    if (Object.keys(patch).some((k) => k !== 'cols')) next.delete('page')
     const qs = next.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }

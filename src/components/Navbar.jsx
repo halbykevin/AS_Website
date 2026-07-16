@@ -91,8 +91,24 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Desktop nav */}
+        {/* Desktop nav — the two red CTAs lead, then the content links */}
         <div className="hidden items-center gap-8 md:flex">
+          <div className="flex items-center gap-3">
+            <a
+              href={storeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+            >
+              Store
+            </a>
+            <Link
+              to="/events"
+              className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+            >
+              Browse Events
+            </Link>
+          </div>
           {nav.map((item) =>
             item.href.includes('#') ? (
               <a
@@ -113,20 +129,6 @@ export default function Navbar() {
               </Link>
             )
           )}
-          <a
-            href={storeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-full border border-as-red/30 px-5 py-2 text-sm font-semibold text-as-red transition hover:border-as-red hover:bg-as-red/5"
-          >
-            Store
-          </a>
-          <Link
-            to="/events"
-            className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
-          >
-            Browse Events
-          </Link>
         </div>
 
         {/* Mobile toggle */}
@@ -151,31 +153,11 @@ export default function Navbar() {
       >
         <div className={`min-h-0 overflow-hidden border-t border-black/5 bg-white transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex flex-col gap-1 px-5 py-3">
-            {nav.map((item) =>
-              item.href.includes('#') ? (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={(e) => handleNavClick(e, item.href)}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-as-charcoal/80 transition hover:bg-as-red/5 hover:text-as-red"
-                >
-                  {item.label}
-                </a>
-              ) : (
-                <Link
-                  key={item.label}
-                  to={item.href}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-as-charcoal/80 transition hover:bg-as-red/5 hover:text-as-red"
-                >
-                  {item.label}
-                </Link>
-              )
-            )}
             <a
               href={storeUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 rounded-full border border-as-red/30 px-5 py-2.5 text-center text-sm font-semibold text-as-red"
+              className="rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
             >
               Store
             </a>
@@ -185,6 +167,28 @@ export default function Navbar() {
             >
               Browse Events
             </Link>
+            <div className="mt-2 flex flex-col gap-1">
+              {nav.map((item) =>
+                item.href.includes('#') ? (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={(e) => handleNavClick(e, item.href)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-as-charcoal/80 transition hover:bg-as-red/5 hover:text-as-red"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-as-charcoal/80 transition hover:bg-as-red/5 hover:text-as-red"
+                  >
+                    {item.label}
+                  </Link>
+                )
+              )}
+            </div>
           </div>
         </div>
       </div>

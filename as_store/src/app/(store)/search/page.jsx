@@ -2,8 +2,9 @@ import { Suspense } from 'react'
 import ProductTile from '@/components/ProductTile.jsx'
 import ProductFilters from '@/components/ProductFilters.jsx'
 import SearchBox from '@/components/SearchBox.jsx'
+import Pagination from '@/components/Pagination.jsx'
 import { searchProducts } from '@/lib/catalog'
-import { brandFacets, priceBounds, applyFilters, sortProducts, gridClass } from '@/lib/catalogFilters'
+import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass } from '@/lib/catalogFilters'
 
 export const metadata = { title: 'Search — AS Store' }
 
@@ -20,6 +21,7 @@ export default async function SearchPage({ searchParams }) {
     sale: searchParams.sale === '1',
   })
   const products = sortProducts(filtered, searchParams.sort || '')
+  const { items, page, totalPages } = paginate(products, searchParams.page)
 
   return (
     <section className="bg-white pb-24 pt-28 sm:pt-32">
@@ -43,11 +45,14 @@ export default async function SearchPage({ searchParams }) {
               <ProductFilters brands={brands} bounds={bounds} total={products.length} />
             </Suspense>
             {products.length > 0 ? (
-              <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
-                {products.map((p) => (
-                  <ProductTile key={p.id} product={p} fluid />
-                ))}
-              </div>
+              <>
+                <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
+                  {items.map((p) => (
+                    <ProductTile key={p.id} product={p} fluid />
+                  ))}
+                </div>
+                <Pagination page={page} totalPages={totalPages} basePath="/search" searchParams={searchParams} />
+              </>
             ) : (
               <p className="mt-16 text-center text-as-ink/40">No products match these filters.</p>
             )}

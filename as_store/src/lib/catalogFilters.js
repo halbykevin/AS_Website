@@ -80,6 +80,25 @@ export function applyFilters(products, { cat = '', brand = '', min = null, max =
   })
 }
 
+// Products per page on the browse listings (/shop, /category/*, /search).
+export const PAGE_SIZE = 24
+
+// Slice a sorted list into a page. Out-of-range pages clamp to the last page
+// so a stale ?page= (e.g. after a filter narrows the list) still renders.
+export function paginate(products, page, perPage = PAGE_SIZE) {
+  const totalPages = Math.max(1, Math.ceil(products.length / perPage))
+  const current = Math.min(Math.max(1, Math.floor(Number(page)) || 1), totalPages)
+  const start = (current - 1) * perPage
+  return {
+    items: products.slice(start, start + perPage),
+    page: current,
+    totalPages,
+    total: products.length,
+    from: products.length ? start + 1 : 0,
+    to: Math.min(start + perPage, products.length),
+  }
+}
+
 export function sortProducts(products, sort) {
   const arr = [...products]
   switch (sort) {
