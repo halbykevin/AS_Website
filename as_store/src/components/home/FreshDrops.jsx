@@ -20,7 +20,7 @@ export default function FreshDrops({
 }) {
   if (!products.length) return null
   return (
-    <section className={`bg-white ${first ? 'pb-24 pt-28 sm:pt-32' : 'py-24 sm:py-32'}`}>
+    <section className={`bg-white ${first ? 'pb-20 pt-20 sm:pb-24 sm:pt-32' : 'py-24 sm:py-32'}`}>
       <div className="shell-wide">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <Reveal>
