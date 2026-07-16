@@ -14,13 +14,13 @@ export default function FreshDrops({
   heading = 'New in.',
   seeAllHref = '/shop?sort=newest',
   seeAllLabel = 'See all new arrivals',
-  // `first` = this is the top block on the homepage → extra top padding so it
-  // clears the fixed nav + announcement bar (no hero above it anymore).
+  // `first` = this is the top block on the homepage → top padding that clears
+  // the fixed nav (matches the shop/category pages), no hero above it anymore.
   first = false,
 }) {
   if (!products.length) return null
   return (
-    <section className={`bg-white ${first ? 'pb-24 pt-36 sm:pb-32 sm:pt-44' : 'py-24 sm:py-32'}`}>
+    <section className={`bg-white ${first ? 'pb-24 pt-28 sm:pt-32' : 'py-24 sm:py-32'}`}>
       <div className="shell-wide">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <Reveal>
