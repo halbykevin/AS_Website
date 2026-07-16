@@ -35,10 +35,6 @@ export default function Layout({ children }) {
   const scrollRef = useRef(null)
   // Lenis smooth-scrolls this inner content element inside the wrapper above.
   const contentRef = useRef(null)
-  // The homepage is a self-contained minimal landing — no footer there.
-  const { pathname } = useLocation()
-  const showFooter = pathname !== '/'
-
   return (
     <ScrollContext.Provider value={scrollRef}>
       <PredictorUIProvider>
@@ -48,8 +44,8 @@ export default function Layout({ children }) {
             <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
               <ScrollToTop scrollRef={scrollRef} />
               <div ref={contentRef} className="flex min-h-full flex-col">
-                <main className="flex-1">{children}</main>
-                {showFooter && <Footer />}
+                <main className="flex flex-1 flex-col">{children}</main>
+                <Footer />
               </div>
             </div>
             <SitePopup />

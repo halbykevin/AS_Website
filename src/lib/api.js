@@ -114,6 +114,7 @@ function mergeSettings(s) {
       tagline: pick(s.tagline, d.brand.tagline),
       logo: pick(s.logoUrl, d.brand.logo),
       logoSize: pick(s.logoSize, d.brand.logoSize),
+      logoSizeDesktop: pick(s.logoSizeDesktop, d.brand.logoSizeDesktop),
     },
     hero: {
       ...d.hero,

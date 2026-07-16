@@ -13,7 +13,9 @@ const INTERVAL = 5000
 
 // Every image is cropped (object-cover) to a shared height, set by the admin as
 // the aspect ratio 16 : N (the `height` prop). Matches the events BannerSlider.
-export default function HorizontalStory({ story, height }) {
+// `fill` makes the strip stretch to its parent's height (used inside the
+// desktop bento grid) instead of imposing its own 16:N aspect ratio.
+export default function HorizontalStory({ story, height, fill = false }) {
   const ratio = Number(height) > 0 ? Number(height) : 6
   const { store } = useContent()
   const storeHref = store?.url || '/store'
@@ -81,14 +83,14 @@ export default function HorizontalStory({ story, height }) {
   return (
     <section
       aria-label="AS Store"
-      className="relative w-full"
+      className={`relative w-full ${fill ? 'h-full' : ''}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       {/* Admin-set aspect ratio, softly rounded so the strips read as separate panels */}
       <div
-        className="relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px]"
-        style={{ animationDelay: '-2.6s', aspectRatio: `16 / ${ratio}` }}
+        className={`relative w-full overflow-hidden rounded-[28px] bg-as-charcoal shadow-2xl shadow-black/10 transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${fill ? 'h-full' : ''}`}
+        style={fill ? { animationDelay: '-2.6s' } : { animationDelay: '-2.6s', aspectRatio: `16 / ${ratio}` }}
       >
         <div
           className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${

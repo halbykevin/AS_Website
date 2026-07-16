@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
 import {
-  Card, Field, TextInput, TextArea, Toggle, Button, Banner,
+  Card, Field, TextInput, TextArea, Toggle, Banner,
   PageHeader, SegmentedControl, SaveBar,
 } from '../ui.jsx'
 
@@ -9,22 +9,17 @@ const SECTIONS = [
   { value: 'publish', label: 'Publish' },
   { value: 'home', label: 'Home' },
   { value: 'brand', label: 'Brand' },
-  { value: 'hero', label: 'Hero' },
   { value: 'services', label: 'Services' },
   { value: 'events', label: 'Events' },
-  { value: 'about', label: 'About' },
   { value: 'contact', label: 'Contact' },
   { value: 'store', label: 'AS Store' },
 ]
 
 const empty = {
-  brandName: '', legalName: '', tagline: '', logoUrl: '', logoSize: 48, faviconUrl: '',
+  brandName: '', legalName: '', tagline: '', logoUrl: '', logoSize: 48, logoSizeDesktop: 72, faviconUrl: '',
   bannerHeight: 6,
-  heroEyebrow: '', heroTitle: '', heroSubtitle: '',
-  heroPrimaryLabel: '', heroSecondaryLabel: '',
   servicesHeading: '', servicesSubheading: '',
   eventsHeading: '', eventsIntro: '',
-  aboutHeading: '', aboutBody: '',
   contactHeading: '', contactSubheading: '',
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
   whatsappNumber: '',
@@ -34,7 +29,6 @@ const empty = {
 
 export default function SettingsEditor() {
   const [form, setForm] = useState(empty)
-  const [stats, setStats] = useState([])
   const [logoFile, setLogoFile] = useState(null)
   const [faviconFile, setFaviconFile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -51,14 +45,11 @@ export default function SettingsEditor() {
       if (s) {
         setForm({
           brandName: s.brandName || '', legalName: s.legalName || '', tagline: s.tagline || '',
-          logoUrl: s.logoUrl || '', logoSize: s.logoSize || 48, faviconUrl: s.faviconUrl || '',
+          logoUrl: s.logoUrl || '', logoSize: s.logoSize || 48, logoSizeDesktop: s.logoSizeDesktop || 72,
+          faviconUrl: s.faviconUrl || '',
           bannerHeight: s.bannerHeight || 6,
-          heroEyebrow: s.heroEyebrow || '', heroTitle: s.heroTitle || '', heroSubtitle: s.heroSubtitle || '',
-          heroPrimaryLabel: s.heroPrimaryLabel || '', heroSecondaryLabel: s.heroSecondaryLabel || '',
           servicesHeading: s.servicesHeading || '', servicesSubheading: s.servicesSubheading || '',
           eventsHeading: s.eventsHeading || '', eventsIntro: s.eventsIntro || '',
-          aboutHeading: s.aboutHeading || '',
-          aboutBody: Array.isArray(s.aboutBody) ? s.aboutBody.join('\n\n') : '',
           contactHeading: s.contactHeading || '', contactSubheading: s.contactSubheading || '',
           contactEmail: s.contactEmail || '', contactWhatsapp: s.contactWhatsapp || '',
           contactInstagram: s.contactInstagram || '', contactInstagramHandle: s.contactInstagramHandle || '',
@@ -67,7 +58,6 @@ export default function SettingsEditor() {
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
           published: Boolean(s.published),
         })
-        setStats(Array.isArray(s.aboutStats) ? s.aboutStats : [])
       }
     } catch {
       setMsg({ kind: 'error', text: 'Could not load settings. Is the API running?' })
@@ -79,11 +69,6 @@ export default function SettingsEditor() {
   useEffect(() => {
     load()
   }, [])
-
-  const updateStat = (i, key, value) =>
-    setStats((s) => s.map((row, idx) => (idx === i ? { ...row, [key]: value } : row)))
-  const addStat = () => setStats((s) => [...s, { value: '', label: '' }])
-  const removeStat = (i) => setStats((s) => s.filter((_, idx) => idx !== i))
 
   async function handleSave(e) {
     e.preventDefault()
@@ -104,8 +89,6 @@ export default function SettingsEditor() {
         ...form,
         logoUrl,
         faviconUrl,
-        aboutBody: form.aboutBody.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean),
-        aboutStats: stats.filter((s) => s.value || s.label),
       }
       const saved = await adminApi.saveSettings(payload)
       setForm((f) => ({ ...f, logoUrl: saved.logoUrl || logoUrl, faviconUrl: saved.faviconUrl || faviconUrl }))
@@ -197,7 +180,7 @@ export default function SettingsEditor() {
           </Field>
         </div>
         <div className="mt-4">
-          <Field label="Logo size" hint="Height of the logo in the top navigation bar (preview above updates as you drag).">
+          <Field label="Mobile logo size" hint="Height of the logo in the top navigation bar on phones (preview above updates as you drag).">
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -207,9 +190,27 @@ export default function SettingsEditor() {
                 value={Number(form.logoSize) || 48}
                 onChange={set('logoSize')}
                 className="w-48 accent-as-red"
-                aria-label="Logo size"
+                aria-label="Mobile logo size"
               />
               <TextInput type="number" min="32" max="80" value={form.logoSize} onChange={set('logoSize')} className="max-w-[90px]" />
+              <span className="text-sm text-as-charcoal/55">px</span>
+            </div>
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Desktop logo size" hint="Height of the logo in the top navigation bar on computers (tablets and up). Set larger than mobile for a bigger logo on PC.">
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="40"
+                max="120"
+                step="1"
+                value={Number(form.logoSizeDesktop) || 72}
+                onChange={set('logoSizeDesktop')}
+                className="w-48 accent-as-red"
+                aria-label="Desktop logo size"
+              />
+              <TextInput type="number" min="40" max="120" value={form.logoSizeDesktop} onChange={set('logoSizeDesktop')} className="max-w-[90px]" />
               <span className="text-sm text-as-charcoal/55">px</span>
             </div>
           </Field>
@@ -231,24 +232,6 @@ export default function SettingsEditor() {
       </Card>
       )}
 
-      {section === 'hero' && (
-      <Card title="Hero (top of homepage)">
-        <div className="space-y-4">
-          <Field label="Eyebrow"><TextInput value={form.heroEyebrow} onChange={set('heroEyebrow')} /></Field>
-          <Field label="Title"><TextInput value={form.heroTitle} onChange={set('heroTitle')} /></Field>
-          <Field label="Subtitle"><TextArea value={form.heroSubtitle} onChange={set('heroSubtitle')} /></Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Primary button label" hint="Links to the events page.">
-              <TextInput value={form.heroPrimaryLabel} onChange={set('heroPrimaryLabel')} placeholder="Browse Events" />
-            </Field>
-            <Field label="Secondary button label" hint="Links to the services section.">
-              <TextInput value={form.heroSecondaryLabel} onChange={set('heroSecondaryLabel')} placeholder="What We Do" />
-            </Field>
-          </div>
-        </div>
-      </Card>
-      )}
-
       {section === 'services' && (
       <Card title="Services section">
         <div className="space-y-4">
@@ -265,33 +248,6 @@ export default function SettingsEditor() {
           <Field label="Intro" hint="Shown under the heading on the events page.">
             <TextArea value={form.eventsIntro} onChange={set('eventsIntro')} />
           </Field>
-        </div>
-      </Card>
-      )}
-
-      {section === 'about' && (
-      <Card title="About">
-        <div className="space-y-4">
-          <Field label="Heading"><TextInput value={form.aboutHeading} onChange={set('aboutHeading')} /></Field>
-          <Field label="Body" hint="Separate paragraphs with a blank line.">
-            <TextArea value={form.aboutBody} onChange={set('aboutBody')} className="min-h-[140px]" />
-          </Field>
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-as-charcoal">Stats</span>
-              <Button type="button" variant="ghost" onClick={addStat} className="px-3 py-1.5">+ Add stat</Button>
-            </div>
-            <div className="space-y-2">
-              {stats.map((row, i) => (
-                <div key={i} className="flex gap-2">
-                  <TextInput placeholder="Value (e.g. 2008)" value={row.value} onChange={(e) => updateStat(i, 'value', e.target.value)} />
-                  <TextInput placeholder="Label (e.g. Established)" value={row.label} onChange={(e) => updateStat(i, 'label', e.target.value)} />
-                  <Button type="button" variant="danger" onClick={() => removeStat(i)} className="px-3 py-1.5">Remove</Button>
-                </div>
-              ))}
-              {stats.length === 0 && <p className="text-xs text-as-charcoal/45">No stats yet.</p>}
-            </div>
-          </div>
         </div>
       </Card>
       )}

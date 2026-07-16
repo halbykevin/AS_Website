@@ -17,41 +17,61 @@ export function stripStyle(bannerHeight) {
   return { aspectRatio: `16 / ${n}` }
 }
 
-// Minimal homepage landing: three equally sized, softly-rounded panels with
-// smooth gaps. No footer here (hidden in Layout for the home route).
+// Homepage landing: three softly-rounded panels.
+//  • Mobile — stacked vertically, each at the admin-set 16:N aspect ratio.
+//  • Desktop (md+) — a bento grid so all three are visible at once: the Events
+//    banner takes the tall left column, with the Store slideshow and What We Do
+//    stacked on the right.
 export default function Home() {
   const { story, banners, services, bannerHeight } = useContent()
 
   return (
-    <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5">
-      {/* 1 — Horizontal scroll-story */}
-      <HorizontalStory story={story} height={bannerHeight} />
+    <>
+      {/* Mobile: stacked strips (unchanged) */}
+      <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5 md:hidden">
+        <HorizontalStory story={story} height={bannerHeight} />
+        <BannerSlider banners={banners} height={bannerHeight} />
+        <WhatWeDoSection services={services} height={bannerHeight} />
+      </div>
 
-      {/* 2 — Events banner (click any slide → /events) */}
-      <BannerSlider banners={banners} height={bannerHeight} />
-
-      {/* 3 — What We Do */}
-      <WhatWeDoSection services={services} height={bannerHeight} />
-    </div>
+      {/* Desktop: bento grid — all three panels in one view, filling the space
+          between the nav and the footer so there's no dead white band below. */}
+      <div className="hidden px-4 py-5 md:flex md:flex-1 md:flex-col">
+        <div className="grid min-h-[26rem] flex-1 grid-cols-3 grid-rows-2 gap-5">
+          {/* Store slideshow — tall spotlight on the left */}
+          <div className="col-span-2 row-span-2 min-h-0">
+            <HorizontalStory story={story} height={bannerHeight} fill />
+          </div>
+          {/* Events banner — top right */}
+          <div className="min-h-0">
+            <BannerSlider banners={banners} height={bannerHeight} fill />
+          </div>
+          {/* What We Do — bottom right */}
+          <div className="min-h-0">
+            <WhatWeDoSection services={services} height={bannerHeight} fill />
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
 
 // A light, lively "What We Do" panel — same size as the other two. An animated
 // red→white particle-line field sits behind centered animated typography, and
 // the whole panel is a clickable link into the full What We Do page.
-function WhatWeDoSection({ services, height }) {
+function WhatWeDoSection({ services, height, fill = false }) {
   const reduce = useReducedMotion()
   const words = (Array.isArray(services.items) ? services.items : [])
     .map((i) => i?.title)
     .filter(Boolean)
 
   return (
-    <section aria-label={services.heading || 'What We Do'} className="relative w-full">
+    <section aria-label={services.heading || 'What We Do'} className={`relative w-full ${fill ? 'h-full' : ''}`}>
       <Link
         to="/what-we-do"
         aria-label={`${services.heading || 'What We Do'} — explore`}
-        className={`relative block w-full overflow-hidden ${PANEL}`}
-        style={stripStyle(height)}
+        className={`relative block w-full overflow-hidden ${PANEL} ${fill ? 'h-full' : ''}`}
+        style={fill ? undefined : stripStyle(height)}
       >
         {/* Soft off-white base (not pure white) */}
         <div

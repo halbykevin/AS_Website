@@ -23,9 +23,7 @@ const ServicesAdmin = lazy(() => import('./admin/pages/ServicesAdmin.jsx'))
 const WhatWeDoAdmin = lazy(() => import('./admin/pages/WhatWeDoAdmin.jsx'))
 const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
-const SectionsAdmin = lazy(() => import('./admin/pages/SectionsAdmin.jsx'))
 const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
-const StoreAdmin = lazy(() => import('./admin/pages/StoreAdmin.jsx'))
 const StoryAdmin = lazy(() => import('./admin/pages/StoryAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
@@ -73,12 +71,10 @@ export default function App() {
             >
               <Route index element={<SettingsEditor />} />
               <Route path="banners" element={<BannersAdmin />} />
-              <Route path="sections" element={<SectionsAdmin />} />
               <Route path="services" element={<ServicesAdmin />} />
               <Route path="what-we-do" element={<WhatWeDoAdmin />} />
               <Route path="events" element={<EventsAdmin />} />
               <Route path="categories" element={<CategoriesAdmin />} />
-              <Route path="store" element={<StoreAdmin />} />
               <Route path="story" element={<StoryAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="predictor" element={<PredictorAdmin />} />

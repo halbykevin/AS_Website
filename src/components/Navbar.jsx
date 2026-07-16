@@ -7,8 +7,10 @@ import FootballButton from './predictor/FootballButton.jsx'
 import { optimizedImage } from '../lib/api'
 
 export default function Navbar() {
-  const { brand, nav } = useContent()
+  const { brand, nav, store } = useContent()
   const logoH = Number(brand.logoSize) || 48
+  const logoHDesktop = Number(brand.logoSizeDesktop) || 72
+  const storeUrl = store?.url || 'https://store.as.com.lb'
   const scrollRef = useScrollEl()
   const lenis = useLenis()
   const [open, setOpen] = useState(false)
@@ -58,23 +60,36 @@ export default function Navbar() {
         }`}
       >
       <nav className="relative mx-auto flex max-w-7xl items-center justify-between px-5 py-1.5 sm:px-8 sm:py-2">
-        {/* Animated football — opens the World Cup predictor (hidden unless enabled) */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%]">
-          <div className="pointer-events-auto">
-            <FootballButton />
-          </div>
-        </div>
-
         <Link to="/" className="flex items-center gap-2" aria-label={brand.name}>
+          {/* Mobile logo (smaller) */}
           <img
             src={optimizedImage(brand.logo, { w: 320 })}
             alt={brand.name}
             fetchpriority="high"
             decoding="async"
-            className="w-auto mix-blend-multiply"
+            className="block w-auto mix-blend-multiply md:hidden"
             style={{ height: `${logoH}px` }}
           />
+          {/* Desktop logo (independently sized, typically larger) */}
+          <img
+            src={optimizedImage(brand.logo, { w: 480 })}
+            alt={brand.name}
+            fetchpriority="high"
+            decoding="async"
+            className="hidden w-auto mix-blend-multiply md:block"
+            style={{ height: `${logoHDesktop}px` }}
+          />
         </Link>
+
+        {/* Animated football — opens the World Cup predictor (hidden unless
+            enabled). On mobile it floats, centered over the bar; on desktop it
+            sits in the flex flow between the logo and the links so it never
+            overlaps a nav item. */}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%] md:static md:left-auto md:top-auto md:z-0 md:translate-x-0 md:translate-y-0">
+          <div className="pointer-events-auto">
+            <FootballButton />
+          </div>
+        </div>
 
         {/* Desktop nav */}
         <div className="hidden items-center gap-8 md:flex">
@@ -98,6 +113,14 @@ export default function Navbar() {
               </Link>
             )
           )}
+          <a
+            href={storeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-as-red/30 px-5 py-2 text-sm font-semibold text-as-red transition hover:border-as-red hover:bg-as-red/5"
+          >
+            Store
+          </a>
           <Link
             to="/events"
             className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
@@ -148,6 +171,14 @@ export default function Navbar() {
                 </Link>
               )
             )}
+            <a
+              href={storeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 rounded-full border border-as-red/30 px-5 py-2.5 text-center text-sm font-semibold text-as-red"
+            >
+              Store
+            </a>
             <Link
               to="/events"
               className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"

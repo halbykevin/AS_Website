@@ -38,7 +38,8 @@ const fmtDate = (d) => (d ? String(d).slice(0, 10) : '')
 // ---- Response mappers (DB snake_case -> API camelCase) ----
 const settingsJson = (r) => ({
   brandName: r.brand_name, legalName: r.legal_name, tagline: r.tagline, logoUrl: r.logo_url,
-  logoSize: r.logo_size, bannerHeight: r.banner_height == null ? 6 : Number(r.banner_height),
+  logoSize: r.logo_size, logoSizeDesktop: r.logo_size_desktop,
+  bannerHeight: r.banner_height == null ? 6 : Number(r.banner_height),
   faviconUrl: r.favicon_url,
   heroEyebrow: r.hero_eyebrow, heroTitle: r.hero_title, heroSubtitle: r.hero_subtitle,
   heroPrimaryLabel: r.hero_primary_label, heroSecondaryLabel: r.hero_secondary_label,
@@ -173,7 +174,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        contact_email=$19, contact_whatsapp=$20, contact_instagram=$21, contact_instagram_handle=$22,
        store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
        published=$27, whatsapp_number=$28, favicon_url=$29, logo_size=$30,
-       banner_height=$31, updated_at=now()
+       banner_height=$31, logo_size_desktop=$32, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
@@ -188,6 +189,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       Boolean(b.published), b.whatsappNumber || '', b.faviconUrl || '',
       Number(b.logoSize) || 48,
       b.bannerHeight == null || b.bannerHeight === '' ? 6 : Number(b.bannerHeight),
+      Number(b.logoSizeDesktop) || 72,
     ]
   )
   res.json(settingsJson(rows[0]))

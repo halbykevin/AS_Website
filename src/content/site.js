@@ -10,7 +10,8 @@ export const brand = {
   name: 'AS Company',
   legalName: 'Absolute Solutions SAL',
   logo: '/ASCompanyLogo.jpg',
-  logoSize: 48, // logo height in the top nav bar, in px (admin-adjustable)
+  logoSize: 48, // logo height in the top nav bar on mobile, in px (admin-adjustable)
+  logoSizeDesktop: 72, // logo height in the top nav bar on desktop (md+), in px
   tagline: 'Market leader in telecommunication and electronics in Lebanon since 2008.',
 }
 

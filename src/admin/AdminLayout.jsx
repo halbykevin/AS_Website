@@ -5,12 +5,10 @@ import { useAuth } from './useAuth.js'
 const links = [
   { to: '/admin', label: 'Site Settings', end: true },
   { to: '/admin/banners', label: 'Banners' },
-  { to: '/admin/sections', label: 'Custom Sections' },
   { to: '/admin/services', label: 'Services' },
   { to: '/admin/what-we-do', label: 'What We Do' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/categories', label: 'Categories' },
-  { to: '/admin/store', label: 'AS Store Showcase' },
   { to: '/admin/story', label: 'Store Slideshow' },
   { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/predictor', label: 'World Cup Predictor' },
