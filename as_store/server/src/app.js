@@ -25,11 +25,14 @@ import {
 } from './otp.js'
 import { sendOrderEmails, sendContactEmail, sendOtpEmail } from './mailer.js'
 import { sendOtpWhatsApp, whatsappOtpEnabled, whatsappRouter } from './whatsapp.js'
+import { beginGoogleAuth, finishGoogleAuth, googleEnabled } from './google.js'
 import { scraperRouter } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
 const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:8081').replace(/\/$/, '')
+// Where the storefront lives — Google sign-in hands the shopper back to it.
+const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/$/, '')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 export const app = express()
@@ -352,10 +355,13 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/me', requireAuth, (req, res) => res.json({ email: req.admin.email }))
 
 // ========================= Customer accounts =========================
-// No registration. An account is created automatically the first time a mobile
-// number places an order, or the first time an identifier verifies a sign-in OTP.
-// Login is a 6-digit code sent to the channel the shopper picks: their email, or
-// their WhatsApp number (only offered when the Cloud API is configured).
+// Three ways in, all landing on the same account (they're all keyed by email):
+//   1. Google      — OAuth, see google.js.
+//   2. Sign up     — the shopper fills in their details, then verifies with a
+//                    code; it's the OTP flow below carrying a `profile`.
+//   3. Email code  — a 6-digit code, nothing else to fill in.
+// An account is also created automatically the first time a mobile number places
+// an order (guest checkout).
 //
 // OTP codes are keyed by the login identifier; we reuse the otp_codes.mobile
 // column to hold that identifier (an email or a mobile), so no schema change is
@@ -455,9 +461,90 @@ async function findOrCreateCustomerByEmail(email, seed = {}) {
   return { customer: made[0], created: true }
 }
 
-// Which sign-in channels the storefront should offer. Public: the login page
-// calls this before rendering so it never shows an option that can't deliver.
-app.get('/api/account/otp/channels', (_req, res) => res.json({ channels: otpChannels() }))
+// Apply the details collected by the sign-up form, once the emailed code has
+// proved the address belongs to them.
+//
+// Blanks only: a returning shopper who goes through the sign-up form instead of
+// signing in must not be able to overwrite what's already on their account, and
+// — more importantly — a form field is not proof of anything, so it can never
+// take a value away from someone else.
+async function fillProfile(customer, profile) {
+  const name = String(profile?.name || '').trim().slice(0, 120)
+  const address = String(profile?.address || '').trim().slice(0, 400)
+  const mobile = normalizeMobile(profile?.mobile)
+  const phone = String(profile?.mobile || profile?.phone || '').trim().slice(0, 40)
+  if (!name && !address && !phone && !mobile) return customer
+
+  const { rows } = await query(
+    `UPDATE customers SET
+       name    = COALESCE(NULLIF(name, ''), $2),
+       phone   = COALESCE(NULLIF(phone, ''), $3),
+       address = COALESCE(NULLIF(address, ''), $4)
+     WHERE id = $1 RETURNING *`,
+    [customer.id, name, phone, address],
+  )
+  let row = rows[0] || customer
+
+  // `mobile` is a login identity carrying a unique index, so it's only claimed
+  // when this account has none and nobody else holds it. A number typed into a
+  // form isn't ownership — a clash means someone else's guest-checkout account
+  // already uses it, and merging on that basis would hand over their orders. It
+  // stays on `phone` (which is what delivery actually needs) instead.
+  if (mobile && !row.mobile) {
+    try {
+      const { rows: claimed } = await query(
+        `UPDATE customers SET mobile = $2 WHERE id = $1 AND mobile IS NULL RETURNING *`,
+        [row.id, mobile],
+      )
+      if (claimed[0]) row = claimed[0]
+    } catch (e) {
+      if (e?.code !== '23505') throw e
+      console.warn(`[account] mobile ${mobile} is already on another account — kept as phone only`)
+    }
+  }
+  return row
+}
+
+// Which sign-in methods the storefront should offer. Public: the login page calls
+// this before rendering so it never shows an option that can't work — Google needs
+// its OAuth credentials, WhatsApp needs the Cloud API.
+app.get('/api/account/auth/methods', (_req, res) =>
+  res.json({ google: googleEnabled(), otpChannels: otpChannels() }),
+)
+
+// ---- Google sign-in --------------------------------------------------------
+// Both routes are top-level browser navigations, not fetches: the shopper's
+// browser walks start → Google → callback → storefront.
+
+app.get(
+  '/api/account/google/start',
+  ah(async (req, res) => {
+    if (!googleEnabled()) return res.redirect(`${STORE_URL}/login?error=google`)
+    res.redirect(beginGoogleAuth(res, req.query.next))
+  }),
+)
+
+app.get(
+  '/api/account/google/callback',
+  ah(async (req, res) => {
+    let profile
+    try {
+      profile = await finishGoogleAuth(req, res)
+    } catch (e) {
+      console.error('[google] sign-in failed:', e?.message || e)
+      return res.redirect(`${STORE_URL}/login?error=google`)
+    }
+
+    const { customer } = await findOrCreateCustomerByEmail(profile.email)
+    const row = await fillProfile(customer, { name: profile.name })
+
+    // The token goes back in the URL fragment, not the query string: fragments
+    // aren't sent to servers and don't land in referrers or access logs. The
+    // page at /auth/google reads it, stores it, and moves on.
+    const params = new URLSearchParams({ token: signCustomerToken(row), next: profile.next })
+    res.redirect(`${STORE_URL}/auth/google#${params}`)
+  }),
+)
 
 // Attach a verified identifier to a customer. When a DIFFERENT row already holds
 // it, the same person owns both accounts — they just proved it by verifying a
@@ -570,12 +657,16 @@ app.post(
         ? await findOrCreateCustomerByMobile(target.identifier)
         : await findOrCreateCustomerByEmail(target.identifier)
 
+    // The sign-up form sends the details it collected along with the code; plain
+    // sign-in sends none. Either way the account is the same one.
+    const row = req.body?.profile ? await fillProfile(customer, req.body.profile) : customer
+
     res.json({
-      token: signCustomerToken(customer),
-      customer: customerJson(customer),
+      token: signCustomerToken(row),
+      customer: customerJson(row),
       // Non-blocking hint: the client may offer to link this channel so the
       // shopper ends up with one account instead of two.
-      linkChannel: otpChannels().includes(missingChannel(customer)) ? missingChannel(customer) : null,
+      linkChannel: otpChannels().includes(missingChannel(row)) ? missingChannel(row) : null,
     })
   }),
 )

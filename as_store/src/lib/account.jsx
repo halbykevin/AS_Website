@@ -31,14 +31,22 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
   return res.status === 204 ? null : res.json()
 }
 
+// Google sign-in is a full-page trip (browser → our API → Google → our API →
+// /auth/google), not a fetch, so all the client needs is the URL to leave for.
+export const googleSignInUrl = (next = '/account') =>
+  `${API}/api/account/google/start?next=${encodeURIComponent(next)}`
+
 export const accountApi = {
+  // Which sign-in methods the API can actually complete right now.
+  authMethods: () => req('/api/account/auth/methods'),
   // Sign-in codes. `channel` is 'email' or 'whatsapp'; `identifier` is the email
   // address or the mobile number to send to.
-  otpChannels: () => req('/api/account/otp/channels'),
   requestOtp: (channel, identifier) =>
     req('/api/account/otp/request', { method: 'POST', body: { channel, identifier } }),
-  verifyOtp: (channel, identifier, code) =>
-    req('/api/account/otp/verify', { method: 'POST', body: { channel, identifier, code } }),
+  // `profile` is the sign-up form's details (name/mobile/address) — the server
+  // applies them once the code proves the email is theirs. Omitted when signing in.
+  verifyOtp: (channel, identifier, code, profile) =>
+    req('/api/account/otp/verify', { method: 'POST', body: { channel, identifier, code, profile } }),
   // Linking a second sign-in channel onto the account you're already signed into.
   requestLink: (channel, identifier) =>
     req('/api/account/link/request', { method: 'POST', auth: true, body: { channel, identifier } }),
@@ -77,11 +85,25 @@ export function AccountProvider({ children }) {
   // Complete the OTP flow: verify the code, store the session. Resolves to the
   // customer plus `linkChannel` — the sign-in method they haven't added yet, so
   // the caller can offer to link it (null when there's nothing to offer).
-  const loginWithOtp = useCallback(async (channel, identifier, code) => {
-    const { token, customer, linkChannel: offer } = await accountApi.verifyOtp(channel, identifier, code)
+  const loginWithOtp = useCallback(async (channel, identifier, code, profile) => {
+    const { token, customer, linkChannel: offer } = await accountApi.verifyOtp(
+      channel,
+      identifier,
+      code,
+      profile,
+    )
     setToken(token)
     setCustomer(customer)
     return { customer, linkChannel: offer }
+  }, [])
+
+  // Adopt a token minted elsewhere — Google hands ours back through the URL when
+  // it returns the shopper to /auth/google.
+  const adoptToken = useCallback(async (token) => {
+    setToken(token)
+    const me = await accountApi.me()
+    setCustomer(me)
+    return me
   }, [])
 
   // Attach a second sign-in channel to the current account. The server may merge
@@ -106,7 +128,7 @@ export function AccountProvider({ children }) {
 
   return (
     <AccountContext.Provider
-      value={{ customer, loading, loginWithOtp, linkChannel, logout, refresh, setCustomer }}
+      value={{ customer, loading, loginWithOtp, adoptToken, linkChannel, logout, refresh, setCustomer }}
     >
       {children}
     </AccountContext.Provider>
