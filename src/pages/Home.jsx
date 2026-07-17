@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useReducedMotion } from 'framer-motion'
+import BannerCta from '../components/BannerCta.jsx'
 import BannerSlider from '../components/BannerSlider.jsx'
 import HorizontalStory from '../components/HorizontalStory.jsx'
 import { useContent } from '../store/content.jsx'
@@ -94,6 +95,11 @@ function WhatWeDoSection({ services, height, fill = false }) {
           )}
         </div>
       </Link>
+
+      {/* Explore now — a sibling of the panel link, never a child: an <a> inside
+          an <a> is invalid and gets un-nested by the browser. Same destination
+          as the panel, just stated outright. */}
+      <BannerCta href="/what-we-do" label="Explore now" />
     </section>
   )
 }
