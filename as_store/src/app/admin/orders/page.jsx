@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, Badge, Spinner, Select, Modal } from '@/components/admin/ui.jsx'
+import Icon from '@/components/Icon.jsx'
+import { Button, Card, Badge, Spinner, Select, Modal, Checkbox } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
+import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
 import { ORDER_STATUSES, statusMeta, money, orderDate } from '@/lib/orders'
 
@@ -18,14 +20,53 @@ export default function OrdersAdmin() {
     queryFn: () => adminApi.listOrders(status || undefined),
   })
 
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin', 'orders'] })
+
   const update = useMutation({
     mutationFn: ({ id, status }) => adminApi.updateOrderStatus(id, status),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin', 'orders'] })
+      invalidate()
       toast.success('Status updated')
     },
     onError: (e) => toast.error(e.message),
   })
+
+  const list = data ?? []
+  const sel = useSelection(list)
+
+  const remove = useMutation({
+    mutationFn: (id) => adminApi.deleteOrder(id),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Order deleted')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const bulkRemove = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map((id) => adminApi.deleteOrder(id))),
+    onSuccess: (_d, ids) => {
+      invalidate()
+      sel.clear()
+      toast.success(`${ids.length} order${ids.length > 1 ? 's' : ''} deleted`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  // Deleting an order destroys the record of a sale, so both paths confirm first
+  // and say plainly that it can't be undone.
+  const onDelete = (o) => {
+    if (confirm(`Delete order #${o.id} from ${o.fullName || 'guest'}? This can’t be undone.`)) {
+      remove.mutate(o.id)
+    }
+  }
+  const onBulkDelete = () => {
+    const ids = sel.selectedIds
+    if (!ids.length) return
+    if (confirm(`Delete ${ids.length} selected order${ids.length > 1 ? 's' : ''}? This can’t be undone.`)) {
+      bulkRemove.mutate(ids)
+    }
+  }
 
   const tabs = [{ value: '', label: 'All' }, ...ORDER_STATUSES]
 
@@ -53,32 +94,64 @@ export default function OrdersAdmin() {
             <p className="font-medium text-red-600">Couldn’t load orders — {error.message}</p>
             <a href="/admin/login" className="mt-2 inline-block text-as-red underline">Sign in again</a>
           </div>
-        ) : (data ?? []).length === 0 ? (
+        ) : list.length === 0 ? (
           <p className="py-16 text-center text-sm text-as-ink/50">No orders here yet.</p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
-            {data.map((o) => (
-              <li key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-as-fog/60">
-                <button onClick={() => setViewId(o.id)} className="min-w-0 text-left">
-                  <p className="font-semibold text-as-ink">Order #{o.id}</p>
-                  <p className="truncate text-xs text-as-ink/45">{o.customerEmail || 'guest'} · {o.fullName}</p>
-                </button>
-                <span className="text-xs text-as-ink/50">
-                  {orderDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
-                </span>
-                <span className="ml-auto font-medium text-as-ink">{money(o.subtotal)}</span>
-                <Select
-                  value={o.status}
-                  onChange={(e) => update.mutate({ id: o.id, status: e.target.value })}
-                  className="w-36"
+          <>
+            {/* Bulk-select bar */}
+            <div className="flex items-center justify-between gap-3 border-b border-as-ink/5 bg-as-fog/40 px-5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-as-ink/60">
+                <Checkbox checked={sel.all} indeterminate={sel.indeterminate} onChange={sel.toggleAll} />
+                {sel.count > 0 ? `${sel.count} selected` : 'Select all'}
+              </label>
+              {sel.count > 0 && (
+                <Button variant="danger" onClick={onBulkDelete} disabled={bulkRemove.isPending} className="px-3 py-1.5">
+                  <Icon name="trash" className="h-4 w-4" />
+                  {bulkRemove.isPending ? 'Deleting…' : `Delete ${sel.count}`}
+                </Button>
+              )}
+            </div>
+            <ul className="divide-y divide-as-ink/5">
+              {list.map((o) => (
+                <li
+                  key={o.id}
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-as-fog/60 ${
+                    sel.has(o.id) ? 'bg-as-red/5' : ''
+                  }`}
                 >
-                  {ORDER_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </Select>
-              </li>
-            ))}
-          </ul>
+                  <Checkbox checked={sel.has(o.id)} onChange={() => sel.toggle(o.id)} />
+                  <button onClick={() => setViewId(o.id)} className="min-w-0 text-left">
+                    <p className="font-semibold text-as-ink">Order #{o.id}</p>
+                    <p className="truncate text-xs text-as-ink/45">{o.customerEmail || 'guest'} · {o.fullName}</p>
+                  </button>
+                  <span className="text-xs text-as-ink/50">
+                    {orderDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="ml-auto font-medium text-as-ink">{money(o.subtotal)}</span>
+                  {/* Select is w-full by design, so its width is set by this wrapper. */}
+                  <span className="w-36 shrink-0">
+                    <Select
+                      value={o.status}
+                      onChange={(e) => update.mutate({ id: o.id, status: e.target.value })}
+                    >
+                      {ORDER_STATUSES.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </Select>
+                  </span>
+                  <button
+                    onClick={() => onDelete(o)}
+                    disabled={remove.isPending}
+                    title={`Delete order #${o.id}`}
+                    aria-label={`Delete order #${o.id}`}
+                    className="rounded-lg p-2 text-as-ink/35 transition hover:bg-red-50 hover:text-as-red disabled:opacity-40"
+                  >
+                    <Icon name="trash" className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </Card>
 

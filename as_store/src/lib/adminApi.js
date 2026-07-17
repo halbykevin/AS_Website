@@ -107,4 +107,5 @@ export const adminApi = {
   getOrder: (id) => req(`/api/admin/orders/${id}`, { auth: true }),
   updateOrderStatus: (id, status) =>
     req(`/api/admin/orders/${id}`, { method: 'PUT', auth: true, body: { status } }),
+  deleteOrder: (id) => req(`/api/admin/orders/${id}`, { method: 'DELETE', auth: true }),
 }

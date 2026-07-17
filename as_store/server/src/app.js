@@ -951,6 +951,21 @@ app.put(
   }),
 )
 
+// Delete an order for good. Its items go with it (order_items cascades); the
+// customer's account and the products are untouched.
+//
+// This is for clearing out test/junk orders. For a real order that fell through,
+// the 'cancelled' status is the non-destructive option — it keeps the record.
+app.delete(
+  '/api/admin/orders/:id',
+  requireAuth,
+  ah(async (req, res) => {
+    const { rows } = await query(`DELETE FROM orders WHERE id = $1 RETURNING id`, [req.params.id])
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    res.status(204).end()
+  }),
+)
+
 // ========================= Categories =========================
 // Public: visible categories. Authed: pass ?all=1 to include hidden.
 app.get(
