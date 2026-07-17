@@ -42,18 +42,23 @@ function Tile({ category, index }) {
         )}
         <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-        <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 sm:p-6">
-          <span>
-            <span className="block text-xl font-semibold tracking-apple text-white sm:text-2xl">
-              {category.name}
+        {/* Absolute, so the label never has to share a line with it. On phones a
+            2-up tile is too narrow for both, so the arrow moves to the corner;
+            from sm: up it returns to its place beside the label (which reserves
+            room for it with pr-20). */}
+        <span className="absolute right-3 top-3 flex h-8 w-8 -rotate-45 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-all duration-500 group-hover:rotate-0 group-hover:bg-as-red sm:bottom-6 sm:right-6 sm:top-auto sm:h-11 sm:w-11">
+          <Icon name="chevronRight" className="h-4 w-4 sm:h-5 sm:w-5" />
+        </span>
+
+        <span className="absolute inset-x-0 bottom-0 block p-4 sm:p-6 sm:pr-20">
+          <span className="block text-base font-semibold tracking-apple text-white sm:text-2xl">
+            {category.name}
+          </span>
+          {category.tagline && (
+            <span className="mt-1 line-clamp-1 block text-xs text-white/60 sm:text-sm">
+              {category.tagline}
             </span>
-            {category.tagline && (
-              <span className="mt-1 line-clamp-1 block text-sm text-white/60">{category.tagline}</span>
-            )}
-          </span>
-          <span className="flex h-11 w-11 shrink-0 -rotate-45 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-all duration-500 group-hover:rotate-0 group-hover:bg-as-red">
-            <Icon name="chevronRight" className="h-5 w-5" />
-          </span>
+          )}
         </span>
       </Link>
     </motion.div>
