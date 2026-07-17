@@ -4,9 +4,15 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount, accountApi } from '@/lib/account'
-import { AuthShell, CodeForm, EmailButton, Field, GoogleButton, inputCls } from '@/components/AccountUI.jsx'
+import { AppleButton, AuthShell, CodeForm, EmailButton, Field, GoogleButton, inputCls } from '@/components/AccountUI.jsx'
 
 const RESEND_SECONDS = 30
+
+// Apple's button is designed and ready (see AppleButton) but has no flow behind
+// it yet, so it stays off: a live button carrying Apple's mark has to actually
+// be Sign in with Apple. Turn this on only together with the real integration —
+// it should then follow the API's method list, like Google's does.
+const APPLE_READY = false
 
 function LoginInner() {
   const { loginWithOtp } = useAccount()
@@ -108,6 +114,7 @@ function LoginInner() {
       {step === 'choose' && (
         <div className="space-y-3">
           {google && <GoogleButton next={next} />}
+          {APPLE_READY && <AppleButton />}
           <EmailButton onClick={() => setStep('email')} />
         </div>
       )}

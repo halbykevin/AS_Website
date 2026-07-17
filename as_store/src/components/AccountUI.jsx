@@ -55,6 +55,34 @@ export function GoogleButton({ next = '/account', label = 'Continue with Google'
   )
 }
 
+function AppleMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
+    </svg>
+  )
+}
+
+// DESIGN ONLY — deliberately not rendered anywhere yet.
+//
+// Sign in with Apple is Apple's service: Apple authenticates the user and can
+// hide their address behind a private relay. A button wearing this mark must
+// actually do that, so it stays off until the real flow exists (an apple.js
+// mirroring google.js, plus a Services ID / Team ID / Key ID / .p8 key from an
+// Apple Developer account). Wiring it to our email codes instead would tell the
+// customer Apple vouched for them when it didn't.
+//
+// To switch it on: build the flow, then render this from the login page's
+// method list the way GoogleButton is.
+export function AppleButton({ href = '#', label = 'Continue with Apple' }) {
+  return (
+    <a href={href} className={choiceCls}>
+      <AppleMark />
+      {label}
+    </a>
+  )
+}
+
 // Reveals the email field rather than going anywhere — the code flow is ours.
 export function EmailButton({ onClick, label = 'Continue with email' }) {
   return (
