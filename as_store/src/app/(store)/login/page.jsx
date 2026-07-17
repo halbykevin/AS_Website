@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount, accountApi } from '@/lib/account'
-import { AuthShell, CodeForm, Field, GoogleButton, OrDivider, inputCls } from '@/components/AccountUI.jsx'
+import { AuthShell, CodeForm, EmailButton, Field, GoogleButton, inputCls } from '@/components/AccountUI.jsx'
 
 const RESEND_SECONDS = 30
 
@@ -17,7 +17,9 @@ function LoginInner() {
   // Google only appears once the API says it's configured, so a dead button is
   // never offered. Errors on the way back from Google land here as ?error=google.
   const [google, setGoogle] = useState(false)
-  const [step, setStep] = useState('email') // email | code
+  // The page opens as a choice of methods; the email field only appears once
+  // that's the method you picked.
+  const [step, setStep] = useState('choose') // choose | email | code
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState(params.get('error') === 'google' ? 'Google sign-in didn’t complete. Please try again.' : '')
@@ -68,14 +70,16 @@ function LoginInner() {
     }
   }
 
+  const subtitle = {
+    choose: 'Use your Google account, or we’ll email you a one-time code.',
+    email: 'We’ll email you a 6-digit code — no password to remember.',
+    code: `We emailed a 6-digit code to ${email}.`,
+  }[step]
+
   return (
     <AuthShell
       title="Sign in"
-      subtitle={
-        step === 'code'
-          ? `We emailed a 6-digit code to ${email}.`
-          : 'Use your Google account, or we’ll email you a one-time code.'
-      }
+      subtitle={subtitle}
       footer={
         step === 'code' ? (
           <button
@@ -101,35 +105,41 @@ function LoginInner() {
     >
       {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      {step === 'email' && (
-        <div className="space-y-5">
-          {google && (
-            <>
-              <GoogleButton next={next} />
-              <OrDivider />
-            </>
-          )}
-          <form onSubmit={requestCode} className="space-y-4">
-            <Field label="Email address">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputCls}
-                placeholder="you@example.com"
-                autoComplete="email"
-                autoFocus
-              />
-            </Field>
-            <button type="submit" disabled={busy} className="pill w-full justify-center">
-              {busy ? 'Sending code…' : 'Email me a code'}
-            </button>
-          </form>
-          <p className="text-center text-xs text-as-ink/45">
-            No password needed — we send a one-time code each time you sign in.
-          </p>
+      {step === 'choose' && (
+        <div className="space-y-3">
+          {google && <GoogleButton next={next} />}
+          <EmailButton onClick={() => setStep('email')} />
         </div>
+      )}
+
+      {step === 'email' && (
+        <form onSubmit={requestCode} className="space-y-4">
+          <Field label="Email address">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputCls}
+              placeholder="you@example.com"
+              autoComplete="email"
+              autoFocus
+            />
+          </Field>
+          <button type="submit" disabled={busy} className="pill w-full justify-center">
+            {busy ? 'Sending code…' : 'Email me a code'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStep('choose')
+              setError('')
+            }}
+            className="block w-full text-center text-sm text-as-ink/45 hover:text-as-red"
+          >
+            Back
+          </button>
+        </form>
       )}
 
       {step === 'code' && (

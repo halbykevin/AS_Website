@@ -1,5 +1,6 @@
 // Shared presentational bits for the account/auth pages.
 
+import Icon from '@/components/Icon.jsx'
 import { googleSignInUrl } from '@/lib/account'
 
 export const inputCls =
@@ -40,16 +41,27 @@ function GoogleMark() {
   )
 }
 
+// The sign-in methods are offered as a set, so they share one look.
+const choiceCls =
+  'flex h-12 w-full items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] font-medium text-as-ink transition hover:border-as-ink/30 hover:bg-as-fog'
+
 // A plain link, not a fetch: Google sign-in is a full-page round trip.
 export function GoogleButton({ next = '/account', label = 'Continue with Google' }) {
   return (
-    <a
-      href={googleSignInUrl(next)}
-      className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] font-medium text-as-ink transition hover:border-as-ink/30 hover:bg-as-fog"
-    >
+    <a href={googleSignInUrl(next)} className={choiceCls}>
       <GoogleMark />
       {label}
     </a>
+  )
+}
+
+// Reveals the email field rather than going anywhere — the code flow is ours.
+export function EmailButton({ onClick, label = 'Continue with email' }) {
+  return (
+    <button type="button" onClick={onClick} className={choiceCls}>
+      <Icon name="mail" className="h-5 w-5 text-as-ink/55" />
+      {label}
+    </button>
   )
 }
 
