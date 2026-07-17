@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Button, Card, Field, Input, Toggle, Spinner, Badge } from '@/components/admin/ui.jsx'
+import { Button, Card, Field, Input, Select, Toggle, Spinner, Badge } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
 import { adminApi } from '@/lib/adminApi'
 
@@ -19,7 +19,16 @@ const EMPTY = {
   navLogoSize: 20,
   navLogoSizeMobile: 18,
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
+  loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
 }
+
+// Must match LOGIN_BUTTON_WEIGHTS server-side — the value becomes a class name.
+const LOGIN_WEIGHTS = [
+  { value: 'normal', label: 'Regular' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'semibold', label: 'Semibold' },
+]
+const LOGIN_WEIGHT_CLS = { normal: 'font-normal', medium: 'font-medium', semibold: 'font-semibold' }
 
 export default function SettingsPage() {
   const qc = useQueryClient()
@@ -38,6 +47,7 @@ export default function SettingsPage() {
         announcement: { ...EMPTY.announcement, ...(data.announcement || {}) },
         contact: { ...EMPTY.contact, ...(data.contact || {}) },
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
+        loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
         navLinks: data.navLinks || [],
         footerGroups: data.footerGroups || [],
@@ -155,6 +165,55 @@ export default function SettingsPage() {
             onChange={(e) => setNested('announcement', 'text', e.target.value)}
             placeholder="Free delivery on orders over $100 · 12 months warranty"
           />
+        </Field>
+      </Card>
+
+      {/* Sign-in button branding */}
+      <Card className="space-y-4 p-5">
+        <h3 className="font-bold text-as-ink">Sign-in button</h3>
+        <p className="text-sm text-as-ink/50">
+          The email-code button on the sign-in page. Use your own logo and wording — it’s your
+          service, so it shouldn’t carry another company’s mark.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Button text">
+            <Input
+              value={form.loginButton.label}
+              onChange={(e) => setNested('loginButton', 'label', e.target.value)}
+              placeholder="Continue with email"
+            />
+          </Field>
+          <Field label="Text weight">
+            <Select
+              value={form.loginButton.weight}
+              onChange={(e) => setNested('loginButton', 'weight', e.target.value)}
+            >
+              {LOGIN_WEIGHTS.map((w) => (
+                <option key={w.value} value={w.value}>{w.label}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <LoginLogoField
+          value={form.loginButton.logo}
+          onChange={(v) => setNested('loginButton', 'logo', v)}
+        />
+        <Field label="Preview" hint="Exactly how it renders on the sign-in page.">
+          <div className="rounded-xl bg-as-fog p-5">
+            <span
+              className={`mx-auto flex h-12 w-full max-w-sm items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] text-as-ink ${
+                LOGIN_WEIGHT_CLS[form.loginButton.weight] || LOGIN_WEIGHT_CLS.medium
+              }`}
+            >
+              {form.loginButton.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.loginButton.logo} alt="" className="h-5 w-auto max-w-[96px] shrink-0 object-contain" />
+              ) : (
+                <Icon name="mail" className="h-5 w-5 text-as-ink/55" />
+              )}
+              {form.loginButton.label || 'Continue with email'}
+            </span>
+          </div>
         </Field>
       </Card>
 
@@ -350,5 +409,62 @@ function LinkList({ value, onChange }) {
         <Icon name="plus" className="h-4 w-4" /> Add link
       </button>
     </div>
+  )
+}
+
+// Logo for the sign-in button: upload a file or paste a URL. Small square marks
+// read best — it renders at 20px next to the label.
+function LoginLogoField({ value, onChange }) {
+  const toast = useToast()
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+
+  const upload = async (file) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const { url } = await adminApi.upload(file)
+      onChange(url)
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <Field label="Logo" hint="Shown 20px tall next to the text; a square mark or a short wordmark both work. Leave empty for the default mail icon.">
+      <div className="flex items-center gap-3">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-as-fog ring-1 ring-as-ink/10">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className="h-full w-full object-contain p-2" />
+          ) : (
+            <Icon name="mail" className="h-5 w-5 text-as-ink/30" />
+          )}
+        </span>
+        <div className="flex-1 space-y-2">
+          <Input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Logo URL" />
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              <Icon name="upload" className="h-4 w-4" />
+              {uploading ? 'Uploading…' : 'Upload'}
+            </Button>
+            {value && (
+              <Button type="button" variant="ghost" onClick={() => onChange('')}>
+                Remove
+              </Button>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
+        </div>
+      </div>
+    </Field>
   )
 }

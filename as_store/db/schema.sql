@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS settings (
   home_new_source      TEXT DEFAULT 'newest',       -- newest | featured | category
   home_new_category_id INTEGER,                     -- when source = category
   home_new_count       INTEGER DEFAULT 8,
+  -- Sign-in page: the email-code button carries your own branding.
+  login_button_label   TEXT DEFAULT 'Continue with email',
+  login_button_logo    TEXT DEFAULT '',                -- uploaded logo; blank = mail icon
+  login_button_weight  TEXT DEFAULT 'medium',          -- normal | medium | semibold
   updated_at           TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
@@ -124,6 +128,10 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_heading     TEXT DEFAULT 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_source      TEXT DEFAULT 'newest';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_category_id INTEGER;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS home_new_count       INTEGER DEFAULT 8;
+-- Sign-in button branding.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_label   TEXT DEFAULT 'Continue with email';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_logo    TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_weight  TEXT DEFAULT 'medium';
 
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (

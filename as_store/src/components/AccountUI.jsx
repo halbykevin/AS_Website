@@ -41,14 +41,16 @@ function GoogleMark() {
   )
 }
 
-// The sign-in methods are offered as a set, so they share one look.
+// The sign-in methods are offered as a set, so they share one look. No weight
+// here on purpose — each button sets its own, and a weight baked in here would
+// beat the one passed in (Tailwind resolves by stylesheet order).
 const choiceCls =
-  'flex h-12 w-full items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] font-medium text-as-ink transition hover:border-as-ink/30 hover:bg-as-fog'
+  'flex h-12 w-full items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] text-as-ink transition hover:border-as-ink/30 hover:bg-as-fog'
 
 // A plain link, not a fetch: Google sign-in is a full-page round trip.
 export function GoogleButton({ next = '/account', label = 'Continue with Google' }) {
   return (
-    <a href={googleSignInUrl(next)} className={choiceCls}>
+    <a href={googleSignInUrl(next)} className={`${choiceCls} font-medium`}>
       <GoogleMark />
       {label}
     </a>
@@ -76,7 +78,7 @@ function AppleMark() {
 // method list the way GoogleButton is.
 export function AppleButton({ href = '#', label = 'Continue with Apple' }) {
   return (
-    <a href={href} className={choiceCls}>
+    <a href={href} className={`${choiceCls} font-medium`}>
       <AppleMark />
       {label}
     </a>
@@ -84,11 +86,29 @@ export function AppleButton({ href = '#', label = 'Continue with Apple' }) {
 }
 
 // Reveals the email field rather than going anywhere — the code flow is ours.
-export function EmailButton({ onClick, label = 'Continue with email' }) {
+//
+// Its logo and wording come from Admin → Settings so the button can carry your
+// branding; `settings.loginButton` supplies the defaults when nothing is set.
+// The weight is whitelisted server-side (LOGIN_BUTTON_WEIGHTS) because it lands
+// in the class name.
+const WEIGHT_CLS = { normal: 'font-normal', medium: 'font-medium', semibold: 'font-semibold' }
+
+export function EmailButton({ onClick, label = 'Continue with email', logo = '', weight = 'medium' }) {
   return (
-    <button type="button" onClick={onClick} className={choiceCls}>
-      <Icon name="mail" className="h-5 w-5 text-as-ink/55" />
-      {label}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${choiceCls} ${WEIGHT_CLS[weight] || WEIGHT_CLS.medium}`}
+    >
+      {logo ? (
+        // Height-locked, width free: a wide wordmark shouldn't be squeezed into
+        // a square, and a square mark stays square.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" className="h-5 w-auto max-w-[96px] shrink-0 object-contain" />
+      ) : (
+        <Icon name="mail" className="h-5 w-5 text-as-ink/55" />
+      )}
+      {label || 'Continue with email'}
     </button>
   )
 }

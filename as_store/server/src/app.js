@@ -115,6 +115,10 @@ const productJson = (r) => {
   }
 }
 
+// The sign-in button's text weight. A whitelist because the value ends up as a
+// class name on the storefront — free text there would be an injection point.
+const LOGIN_BUTTON_WEIGHTS = ['normal', 'medium', 'semibold']
+
 const settingsJson = (r) => ({
   storeName: r.store_name || 'AS Store',
   announcement: { enabled: r.announcement_enabled, text: r.announcement_text || '' },
@@ -137,6 +141,11 @@ const settingsJson = (r) => ({
     source: r.home_new_source || 'newest',
     categoryId: r.home_new_category_id ?? null,
     count: r.home_new_count ?? 8,
+  },
+  loginButton: {
+    label: r.login_button_label ?? 'Continue with email',
+    logo: r.login_button_logo || '',
+    weight: r.login_button_weight || 'medium',
   },
   published: r.published ?? false,
   updatedAt: r.updated_at,
@@ -1462,7 +1471,10 @@ app.put(
          home_new_heading     = COALESCE($17, home_new_heading),
          home_new_source      = COALESCE($18, home_new_source),
          home_new_category_id = CASE WHEN $19::boolean THEN $20 ELSE home_new_category_id END,
-         home_new_count       = COALESCE($21, home_new_count)
+         home_new_count       = COALESCE($21, home_new_count),
+         login_button_label   = COALESCE($22, login_button_label),
+         login_button_logo    = COALESCE($23, login_button_logo),
+         login_button_weight  = COALESCE($24, login_button_weight)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -1488,6 +1500,10 @@ app.put(
         b.homeNew && 'categoryId' in b.homeNew,
         b.homeNew?.categoryId ?? null,
         b.homeNew?.count ?? null,
+        b.loginButton?.label ?? null,
+        b.loginButton?.logo ?? null,
+        // Whitelisted: this class name goes straight into the button's markup.
+        LOGIN_BUTTON_WEIGHTS.includes(b.loginButton?.weight) ? b.loginButton.weight : null,
       ],
     )
     res.json(settingsJson(rows[0]))

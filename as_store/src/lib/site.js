@@ -17,6 +17,8 @@ export const defaultSettings = {
   navLogoSizeMobile: 18,
   // Homepage "New arrivals" section (the first block on the homepage).
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
+  // Sign-in page: your branding on the email-code button.
+  loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
@@ -38,6 +40,7 @@ export async function loadSettings() {
       announcement: { ...defaultSettings.announcement, ...(s.announcement || {}) },
       contact: { ...defaultSettings.contact, ...(s.contact || {}) },
       homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
+      loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
       socials: s.socials || {},
       navLinks: s.navLinks?.length ? s.navLinks : defaultSettings.navLinks,
       footerGroups: s.footerGroups?.length ? s.footerGroups : defaultSettings.footerGroups,
