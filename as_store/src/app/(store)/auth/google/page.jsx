@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAccount } from '@/lib/account'
+import { useAccount, AFTER_SIGN_IN } from '@/lib/account'
 
 export default function GoogleAuthPage() {
   const { adoptToken } = useAccount()
@@ -21,7 +21,7 @@ export default function GoogleAuthPage() {
 
     const params = new URLSearchParams(window.location.hash.slice(1))
     const token = params.get('token')
-    const next = params.get('next') || '/account'
+    const next = params.get('next') || AFTER_SIGN_IN
     if (!token) {
       router.replace('/login?error=google')
       return
@@ -30,7 +30,7 @@ export default function GoogleAuthPage() {
     // Drop the token out of the address bar before anything else can read it.
     window.history.replaceState(null, '', window.location.pathname)
     adoptToken(token)
-      .then(() => router.replace(next.startsWith('/') ? next : '/account'))
+      .then(() => router.replace(next.startsWith('/') ? next : AFTER_SIGN_IN))
       .catch(() => setError('We couldn’t finish signing you in.'))
   }, [adoptToken, router])
 

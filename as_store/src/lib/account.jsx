@@ -31,9 +31,14 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
   return res.status === 204 ? null : res.json()
 }
 
+// Where you land after signing in, unless a `?next=` says otherwise (checkout
+// sends you back to checkout). Shopping is the point, so it's the storefront —
+// the account page is somewhere you go deliberately, via the nav.
+export const AFTER_SIGN_IN = '/'
+
 // Google sign-in is a full-page trip (browser → our API → Google → our API →
 // /auth/google), not a fetch, so all the client needs is the URL to leave for.
-export const googleSignInUrl = (next = '/account') =>
+export const googleSignInUrl = (next = AFTER_SIGN_IN) =>
   `${API}/api/account/google/start?next=${encodeURIComponent(next)}`
 
 export const accountApi = {

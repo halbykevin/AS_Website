@@ -7,7 +7,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAccount, accountApi } from '@/lib/account'
+import { useAccount, accountApi, AFTER_SIGN_IN } from '@/lib/account'
 import { AuthShell, CodeForm, Field, GoogleButton, OrDivider, inputCls } from '@/components/AccountUI.jsx'
 
 const RESEND_SECONDS = 30
@@ -16,7 +16,7 @@ const EMPTY = { name: '', email: '', mobile: '', address: '' }
 function RegisterInner() {
   const { loginWithOtp } = useAccount()
   const router = useRouter()
-  const next = useSearchParams().get('next') || '/account'
+  const next = useSearchParams().get('next') || AFTER_SIGN_IN
 
   const [google, setGoogle] = useState(false)
   const [step, setStep] = useState('details') // details | code
@@ -100,7 +100,7 @@ function RegisterInner() {
           <>
             Already have an account?{' '}
             <Link
-              href={`/login${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}`}
+              href={`/login${next !== AFTER_SIGN_IN ? `?next=${encodeURIComponent(next)}` : ''}`}
               className="font-medium text-as-red hover:underline"
             >
               Sign in

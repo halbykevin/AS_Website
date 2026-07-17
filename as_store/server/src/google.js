@@ -34,10 +34,12 @@ const STATE_TTL_SECONDS = 600
 export const googleEnabled = () => Boolean(CLIENT_ID && CLIENT_SECRET)
 
 // Where to send the shopper once they're signed in. Only same-site paths are
-// allowed: anything else would turn this endpoint into an open redirect.
+// allowed: anything else would turn this endpoint into an open redirect. The
+// fallback mirrors AFTER_SIGN_IN on the storefront (the client normally passes
+// an explicit ?next=, so this only catches a hand-made link).
 export const safeNext = (value) => {
   const n = String(value || '')
-  return n.startsWith('/') && !n.startsWith('//') ? n : '/account'
+  return n.startsWith('/') && !n.startsWith('//') ? n : '/'
 }
 
 function readCookie(req, name) {

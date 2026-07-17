@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAccount, accountApi } from '@/lib/account'
+import { useAccount, accountApi, AFTER_SIGN_IN } from '@/lib/account'
 import { AppleButton, AuthShell, CodeForm, EmailButton, Field, GoogleButton, inputCls } from '@/components/AccountUI.jsx'
 
 const RESEND_SECONDS = 30
@@ -18,7 +18,7 @@ function LoginInner({ loginButton }) {
   const { loginWithOtp } = useAccount()
   const router = useRouter()
   const params = useSearchParams()
-  const next = params.get('next') || '/account'
+  const next = params.get('next') || AFTER_SIGN_IN
 
   // Google only appears once the API says it's configured, so a dead button is
   // never offered. Errors on the way back from Google land here as ?error=google.
@@ -100,7 +100,7 @@ function LoginInner({ loginButton }) {
           <>
             New to AS Store?{' '}
             <Link
-              href={`/register${next !== '/account' ? `?next=${encodeURIComponent(next)}` : ''}`}
+              href={`/register${next !== AFTER_SIGN_IN ? `?next=${encodeURIComponent(next)}` : ''}`}
               className="font-medium text-as-red hover:underline"
             >
               Create an account
