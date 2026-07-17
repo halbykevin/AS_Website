@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { optimizedImage } from '../lib/api'
+import BannerCta from './BannerCta'
 
 // Every banner sends visitors to the events listing page
 // (www.as.com.lb/events in production) rather than each banner's own link.
@@ -110,6 +111,11 @@ export default function BannerSlider({ banners, height, fill = false }) {
             <Slide key={b.id} banner={b} eager={i === 0} />
           ))}
         </div>
+
+        {/* Same destination as the slides themselves, just an explicit prompt.
+            A sibling of the drag container (not a child) so a swipe can never
+            fire it. */}
+        <BannerCta href={EVENTS_PATH} label="Book now" />
 
         {/* Arrows over the image */}
         {count > 1 && (
