@@ -1,6 +1,6 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (*Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events, and run a **web scraper** that pulls product data from e-commerce pages and downloads it (JSON/CSV/Excel/HTML).
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (*Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events, and run a **web scraper** that syncs events from Ticketing Box Office into the site.
 
 > The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
 
@@ -80,12 +80,13 @@ output back for download (`archiver` zips the whole folder, images included).
   `GET /api/scrape/:id` polls status/log; `GET /api/scrape/:id/files/:name` downloads one export
   file; `GET /api/scrape/:id/zip` downloads everything. Jobs are tracked **in memory** (lost on
   restart); only the most recent ~20 run folders are kept.
-- The admin UI ([src/admin/pages/ScraperAdmin.jsx](src/admin/pages/ScraperAdmin.jsx)) mirrors the
-  desktop GUI's options and polls the job while it runs. Downloads need the token, so the client
-  fetches them as authed blobs (`downloadScrapeFile` / `downloadScrapeZip` in `lib/api.js`).
+- The product-scraping **UI was removed** from the admin: [src/admin/pages/ScraperAdmin.jsx](src/admin/pages/ScraperAdmin.jsx)
+  now only drives the events sync below. The `POST /api/scrape` endpoints, `scrape.py`, and the
+  `startScrape` / `downloadScrapeFile` / `downloadScrapeZip` client helpers are all still in place —
+  nothing in the site calls them, so re-adding a page is enough to bring the tool back.
 - `scrape.py` gained an `--auto <url>` mode (probe → single product vs. crawl) used by the backend;
   the existing `--url/--urls/--crawl` modes are unchanged.
-- **Events sync** (second tool in the same admin page): `POST /api/scrape/events` runs
+- **Events sync** (the only tool in the admin page): `POST /api/scrape/events` runs
   [WebScarping/tbo_events.py](WebScarping/tbo_events.py), which scrapes **ticketingboxoffice.com**
   (homepage = full current event list + category mapping via isotope CSS classes; each event/group
   page for details) and writes `events.json`. `scraper.js` then **ingests** it into Postgres:
