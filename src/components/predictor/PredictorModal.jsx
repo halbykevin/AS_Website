@@ -18,57 +18,6 @@ const STEPS = [
   { key: 'details', label: 'Details' },
 ]
 
-// The platforms a player can share an AS Store item to. `href` builds the share
-// intent; Instagram has no web story intent, so it just opens the store and the
-// player shares from there.
-const PLATFORMS = [
-  {
-    key: 'instagram',
-    label: 'Instagram Story',
-    hint: 'Open the item, then share it to your story',
-    ring: 'from-[#feda75] via-[#d62976] to-[#4f5bd5]',
-    href: (url) => url,
-  },
-  {
-    key: 'facebook',
-    label: 'Facebook Story',
-    hint: 'Post the item to your story or feed',
-    ring: 'from-[#1877f2] to-[#0b5fd0]',
-    href: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-  },
-  {
-    key: 'whatsapp',
-    label: 'WhatsApp Status',
-    hint: 'Share the item to your status',
-    ring: 'from-[#25d366] to-[#128c7e]',
-    href: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text ? text + ' ' : ''}${url}`)}`,
-  },
-]
-
-function PlatformIcon({ platform, className = 'h-6 w-6' }) {
-  if (platform === 'facebook') {
-    return (
-      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-        <path d="M14 9h3V6h-3c-2.2 0-4 1.8-4 4v2H8v3h2v7h3v-7h2.5l.5-3H13v-2c0-.6.4-1 1-1z" />
-      </svg>
-    )
-  }
-  if (platform === 'whatsapp') {
-    return (
-      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-        <path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.3 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .1-1.6-.1a12 12 0 01-4-2.4 9 9 0 01-1.9-2.6c-.4-.8 0-1.6.3-2 .3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5l.7 1.7c.1.2 0 .4-.1.5l-.4.5c-.1.2-.3.3-.1.6.2.3.7 1.1 1.4 1.7.9.8 1.6 1 1.9 1.2.2.1.4.1.5-.1l.6-.7c.2-.2.3-.2.6-.1l1.6.8c.3.1.5.2.5.4v.8z" />
-      </svg>
-    )
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
 function Confetti() {
   const pieces = useMemo(
     () =>
@@ -165,9 +114,6 @@ export default function PredictorModal() {
   const [step, setStep] = useState('score') // score | share | details | done
   const [scoreA, setScoreA] = useState('')
   const [scoreB, setScoreB] = useState('')
-  const [platform, setPlatform] = useState('') // instagram | facebook | whatsapp
-  const [shareItem, setShareItem] = useState('')
-  const [confirmedShare, setConfirmedShare] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
   const [drawNumber, setDrawNumber] = useState(null) // assigned on submit
@@ -219,23 +165,8 @@ export default function PredictorModal() {
   }
 
   const afterShare = () => {
-    if (!platform) {
-      setError('Choose where you shared your AS Store item.')
-      return
-    }
-    if (!confirmedShare) {
-      setError('Confirm you shared an item from the AS Store to continue.')
-      return
-    }
     setError('')
     setStep('details')
-  }
-
-  const openShare = (p) => {
-    setPlatform(p.key)
-    setError('')
-    const url = shareItem.trim().startsWith('http') ? shareItem.trim() : storeUrl
-    window.open(p.href(url, predictor.shareMessage), '_blank', 'noopener')
   }
 
   const submit = async (e) => {
@@ -253,8 +184,6 @@ export default function PredictorModal() {
         matchId: match?.id,
         scoreA: Number(scoreA),
         scoreB: Number(scoreB),
-        sharePlatform: platform,
-        shareItem: shareItem.trim(),
       })
       setDrawNumber(entry?.drawNumber ?? null)
       setSubmitted(true)
@@ -401,56 +330,6 @@ export default function PredictorModal() {
                 🛍️ Open the AS Store
               </a>
 
-              <div className="space-y-2">
-                {PLATFORMS.map((p) => {
-                  const active = platform === p.key
-                  return (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => openShare(p)}
-                      className={`flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${
-                        active ? 'border-amber-400 bg-amber-50' : 'border-black/10 bg-white hover:border-amber-300'
-                      }`}
-                    >
-                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${p.ring} text-white`}>
-                        <PlatformIcon platform={p.key} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-extrabold text-as-charcoal">{p.label}</span>
-                        <span className="block text-xs text-as-charcoal/55">{p.hint}</span>
-                      </span>
-                      <span className={`ml-auto shrink-0 text-xs font-bold ${active ? 'text-amber-600' : 'text-as-charcoal/40'}`}>
-                        {active ? 'Selected ✓' : 'Share'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-as-charcoal">
-                  Which item did you share? <span className="font-normal text-as-charcoal/45">(optional)</span>
-                </span>
-                <input
-                  value={shareItem}
-                  onChange={(e) => setShareItem(e.target.value)}
-                  placeholder="Item name or link"
-                  className="w-full rounded-xl border-2 border-black/10 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-300/50"
-                />
-              </label>
-
-              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-3">
-                <input
-                  type="checkbox"
-                  checked={confirmedShare}
-                  onChange={(e) => { setConfirmedShare(e.target.checked); setError('') }}
-                  className="h-5 w-5 shrink-0 accent-amber-500"
-                />
-                <span className="text-sm font-medium text-as-charcoal">
-                  I shared an AS Store item on my story/status.
-                </span>
-              </label>
             </div>
           )}
 
