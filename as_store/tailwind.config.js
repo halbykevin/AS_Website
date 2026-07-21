@@ -51,6 +51,20 @@ module.exports = {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-16px)' },
         },
+        // Share sheet: backdrop fade, sheet rise, and the per-icon pop-in.
+        'share-fade': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        'share-sheet': {
+          from: { opacity: '0', transform: 'translateY(24px) scale(.96)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'share-pop': {
+          '0%': { opacity: '0', transform: 'translateY(14px) scale(.6)' },
+          '65%': { opacity: '1', transform: 'translateY(-3px) scale(1.06)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
       },
       animation: {
         marquee: 'marquee 30s linear infinite',
@@ -58,6 +72,9 @@ module.exports = {
         breathe: 'breathe 9s ease-in-out infinite',
         'breathe-slow': 'breathe 11s ease-in-out infinite reverse',
         float: 'float 6s ease-in-out infinite',
+        'share-fade': 'share-fade .25s ease-out both',
+        'share-sheet': 'share-sheet .38s cubic-bezier(.16,1,.3,1) both',
+        'share-pop': 'share-pop .45s cubic-bezier(.34,1.56,.64,1) both',
       },
     },
   },

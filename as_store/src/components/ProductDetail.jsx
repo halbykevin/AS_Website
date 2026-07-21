@@ -8,7 +8,9 @@ import ProductTabs from './ProductTabs.jsx'
 import MaxQtyNote from './MaxQtyNote.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import Breadcrumbs from './Breadcrumbs.jsx'
+import ShareMenu from './ShareMenu.jsx'
 import { addItem, MAX_QTY } from '@/store/cartSlice'
+import { SITE_URL } from '@/lib/seo'
 import { openCart } from '@/store/uiSlice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
@@ -157,6 +159,14 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               <button onClick={add} className="pill flex-1 justify-center sm:flex-none sm:px-10">
                 Add to Bag
               </button>
+              <ShareMenu
+                url={product.slug ? `${SITE_URL}/product/${product.slug}` : undefined}
+                title={product.name}
+                label={`Share ${product.name}`}
+                sizeClass="h-11 w-11 shrink-0"
+                iconClass="h-[18px] w-[18px]"
+                className="border-as-ink/15"
+              />
             </div>
 
             {maxHit && <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />}

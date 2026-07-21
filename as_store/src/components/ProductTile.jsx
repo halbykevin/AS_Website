@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useDispatch } from 'react-redux'
+import ShareMenu from './ShareMenu.jsx'
 import { addItem } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
+import { SITE_URL } from '@/lib/seo'
 
 // Clean Apple Store product card: name, tagline, centered image, colour dots,
 // "From $X", and an Add to Bag pill (wired to Redux). `fluid` fills its parent
@@ -89,9 +91,20 @@ export default function ProductTile({ product, fluid = false }) {
         ) : (
           <p className="text-sm font-medium text-as-ink sm:text-base">From ${priceNum.toLocaleString()}</p>
         )}
-        <button onClick={add} className="pill mt-2 w-full text-sm sm:mt-3 sm:text-base">
-          Add to Bag
-        </button>
+        {/* Action row: the bag pill takes the space, share sits beside it — kept
+            in normal flow so it can never overlap the name/price on narrow cards. */}
+        <div className="mt-2 flex w-full items-center gap-2 sm:mt-3">
+          <button onClick={add} className="pill min-w-0 flex-1 px-3 text-sm sm:px-5 sm:text-base">
+            Add to Bag
+          </button>
+          <ShareMenu
+            url={slug ? `${SITE_URL}/product/${slug}` : undefined}
+            title={name}
+            label={`Share ${name}`}
+            sizeClass="h-9 w-9 shrink-0 sm:h-11 sm:w-11"
+            iconClass="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+          />
+        </div>
       </div>
     </div>
   )
