@@ -56,6 +56,14 @@ password. Note them — they form your `DATABASE_URL`:
 ### 2. Upload this `server/` folder and configure
 Copy `server/` to the VPS (e.g. `/opt/as-api`), then:
 
+> **The live AS Company install** clones the whole repo to **`/opt/as-company`**, so the API
+> lives at `/opt/as-company/server` (not `/opt/as-api`). To ship a backend change:
+> ```bash
+> cd /opt/as-company && git pull
+> cd server && npm run migrate   # only when migrate.js changed
+> pm2 restart as-api
+> ```
+
 ```bash
 cd /opt/as-api
 cp .env.example .env

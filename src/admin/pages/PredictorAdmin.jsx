@@ -544,7 +544,11 @@ export default function PredictorAdmin() {
                 />
               </div>
               <div className="grid gap-4">
-                <Field label="Prize title"><TextInput value={settings.prizeTitle} onChange={setS('prizeTitle')} placeholder="e.g. $10,000" /></Field>
+                <p className="text-xs text-as-charcoal/55">
+                  The voucher card on the game screen is drawn automatically — its face value is the first
+                  amount found in “Prize amount” or “Prize title” (e.g. “2 × $100 Vouchers” → $100).
+                </p>
+                <Field label="Prize title"><TextInput value={settings.prizeTitle} onChange={setS('prizeTitle')} placeholder="e.g. 2 vouchers — $100 each" /></Field>
                 <Field label="Prize description"><TextArea value={settings.prizeDescription} onChange={setS('prizeDescription')} placeholder="What the lucky winner takes home." /></Field>
                 <Field label="Prize image (optional)" hint="Replaces the trophy next to the title.">
                   <div className="flex items-center gap-4">

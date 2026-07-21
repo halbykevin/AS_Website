@@ -3,6 +3,7 @@ import { useContent } from '../../store/content.jsx'
 import { usePredictorUI } from '../../store/predictor.jsx'
 import { submitPrediction } from '../../lib/api.js'
 import Basketball from './Basketball.jsx'
+import Voucher from './Voucher.jsx'
 
 const CONFETTI_COLORS = ['#f59e0b', '#fbbf24', '#A41E22', '#1d1d1f', '#e2711d', '#ffffff']
 
@@ -117,6 +118,7 @@ function DrawTicket({ number, score }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
+  const { brand } = useContent()
   const [step, setStep] = useState('score') // score | details | done
   const [scoreA, setScoreA] = useState('')
   const [scoreB, setScoreB] = useState('')
@@ -149,6 +151,11 @@ export default function PredictorModal() {
   if (!predictor) return null
   const { prize, closed, terms, match } = predictor
   const storeUrl = predictor.shareUrl || STORE_URL
+  // The voucher's face value: the first money amount in the admin's prize copy
+  // ("2 × $100 Vouchers" → "$100"), so one field drives both the headline and
+  // the card. Falls back to $100 when the admin wrote no amount.
+  const voucherAmount =
+    (`${prize.amount || ''} ${prize.title || ''}`.match(/\$\s?[\d,]+/) || [])[0]?.replace(/\s/g, '') || '$100'
   const scoreLine = match ? `${match.teamA} ${scoreA || 0} — ${scoreB || 0} ${match.teamB}` : ''
 
   // "Game 1: July 22, 2026" — the stage plus the tip-off date, as in the card.
@@ -307,6 +314,22 @@ export default function PredictorModal() {
                 <p className="w-[112px] text-center text-sm font-bold leading-tight text-as-charcoal sm:w-[132px]">{match?.teamB}</p>
               </div>
 
+              {/* What you're playing for — the voucher, drawn not uploaded. */}
+              {prize.enabled && (
+                <div className="mt-6">
+                  <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-as-charcoal/45">
+                    What you&apos;re playing for
+                  </p>
+                  <Voucher amount={voucherAmount} logo={brand?.logo} className="drop-shadow-md" />
+                  {prize.title && (
+                    <p className="mt-2 text-center text-sm font-bold text-as-charcoal">{prize.title}</p>
+                  )}
+                  {prize.description && (
+                    <p className="mt-1 text-center text-xs leading-snug text-as-charcoal/60">{prize.description}</p>
+                  )}
+                </div>
+              )}
+
               {predictor.intro && <p className="mt-5 text-center text-sm text-as-charcoal/60">{predictor.intro}</p>}
             </div>
           )}
@@ -354,9 +377,12 @@ export default function PredictorModal() {
               {predictor.successMessage && (
                 <p className="mt-4 text-sm font-medium text-as-charcoal/70">{predictor.successMessage}</p>
               )}
-              {prize.enabled && prize.title && (
-                <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-700">
-                  🎁 Playing for: {prize.title}
+              {prize.enabled && (
+                <div className="mt-5">
+                  <Voucher amount={voucherAmount} logo={brand?.logo} className="drop-shadow-md" />
+                  {prize.title && (
+                    <p className="mt-2 text-sm font-bold text-as-charcoal">🎁 Playing for: {prize.title}</p>
+                  )}
                 </div>
               )}
             </div>
