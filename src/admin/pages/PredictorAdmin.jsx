@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { adminApi } from '../../lib/api.js'
+import { downloadXlsx } from '../../lib/xlsx.js'
 import { COUNTRIES, flagUrl, countryName } from '../../lib/flags.js'
 import { Card, Field, TextInput, TextArea, Toggle, Button, Banner, PageHeader, SaveBar } from '../ui.jsx'
 
@@ -389,6 +390,26 @@ export default function PredictorAdmin() {
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
   }
 
+  // Export every entry (active + archived) to an Excel sheet, one row each.
+  function exportEntries() {
+    if (predictions.length === 0) {
+      setMsg({ kind: 'error', text: 'There are no entries to export yet.' })
+      return
+    }
+    const header = ['Draw #', 'Full name', 'Mobile', 'Champion pick', 'Status', 'Submitted', 'Archived at']
+    const rows = predictions.map((p) => [
+      p.drawNumber != null ? formatDraw(p.drawNumber) : '',
+      p.fullName || '',
+      p.mobile || '',
+      championOf(p),
+      p.archived ? 'Archived' : 'Active',
+      p.createdAt ? new Date(p.createdAt).toLocaleString('en-GB') : '',
+      p.archived && p.archivedAt ? new Date(p.archivedAt).toLocaleString('en-GB') : '',
+    ])
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadXlsx(`world-cup-predictor-entries-${stamp}.xlsx`, [header, ...rows], 'Entries')
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -614,8 +635,13 @@ export default function PredictorAdmin() {
       <Card
         title="Entries"
         actions={
-          entriesTab === 'active' && activeEntries.length > 0 && (
-            <Button variant="ghost" type="button" onClick={archiveAll}>Archive all</Button>
+          predictions.length > 0 && (
+            <div className="flex gap-2">
+              <Button variant="ghost" type="button" onClick={exportEntries}>Export Excel</Button>
+              {entriesTab === 'active' && activeEntries.length > 0 && (
+                <Button variant="ghost" type="button" onClick={archiveAll}>Archive all</Button>
+              )}
+            </div>
           )
         }
       >
