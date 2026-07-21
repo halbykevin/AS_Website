@@ -49,21 +49,26 @@ frontend stores in localStorage to show it once),
 mission, divisions JSONB, plus section headings) and `solutions` (the items listed on that page:
 slug/title/summary/icon/image/intro/outro + an `items` JSONB array of `{title, description}`,
 sort/visible — each renders a homepage "What We Do" card and a `/what-we-do/:slug` detail page),
-`predictor` (single row, id=1: the **World Cup 2026 score-prediction game** — enabled/title/subtitle/intro/
-success_message + prize (`prize_title`/`prize_description`/`prize_image_url`) + optional `deadline` and a
-`closed` flag), `predictor_matches` (admin-created matches: two teams each with a name + ISO country code
-`team_a_code`/`team_b_code` → flag from flagcdn.com, optional manual flag override, plus stage/kickoff/sort/visible)
-and `predictions` (public entries: full_name/mobile + a `picks` JSONB array of `{matchId, scoreA, scoreB}`),
+`predictor` (single row, id=1: the **Guess the Score game** — enabled/title/subtitle/intro/
+success_message + prize (`prize_title`/`prize_description`/`prize_image_url`/`prize_amount`) +
+`share_url`/`share_message` (the AS Store item players share to enter) + `terms` JSONB (the red
+T&C bullets) + optional `deadline` and a `closed` flag), `predictor_matches` (admin-created matches:
+two teams each with a name + a club logo in `team_a_flag`/`team_b_flag` — uploaded or pasted, with the
+older `team_a_code`/`team_b_code` still resolving a flagcdn.com flag for national teams — plus
+stage/kickoff/sort/visible) and `predictions` (public entries: full_name/mobile + a `picks` JSONB array
+of `{matchId, teamA, teamB, scoreA, scoreB}` + `share_platform`/`share_item`),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
-The **World Cup predictor** game: when enabled in `/admin/predictor` with ≥1 visible match, an animated
-football appears in the **middle of the nav bar** ([components/predictor/FootballButton.jsx](src/components/predictor/FootballButton.jsx));
-tapping it opens a colorful multi-step modal ([components/predictor/PredictorModal.jsx](src/components/predictor/PredictorModal.jsx))
-where visitors predict exact scores, then submit their full name + mobile. Open-state is shared via
-[store/predictor.jsx](src/store/predictor.jsx) (provider in `Layout.jsx`). Flags render from flagcdn.com by
-ISO code via [lib/flags.js](src/lib/flags.js). Submissions (`POST /api/predictions`) are public but gated by
-the enabled/closed/deadline checks; the admin reads/deletes entries.
+The **Guess the Score** game: when enabled in `/admin/predictor` with ≥1 visible match, an animated
+basketball appears in the **middle of the nav bar** ([components/predictor/BasketballButton.jsx](src/components/predictor/BasketballButton.jsx));
+tapping it opens a three-step modal ([components/predictor/PredictorModal.jsx](src/components/predictor/PredictorModal.jsx)):
+**(1)** guess the exact final score of the featured game (club crests + two big score boxes, gold CTA,
+T&C bullets underneath), **(2)** share any item from the AS Store to an Instagram/Facebook story or
+WhatsApp status (the chosen platform + item are stored on the entry), **(3)** full name + mobile →
+a draw ticket. Open-state is shared via [store/predictor.jsx](src/store/predictor.jsx) (provider in
+`Layout.jsx`). Submissions (`POST /api/predictions`) are public but gated by the enabled/closed/deadline
+checks and one active entry per mobile; the admin reads/archives/deletes entries and exports them to Excel.
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
 Public can read content; everything else needs a Bearer token.
@@ -139,10 +144,10 @@ src/
   data/events.js           # static default events
   lib/api.js               # HTTP client + mappers + auth + adminApi
   store/content.jsx        # ContentProvider + useContent()
-  lib/flags.js              # country list + flagcdn.com flag URLs (World Cup predictor)
+  lib/flags.js              # country list + flagcdn.com flag URLs (national-team rounds)
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
   components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
-  components/predictor/      # Football, FootballButton (nav), PredictorModal (World Cup game)
+  components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx

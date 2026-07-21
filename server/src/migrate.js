@@ -200,8 +200,9 @@ CREATE TABLE IF NOT EXISTS solutions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- World Cup 2026 score-predictor game: a singleton row of copy + prize, the
--- admin-created matches (each with two teams + flags), and the public entries.
+-- "Guess the score" game: a singleton row of copy + prize, the admin-created
+-- matches (each with two teams + logos), and the public entries (each carrying
+-- the exact score the player predicted).
 CREATE TABLE IF NOT EXISTS predictor (
   id INTEGER PRIMARY KEY DEFAULT 1,
   enabled BOOLEAN DEFAULT false,
@@ -291,6 +292,16 @@ ALTER TABLE predictor ADD COLUMN IF NOT EXISTS auto_open BOOLEAN DEFAULT false;
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS trigger_type TEXT DEFAULT 'load';
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS delay_seconds NUMERIC(5,2) DEFAULT 1;
 ALTER TABLE predictor ADD COLUMN IF NOT EXISTS scroll_percent INTEGER DEFAULT 40;
+-- Basketball "Guess the score" round: players share an AS Store item to their
+-- story/status to enter, so the game carries the store link, the headline for
+-- the prize amount, and the terms shown at the bottom of the card.
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS share_url TEXT DEFAULT 'https://store.as.com.lb';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS share_message TEXT DEFAULT '';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS prize_amount TEXT DEFAULT '';
+ALTER TABLE predictor ADD COLUMN IF NOT EXISTS terms JSONB DEFAULT '[]'::jsonb;
+-- Which platform the player shared on, and the store item they shared.
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS share_platform TEXT DEFAULT '';
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS share_item TEXT DEFAULT '';
 
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
@@ -371,9 +382,9 @@ INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton predictor row exists (disabled by default).
 INSERT INTO predictor (id, enabled, title, subtitle, intro, success_message)
-VALUES (1, false, 'Predict & Win — World Cup 2026',
-  'Pick the World Cup winner and win big.',
-  'Pick the team you think will lift the trophy, enter your details, and you could be our lucky winner.',
+VALUES (1, false, 'Guess the Score',
+  'Enter the exact final score.',
+  'Share any item you like from the AS Store to your story or status, guess the exact final score, and you could be our lucky winner.',
   'You''re in the draw! Good luck — we''ll be in touch on WhatsApp if you win.')
 ON CONFLICT (id) DO NOTHING;
 

@@ -1,4 +1,4 @@
-// Country flags for the World Cup predictor. We render flags from flagcdn.com by
+// Country flags, kept for national-team rounds of the predictor game. We render flags from flagcdn.com by
 // ISO 3166-1 alpha-2 code (works on every platform, unlike flag emoji on Windows).
 // The admin picks a country in the match editor; a manual flag URL can override it.
 

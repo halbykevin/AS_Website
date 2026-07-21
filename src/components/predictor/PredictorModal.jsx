@@ -1,120 +1,71 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useContent } from '../../store/content.jsx'
 import { usePredictorUI } from '../../store/predictor.jsx'
 import { submitPrediction } from '../../lib/api.js'
+import Basketball from './Basketball.jsx'
 
-const CONFETTI_COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#ec4899']
+const CONFETTI_COLORS = ['#f59e0b', '#fbbf24', '#A41E22', '#1d1d1f', '#e2711d', '#ffffff']
 
-const INSTAGRAM_URL = 'https://www.instagram.com/ascompany.lb/'
-// Where players land once their entry is confirmed (the AS Store).
+// Where players pick the item they share to enter.
 const STORE_URL = 'https://store.as.com.lb'
-const WORLD_CUP_LOGO = '/fifa-world-cup-2026--white.9ba8a004.png'
-const WORLD_CUP_EMBLEM = '/2026_FIFA_World_Cup_emblem.svg.webp'
 // A draw number as a padded ticket, e.g. 7 → "#0007".
 const formatDraw = (n) => (n == null || n === '' ? '' : `#${String(n).padStart(4, '0')}`)
 
-// The three visible steps, shown as a "road to the trophy" progress bar.
+// The three steps: guess the score → share a store item → leave your details.
 const STEPS = [
-  { key: 'repost', label: 'Repost' },
-  { key: 'play', label: 'Pick' },
-  { key: 'register', label: 'Details' },
+  { key: 'score', label: 'Score' },
+  { key: 'share', label: 'Share' },
+  { key: 'details', label: 'Details' },
 ]
 
-function RepostCard({ url, onClick }) {
-  return (
-    <a
-      href={url || INSTAGRAM_URL}
-      target="_blank"
-      rel="noreferrer"
-      onClick={onClick}
-      className="group flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px] shadow-sm transition hover:shadow-md"
-    >
-      <span className="flex w-full items-center gap-3 rounded-[14px] bg-white px-3 py-2.5">
-        <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 shrink-0" aria-hidden="true">
-          <defs>
-            <linearGradient id="ig-grad" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0" stopColor="#feda75" />
-              <stop offset="0.45" stopColor="#d62976" />
-              <stop offset="1" stopColor="#4f5bd5" />
-            </linearGradient>
-          </defs>
-          <rect x="2" y="2" width="20" height="20" rx="6" stroke="url(#ig-grad)" strokeWidth="2" />
-          <circle cx="12" cy="12" r="4.2" stroke="url(#ig-grad)" strokeWidth="2" />
-          <circle cx="17.4" cy="6.6" r="1.3" fill="url(#ig-grad)" />
-        </svg>
-        <span className="min-w-0">
-          <span className="block text-sm font-extrabold text-as-charcoal">Repost our post to enter</span>
-          <span className="block text-xs font-medium text-as-charcoal/60">@ascompany.lb — reposting is required to win</span>
-        </span>
-        <span className="ml-auto shrink-0 rounded-full bg-gradient-to-r from-[#d62976] to-[#4f5bd5] px-3 py-1.5 text-xs font-bold text-white transition group-hover:brightness-110">
-          Open post
-        </span>
-      </span>
-    </a>
-  )
-}
+// The platforms a player can share an AS Store item to. `href` builds the share
+// intent; Instagram has no web story intent, so it just opens the store and the
+// player shares from there.
+const PLATFORMS = [
+  {
+    key: 'instagram',
+    label: 'Instagram Story',
+    hint: 'Open the item, then share it to your story',
+    ring: 'from-[#feda75] via-[#d62976] to-[#4f5bd5]',
+    href: (url) => url,
+  },
+  {
+    key: 'facebook',
+    label: 'Facebook Story',
+    hint: 'Post the item to your story or feed',
+    ring: 'from-[#1877f2] to-[#0b5fd0]',
+    href: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp Status',
+    hint: 'Share the item to your status',
+    ring: 'from-[#25d366] to-[#128c7e]',
+    href: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text ? text + ' ' : ''}${url}`)}`,
+  },
+]
 
-// The star of the show: the prize (their TV) as a glowing, floating hero.
-function PrizeHero({ prize }) {
-  if (!(prize.enabled && (prize.title || prize.description || prize.image))) return null
+function PlatformIcon({ platform, className = 'h-6 w-6' }) {
+  if (platform === 'facebook') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M14 9h3V6h-3c-2.2 0-4 1.8-4 4v2H8v3h2v7h3v-7h2.5l.5-3H13v-2c0-.6.4-1 1-1z" />
+      </svg>
+    )
+  }
+  if (platform === 'whatsapp') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.3 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .1-1.6-.1a12 12 0 01-4-2.4 9 9 0 01-1.9-2.6c-.4-.8 0-1.6.3-2 .3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5l.7 1.7c.1.2 0 .4-.1.5l-.4.5c-.1.2-.3.3-.1.6.2.3.7 1.1 1.4 1.7.9.8 1.6 1 1.9 1.2.2.1.4.1.5-.1l.6-.7c.2-.2.3-.2.6-.1l1.6.8c.3.1.5.2.5.4v.8z" />
+      </svg>
+    )
+  }
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white px-5 pb-5 pt-4 text-center">
-      <div className="pointer-events-none absolute left-1/2 top-2 h-40 w-40 -translate-x-1/2 rounded-full bg-amber-300/40 blur-3xl" aria-hidden="true" />
-      <span className="relative inline-flex items-center gap-1 rounded-full bg-as-red px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-sm">
-        ✨ Win this ✨
-      </span>
-      <div className="relative mt-3 flex justify-center">
-        <img
-          src={prize.image || WORLD_CUP_LOGO}
-          alt={prize.title || ''}
-          className={`animate-float object-contain drop-shadow-xl ${prize.image ? 'h-36 w-auto max-w-full' : 'h-24 w-auto'}`}
-        />
-      </div>
-      {prize.title && <p className="relative mt-3 text-lg font-extrabold leading-tight text-as-charcoal">{prize.title}</p>}
-      {prize.description && <p className="relative mt-1 text-sm text-as-charcoal/70">{prize.description}</p>}
-    </div>
-  )
-}
-
-// A slim prize reminder for the steps where the big hero would crowd the screen.
-function PrizeStrip({ prize }) {
-  if (!(prize.enabled && (prize.title || prize.image))) return null
-  return (
-    <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/60 px-3 py-2">
-      <img src={prize.image || WORLD_CUP_LOGO} alt="" className={`shrink-0 object-contain ${prize.image ? 'h-9 w-12' : 'h-8 w-8'}`} />
-      <p className="min-w-0 truncate text-sm font-bold text-as-charcoal">
-        <span className="text-amber-600">Playing for:</span> {prize.title || 'the prize'}
-      </p>
-    </div>
-  )
-}
-
-// "Road to the trophy" progress bar across the top of the body.
-function Progress({ step }) {
-  const idx = STEPS.findIndex((s) => s.key === step)
-  const current = idx === -1 ? STEPS.length : idx
-  return (
-    <div className="flex items-center justify-center gap-1.5">
-      {STEPS.map((s, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <Fragment key={s.key}>
-            <div className="flex flex-col items-center gap-1">
-              <span
-                className={`grid h-7 w-7 place-items-center rounded-full text-xs font-black transition ${
-                  active ? 'bg-emerald-600 text-white ring-4 ring-emerald-200' : done ? 'bg-emerald-500 text-white' : 'bg-as-charcoal/10 text-as-charcoal/45'
-                }`}
-              >
-                {done ? '✓' : i + 1}
-              </span>
-              <span className={`text-[10px] font-bold ${active || done ? 'text-emerald-700' : 'text-as-charcoal/40'}`}>{s.label}</span>
-            </div>
-            {i < STEPS.length - 1 && <span className={`mb-4 h-0.5 w-7 rounded ${i < current ? 'bg-emerald-500' : 'bg-as-charcoal/12'}`} />}
-          </Fragment>
-        )
-      })}
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
   )
 }
 
@@ -150,52 +101,47 @@ function Confetti() {
   )
 }
 
-// A flag with two sizes: 'lg' for the picker cards, 'md' elsewhere.
-function Flag({ src, name, size = 'md' }) {
-  const cls = size === 'lg' ? 'h-14 w-20' : 'h-9 w-12'
+// A club crest — the uploaded logo, or the team's initials when there is none.
+function Crest({ src, name, className = 'h-12 w-12' }) {
   if (!src) {
     return (
-      <div className={`flex ${cls} items-center justify-center rounded-lg bg-as-charcoal/10 text-sm font-black text-as-charcoal/60 ring-1 ring-black/10`}>
-        {(name || '?').slice(0, 2).toUpperCase()}
+      <div className={`grid ${className} place-items-center rounded-full bg-as-charcoal/10 text-xs font-black text-as-charcoal/60`}>
+        {(name || '?')
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((w) => w[0])
+          .join('')
+          .toUpperCase()}
       </div>
     )
   }
-  return <img src={src} alt={name} loading="lazy" className={`${cls} rounded-lg object-cover shadow-sm ring-1 ring-black/10`} />
+  return <img src={src} alt={name} loading="lazy" className={`${className} object-contain`} />
 }
 
-// One candidate team in the "who will win the World Cup?" picker — a big,
-// tappable flag card that lights up gold-green when chosen.
-function ChampionCard({ team, active, onClick, disabled }) {
+// One team's score box: a big, tappable number that turns gold while focused —
+// the centrepiece of the card.
+function ScoreBox({ value, onChange, disabled, label }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      maxLength={3}
+      value={value}
       disabled={disabled}
-      aria-pressed={active}
-      className={`group relative flex flex-col items-center gap-2 rounded-2xl border-2 p-3 transition disabled:cursor-not-allowed disabled:opacity-60 ${
-        active ? 'scale-[1.03] border-emerald-500 bg-emerald-50 shadow-md' : 'border-black/10 bg-white hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm'
-      }`}
-    >
-      <div className="relative">
-        <Flag src={team.flagA} name={team.teamA} size="lg" />
-        {active && (
-          <span className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-emerald-600 text-xs text-white shadow ring-2 ring-white">
-            ✓
-          </span>
-        )}
-      </div>
-      <span className={`line-clamp-1 w-full text-center text-sm font-bold ${active ? 'text-emerald-700' : 'text-as-charcoal'}`}>
-        {team.teamA || 'Team'}
-      </span>
-    </button>
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 3))}
+      className="h-[72px] w-[84px] rounded-2xl border-2 border-black/10 bg-white text-center text-3xl font-extrabold tabular-nums text-as-charcoal shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-300/40 disabled:cursor-not-allowed disabled:bg-as-charcoal/5 sm:h-20 sm:w-24 sm:text-4xl"
+      placeholder="0"
+    />
   )
 }
 
 // The winning moment: the player's draw number as a tear-off lottery ticket.
-function DrawTicket({ number, team }) {
+function DrawTicket({ number, score }) {
   return (
     <div className="mx-auto max-w-[17rem] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-black/10">
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.2em] text-white">
+      <div className="bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.2em] text-as-charcoal">
         Draw Ticket
       </div>
       <div className="border-b border-dashed border-black/20 px-4 py-4 text-center">
@@ -203,8 +149,8 @@ function DrawTicket({ number, team }) {
         <p className="text-4xl font-black tracking-wider text-as-charcoal">{formatDraw(number)}</p>
       </div>
       <div className="px-4 py-2.5 text-center text-xs text-as-charcoal/65">
-        {team ? (
-          <>Backing <span className="font-bold text-as-charcoal">{team}</span> 🏆</>
+        {score ? (
+          <>Your score: <span className="font-bold text-as-charcoal">{score}</span> 🏀</>
         ) : (
           <>You&apos;re in the draw 🎉</>
         )}
@@ -216,15 +162,19 @@ function DrawTicket({ number, team }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('repost') // repost | play | register | done
-  const [confirmedRepost, setConfirmedRepost] = useState(false)
-  const [champion, setChampion] = useState(null) // selected team id
+  const [step, setStep] = useState('score') // score | share | details | done
+  const [scoreA, setScoreA] = useState('')
+  const [scoreB, setScoreB] = useState('')
+  const [platform, setPlatform] = useState('') // instagram | facebook | whatsapp
+  const [shareItem, setShareItem] = useState('')
+  const [confirmedShare, setConfirmedShare] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('+961 ')
   const [drawNumber, setDrawNumber] = useState(null) // assigned on submit
-  const [submitted, setSubmitted] = useState(false) // true only once the entry is saved
+  const [submitted, setSubmitted] = useState(false) // true only once saved
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const bodyRef = useRef(null)
 
   // Lock background scroll + close on Escape while open — except on the final
   // screen, which can only be left via the "Check our store" button.
@@ -239,18 +189,53 @@ export default function PredictorModal() {
     }
   }, [closeGame, step])
 
-  if (!predictor) return null
-  const { teams, prize, closed, repostUrl } = predictor
-  const championTeam = teams.find((t) => t.id === champion) || null
+  // Each step starts at the top of the card.
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 })
+  }, [step])
 
-  // From the pick step: a champion must be chosen to continue.
-  const afterPlay = () => {
-    if (!champion) {
-      setError('Tap the team you think will win the World Cup to continue.')
+  if (!predictor) return null
+  const { prize, closed, terms, match } = predictor
+  const storeUrl = predictor.shareUrl || STORE_URL
+  const scoreLine = match ? `${match.teamA} ${scoreA || 0} — ${scoreB || 0} ${match.teamB}` : ''
+
+  // "Game 1: July 22, 2026" — the stage plus the tip-off date, as in the card.
+  const gameLine = [
+    match?.stage,
+    match?.kickoff
+      ? new Date(match.kickoff).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : '',
+  ]
+    .filter(Boolean)
+    .join(': ')
+
+  const afterScore = () => {
+    if (scoreA === '' || scoreB === '') {
+      setError('Enter the exact final score for both teams to continue.')
       return
     }
     setError('')
-    setStep('register')
+    setStep('share')
+  }
+
+  const afterShare = () => {
+    if (!platform) {
+      setError('Choose where you shared your AS Store item.')
+      return
+    }
+    if (!confirmedShare) {
+      setError('Confirm you shared an item from the AS Store to continue.')
+      return
+    }
+    setError('')
+    setStep('details')
+  }
+
+  const openShare = (p) => {
+    setPlatform(p.key)
+    setError('')
+    const url = shareItem.trim().startsWith('http') ? shareItem.trim() : storeUrl
+    window.open(p.href(url, predictor.shareMessage), '_blank', 'noopener')
   }
 
   const submit = async (e) => {
@@ -262,7 +247,15 @@ export default function PredictorModal() {
     setSubmitting(true)
     setError('')
     try {
-      const entry = await submitPrediction({ fullName: fullName.trim(), mobile: mobile.trim(), champion })
+      const entry = await submitPrediction({
+        fullName: fullName.trim(),
+        mobile: mobile.trim(),
+        matchId: match?.id,
+        scoreA: Number(scoreA),
+        scoreB: Number(scoreB),
+        sharePlatform: platform,
+        shareItem: shareItem.trim(),
+      })
       setDrawNumber(entry?.drawNumber ?? null)
       setSubmitted(true)
       setStep('done')
@@ -279,122 +272,195 @@ export default function PredictorModal() {
       setError('Your entry hasn’t been submitted yet. Please try again.')
       return
     }
-    window.location.href = STORE_URL
+    window.location.href = storeUrl
   }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={predictor.title}>
       {/* Backdrop — clicking it closes the game, except on the final screen. */}
       {step === 'done' ? (
-        <div className="absolute inset-0 bg-as-charcoal/60 backdrop-blur-sm animate-fade-in" aria-hidden="true" />
+        <div className="absolute inset-0 bg-as-charcoal/70 backdrop-blur-sm animate-fade-in" aria-hidden="true" />
       ) : (
-        <button type="button" aria-label="Close" onClick={closeGame} className="absolute inset-0 bg-as-charcoal/60 backdrop-blur-sm animate-fade-in" />
+        <button type="button" aria-label="Close" onClick={closeGame} className="absolute inset-0 bg-as-charcoal/70 backdrop-blur-sm animate-fade-in" />
       )}
 
       {/* Card */}
-      <div className="relative flex max-h-[92vh] w-full max-w-lg animate-pop-in flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+      <div className="relative flex max-h-[94vh] w-full max-w-md animate-pop-in flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
         {step === 'done' && <Confetti />}
 
-        {/* Header */}
-        <div
-          className="relative shrink-0 overflow-hidden bg-[length:200%_200%] px-5 py-5 text-white animate-gradient-pan"
-          style={{ backgroundImage: 'linear-gradient(120deg,#047857,#10b981,#f59e0b,#ef4444,#6d28d9)' }}
-        >
-          {step !== 'done' && (
-            <button
-              type="button"
-              onClick={closeGame}
-              aria-label="Close"
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/35"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M6 6l12 12M6 18L18 6" />
-              </svg>
-            </button>
-          )}
-          <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/90 shadow-md ring-1 ring-white/50">
-              <img src={WORLD_CUP_EMBLEM} alt="" className="h-10 w-auto" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-lg font-extrabold leading-tight drop-shadow-sm sm:text-xl">{predictor.title}</h2>
-              {predictor.subtitle && <p className="text-sm font-medium text-white/90">{predictor.subtitle}</p>}
-            </div>
-          </div>
-        </div>
+        {step !== 'done' && (
+          <button
+            type="button"
+            onClick={closeGame}
+            aria-label="Close"
+            className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-as-charcoal/[0.07] text-as-charcoal/70 transition hover:bg-as-charcoal/15 hover:text-as-charcoal"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M6 6l12 12M6 18L18 6" />
+            </svg>
+          </button>
+        )}
 
         {/* Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {step !== 'done' && (
-            <div className="mb-5">
-              <Progress step={step} />
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-7">
+          {/* Headline — the game title, with the prize amount in gold. */}
+          <div className="flex items-start gap-3 pr-10">
+            {prize.enabled && prize.image ? (
+              <img src={prize.image} alt="" className="h-16 w-16 shrink-0 object-contain drop-shadow" />
+            ) : (
+              <span className="shrink-0 text-4xl leading-none" aria-hidden="true">🏆</span>
+            )}
+            <h2 className="min-w-0 text-2xl font-black uppercase leading-[1.05] tracking-tight text-as-charcoal sm:text-[28px]">
+              {predictor.title}
+              {prize.enabled && prize.amount && (
+                <>
+                  {' '}
+                  <span className="whitespace-nowrap text-amber-500">&amp; Win {prize.amount}</span>
+                </>
+              )}
+            </h2>
+          </div>
+
+          {step === 'score' && (
+            <div className="mt-4">
+              {/* The ball, floating over faint court arcs. */}
+              <div className="relative flex justify-center py-3">
+                <svg viewBox="0 0 320 120" className="pointer-events-none absolute inset-0 h-full w-full text-as-charcoal/10" aria-hidden="true">
+                  <g fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M2 20 h44 a38 40 0 0 1 0 80 H2" />
+                    <path d="M318 20 h-44 a38 40 0 0 0 0 80 H318" />
+                  </g>
+                </svg>
+                <Basketball className="relative h-28 w-28 animate-float drop-shadow-xl sm:h-32 sm:w-32" />
+              </div>
+
+              <p className="text-center text-sm font-medium text-as-charcoal/70">
+                {predictor.subtitle || 'Enter the exact final score.'}
+              </p>
+              {gameLine && <p className="mt-1 text-center text-sm font-bold text-as-charcoal">{gameLine}</p>}
+
+              {closed && (
+                <div className="mt-4 rounded-xl bg-as-red/10 px-4 py-3 text-center text-sm font-semibold text-as-red">
+                  This game is now closed — entries are no longer accepted. Thanks for playing!
+                </div>
+              )}
+
+              {/* The score row: crest — box — VS — box — crest */}
+              <div className="mt-5 flex items-start justify-center gap-2 sm:gap-3">
+                <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
+                  <Crest src={match?.logoA} name={match?.teamA} className="h-12 w-12" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <ScoreBox value={scoreA} onChange={setScoreA} disabled={closed} label={`${match?.teamA || 'Home'} score`} />
+                </div>
+                <span className="self-center px-1 pt-1 text-sm font-bold text-as-charcoal/45">VS</span>
+                <div className="flex flex-col items-center">
+                  <ScoreBox value={scoreB} onChange={setScoreB} disabled={closed} label={`${match?.teamB || 'Away'} score`} />
+                </div>
+                <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
+                  <Crest src={match?.logoB} name={match?.teamB} className="h-12 w-12" />
+                </div>
+              </div>
+              <div className="mt-2 flex justify-center gap-2 sm:gap-3">
+                <p className="w-[112px] text-center text-sm font-bold leading-tight text-as-charcoal sm:w-[132px]">{match?.teamA}</p>
+                <span className="w-[52px]" aria-hidden="true" />
+                <p className="w-[112px] text-center text-sm font-bold leading-tight text-as-charcoal sm:w-[132px]">{match?.teamB}</p>
+              </div>
+
+              {predictor.intro && <p className="mt-5 text-center text-sm text-as-charcoal/60">{predictor.intro}</p>}
             </div>
           )}
 
-          {step === 'repost' && (
-            <div className="space-y-4">
-              <PrizeHero prize={prize} />
+          {step === 'share' && (
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-center">
+                <p className="text-sm font-bold text-as-charcoal">Your score is locked in</p>
+                <p className="mt-1 text-lg font-black tabular-nums text-as-charcoal">
+                  {scoreA} <span className="text-as-charcoal/40">—</span> {scoreB}
+                </p>
+                <p className="mt-0.5 text-xs text-as-charcoal/60">{match?.teamA} vs {match?.teamB}</p>
+              </div>
 
-              <RepostCard url={repostUrl} />
+              <div>
+                <p className="text-base font-extrabold text-as-charcoal">Share an AS Store item to enter</p>
+                <p className="mt-1 text-sm text-as-charcoal/65">
+                  Pick any item you&apos;d love to win from{' '}
+                  <a href={storeUrl} target="_blank" rel="noreferrer" className="font-semibold text-as-red underline">
+                    store.as.com.lb
+                  </a>{' '}
+                  and share it to your story or status.
+                </p>
+              </div>
 
-              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-3">
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-as-charcoal/10 bg-white px-5 py-3 text-sm font-bold text-as-charcoal transition hover:border-as-red hover:text-as-red"
+              >
+                🛍️ Open the AS Store
+              </a>
+
+              <div className="space-y-2">
+                {PLATFORMS.map((p) => {
+                  const active = platform === p.key
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => openShare(p)}
+                      className={`flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${
+                        active ? 'border-amber-400 bg-amber-50' : 'border-black/10 bg-white hover:border-amber-300'
+                      }`}
+                    >
+                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${p.ring} text-white`}>
+                        <PlatformIcon platform={p.key} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-extrabold text-as-charcoal">{p.label}</span>
+                        <span className="block text-xs text-as-charcoal/55">{p.hint}</span>
+                      </span>
+                      <span className={`ml-auto shrink-0 text-xs font-bold ${active ? 'text-amber-600' : 'text-as-charcoal/40'}`}>
+                        {active ? 'Selected ✓' : 'Share'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-as-charcoal">
+                  Which item did you share? <span className="font-normal text-as-charcoal/45">(optional)</span>
+                </span>
+                <input
+                  value={shareItem}
+                  onChange={(e) => setShareItem(e.target.value)}
+                  placeholder="Item name or link"
+                  className="w-full rounded-xl border-2 border-black/10 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-300/50"
+                />
+              </label>
+
+              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-3">
                 <input
                   type="checkbox"
-                  checked={confirmedRepost}
-                  onChange={(e) => setConfirmedRepost(e.target.checked)}
-                  className="h-5 w-5 shrink-0 accent-emerald-600"
+                  checked={confirmedShare}
+                  onChange={(e) => { setConfirmedShare(e.target.checked); setError('') }}
+                  className="h-5 w-5 shrink-0 accent-amber-500"
                 />
                 <span className="text-sm font-medium text-as-charcoal">
-                  I&apos;ve reposted <span className="font-bold">@ascompany.lb</span>&apos;s post.
+                  I shared an AS Store item on my story/status.
                 </span>
               </label>
             </div>
           )}
 
-          {step === 'play' && (
-            <div className="space-y-4">
-              <PrizeStrip prize={prize} />
-
-              {predictor.intro && <p className="text-sm text-as-charcoal/70">{predictor.intro}</p>}
-
-              {closed && (
-                <div className="rounded-xl bg-as-red/10 px-4 py-3 text-sm font-semibold text-as-red">
-                  This game is now closed — entries are no longer accepted. Thanks for playing!
-                </div>
-              )}
-
-              <div>
-                <p className="mb-1 text-center text-lg font-extrabold text-as-charcoal">Who will win the World Cup? 🏆</p>
-                <p className="mb-3 text-center text-xs font-medium text-as-charcoal/55">Tap your champion — pick just one.</p>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                  {teams.map((t) => (
-                    <ChampionCard
-                      key={t.id}
-                      team={t}
-                      active={champion === t.id}
-                      onClick={() => { setChampion(t.id); setError('') }}
-                      disabled={closed}
-                    />
-                  ))}
-                </div>
+          {step === 'details' && (
+            <form id="predictor-details" onSubmit={submit} className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3 text-center">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">Your prediction</p>
+                <p className="mt-0.5 text-sm font-extrabold text-as-charcoal">{scoreLine}</p>
               </div>
-            </div>
-          )}
-
-          {step === 'register' && (
-            <form id="predictor-register" onSubmit={submit} className="space-y-4">
-              {championTeam && (
-                <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
-                  <Flag src={championTeam.flagA} name={championTeam.teamA} size="lg" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Your pick to win</p>
-                    <p className="line-clamp-1 text-lg font-extrabold text-as-charcoal">🏆 {championTeam.teamA}</p>
-                  </div>
-                </div>
-              )}
-              <p className="text-sm text-as-charcoal/70">
-                Last step — where do we reach you if you win?
-              </p>
+              <p className="text-sm text-as-charcoal/70">Last step — where do we reach you if you win?</p>
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-as-charcoal">Full name</span>
                 <input
@@ -402,7 +468,7 @@ export default function PredictorModal() {
                   onChange={(e) => setFullName(e.target.value)}
                   required
                   placeholder="Your full name"
-                  className="w-full rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300/60"
+                  className="w-full rounded-xl border-2 border-black/10 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-300/50"
                 />
               </label>
               <label className="block">
@@ -414,21 +480,23 @@ export default function PredictorModal() {
                   onChange={(e) => setMobile(e.target.value)}
                   required
                   placeholder="+961 …"
-                  className="w-full rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300/60"
+                  className="w-full rounded-xl border-2 border-black/10 bg-white px-4 py-3 text-sm text-as-charcoal outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-300/50"
                 />
               </label>
             </form>
           )}
 
           {step === 'done' && (
-            <div className="relative py-2 text-center">
+            <div className="relative mt-5 text-center">
               {drawNumber != null && (
-                <div className="mt-1">
-                  <DrawTicket number={drawNumber} team={championTeam?.teamA} />
+                <>
+                  <DrawTicket number={drawNumber} score={scoreLine} />
                   <p className="mt-2 text-xs text-as-charcoal/60">📸 Screenshot your ticket — it&apos;s your entry into the draw.</p>
-                </div>
+                </>
               )}
-
+              {predictor.successMessage && (
+                <p className="mt-4 text-sm font-medium text-as-charcoal/70">{predictor.successMessage}</p>
+              )}
               {prize.enabled && prize.title && (
                 <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-700">
                   🎁 Playing for: {prize.title}
@@ -437,65 +505,94 @@ export default function PredictorModal() {
             </div>
           )}
 
-          {error && <p className="mt-3 rounded-lg bg-as-red/10 px-3 py-2 text-sm font-medium text-as-red">{error}</p>}
+          {error && <p className="mt-4 rounded-lg bg-as-red/10 px-3 py-2 text-sm font-medium text-as-red">{error}</p>}
+
+          {/* Terms — the red bullet list from the bottom of the card. */}
+          {step !== 'done' && terms.length > 0 && (
+            <div className="mt-6">
+              <p className="text-base font-extrabold text-as-charcoal">Terms and Conditions:</p>
+              <ul className="mt-2 space-y-1.5">
+                {terms.map((t, i) => (
+                  <li key={i} className="flex gap-2 text-sm font-semibold leading-snug text-as-red">
+                    <span aria-hidden="true">•</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        {/* Footer actions */}
-        {step !== 'done' && (
-          <div className="shrink-0 border-t border-black/5 bg-white px-5 py-4">
-            {step === 'repost' && (
+        {/* Footer action — the gold call to action */}
+        <div className="shrink-0 border-t border-black/5 bg-white px-6 py-4">
+          {step === 'score' && (
+            <button
+              type="button"
+              onClick={afterScore}
+              disabled={closed}
+              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Submit Score
+            </button>
+          )}
+          {step === 'share' && (
+            <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => { setStep('play'); setError('') }}
-                disabled={!confirmedRepost}
-                className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => { setStep('score'); setError('') }}
+                className="rounded-full border border-black/10 bg-white px-5 py-4 text-sm font-semibold text-as-charcoal transition hover:border-amber-400"
               >
-                {confirmedRepost ? 'Make my pick →' : 'Repost to unlock'}
+                ← Back
               </button>
-            )}
-            {step === 'play' && (
               <button
                 type="button"
-                onClick={afterPlay}
-                disabled={closed}
-                className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={afterShare}
+                className="flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg"
               >
-                Continue →
+                Continue
               </button>
-            )}
-            {step === 'register' && (
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setStep('play'); setError('') }}
-                  className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-as-charcoal transition hover:border-emerald-400 hover:text-emerald-600"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="submit"
-                  form="predictor-register"
-                  disabled={submitting}
-                  className="flex-1 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg disabled:opacity-60"
-                >
-                  {submitting ? 'Submitting…' : 'Enter the draw 🏆'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 'done' && (
-          <div className="shrink-0 border-t border-black/5 bg-white px-5 py-4">
+            </div>
+          )}
+          {step === 'details' && (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setStep('share'); setError('') }}
+                className="rounded-full border border-black/10 bg-white px-5 py-4 text-sm font-semibold text-as-charcoal transition hover:border-amber-400"
+              >
+                ← Back
+              </button>
+              <button
+                type="submit"
+                form="predictor-details"
+                disabled={submitting}
+                className="flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg disabled:opacity-60"
+              >
+                {submitting ? 'Submitting…' : 'Enter the draw 🏀'}
+              </button>
+            </div>
+          )}
+          {step === 'done' && (
             <button
               type="button"
               onClick={finishToStore}
-              className="w-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4 text-base font-bold text-white shadow-lg shadow-emerald-500/40 ring-1 ring-emerald-400/40 transition hover:shadow-xl hover:shadow-emerald-500/50 hover:brightness-105"
+              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg"
             >
               Check our store →
             </button>
-          </div>
-        )}
+          )}
+
+          {step !== 'done' && (
+            <div className="mt-3 flex items-center justify-center gap-1.5" aria-hidden="true">
+              {STEPS.map((s) => (
+                <span
+                  key={s.key}
+                  className={`h-1.5 rounded-full transition-all ${s.key === step ? 'w-6 bg-amber-400' : 'w-1.5 bg-as-charcoal/15'}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

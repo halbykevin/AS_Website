@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 import { useScrollEl } from '../store/scroll.jsx'
 import { useLenis } from '../store/lenis.jsx'
-import FootballButton from './predictor/FootballButton.jsx'
+import BasketballButton from './predictor/BasketballButton.jsx'
 import { optimizedImage } from '../lib/api'
 
 export default function Navbar() {
@@ -81,13 +81,13 @@ export default function Navbar() {
           />
         </Link>
 
-        {/* Animated football — opens the World Cup predictor (hidden unless
+        {/* Animated basketball — opens the Guess-the-Score game (hidden unless
             enabled). On mobile it floats, centered over the bar; on desktop it
             sits in the flex flow between the logo and the links so it never
             overlaps a nav item. */}
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%] md:static md:left-auto md:top-auto md:z-0 md:translate-x-0 md:translate-y-0">
           <div className="pointer-events-auto">
-            <FootballButton />
+            <BasketballButton />
           </div>
         </div>
 

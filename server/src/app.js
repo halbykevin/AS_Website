@@ -124,6 +124,9 @@ const predictorJson = (r) => ({
   paymentNote: r.payment_note, paymentInstructions: r.payment_instructions,
   howToWin: Array.isArray(r.how_to_win) ? r.how_to_win : [],
   repostUrl: r.repost_url || '',
+  shareUrl: r.share_url || '', shareMessage: r.share_message || '',
+  prizeAmount: r.prize_amount || '',
+  terms: Array.isArray(r.terms) ? r.terms : [],
   autoOpen: r.auto_open === true, triggerType: r.trigger_type || 'load',
   delaySeconds: r.delay_seconds == null ? 1 : Number(r.delay_seconds),
   scrollPercent: r.scroll_percent == null ? 40 : Number(r.scroll_percent),
@@ -139,6 +142,7 @@ const predictionJson = (r) => ({
   id: r.id, fullName: r.full_name, mobile: r.mobile,
   drawNumber: r.draw_number == null ? null : Number(r.draw_number),
   picks: Array.isArray(r.picks) ? r.picks : [], createdAt: r.created_at,
+  sharePlatform: r.share_platform || '', shareItem: r.share_item || '',
   archived: r.archived === true, archivedAt: r.archived_at,
 })
 
@@ -617,6 +621,7 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
        entry_fee=$13, payment_enabled=$14, payment_recipient=$15, payment_note=$16, payment_instructions=$17,
        how_to_win=$18::jsonb, repost_url=$19,
        auto_open=$20, trigger_type=$21, delay_seconds=$22, scroll_percent=$23,
+       share_url=$24, share_message=$25, prize_amount=$26, terms=$27::jsonb,
        updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
@@ -633,6 +638,8 @@ app.put('/api/predictor', requireAuth, ah(async (req, res) => {
       Boolean(b.autoOpen), b.triggerType === 'scroll' ? 'scroll' : 'load',
       b.delaySeconds == null || b.delaySeconds === '' ? 1 : Number(b.delaySeconds),
       b.scrollPercent == null || b.scrollPercent === '' ? 40 : Number(b.scrollPercent),
+      b.shareUrl || '', b.shareMessage || '', b.prizeAmount || '',
+      JSON.stringify((Array.isArray(b.terms) ? b.terms : []).map((s) => String(s || '').trim()).filter(Boolean).slice(0, 12)),
     ]
   )
   res.json(predictorJson(rows[0]))
@@ -676,8 +683,8 @@ app.delete('/api/predictor-matches/:id', requireAuth, ah(async (req, res) => {
   res.status(204).end()
 }))
 
-// Public submission. The game is a single pick — the team the player thinks
-// will win the World Cup — validated against the visible team pool.
+// Public submission. The game is a single pick — the exact final score of the
+// featured match — validated against the visible matches.
 // Normalise a phone number so the same number typed with/without spaces, dashes
 // or parentheses counts as one entry (keeps a leading + and the digits).
 const normalizeMobile = (s) => {
@@ -696,29 +703,44 @@ app.post('/api/predictions', ah(async (req, res) => {
   if (cfg.deadline && new Date(cfg.deadline).getTime() < Date.now())
     return res.status(403).json({ error: 'The prediction deadline has passed' })
 
-  // Candidate teams are the visible predictor_matches rows (team_a is the team).
-  const teamRows = (await query('SELECT id, team_a FROM predictor_matches WHERE visible = true')).rows
-  const byId = new Map(teamRows.map((r) => [r.id, r]))
-  // A single pick: the team the player thinks will win the World Cup. Accept it
-  // as `champion` (a team id) or as the first entry of a `picks` array.
-  const championId = Number(b.champion ?? (Array.isArray(b.picks) ? b.picks[0]?.teamId : undefined))
-  const champTeam = byId.get(championId)
-  if (!champTeam) return res.status(400).json({ error: 'Please pick who you think will win the World Cup' })
-  const championName = champTeam.team_a || 'Their pick'
+  // The match being played is one of the visible predictor_matches rows; the
+  // player predicts its exact final score.
+  const matchRows = (await query(
+    'SELECT id, stage, team_a, team_b FROM predictor_matches WHERE visible = true ORDER BY sort ASC, kickoff ASC, id ASC'
+  )).rows
+  const pick = Array.isArray(b.picks) ? b.picks[0] : null
+  const matchId = Number(b.matchId ?? pick?.matchId)
+  const match = matchRows.find((m) => m.id === matchId) || (matchRows.length === 1 ? matchRows[0] : null)
+  if (!match) return res.status(400).json({ error: 'Please choose the match you are predicting' })
+
+  const asScore = (v) => {
+    const n = Number(v)
+    return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null
+  }
+  const scoreA = asScore(b.scoreA ?? pick?.scoreA)
+  const scoreB = asScore(b.scoreB ?? pick?.scoreB)
+  if (scoreA === null || scoreB === null)
+    return res.status(400).json({ error: 'Please enter both final scores (whole numbers)' })
+
   // Stored as a one-entry picks array so existing entry tooling keeps working.
-  const picks = [{ teamId: championId, team: championName }]
+  const picks = [{ matchId: match.id, teamA: match.team_a || '', teamB: match.team_b || '', scoreA, scoreB }]
+  const scoreLine = `${match.team_a || 'Team A'} ${scoreA} — ${scoreB} ${match.team_b || 'Team B'}`
+  const sharePlatform = ['instagram', 'facebook', 'whatsapp'].includes(String(b.sharePlatform || '').toLowerCase())
+    ? String(b.sharePlatform).toLowerCase()
+    : ''
+  const shareItem = String(b.shareItem || '').trim().slice(0, 500)
 
   try {
     const { rows } = await query(
-      'INSERT INTO predictions (full_name, mobile, picks) VALUES ($1,$2,$3) RETURNING *',
-      [fullName, mobile, JSON.stringify(picks)]
+      'INSERT INTO predictions (full_name, mobile, picks, share_platform, share_item) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [fullName, mobile, JSON.stringify(picks), sharePlatform, shareItem]
     )
     res.status(201).json(predictionJson(rows[0]))
 
     // Fire-and-forget WhatsApp confirmation. Never blocks or fails the response;
     // a no-op unless the admin enabled it AND the Cloud API env vars are configured.
     if (cfg.notify_whatsapp && whatsappEnabled()) {
-      sendTemplate(mobile, [fullName, championName]).catch((err) =>
+      sendTemplate(mobile, [fullName, scoreLine]).catch((err) =>
         console.error('[whatsapp] prediction confirmation failed:', err.message)
       )
     }
@@ -729,8 +751,9 @@ app.post('/api/predictions', ah(async (req, res) => {
         playerName: fullName,
         mobile,
         createdAt: rows[0].created_at,
-        gameTitle: cfg.title || 'Predict & Win — World Cup 2026',
-        champion: championName,
+        gameTitle: cfg.title || 'Guess the Score',
+        pick: scoreLine,
+        sharePlatform,
         drawNumber: rows[0].draw_number,
       }).catch((err) => console.error('[mail] prediction notification failed:', err.message))
     }

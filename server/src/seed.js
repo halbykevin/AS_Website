@@ -227,6 +227,34 @@ async function run() {
     console.log('• Story panels already present — skipped')
   }
 
+  // The "Guess the score" round: copy, terms and the featured game. Only seeded
+  // when no match exists yet, so a live round is never overwritten.
+  const pm = await pool.query('SELECT count(*)::int AS n FROM predictor_matches')
+  if (pm.rows[0].n === 0) {
+    await pool.query(
+      `UPDATE predictor SET title=$1, subtitle=$2, prize_amount=$3,
+         share_url=$4, share_message=$5, terms=$6::jsonb, updated_at=now()
+       WHERE id = 1`,
+      [
+        'Guess the Score', 'Enter the exact final score.', '$10,000',
+        'https://store.as.com.lb',
+        'This is what I want to win from the AS Store!',
+        JSON.stringify([
+          'Only users who shared an AS Store item on their story or status are eligible to win.',
+          'If multiple users guess correctly, the prize will be shared equally among the winners.',
+        ]),
+      ]
+    )
+    await pool.query(
+      `INSERT INTO predictor_matches (stage, team_a, team_b, kickoff, sort, visible)
+       VALUES ($1,$2,$3,$4,0,true)`,
+      ['Game 1', 'Sagesse Sports Club', 'Al Riyadi Beirut Club', null]
+    )
+    console.log('✓ Seeded the Guess the Score game (Sagesse vs Al Riyadi)')
+  } else {
+    console.log('• Predictor match already present — skipped')
+  }
+
   await pool.end()
 }
 

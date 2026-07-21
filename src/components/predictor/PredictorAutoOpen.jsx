@@ -3,10 +3,10 @@ import { useContent } from '../../store/content.jsx'
 import { usePredictorUI } from '../../store/predictor.jsx'
 import { useScrollEl } from '../../store/scroll.jsx'
 
-// Auto-opens the World Cup predictor once per browser session — like an ad
+// Auto-opens the Guess-the-Score game once per browser session — like an ad
 // popup — when the admin enables "auto-open". Fires on page load after a delay,
 // or once the visitor scrolls a set amount, mirroring the SitePopup triggers.
-// The nav football button still opens it manually anytime.
+// The nav basketball button still opens it manually anytime.
 const SEEN_KEY = 'as_predictor_autoseen'
 
 export default function PredictorAutoOpen() {

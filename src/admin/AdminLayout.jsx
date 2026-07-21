@@ -11,7 +11,7 @@ const links = [
   { to: '/admin/categories', label: 'Categories' },
   { to: '/admin/story', label: 'Store Slideshow' },
   { to: '/admin/popup', label: 'Popup' },
-  { to: '/admin/predictor', label: 'World Cup Predictor' },
+  { to: '/admin/predictor', label: 'Guess the Score' },
   { to: '/admin/scraper', label: 'Web Scraper' },
 ]
 

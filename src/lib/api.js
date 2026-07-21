@@ -414,23 +414,25 @@ export function mapPredictorMatch(m) {
     stage: m.stage || '',
     teamA: m.teamA || '',
     teamB: m.teamB || '',
-    flagA: flagUrl(m.teamACode, m.teamAFlag),
-    flagB: flagUrl(m.teamBCode, m.teamBFlag),
+    // The club crest: an uploaded/entered logo, falling back to a country flag
+    // when the admin picked one (kept for national-team rounds).
+    logoA: flagUrl(m.teamACode, m.teamAFlag),
+    logoB: flagUrl(m.teamBCode, m.teamBFlag),
     kickoff: m.kickoff || null,
     visible: m.visible !== false,
   }
 }
 
-// The World Cup predictor game: config row + its visible team pool. Hidden (null)
-// unless enabled with at least one visible team. `closed` is true once the admin
-// closes it or the deadline passes — the pick then becomes read-only.
+// The "Guess the score" game: config row + the matches being played. Hidden
+// (null) unless enabled with at least one visible match. `closed` is true once
+// the admin closes it or the deadline passes — the score inputs then lock.
 function mapPredictor(meta, matches) {
   if (!meta || meta.enabled === false) return null
   const list = Array.isArray(matches) ? matches.map(mapPredictorMatch).filter((m) => m.visible) : []
   if (!list.length) return null
   const deadlinePassed = meta.deadline ? new Date(meta.deadline).getTime() < Date.now() : false
   return {
-    title: meta.title || 'Predict & Win',
+    title: meta.title || 'Guess the Score',
     subtitle: meta.subtitle || '',
     intro: meta.intro || '',
     prize: {
@@ -438,9 +440,14 @@ function mapPredictor(meta, matches) {
       title: meta.prizeTitle || '',
       description: meta.prizeDescription || '',
       image: meta.prizeImageUrl || '',
+      amount: meta.prizeAmount || '',
     },
     howToWin: Array.isArray(meta.howToWin) ? meta.howToWin.filter(Boolean) : [],
     repostUrl: meta.repostUrl || '',
+    // Players enter by sharing an AS Store item to their story/status.
+    shareUrl: meta.shareUrl || 'https://store.as.com.lb',
+    shareMessage: meta.shareMessage || '',
+    terms: Array.isArray(meta.terms) ? meta.terms.filter(Boolean) : [],
     autoOpen: meta.autoOpen === true,
     trigger: meta.triggerType === 'scroll' ? 'scroll' : 'load',
     delaySeconds: Number(meta.delaySeconds) || 0,
@@ -449,12 +456,14 @@ function mapPredictor(meta, matches) {
     deadline: meta.deadline || null,
     closed: meta.closed === true || deadlinePassed,
     successMessage: meta.successMessage || '',
-    teams: list,
+    matches: list,
+    // The featured game — the one the score card shows.
+    match: list[0],
   }
 }
 
-// Submit a public prediction entry. body = { fullName, mobile, champion: <teamId> }
-// where champion is the team the player picked to win the World Cup.
+// Submit a public prediction entry.
+// body = { fullName, mobile, matchId, scoreA, scoreB, sharePlatform, shareItem }
 export const submitPrediction = (data) =>
   request('/api/predictions', { method: 'POST', body: data })
 

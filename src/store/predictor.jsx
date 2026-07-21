@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 
-// Shares the "is the World Cup predictor open?" state between the nav football
+// Shares the "is the Guess-the-Score game open?" state between the nav basketball
 // button (the trigger) and the modal (rendered once in Layout).
 const PredictorUIContext = createContext(null)
 
