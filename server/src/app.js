@@ -713,14 +713,19 @@ app.post('/api/predictions', ah(async (req, res) => {
   const match = matchRows.find((m) => m.id === matchId) || (matchRows.length === 1 ? matchRows[0] : null)
   if (!match) return res.status(400).json({ error: 'Please choose the match you are predicting' })
 
+  // The pick is a best-of-7 series result (NBA finals style): games won by each
+  // team, so exactly one side must reach 4 and the other sits on 0–3.
+  const SERIES_WINS = 4
   const asScore = (v) => {
     const n = Number(v)
-    return Number.isInteger(n) && n >= 0 && n <= 999 ? n : null
+    return Number.isInteger(n) && n >= 0 && n <= SERIES_WINS ? n : null
   }
   const scoreA = asScore(b.scoreA ?? pick?.scoreA)
   const scoreB = asScore(b.scoreB ?? pick?.scoreB)
   if (scoreA === null || scoreB === null)
-    return res.status(400).json({ error: 'Please enter both final scores (whole numbers)' })
+    return res.status(400).json({ error: 'Please enter how many games each team wins (0–4)' })
+  if (Math.max(scoreA, scoreB) !== SERIES_WINS || Math.min(scoreA, scoreB) >= SERIES_WINS)
+    return res.status(400).json({ error: 'A best-of-7 series ends at 4 wins — one team must have exactly 4' })
 
   // Stored as a one-entry picks array so existing entry tooling keeps working.
   const picks = [{ matchId: match.id, teamA: match.team_a || '', teamB: match.team_b || '', scoreA, scoreB }]

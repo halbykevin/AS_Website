@@ -6,15 +6,18 @@ import Basketball from './Basketball.jsx'
 
 const CONFETTI_COLORS = ['#f59e0b', '#fbbf24', '#A41E22', '#1d1d1f', '#e2711d', '#ffffff']
 
-// Where players pick the item they share to enter.
+// Where players land once their entry is saved.
 const STORE_URL = 'https://store.as.com.lb'
 // A draw number as a padded ticket, e.g. 7 → "#0007".
 const formatDraw = (n) => (n == null || n === '' ? '' : `#${String(n).padStart(4, '0')}`)
 
-// The three steps: guess the score → share a store item → leave your details.
+// NBA-style best-of-7 finals: the series ends the moment a team wins 4 games, so
+// a valid pick is always 4–0, 4–1, 4–2, 4–3 (or the mirror).
+const SERIES_WINS = 4
+
+// The two steps: predict the series → leave your details.
 const STEPS = [
-  { key: 'score', label: 'Score' },
-  { key: 'share', label: 'Share' },
+  { key: 'score', label: 'Series' },
   { key: 'details', label: 'Details' },
 ]
 
@@ -67,19 +70,22 @@ function Crest({ src, name, className = 'h-12 w-12' }) {
   return <img src={src} alt={name} loading="lazy" className={`${className} object-contain`} />
 }
 
-// One team's score box: a big, tappable number that turns gold while focused —
-// the centrepiece of the card.
+// One team's games won: a big, tappable number that turns gold while focused —
+// the centrepiece of the card. Capped at 4, since no team wins more in a series.
 function ScoreBox({ value, onChange, disabled, label }) {
   return (
     <input
       type="text"
       inputMode="numeric"
       pattern="[0-9]*"
-      maxLength={3}
+      maxLength={1}
       value={value}
       disabled={disabled}
       aria-label={label}
-      onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 3))}
+      onChange={(e) => {
+        const d = e.target.value.replace(/\D/g, '').slice(-1)
+        if (d === '' || Number(d) <= SERIES_WINS) onChange(d)
+      }}
       className="h-[72px] w-[84px] rounded-2xl border-2 border-black/10 bg-white text-center text-3xl font-extrabold tabular-nums text-as-charcoal shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-300/40 disabled:cursor-not-allowed disabled:bg-as-charcoal/5 sm:h-20 sm:w-24 sm:text-4xl"
       placeholder="0"
     />
@@ -99,7 +105,7 @@ function DrawTicket({ number, score }) {
       </div>
       <div className="px-4 py-2.5 text-center text-xs text-as-charcoal/65">
         {score ? (
-          <>Your score: <span className="font-bold text-as-charcoal">{score}</span> 🏀</>
+          <>Your series: <span className="font-bold text-as-charcoal">{score}</span> 🏀</>
         ) : (
           <>You&apos;re in the draw 🎉</>
         )}
@@ -111,7 +117,7 @@ function DrawTicket({ number, score }) {
 export default function PredictorModal() {
   const { predictor } = useContent()
   const { closeGame } = usePredictorUI()
-  const [step, setStep] = useState('score') // score | share | details | done
+  const [step, setStep] = useState('score') // score | details | done
   const [scoreA, setScoreA] = useState('')
   const [scoreB, setScoreB] = useState('')
   const [fullName, setFullName] = useState('')
@@ -123,7 +129,7 @@ export default function PredictorModal() {
   const bodyRef = useRef(null)
 
   // Lock background scroll + close on Escape while open — except on the final
-  // screen, which can only be left via the "Check our store" button.
+  // screen, which can only be left via the "Done" button that opens the store.
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && step !== 'done' && closeGame()
     document.addEventListener('keydown', onKey)
@@ -155,16 +161,18 @@ export default function PredictorModal() {
     .filter(Boolean)
     .join(': ')
 
+  // A best-of-7 pick is only valid when exactly one team reaches 4 wins.
   const afterScore = () => {
     if (scoreA === '' || scoreB === '') {
-      setError('Enter the exact final score for both teams to continue.')
+      setError('Enter how many games each team wins.')
       return
     }
-    setError('')
-    setStep('share')
-  }
-
-  const afterShare = () => {
+    const a = Number(scoreA)
+    const b = Number(scoreB)
+    if (Math.max(a, b) !== SERIES_WINS || Math.min(a, b) >= SERIES_WINS) {
+      setError('It’s a best-of-7 series — the winner must have exactly 4 wins (4-0, 4-1, 4-2 or 4-3).')
+      return
+    }
     setError('')
     setStep('details')
   }
@@ -264,7 +272,7 @@ export default function PredictorModal() {
               </div>
 
               <p className="text-center text-sm font-medium text-as-charcoal/70">
-                {predictor.subtitle || 'Enter the exact final score.'}
+                {predictor.subtitle || 'Predict the final series score.'}
               </p>
               {gameLine && <p className="mt-1 text-center text-sm font-bold text-as-charcoal">{gameLine}</p>}
 
@@ -274,17 +282,20 @@ export default function PredictorModal() {
                 </div>
               )}
 
-              {/* The score row: crest — box — VS — box — crest */}
-              <div className="mt-5 flex items-start justify-center gap-2 sm:gap-3">
+              {/* Games won by each team — the series row: crest — box — VS — box — crest */}
+              <p className="mt-4 text-center text-xs font-bold uppercase tracking-wide text-amber-600">
+                Best of 7 — first to 4 wins
+              </p>
+              <div className="mt-2 flex items-start justify-center gap-2 sm:gap-3">
                 <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
                   <Crest src={match?.logoA} name={match?.teamA} className="h-12 w-12" />
                 </div>
                 <div className="flex flex-col items-center">
-                  <ScoreBox value={scoreA} onChange={setScoreA} disabled={closed} label={`${match?.teamA || 'Home'} score`} />
+                  <ScoreBox value={scoreA} onChange={setScoreA} disabled={closed} label={`${match?.teamA || 'Home'} games won`} />
                 </div>
                 <span className="self-center px-1 pt-1 text-sm font-bold text-as-charcoal/45">VS</span>
                 <div className="flex flex-col items-center">
-                  <ScoreBox value={scoreB} onChange={setScoreB} disabled={closed} label={`${match?.teamB || 'Away'} score`} />
+                  <ScoreBox value={scoreB} onChange={setScoreB} disabled={closed} label={`${match?.teamB || 'Away'} games won`} />
                 </div>
                 <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
                   <Crest src={match?.logoB} name={match?.teamB} className="h-12 w-12" />
@@ -300,43 +311,10 @@ export default function PredictorModal() {
             </div>
           )}
 
-          {step === 'share' && (
-            <div className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-center">
-                <p className="text-sm font-bold text-as-charcoal">Your score is locked in</p>
-                <p className="mt-1 text-lg font-black tabular-nums text-as-charcoal">
-                  {scoreA} <span className="text-as-charcoal/40">—</span> {scoreB}
-                </p>
-                <p className="mt-0.5 text-xs text-as-charcoal/60">{match?.teamA} vs {match?.teamB}</p>
-              </div>
-
-              <div>
-                <p className="text-base font-extrabold text-as-charcoal">Share an AS Store item to enter</p>
-                <p className="mt-1 text-sm text-as-charcoal/65">
-                  Pick any item you&apos;d love to win from{' '}
-                  <a href={storeUrl} target="_blank" rel="noreferrer" className="font-semibold text-as-red underline">
-                    store.as.com.lb
-                  </a>{' '}
-                  and share it to your story or status.
-                </p>
-              </div>
-
-              <a
-                href={storeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-as-charcoal/10 bg-white px-5 py-3 text-sm font-bold text-as-charcoal transition hover:border-as-red hover:text-as-red"
-              >
-                🛍️ Open the AS Store
-              </a>
-
-            </div>
-          )}
-
           {step === 'details' && (
             <form id="predictor-details" onSubmit={submit} className="mt-5 space-y-4">
               <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3 text-center">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">Your prediction</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-600">Your series prediction</p>
                 <p className="mt-0.5 text-sm font-extrabold text-as-charcoal">{scoreLine}</p>
               </div>
               <p className="text-sm text-as-charcoal/70">Last step — where do we reach you if you win?</p>
@@ -411,32 +389,14 @@ export default function PredictorModal() {
               disabled={closed}
               className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Submit Score
+              Submit Series Score
             </button>
-          )}
-          {step === 'share' && (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => { setStep('score'); setError('') }}
-                className="rounded-full border border-black/10 bg-white px-5 py-4 text-sm font-semibold text-as-charcoal transition hover:border-amber-400"
-              >
-                ← Back
-              </button>
-              <button
-                type="button"
-                onClick={afterShare}
-                className="flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg"
-              >
-                Continue
-              </button>
-            </div>
           )}
           {step === 'details' && (
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => { setStep('share'); setError('') }}
+                onClick={() => { setStep('score'); setError('') }}
                 className="rounded-full border border-black/10 bg-white px-5 py-4 text-sm font-semibold text-as-charcoal transition hover:border-amber-400"
               >
                 ← Back
@@ -457,7 +417,7 @@ export default function PredictorModal() {
               onClick={finishToStore}
               className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg"
             >
-              Check our store →
+              Done — Visit the AS Store →
             </button>
           )}
 

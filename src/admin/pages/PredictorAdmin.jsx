@@ -41,7 +41,6 @@ const scoreOnly = (p) => {
   const pick = Array.isArray(p.picks) ? p.picks[0] : null
   return pick && pick.scoreA != null ? `${pick.scoreA} — ${pick.scoreB}` : ''
 }
-const PLATFORM_LABEL = { instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp' }
 
 // One team inside the match form: display name + club logo (upload or URL).
 function TeamEditor({ label, name, logo, onName, onLogo, onUpload, uploading }) {
@@ -360,16 +359,6 @@ export default function PredictorAdmin() {
       .map(([label, count]) => ({ label, count, pct: totalEntries ? Math.round((count / totalEntries) * 100) : 0 }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 
-    // How players shared to enter.
-    const shareCounts = new Map()
-    for (const p of all) {
-      const k = p.sharePlatform || 'unknown'
-      shareCounts.set(k, (shareCounts.get(k) || 0) + 1)
-    }
-    const topShare = [...shareCounts.entries()]
-      .filter(([k]) => k !== 'unknown')
-      .sort((a, b) => b[1] - a[1])[0]
-
     // Entries per day across the 14 days ending on the most recent entry.
     const dayCounts = new Map()
     let maxTime = 0
@@ -394,7 +383,6 @@ export default function PredictorAdmin() {
     return {
       totalEntries, activeCount, uniqueParticipants, scoreRows, byDay,
       topScore: scoreRows[0] || null,
-      topShare: topShare ? { label: PLATFORM_LABEL[topShare[0]] || topShare[0], count: topShare[1] } : null,
     }
   }, [predictions])
 
@@ -437,14 +425,12 @@ export default function PredictorAdmin() {
       setMsg({ kind: 'error', text: 'There are no entries to export yet.' })
       return
     }
-    const header = ['Draw #', 'Full name', 'Mobile', 'Predicted score', 'Shared on', 'Shared item', 'Status', 'Submitted', 'Archived at']
+    const header = ['Draw #', 'Full name', 'Mobile', 'Predicted series', 'Status', 'Submitted', 'Archived at']
     const rows = predictions.map((p) => [
       p.drawNumber != null ? formatDraw(p.drawNumber) : '',
       p.fullName || '',
       p.mobile || '',
       scoreLine(p),
-      PLATFORM_LABEL[p.sharePlatform] || '',
-      p.shareItem || '',
       p.archived ? 'Archived' : 'Active',
       p.createdAt ? new Date(p.createdAt).toLocaleString('en-GB') : '',
       p.archived && p.archivedAt ? new Date(p.archivedAt).toLocaleString('en-GB') : '',
@@ -470,7 +456,7 @@ export default function PredictorAdmin() {
           </p>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <StatTile
                 label="Total entries"
                 value={insights.totalEntries}
@@ -481,11 +467,6 @@ export default function PredictorAdmin() {
                 label="Most-guessed"
                 value={insights.topScore ? insights.topScore.label : '—'}
                 sub={insights.topScore ? `${insights.topScore.count} entries · ${insights.topScore.pct}%` : ''}
-              />
-              <StatTile
-                label="Top share"
-                value={insights.topShare ? insights.topShare.label : '—'}
-                sub={insights.topShare ? `${insights.topShare.count} entries` : 'no platform recorded'}
               />
             </div>
 
@@ -541,9 +522,9 @@ export default function PredictorAdmin() {
                 <TextInput value={settings.prizeAmount} onChange={setS('prizeAmount')} placeholder="$10,000" />
               </Field>
             </div>
-            <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Enter the exact final score." /></Field>
+            <Field label="Subtitle"><TextInput value={settings.subtitle} onChange={setS('subtitle')} placeholder="Predict the final series score." /></Field>
             <Field label="Intro text" hint="A small line under the score boxes (optional).">
-              <TextArea value={settings.intro} onChange={setS('intro')} placeholder="Share an AS Store item to enter…" />
+              <TextArea value={settings.intro} onChange={setS('intro')} placeholder="One entry per person — closes at tip-off." />
             </Field>
             <Field label="Submission deadline (optional)" hint="After this time, entries are automatically closed.">
               <TextInput type="datetime-local" value={settings.deadline} onChange={setS('deadline')} />
@@ -592,13 +573,10 @@ export default function PredictorAdmin() {
           </div>
         </Card>
 
-        <Card title="How players enter (share an AS Store item)">
+        <Card title="Where players go after entering">
           <div className="space-y-4">
-            <Field label="Store link" hint="Where players pick the item they share. Defaults to the AS Store.">
+            <Field label="Store link" hint="The “Done” button on the final screen sends players here. Defaults to the AS Store.">
               <TextInput value={settings.shareUrl} onChange={setS('shareUrl')} placeholder="https://store.as.com.lb" />
-            </Field>
-            <Field label="Share caption" hint="Pre-filled text for the WhatsApp share (Instagram and Facebook set their own).">
-              <TextInput value={settings.shareMessage} onChange={setS('shareMessage')} placeholder="This is what I want to win from the AS Store!" />
             </Field>
           </div>
         </Card>
@@ -788,7 +766,6 @@ export default function PredictorAdmin() {
                     </p>
                     <p className="truncate text-sm text-as-charcoal/55">
                       {p.mobile}
-                      {p.sharePlatform ? ` · shared on ${PLATFORM_LABEL[p.sharePlatform] || p.sharePlatform}` : ''}
                       {' · '}
                       {new Date(p.createdAt).toLocaleString('en-GB')}
                       {p.archived && p.archivedAt ? ` · archived ${new Date(p.archivedAt).toLocaleDateString('en-GB')}` : ''}
@@ -808,18 +785,8 @@ export default function PredictorAdmin() {
                 {expanded === p.id && (
                   <div className="mt-3 space-y-2 rounded-xl bg-as-charcoal/[0.03] p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-as-charcoal/70">Predicted final score</span>
+                      <span className="text-as-charcoal/70">Predicted series</span>
                       <span className="shrink-0 text-right font-bold text-as-charcoal">🏀 {scoreLine(p)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-as-charcoal/70">Shared on</span>
-                      <span className="shrink-0 text-right font-semibold text-as-charcoal">
-                        {PLATFORM_LABEL[p.sharePlatform] || '—'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-as-charcoal/70">Item shared</span>
-                      <span className="min-w-0 truncate text-right font-semibold text-as-charcoal">{p.shareItem || '—'}</span>
                     </div>
                   </div>
                 )}
