@@ -174,6 +174,9 @@ export default function PredictorAdmin() {
   const [savingMatch, setSavingMatch] = useState(false)
   const [msg, setMsg] = useState(null)
   const [expanded, setExpanded] = useState(null)
+  // The page is split into tabs so it isn't one long scroll: Setup (the game
+  // settings form), Match, Entries and Insights. Only the active one renders.
+  const [tab, setTab] = useState('setup')
   const [entriesTab, setEntriesTab] = useState('active')
   const [showAllScores, setShowAllScores] = useState(false)
   // Ids ticked for bulk delete. Cleared whenever the tab changes, so a selection
@@ -477,7 +480,38 @@ export default function PredictorAdmin() {
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
 
+      {/* Section switcher — keeps the page to one screenful at a time. */}
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {[
+          ['setup', 'Setup', null],
+          ['match', 'Match', matches.length || null],
+          ['entries', 'Entries', activeEntries.length || null],
+          ['insights', 'Insights', null],
+        ].map(([key, label, count]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              tab === key ? 'bg-as-red text-white' : 'bg-as-charcoal/5 text-as-charcoal/60 hover:bg-as-charcoal/10'
+            }`}
+          >
+            {label}
+            {count != null && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums ${
+                  tab === key ? 'bg-white/25 text-white' : 'bg-as-charcoal/10 text-as-charcoal/60'
+                }`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Dashboard — who entered and what they guessed */}
+      {tab === 'insights' && (
       <Card title="Insights">
         {insights.totalEntries === 0 ? (
           <p className="text-sm text-as-charcoal/50">
@@ -522,8 +556,10 @@ export default function PredictorAdmin() {
           </div>
         )}
       </Card>
+      )}
 
       {/* Settings + prize */}
+      {tab === 'setup' && (
       <form onSubmit={saveSettings} className="space-y-6">
         <Card title="Game & prize">
           <div className="space-y-4">
@@ -659,8 +695,10 @@ export default function PredictorAdmin() {
 
         <SaveBar saving={savingSettings} label="Save game settings" />
       </form>
+      )}
 
       {/* The match being played */}
+      {tab === 'match' && (
       <Card
         title="Match"
         actions={!editing && <Button onClick={startNew} type="button">+ New match</Button>}
@@ -742,8 +780,10 @@ export default function PredictorAdmin() {
           </ul>
         )}
       </Card>
+      )}
 
       {/* Submissions */}
+      {tab === 'entries' && (
       <Card
         title="Entries"
         actions={
@@ -863,6 +903,7 @@ export default function PredictorAdmin() {
           </>
         )}
       </Card>
+      )}
     </div>
   )
 }
