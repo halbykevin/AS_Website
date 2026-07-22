@@ -176,6 +176,10 @@ export default function PredictorAdmin() {
   const [expanded, setExpanded] = useState(null)
   const [entriesTab, setEntriesTab] = useState('active')
   const [showAllScores, setShowAllScores] = useState(false)
+  // Ids ticked for bulk delete. Cleared whenever the tab changes, so a selection
+  // can never span the Active and Archived lists.
+  const [selected, setSelected] = useState([])
+  const [deletingBulk, setDeletingBulk] = useState(false)
 
   const setS = (key) => (e) => setSettings((s) => ({ ...s, [key]: e.target.value }))
   const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -304,6 +308,30 @@ export default function PredictorAdmin() {
     if (!confirm(`Permanently delete ${p.fullName}'s entry? Use Archive instead if you may need it later.`)) return
     await adminApi.deletePrediction(p.id)
     setPredictions((list) => list.filter((x) => x.id !== p.id))
+    setSelected((ids) => ids.filter((id) => id !== p.id))
+  }
+
+  const toggleSelected = (id) =>
+    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+
+  // Permanently delete every ticked entry in the current tab.
+  async function removeSelected() {
+    if (selected.length === 0) return
+    const what = entriesTab === 'archived' ? 'archived' : 'active'
+    if (!confirm(`Permanently delete ${selected.length} ${what} ${selected.length === 1 ? 'entry' : 'entries'}? This cannot be undone.`)) return
+    setMsg(null)
+    setDeletingBulk(true)
+    try {
+      const { deleted } = await adminApi.deletePredictions(selected)
+      const gone = new Set(selected)
+      setPredictions((list) => list.filter((x) => !gone.has(x.id)))
+      setSelected([])
+      setMsg({ kind: 'success', text: `Deleted ${deleted} ${deleted === 1 ? 'entry' : 'entries'}.` })
+    } catch (err) {
+      setMsg({ kind: 'error', text: err?.message || 'Could not delete the selected entries.' })
+    } finally {
+      setDeletingBulk(false)
+    }
   }
 
   // Archive keeps the entry on record but frees the mobile number, so the same
@@ -336,6 +364,7 @@ export default function PredictorAdmin() {
   const activeEntries = predictions.filter((p) => !p.archived)
   const archivedEntries = predictions.filter((p) => p.archived)
   const shownEntries = entriesTab === 'archived' ? archivedEntries : activeEntries
+  const allShownSelected = shownEntries.length > 0 && shownEntries.every((p) => selected.includes(p.id))
 
   // All-time dashboard numbers, recomputed whenever entries change.
   const insights = useMemo(() => {
@@ -736,7 +765,7 @@ export default function PredictorAdmin() {
             <button
               key={key}
               type="button"
-              onClick={() => setEntriesTab(key)}
+              onClick={() => { setEntriesTab(key); setSelected([]) }}
               className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                 entriesTab === key
                   ? 'bg-as-red text-white'
@@ -752,11 +781,45 @@ export default function PredictorAdmin() {
             {entriesTab === 'archived' ? 'No archived entries.' : 'No entries yet.'}
           </p>
         ) : (
-          <ul className="divide-y divide-black/5">
+          <>
+            {/* Select-all + bulk delete bar for the visible tab. */}
+            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-xl bg-as-charcoal/[0.03] px-3 py-2">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-as-charcoal">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-as-red"
+                  checked={allShownSelected}
+                  ref={(el) => { if (el) el.indeterminate = selected.length > 0 && !allShownSelected }}
+                  onChange={(e) => setSelected(e.target.checked ? shownEntries.map((p) => p.id) : [])}
+                />
+                Select all
+              </label>
+              <span className="text-sm text-as-charcoal/55">
+                {selected.length > 0 ? `${selected.length} selected` : `${shownEntries.length} shown`}
+              </span>
+              {selected.length > 0 && (
+                <div className="ml-auto flex gap-2">
+                  <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => setSelected([])}>
+                    Clear
+                  </Button>
+                  <Button variant="danger" type="button" className="px-3 py-1.5" disabled={deletingBulk} onClick={removeSelected}>
+                    {deletingBulk ? 'Deleting…' : `Delete ${selected.length}`}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <ul className="divide-y divide-black/5">
             {shownEntries.map((p) => (
               <li key={p.id} className="py-3">
                 <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-as-red"
+                    checked={selected.includes(p.id)}
+                    onChange={() => toggleSelected(p.id)}
+                    aria-label={`Select ${p.fullName}'s entry`}
+                  />
+                  <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 font-semibold text-as-charcoal">
                       {p.drawNumber != null && (
                         <span className="shrink-0 rounded-md bg-as-red/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-as-red">
@@ -796,7 +859,8 @@ export default function PredictorAdmin() {
                 )}
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </Card>
     </div>

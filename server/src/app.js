@@ -799,6 +799,17 @@ app.post('/api/predictions/archive-all', requireAuth, ah(async (req, res) => {
   res.json({ archived: rowCount })
 }))
 
+// Delete a hand-picked set of entries (the admin's checkbox selection). Kept as
+// POST so the id list travels in the body — DELETE bodies are unreliable.
+app.post('/api/predictions/bulk-delete', requireAuth, ah(async (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : [])
+    .map((id) => Number(id))
+    .filter(Number.isInteger)
+  if (ids.length === 0) return res.status(400).json({ error: 'No entries selected.' })
+  const { rowCount } = await query('DELETE FROM predictions WHERE id = ANY($1::int[])', [ids])
+  res.json({ deleted: rowCount })
+}))
+
 app.delete('/api/predictions/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM predictions WHERE id=$1', [req.params.id])
   res.status(204).end()

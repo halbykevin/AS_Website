@@ -593,6 +593,8 @@ export const adminApi = {
   deletePredictorMatch: (id) => request(`/api/predictor-matches/${id}`, { method: 'DELETE', authed: true }),
   listPredictions: () => request('/api/predictions', { authed: true }),
   deletePrediction: (id) => request(`/api/predictions/${id}`, { method: 'DELETE', authed: true }),
+  deletePredictions: (ids) =>
+    request('/api/predictions/bulk-delete', { method: 'POST', body: { ids }, authed: true }),
   archivePrediction: (id, archived = true) =>
     request(`/api/predictions/${id}/archive`, { method: 'PUT', body: { archived }, authed: true }),
   archiveAllPredictions: () => request('/api/predictions/archive-all', { method: 'POST', authed: true }),
