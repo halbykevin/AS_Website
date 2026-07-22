@@ -87,7 +87,7 @@ function ScoreBox({ value, onChange, disabled, label }) {
         const d = e.target.value.replace(/\D/g, '').slice(-1)
         if (d === '' || Number(d) <= SERIES_WINS) onChange(d)
       }}
-      className="h-[72px] w-[84px] rounded-2xl border-2 border-black/10 bg-white text-center text-3xl font-extrabold tabular-nums text-as-charcoal shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-300/40 disabled:cursor-not-allowed disabled:bg-as-charcoal/5 sm:h-20 sm:w-24 sm:text-4xl"
+      className="h-[58px] w-[68px] rounded-2xl border-2 border-black/10 bg-white text-center text-2xl font-extrabold tabular-nums text-as-charcoal shadow-sm outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-300/40 disabled:cursor-not-allowed disabled:bg-as-charcoal/5 sm:h-20 sm:w-24 sm:text-4xl"
       placeholder="0"
     />
   )
@@ -229,7 +229,7 @@ export default function PredictorModal() {
       )}
 
       {/* Card */}
-      <div className="relative flex max-h-[94vh] w-full max-w-md animate-pop-in flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
+      <div className="relative flex max-h-[88vh] w-full max-w-md animate-pop-in flex-col overflow-hidden rounded-t-[24px] bg-white shadow-2xl sm:rounded-[28px]">
         {step === 'done' && <Confetti />}
 
         {step !== 'done' && (
@@ -246,15 +246,15 @@ export default function PredictorModal() {
         )}
 
         {/* Body */}
-        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-7">
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-7">
           {/* Headline — the game title, with the prize amount in gold. */}
           <div className="flex items-start gap-3 pr-10">
             {prize.enabled && prize.image ? (
-              <img src={prize.image} alt="" className="h-16 w-16 shrink-0 object-contain drop-shadow" />
+              <img src={prize.image} alt="" className="h-12 w-12 shrink-0 object-contain drop-shadow sm:h-16 sm:w-16" />
             ) : (
-              <span className="shrink-0 text-4xl leading-none" aria-hidden="true">🏆</span>
+              <span className="shrink-0 text-3xl leading-none sm:text-4xl" aria-hidden="true">🏆</span>
             )}
-            <h2 className="min-w-0 text-2xl font-black uppercase leading-[1.05] tracking-tight text-as-charcoal sm:text-[28px]">
+            <h2 className="min-w-0 text-xl font-black uppercase leading-[1.05] tracking-tight text-as-charcoal sm:text-[28px]">
               {predictor.title}
               {prize.enabled && prize.amount && (
                 <>
@@ -268,14 +268,14 @@ export default function PredictorModal() {
           {step === 'score' && (
             <div className="mt-4">
               {/* The ball, floating over faint court arcs. */}
-              <div className="relative flex justify-center py-3">
+              <div className="relative flex justify-center py-1.5 sm:py-3">
                 <svg viewBox="0 0 320 120" className="pointer-events-none absolute inset-0 h-full w-full text-as-charcoal/10" aria-hidden="true">
                   <g fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M2 20 h44 a38 40 0 0 1 0 80 H2" />
                     <path d="M318 20 h-44 a38 40 0 0 0 0 80 H318" />
                   </g>
                 </svg>
-                <Basketball className="relative h-28 w-28 animate-float drop-shadow-xl sm:h-32 sm:w-32" />
+                <Basketball className="relative h-20 w-20 animate-float drop-shadow-xl sm:h-32 sm:w-32" />
               </div>
 
               <p className="text-center text-sm font-medium text-as-charcoal/70">
@@ -294,8 +294,8 @@ export default function PredictorModal() {
                 Best of 7 — first to 4 wins
               </p>
               <div className="mt-2 flex items-start justify-center gap-2 sm:gap-3">
-                <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
-                  <Crest src={match?.logoA} name={match?.teamA} className="h-12 w-12" />
+                <div className="flex w-[68px] flex-col items-center gap-2 pt-3 sm:w-24 sm:pt-4">
+                  <Crest src={match?.logoA} name={match?.teamA} className="h-10 w-10 sm:h-12 sm:w-12" />
                 </div>
                 <div className="flex flex-col items-center">
                   <ScoreBox value={scoreA} onChange={setScoreA} disabled={closed} label={`${match?.teamA || 'Home'} games won`} />
@@ -304,19 +304,19 @@ export default function PredictorModal() {
                 <div className="flex flex-col items-center">
                   <ScoreBox value={scoreB} onChange={setScoreB} disabled={closed} label={`${match?.teamB || 'Away'} games won`} />
                 </div>
-                <div className="flex w-[86px] flex-col items-center gap-2 pt-4 sm:w-24">
-                  <Crest src={match?.logoB} name={match?.teamB} className="h-12 w-12" />
+                <div className="flex w-[68px] flex-col items-center gap-2 pt-3 sm:w-24 sm:pt-4">
+                  <Crest src={match?.logoB} name={match?.teamB} className="h-10 w-10 sm:h-12 sm:w-12" />
                 </div>
               </div>
               <div className="mt-2 flex justify-center gap-2 sm:gap-3">
-                <p className="w-[112px] text-center text-sm font-bold leading-tight text-as-charcoal sm:w-[132px]">{match?.teamA}</p>
-                <span className="w-[52px]" aria-hidden="true" />
-                <p className="w-[112px] text-center text-sm font-bold leading-tight text-as-charcoal sm:w-[132px]">{match?.teamB}</p>
+                <p className="w-[92px] text-center text-xs font-bold leading-tight text-as-charcoal sm:w-[132px] sm:text-sm">{match?.teamA}</p>
+                <span className="w-[38px] sm:w-[52px]" aria-hidden="true" />
+                <p className="w-[92px] text-center text-xs font-bold leading-tight text-as-charcoal sm:w-[132px] sm:text-sm">{match?.teamB}</p>
               </div>
 
               {/* What you're playing for — the voucher, drawn not uploaded. */}
               {prize.enabled && (
-                <div className="mt-6">
+                <div className="mt-5 sm:mt-6">
                   <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-as-charcoal/45">
                     What you&apos;re playing for
                   </p>
@@ -330,7 +330,7 @@ export default function PredictorModal() {
                 </div>
               )}
 
-              {predictor.intro && <p className="mt-5 text-center text-sm text-as-charcoal/60">{predictor.intro}</p>}
+              {predictor.intro && <p className="mt-4 text-center text-xs text-as-charcoal/60 sm:mt-5 sm:text-sm">{predictor.intro}</p>}
             </div>
           )}
 
@@ -392,11 +392,11 @@ export default function PredictorModal() {
 
           {/* Terms — the red bullet list from the bottom of the card. */}
           {step !== 'done' && terms.length > 0 && (
-            <div className="mt-6">
-              <p className="text-base font-extrabold text-as-charcoal">Terms and Conditions:</p>
-              <ul className="mt-2 space-y-1.5">
+            <div className="mt-5 sm:mt-6">
+              <p className="text-sm font-extrabold text-as-charcoal sm:text-base">Terms and Conditions:</p>
+              <ul className="mt-2 space-y-1">
                 {terms.map((t, i) => (
-                  <li key={i} className="flex gap-2 text-sm font-semibold leading-snug text-as-red">
+                  <li key={i} className="flex gap-2 text-xs font-semibold leading-snug text-as-red sm:text-sm">
                     <span aria-hidden="true">•</span>
                     <span>{t}</span>
                   </li>
@@ -407,13 +407,13 @@ export default function PredictorModal() {
         </div>
 
         {/* Footer action — the gold call to action */}
-        <div className="shrink-0 border-t border-black/5 bg-white px-6 py-4">
+        <div className="shrink-0 border-t border-black/5 bg-white px-4 py-3 sm:px-6 sm:py-4">
           {step === 'score' && (
             <button
               type="button"
               onClick={afterScore}
               disabled={closed}
-              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-3 text-sm font-extrabold text-as-charcoal sm:py-4 sm:text-base shadow-md transition hover:brightness-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Submit Series Score
             </button>
@@ -423,7 +423,7 @@ export default function PredictorModal() {
               <button
                 type="button"
                 onClick={() => { setStep('score'); setError('') }}
-                className="rounded-full border border-black/10 bg-white px-5 py-4 text-sm font-semibold text-as-charcoal transition hover:border-amber-400"
+                className="rounded-full border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-as-charcoal sm:px-5 sm:py-4 transition hover:border-amber-400"
               >
                 ← Back
               </button>
@@ -431,7 +431,7 @@ export default function PredictorModal() {
                 type="submit"
                 form="predictor-details"
                 disabled={submitting}
-                className="flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg disabled:opacity-60"
+                className="flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-3 text-sm font-extrabold text-as-charcoal sm:py-4 sm:text-base shadow-md transition hover:brightness-105 hover:shadow-lg disabled:opacity-60"
               >
                 {submitting ? 'Submitting…' : 'Enter the draw 🏀'}
               </button>
@@ -441,7 +441,7 @@ export default function PredictorModal() {
             <button
               type="button"
               onClick={finishToStore}
-              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-4 text-base font-extrabold text-as-charcoal shadow-md transition hover:brightness-105 hover:shadow-lg"
+              className="w-full rounded-full bg-gradient-to-r from-amber-300 to-amber-400 px-5 py-3 text-sm font-extrabold text-as-charcoal sm:py-4 sm:text-base shadow-md transition hover:brightness-105 hover:shadow-lg"
             >
               Done — Visit the AS Store →
             </button>
