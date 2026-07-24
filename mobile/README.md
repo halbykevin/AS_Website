@@ -143,7 +143,7 @@ npm run web        # run in the browser
 
 ## Notes
 
-- **SDK / versions:** Expo SDK 52, React 18.3.1, React Native 0.76 — the same React version as the web apps.
+- **SDK / versions:** Expo SDK 54, React 19.1, React Native 0.81 (New Architecture). Requires the SDK 54 build of **Expo Go**.
 - **Icons:** `@expo/vector-icons` (Ionicons), wrapped by `src/ui/Icon.jsx` which maps the app's semantic icon names.
 - **Images:** `expo-image` via `src/components/RemoteImage.jsx` (caching + branded fallback).
 - Building a native binary (EAS): `npx eas build` after configuring an Expo account.
