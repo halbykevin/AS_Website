@@ -11,7 +11,15 @@
     "web": "expo start --web --port 8082",
     "lint": "expo lint",
     "format:check": "prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:prod": "eas build --platform android --profile production-apk",
+    "build:aab": "eas build --platform android --profile production",
+    "build:dev": "eas build --platform android --profile development",
+    "build:ios": "eas build --platform ios --profile production",
+    "build:all": "eas build --platform all --profile production",
+    "credentials": "eas credentials",
+    "submit:android": "eas submit --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
