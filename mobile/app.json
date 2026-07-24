@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "AS Company",
+    "slug": "as-company-mobile",
+    "scheme": "ascompany",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "lb.com.as.company"
+    },
+    "android": {
+      "package": "lb.com.as.company",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#A41E22"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image",
+        { "cacheDurationInSeconds": 604800 }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "websiteApiUrl": "http://localhost:8080",
+      "storeApiUrl": "http://localhost:8081"
+    }
+  }
+}
