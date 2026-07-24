@@ -4,44 +4,44 @@
 //   3. Full name + mobile → a draw ticket (POST /api/predictions).
 // Gated by the same enabled/closed/deadline checks as the web.
 
-import { useState } from 'react'
-import { View } from 'react-native'
-import { router } from 'expo-router'
-import { useContent } from '@/src/content/ContentProvider'
-import { submitPrediction } from '@/src/lib/websiteApi'
-import { openUrl } from '@/src/lib/whatsapp'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Card, Icon, Badge, EmptyState } from '@/src/ui'
-import { Field, Input } from '@/src/ui/Input'
-import RemoteImage from '@/src/components/RemoteImage'
+import { useState } from 'react';
+import { View } from 'react-native';
+import { router } from 'expo-router';
+import { useContent } from '@/src/content/ContentProvider';
+import { submitPrediction } from '@/src/lib/websiteApi';
+import { openUrl } from '@/src/lib/whatsapp';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Card, Icon, Badge, EmptyState } from '@/src/ui';
+import { Field, Input } from '@/src/ui/Input';
+import RemoteImage from '@/src/components/RemoteImage';
 
 const PLATFORMS = [
   { id: 'instagram', label: 'Instagram Story', icon: 'instagram' },
   { id: 'facebook', label: 'Facebook Story', icon: 'facebook' },
-  { id: 'whatsapp', label: 'WhatsApp Status', icon: 'whatsapp' },
-]
+  { id: 'whatsapp', label: 'WhatsApp Status', icon: 'whatsapp' }
+];
 
 export default function PredictorScreen() {
-  const theme = useTheme()
-  const { content } = useContent()
-  const predictor = content.predictor
+  const theme = useTheme();
+  const { content } = useContent();
+  const predictor = content.predictor;
 
-  const [step, setStep] = useState(1)
-  const [scoreA, setScoreA] = useState('')
-  const [scoreB, setScoreB] = useState('')
-  const [platform, setPlatform] = useState(null)
-  const [fullName, setFullName] = useState('')
-  const [mobile, setMobile] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(false)
+  const [step, setStep] = useState(1);
+  const [scoreA, setScoreA] = useState('');
+  const [scoreB, setScoreB] = useState('');
+  const [platform, setPlatform] = useState(null);
+  const [fullName, setFullName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
 
   if (!predictor) {
     return (
       <GateScreen title="Guess the Score">
         <EmptyState icon="basketball" title="Not available" message="The game isn't running right now. Check back soon!" actionLabel="Back home" onAction={() => router.replace('/')} />
       </GateScreen>
-    )
+    );
   }
 
   if (predictor.closed) {
@@ -49,14 +49,14 @@ export default function PredictorScreen() {
       <GateScreen title={predictor.title}>
         <EmptyState icon="trophy" title="Entries are closed" message={predictor.successMessage || 'This round is closed. Winners will be announced soon.'} actionLabel="Back home" onAction={() => router.replace('/')} />
       </GateScreen>
-    )
+    );
   }
 
-  const match = predictor.match
+  const match = predictor.match;
 
   const submit = async () => {
-    setBusy(true)
-    setError('')
+    setBusy(true);
+    setError('');
     try {
       await submitPrediction({
         fullName: fullName.trim(),
@@ -65,28 +65,22 @@ export default function PredictorScreen() {
         scoreA: Number(scoreA),
         scoreB: Number(scoreB),
         sharePlatform: platform,
-        shareItem: predictor.shareUrl,
-      })
-      setDone(true)
+        shareItem: predictor.shareUrl
+      });
+      setDone(true);
     } catch (e) {
-      setError(e.message || 'Could not submit your entry.')
+      setError(e.message || 'Could not submit your entry.');
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   if (done) {
     return (
       <GateScreen title={predictor.title}>
-        <EmptyState
-          icon="checkCircle"
-          title="You're in! 🎉"
-          message={predictor.successMessage || 'Your prediction is locked in. Good luck — winners will be contacted on WhatsApp.'}
-          actionLabel="Done"
-          onAction={() => router.replace('/')}
-        />
+        <EmptyState icon="checkCircle" title="You're in! 🎉" message={predictor.successMessage || 'Your prediction is locked in. Good luck — winners will be contacted on WhatsApp.'} actionLabel="Done" onAction={() => router.replace('/')} />
       </GateScreen>
-    )
+    );
   }
 
   return (
@@ -125,13 +119,7 @@ export default function PredictorScreen() {
                 {match.stage ? <Badge label={match.stage} tone="neutral" /> : null}
               </Card>
             ) : null}
-            <Button
-              label="Continue"
-              iconRight="chevronRight"
-              disabled={scoreA === '' || scoreB === ''}
-              onPress={() => setStep(2)}
-              fullWidth
-            />
+            <Button label="Continue" iconRight="chevronRight" disabled={scoreA === '' || scoreB === ''} onPress={() => setStep(2)} fullWidth />
           </View>
         ) : null}
 
@@ -143,7 +131,7 @@ export default function PredictorScreen() {
             </Text>
             <Button label="Open AS Store" icon="bag" variant="ghost" onPress={() => openUrl(predictor.shareUrl)} fullWidth />
             <View style={{ gap: theme.spacing.sm }}>
-              {PLATFORMS.map((p) => (
+              {PLATFORMS.map(p => (
                 <Card key={p.id} onPress={() => setPlatform(p.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, borderColor: platform === p.id ? theme.colors.primary : theme.colors.border, borderWidth: platform === p.id ? 2 : 1 }}>
                   <Icon name={p.icon} size={22} color={platform === p.id ? theme.colors.primary : theme.colors.text} />
                   <Text variant="title" style={{ flex: 1 }}>
@@ -196,21 +184,21 @@ export default function PredictorScreen() {
         ) : null}
       </View>
     </Screen>
-  )
+  );
 }
 
 function GateScreen({ title, children }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
       <Header title={title} />
       <View style={{ paddingHorizontal: theme.layout.screenPadding }}>{children}</View>
     </Screen>
-  )
+  );
 }
 
 function StepDots({ step, total }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
       {Array.from({ length: total }).map((_, i) => (
@@ -220,30 +208,23 @@ function StepDots({ step, total }) {
             width: i + 1 === step ? 24 : 8,
             height: 8,
             borderRadius: 4,
-            backgroundColor: i + 1 <= step ? theme.colors.primary : theme.colors.border,
+            backgroundColor: i + 1 <= step ? theme.colors.primary : theme.colors.border
           }}
         />
       ))}
     </View>
-  )
+  );
 }
 
 function TeamScore({ name, logo, value, onChange }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing.sm, flex: 1 }}>
       <RemoteImage uri={logo} style={{ width: 48, height: 48 }} contentFit="contain" fallbackIcon="trophy" radius={24} />
       <Text variant="callout" center numberOfLines={1}>
         {name}
       </Text>
-      <Input
-        value={value}
-        onChangeText={(t) => onChange(t.replace(/[^0-9]/g, '').slice(0, 2))}
-        keyboardType="number-pad"
-        placeholder="0"
-        maxLength={2}
-        style={{ width: 64, textAlign: 'center', fontSize: 28, fontWeight: '700' }}
-      />
+      <Input value={value} onChangeText={t => onChange(t.replace(/[^0-9]/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="0" maxLength={2} style={{ width: 64, textAlign: 'center', fontSize: 28, fontWeight: '700' }} />
     </View>
-  )
+  );
 }

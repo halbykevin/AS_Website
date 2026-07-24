@@ -5,8 +5,8 @@
 
 // Import the Ionicons entry directly (not the '@expo/vector-icons' barrel) so
 // only the Ionicons font is bundled — the barrel pulls in every icon family.
-import Ionicons from '@expo/vector-icons/Ionicons'
-import { useTheme } from '@/src/theme'
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme } from '@/src/theme';
 
 // Semantic name → Ionicons glyph.
 const MAP = {
@@ -65,12 +65,12 @@ const MAP = {
   phone: 'call-outline',
   share: 'share-social-outline',
   link: 'link-outline',
-  google: 'logo-google',
-}
+  google: 'logo-google'
+};
 
 export default function Icon({ name, size = 20, color, style, ...rest }) {
-  const theme = useTheme()
-  const glyph = MAP[name] || name || 'ellipse-outline'
-  const resolved = color && theme.colors[color] ? theme.colors[color] : color || theme.colors.text
-  return <Ionicons name={glyph} size={size} color={resolved} style={style} {...rest} />
+  const theme = useTheme();
+  const glyph = MAP[name] || name || 'ellipse-outline';
+  const resolved = color && theme.colors[color] ? theme.colors[color] : color || theme.colors.text;
+  return <Ionicons name={glyph} size={size} color={resolved} style={style} {...rest} />;
 }

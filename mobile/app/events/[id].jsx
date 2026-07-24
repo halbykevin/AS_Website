@@ -2,20 +2,20 @@
 // Reserving opens a pre-filled WhatsApp chat to the admin number (falls back to
 // the Ticketing Box Office link), exactly like the website.
 
-import { View } from 'react-native'
-import { useLocalSearchParams, router } from 'expo-router'
-import { useContent } from '@/src/content/ContentProvider'
-import { openUrl } from '@/src/lib/whatsapp'
-import { eventDateLabel, isEventPast } from '@/src/lib/format'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Icon, Button, Badge, Card, Divider, EmptyState } from '@/src/ui'
-import RemoteImage from '@/src/components/RemoteImage'
+import { View } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useContent } from '@/src/content/ContentProvider';
+import { openUrl } from '@/src/lib/whatsapp';
+import { eventDateLabel, isEventPast } from '@/src/lib/format';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Icon, Button, Badge, Card, Divider, EmptyState } from '@/src/ui';
+import RemoteImage from '@/src/components/RemoteImage';
 
 export default function EventDetailScreen() {
-  const theme = useTheme()
-  const { id } = useLocalSearchParams()
-  const { events, content } = useContent()
-  const event = (events || []).find((e) => e.id === id)
+  const theme = useTheme();
+  const { id } = useLocalSearchParams();
+  const { events, content } = useContent();
+  const event = (events || []).find(e => e.id === id);
 
   if (!event) {
     return (
@@ -25,16 +25,16 @@ export default function EventDetailScreen() {
           <EmptyState icon="ticket" title="Not found" message="This event isn't available." actionLabel="Back to Events" onAction={() => router.replace('/events')} />
         </View>
       </Screen>
-    )
+    );
   }
 
-  const past = isEventPast(event)
-  const multiDay = Array.isArray(event.dates) && event.dates.length > 1
+  const past = isEventPast(event);
+  const multiDay = Array.isArray(event.dates) && event.dates.length > 1;
 
   const reserve = () => {
-    const url = event.bookingUrl || event.ticketUrl
-    if (url) openUrl(url)
-  }
+    const url = event.bookingUrl || event.ticketUrl;
+    if (url) openUrl(url);
+  };
 
   return (
     <Screen
@@ -42,14 +42,7 @@ export default function EventDetailScreen() {
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background }}>
-          <Button
-            label={past ? 'Event has ended' : 'Reserve on WhatsApp'}
-            icon={past ? undefined : 'whatsapp'}
-            onPress={reserve}
-            disabled={past || !(event.bookingUrl || event.ticketUrl)}
-            fullWidth
-            size="lg"
-          />
+          <Button label={past ? 'Event has ended' : 'Reserve on WhatsApp'} icon={past ? undefined : 'whatsapp'} onPress={reserve} disabled={past || !(event.bookingUrl || event.ticketUrl)} fullWidth size="lg" />
           <Text variant="caption" faint center style={{ marginTop: 8 }}>
             Reservations powered by Ticketing Box Office
           </Text>
@@ -116,11 +109,11 @@ export default function EventDetailScreen() {
         ) : null}
       </View>
     </Screen>
-  )
+  );
 }
 
 function MetaRow({ icon, label }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
       <Icon name={icon} size={20} color={theme.colors.primary} />
@@ -128,5 +121,5 @@ function MetaRow({ icon, label }) {
         {label}
       </Text>
     </View>
-  )
+  );
 }

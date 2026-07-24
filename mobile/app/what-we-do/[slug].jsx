@@ -1,19 +1,19 @@
 // Solution detail — intro, the list of capabilities (title + optional
 // description), and an outro. Content comes from the loaded solutions list.
 
-import { View } from 'react-native'
-import { useLocalSearchParams, router } from 'expo-router'
-import { useContent } from '@/src/content/ContentProvider'
-import { openUrl } from '@/src/lib/whatsapp'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Card, Header, Icon, Button, EmptyState } from '@/src/ui'
-import RemoteImage from '@/src/components/RemoteImage'
+import { View } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useContent } from '@/src/content/ContentProvider';
+import { openUrl } from '@/src/lib/whatsapp';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Card, Header, Icon, Button, EmptyState } from '@/src/ui';
+import RemoteImage from '@/src/components/RemoteImage';
 
 export default function SolutionDetailScreen() {
-  const theme = useTheme()
-  const { slug } = useLocalSearchParams()
-  const { content } = useContent()
-  const solution = (content.solutions || []).find((s) => s.slug === slug)
+  const theme = useTheme();
+  const { slug } = useLocalSearchParams();
+  const { content } = useContent();
+  const solution = (content.solutions || []).find(s => s.slug === slug);
 
   if (!solution) {
     return (
@@ -23,7 +23,7 @@ export default function SolutionDetailScreen() {
           <EmptyState icon="info" title="Not found" message="This solution isn't available." actionLabel="Back to What We Do" onAction={() => router.replace('/what-we-do')} />
         </View>
       </Screen>
-    )
+    );
   }
 
   return (
@@ -69,14 +69,8 @@ export default function SolutionDetailScreen() {
           </Text>
         ) : null}
 
-        <Button
-          label="Talk to us"
-          icon="whatsapp"
-          onPress={() => openUrl(content.contact?.whatsapp)}
-          fullWidth
-          style={{ marginTop: theme.spacing.sm }}
-        />
+        <Button label="Talk to us" icon="whatsapp" onPress={() => openUrl(content.contact?.whatsapp)} fullWidth style={{ marginTop: theme.spacing.sm }} />
       </View>
     </Screen>
-  )
+  );
 }

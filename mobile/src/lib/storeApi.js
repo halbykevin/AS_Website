@@ -1,15 +1,15 @@
-import { STORE_API_URL } from "@/src/config/env";
+import { STORE_API_URL } from '@/src/config/env';
 
 const API = STORE_API_URL;
 
-async function req(path, { method = "GET", body, token } = {}) {
+async function req(path, { method = 'GET', body, token } = {}) {
   const headers = {};
-  if (body != null) headers["Content-Type"] = "application/json";
+  if (body != null) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, {
     method,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: body != null ? JSON.stringify(body) : undefined
   });
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -25,18 +25,17 @@ async function req(path, { method = "GET", body, token } = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-const LOOPBACK_ORIGIN =
-  /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.0\.2\.2)(:\d+)?/i;
+const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.0\.2\.2)(:\d+)?/i;
 
 export function mediaUrl(url) {
-  if (!url) return "";
-  if (url.startsWith("data:")) return url;
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
   // Absolute URL: rebase only loopback hosts; pass real remote URLs through.
   if (/^https?:\/\//i.test(url)) {
     return LOOPBACK_ORIGIN.test(url) ? url.replace(LOOPBACK_ORIGIN, API) : url;
   }
   // Relative path (e.g. `/uploads/…`) → absolutize against the API origin.
-  return `${API}${url.startsWith("/") ? "" : "/"}${url}`;
+  return `${API}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 // Back-compat alias — same behavior for callers that referenced absUrl.
@@ -48,7 +47,7 @@ function mapProduct(p) {
   return {
     ...p,
     image: mediaUrl(p.image),
-    images: Array.isArray(p.images) ? p.images.map(mediaUrl) : [],
+    images: Array.isArray(p.images) ? p.images.map(mediaUrl) : []
   };
 }
 
@@ -60,39 +59,39 @@ function mapCategory(c) {
 
 // ---- Settings (announcement, contact, socials, publish gate, homeNew…) ----
 export const defaultStoreSettings = {
-  storeName: "AS Store",
+  storeName: 'AS Store',
   published: true,
   announcement: {
     enabled: true,
-    text: "Free delivery on orders over $100 · 12 months warranty",
+    text: 'Free delivery on orders over $100 · 12 months warranty'
   },
-  contact: { email: "", phone: "", whatsapp: "", address: "" },
+  contact: { email: '', phone: '', whatsapp: '', address: '' },
   socials: {},
   homeNew: {
     enabled: true,
-    eyebrow: "Just landed",
-    heading: "New in.",
-    source: "newest",
+    eyebrow: 'Just landed',
+    heading: 'New in.',
+    source: 'newest',
     categoryId: null,
-    count: 8,
+    count: 8
   },
-  loginButton: { label: "Continue with email", logo: "", weight: "medium" },
+  loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   navLinks: [],
-  footerGroups: [],
+  footerGroups: []
 };
 
 export async function loadStoreSettings() {
   try {
-    const s = await req("/api/settings");
+    const s = await req('/api/settings');
     return {
       ...defaultStoreSettings,
       ...s,
       announcement: {
         ...defaultStoreSettings.announcement,
-        ...(s.announcement || {}),
+        ...(s.announcement || {})
       },
       contact: { ...defaultStoreSettings.contact, ...(s.contact || {}) },
-      homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) },
+      homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) }
     };
   } catch {
     return defaultStoreSettings;
@@ -102,7 +101,7 @@ export async function loadStoreSettings() {
 // ---- Catalog ----
 export async function loadCategories() {
   try {
-    const rows = await req("/api/categories");
+    const rows = await req('/api/categories');
     return Array.isArray(rows) ? rows.map(mapCategory) : [];
   } catch {
     return [];
@@ -111,7 +110,7 @@ export async function loadCategories() {
 
 export async function loadBrands() {
   try {
-    return await req("/api/brands");
+    return await req('/api/brands');
   } catch {
     return [];
   }
@@ -120,11 +119,11 @@ export async function loadBrands() {
 // Products list. Filters: { category, featured, search, limit }.
 export async function loadProducts({ category, featured, search, limit } = {}) {
   const params = new URLSearchParams();
-  if (category && category !== "All") params.set("category", category);
-  if (featured) params.set("featured", "1");
-  if (search) params.set("search", search);
-  if (limit) params.set("limit", String(limit));
-  const qs = params.toString() ? `?${params}` : "";
+  if (category && category !== 'All') params.set('category', category);
+  if (featured) params.set('featured', '1');
+  if (search) params.set('search', search);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString() ? `?${params}` : '';
   try {
     const rows = await req(`/api/products${qs}`);
     return Array.isArray(rows) ? rows.map(mapProduct) : [];

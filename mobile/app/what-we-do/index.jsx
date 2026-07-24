@@ -1,17 +1,17 @@
 // What We Do — the Absolute Solution division page: intro, the solution tiles
 // (each opens a detail screen), vision & mission, and the company divisions.
 
-import { View } from 'react-native'
-import { router } from 'expo-router'
-import { useContent } from '@/src/content/ContentProvider'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Card, Header, Icon, SectionHeader } from '@/src/ui'
+import { View } from 'react-native';
+import { router } from 'expo-router';
+import { useContent } from '@/src/content/ContentProvider';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Card, Header, Icon, SectionHeader } from '@/src/ui';
 
 export default function WhatWeDoScreen() {
-  const theme = useTheme()
-  const { content } = useContent()
-  const wwd = content.whatWeDo || {}
-  const solutions = content.solutions || []
+  const theme = useTheme();
+  const { content } = useContent();
+  const wwd = content.whatWeDo || {};
+  const solutions = content.solutions || [];
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
@@ -35,7 +35,7 @@ export default function WhatWeDoScreen() {
           <View>
             <SectionHeader eyebrow={wwd.solutionsHeading} title={wwd.solutionsHeading || 'Our Solutions'} subtitle={wwd.solutionsIntro} />
             <View style={{ gap: theme.spacing.md }}>
-              {solutions.map((s) => (
+              {solutions.map(s => (
                 <Card key={s.slug} onPress={() => router.push(`/what-we-do/${s.slug}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
                   <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: theme.alpha(theme.colors.primary, 0.1), alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name={s.icon} size={24} color={theme.colors.primary} />
@@ -95,5 +95,5 @@ export default function WhatWeDoScreen() {
         ) : null}
       </View>
     </Screen>
-  )
+  );
 }

@@ -5,13 +5,13 @@
 // filled variant when focused, and a live cart-count badge on the Bag tab.
 // Built from the theme so it stays on-brand with everything else.
 
-import { Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Ionicons from '@expo/vector-icons/Ionicons'
-import { useSelector } from 'react-redux'
-import { selectCartCount } from '@/src/store/cartSlice'
-import { useTheme, useThemedStyles } from '@/src/theme'
-import Text from '@/src/ui/Text'
+import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSelector } from 'react-redux';
+import { selectCartCount } from '@/src/store/cartSlice';
+import { useTheme, useThemedStyles } from '@/src/theme';
+import Text from '@/src/ui/Text';
 
 // route name → [outline icon, filled icon]
 const ICONS = {
@@ -19,38 +19,31 @@ const ICONS = {
   shop: ['grid-outline', 'grid'],
   bag: ['bag-handle-outline', 'bag-handle'],
   events: ['calendar-outline', 'calendar'],
-  account: ['person-outline', 'person'],
-}
+  account: ['person-outline', 'person']
+};
 
 export default function TabBar({ state, descriptors, navigation }) {
-  const theme = useTheme()
-  const styles = useThemedStyles(makeStyles)
-  const insets = useSafeAreaInsets()
-  const cartCount = useSelector(selectCartCount)
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const cartCount = useSelector(selectCartCount);
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key]
-        const label = options.title ?? route.name
-        const focused = state.index === index
-        const [outline, filled] = ICONS[route.name] || ['ellipse-outline', 'ellipse']
-        const color = focused ? theme.colors.primary : theme.colors.textFaint
+        const { options } = descriptors[route.key];
+        const label = options.title ?? route.name;
+        const focused = state.index === index;
+        const [outline, filled] = ICONS[route.name] || ['ellipse-outline', 'ellipse'];
+        const color = focused ? theme.colors.primary : theme.colors.textFaint;
 
         const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
-          if (!focused && !event.defaultPrevented) navigation.navigate(route.name)
-        }
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+        };
 
         return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-            onPress={onPress}
-            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
-          >
+          <Pressable key={route.key} accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={options.tabBarAccessibilityLabel ?? label} onPress={onPress} style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
             <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
               <Ionicons name={focused ? filled : outline} size={22} color={color} />
               {route.name === 'bag' && cartCount > 0 ? (
@@ -65,13 +58,13 @@ export default function TabBar({ state, descriptors, navigation }) {
               {label}
             </Text>
           </Pressable>
-        )
+        );
       })}
     </View>
-  )
+  );
 }
 
-const makeStyles = (t) => ({
+const makeStyles = t => ({
   bar: {
     flexDirection: 'row',
     backgroundColor: t.colors.background,
@@ -81,7 +74,7 @@ const makeStyles = (t) => ({
     paddingHorizontal: t.spacing.sm,
     // Lifted shadow pointing up so the bar floats above the content.
     ...t.shadows.raised,
-    shadowOffset: { width: 0, height: -6 },
+    shadowOffset: { width: 0, height: -6 }
   },
   item: { flex: 1, alignItems: 'center', gap: 3 },
   pressed: { opacity: 0.7 },
@@ -90,7 +83,7 @@ const makeStyles = (t) => ({
     height: 32,
     borderRadius: t.radii.pill,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   iconWrapActive: { backgroundColor: t.alpha(t.colors.primary, 0.12) },
   badge: {
@@ -105,8 +98,8 @@ const makeStyles = (t) => ({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: t.colors.background,
+    borderColor: t.colors.background
   },
   badgeText: { fontSize: 9, lineHeight: 12 },
-  label: { fontSize: 10.5, fontWeight: '600', letterSpacing: 0.2 },
-})
+  label: { fontSize: 10.5, fontWeight: '600', letterSpacing: 0.2 }
+});

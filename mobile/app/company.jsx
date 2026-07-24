@@ -1,17 +1,17 @@
 // AS Company — the informative (website) side, one tap away from the store:
 // hero, what-we-do services, about stats and contact. Linked from Home + Account.
 
-import { View } from 'react-native'
-import { router } from 'expo-router'
-import { useContent } from '@/src/content/ContentProvider'
-import { openUrl } from '@/src/lib/whatsapp'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Button, Card, Header, Icon, SectionHeader, Divider } from '@/src/ui'
+import { View } from 'react-native';
+import { router } from 'expo-router';
+import { useContent } from '@/src/content/ContentProvider';
+import { openUrl } from '@/src/lib/whatsapp';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Button, Card, Header, Icon, SectionHeader, Divider } from '@/src/ui';
 
 export default function CompanyScreen() {
-  const theme = useTheme()
-  const { content } = useContent()
-  const services = content.services?.items || []
+  const theme = useTheme();
+  const { content } = useContent();
+  const services = content.services?.items || [];
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
@@ -36,13 +36,7 @@ export default function CompanyScreen() {
         {/* Services */}
         {services.length > 0 ? (
           <View>
-            <SectionHeader
-              eyebrow="What We Do"
-              title={content.services?.heading || 'What We Do'}
-              subtitle={content.services?.subheading}
-              actionLabel="Learn more"
-              onAction={() => router.push('/what-we-do')}
-            />
+            <SectionHeader eyebrow="What We Do" title={content.services?.heading || 'What We Do'} subtitle={content.services?.subheading} actionLabel="Learn more" onAction={() => router.push('/what-we-do')} />
             <View style={{ gap: theme.spacing.md }}>
               {services.map((s, i) => (
                 <Card key={i} style={{ flexDirection: 'row', gap: theme.spacing.lg, alignItems: 'flex-start' }}>
@@ -53,7 +47,7 @@ export default function CompanyScreen() {
                       borderRadius: 12,
                       backgroundColor: theme.alpha(theme.colors.primary, 0.1),
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      justifyContent: 'center'
                     }}
                   >
                     <Icon name={s.icon} size={22} color={theme.colors.primary} />
@@ -113,12 +107,12 @@ export default function CompanyScreen() {
         </Text>
       </View>
     </Screen>
-  )
+  );
 }
 
 function ContactRow({ icon, label, onPress }) {
-  const theme = useTheme()
-  if (!label) return null
+  const theme = useTheme();
+  if (!label) return null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
       <Icon name={icon} size={20} color={theme.colors.primary} />
@@ -127,5 +121,5 @@ function ContactRow({ icon, label, onPress }) {
       </Text>
       <Icon name="chevronRight" size={18} color={theme.colors.textFaint} />
     </View>
-  )
+  );
 }

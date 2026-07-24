@@ -1,24 +1,24 @@
 // Top brand bar for the main tab screens: the logo on the left, action icons
 // (search / bag) on the right. Keeps the two home screens visually anchored.
 
-import { Pressable, View } from 'react-native'
-import { Image } from 'expo-image'
-import { router } from 'expo-router'
-import { useSelector } from 'react-redux'
-import { useTheme, useThemedStyles } from '@/src/theme'
-import { selectCartCount } from '@/src/store/cartSlice'
-import Icon from '@/src/ui/Icon'
-import Text from '@/src/ui/Text'
+import { Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { useSelector } from 'react-redux';
+import { useTheme, useThemedStyles } from '@/src/theme';
+import { selectCartCount } from '@/src/store/cartSlice';
+import Icon from '@/src/ui/Icon';
+import Text from '@/src/ui/Text';
 
 const LOGOS = {
   company: require('../../assets/as-company-logo.jpg'),
-  store: require('../../assets/as-store-logo-clear.png'),
-}
+  store: require('../../assets/as-store-logo-clear.png')
+};
 
 export default function BrandBar({ variant = 'company', showSearch = false, showBag = false, title }) {
-  const theme = useTheme()
-  const styles = useThemedStyles(makeStyles)
-  const cartCount = useSelector(selectCartCount)
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const cartCount = useSelector(selectCartCount);
 
   return (
     <View style={styles.bar}>
@@ -51,16 +51,16 @@ export default function BrandBar({ variant = 'company', showSearch = false, show
         ) : null}
       </View>
     </View>
-  )
+  );
 }
 
-const makeStyles = (t) => ({
+const makeStyles = t => ({
   bar: {
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: t.layout.screenPadding,
+    paddingHorizontal: t.layout.screenPadding
   },
   logoWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   logo: { height: 34, width: 120 },
@@ -76,6 +76,6 @@ const makeStyles = (t) => ({
     paddingHorizontal: 4,
     backgroundColor: t.colors.primary,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-})
+    justifyContent: 'center'
+  }
+});

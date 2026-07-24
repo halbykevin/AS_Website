@@ -1,36 +1,36 @@
 // Themed text input + a labelled Field wrapper — the RN port of the store's
 // `inputCls` + `<Field>`. Focus ring uses the brand red, like the web.
 
-import { useState } from 'react'
-import { TextInput, View } from 'react-native'
-import { useTheme, useThemedStyles } from '@/src/theme'
-import Text from './Text'
+import { useState } from 'react';
+import { TextInput, View } from 'react-native';
+import { useTheme, useThemedStyles } from '@/src/theme';
+import Text from './Text';
 
 export function Input({ style, onFocus, onBlur, invalid = false, ...rest }) {
-  const theme = useTheme()
-  const styles = useThemedStyles(makeStyles)
-  const [focused, setFocused] = useState(false)
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const [focused, setFocused] = useState(false);
   return (
     <TextInput
       placeholderTextColor={theme.colors.textFaint}
       style={[styles.input, focused && styles.inputFocused, invalid && styles.inputInvalid, style]}
-      onFocus={(e) => {
-        setFocused(true)
-        onFocus?.(e)
+      onFocus={e => {
+        setFocused(true);
+        onFocus?.(e);
       }}
-      onBlur={(e) => {
-        setFocused(false)
-        onBlur?.(e)
+      onBlur={e => {
+        setFocused(false);
+        onBlur?.(e);
       }}
       {...rest}
     />
-  )
+  );
 }
 
 // Labelled field: label + control + optional hint/error. Pass children to use a
 // custom control, or `inputProps` to render a plain Input.
 export function Field({ label, hint, error, children, inputProps, style }) {
-  const styles = useThemedStyles(makeStyles)
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.field, style]}>
       {label ? (
@@ -49,10 +49,10 @@ export function Field({ label, hint, error, children, inputProps, style }) {
         </Text>
       ) : null}
     </View>
-  )
+  );
 }
 
-const makeStyles = (t) => ({
+const makeStyles = t => ({
   field: { gap: 6 },
   label: { marginBottom: 2 },
   hint: { marginTop: 2 },
@@ -65,10 +65,10 @@ const makeStyles = (t) => ({
     paddingHorizontal: t.spacing.lg,
     paddingVertical: 12,
     fontSize: 15,
-    color: t.colors.text,
+    color: t.colors.text
   },
   inputFocused: { borderColor: t.colors.primary },
-  inputInvalid: { borderColor: t.colors.danger },
-})
+  inputInvalid: { borderColor: t.colors.danger }
+});
 
-export default Input
+export default Input;

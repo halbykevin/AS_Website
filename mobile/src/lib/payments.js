@@ -10,18 +10,18 @@
 // checkout sends the app's deep link along with the order and the API bounces the
 // customer back through `/api/orders/whish/return` → `<scheme>://orders/<id>`.
 
-import { Linking } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
-import * as ExpoLinking from 'expo-linking'
-import { accountApi } from './account'
+import { Linking } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as ExpoLinking from 'expo-linking';
+import { accountApi } from './account';
 
-export const PAYMENT_COD = 'cod'
-export const PAYMENT_WHISH = 'whish'
+export const PAYMENT_COD = 'cod';
+export const PAYMENT_WHISH = 'whish';
 
 // Where Whish should hand the customer back: the server appends `/<orderId>?…`.
 // Resolves to `ascompany://orders` in a build and `exp://<host>/--/orders` in
 // Expo Go, so the flow is testable in development too.
-export const paymentReturnUrl = () => ExpoLinking.createURL('/orders')
+export const paymentReturnUrl = () => ExpoLinking.createURL('/orders');
 
 // Open the hosted Whish page and wait for the customer to come back.
 //
@@ -34,13 +34,13 @@ export const paymentReturnUrl = () => ExpoLinking.createURL('/orders')
 export async function openWhishCheckout(collectUrl) {
   try {
     const result = await WebBrowser.openAuthSessionAsync(collectUrl, paymentReturnUrl(), {
-      showInRecents: true,
-    })
-    return result?.type === 'success' ? 'returned' : 'closed'
+      showInRecents: true
+    });
+    return result?.type === 'success' ? 'returned' : 'closed';
   } catch {
     // Very old/locked-down devices without a custom-tab provider.
-    await Linking.openURL(collectUrl)
-    return 'external'
+    await Linking.openURL(collectUrl);
+    return 'external';
   }
 }
 
@@ -49,24 +49,23 @@ export async function openWhishCheckout(collectUrl) {
 // device) leaves the order unpaid until someone asks — so ask, a few times, with
 // a short gap. Calls `onOrder` with every fresh copy it gets.
 export async function pollPayment({ id, token, tries = 5, interval = 2500, onOrder, isCancelled }) {
-  const stop = () => (typeof isCancelled === 'function' ? isCancelled() : false)
-  let order = null
+  const stop = () => (typeof isCancelled === 'function' ? isCancelled() : false);
+  let order = null;
   for (let i = 0; i < tries; i += 1) {
-    if (stop()) return order
+    if (stop()) return order;
     try {
-      order = await accountApi.reconcilePayment(id, token)
-      if (stop()) return order
-      onOrder?.(order)
-      if (order?.paymentStatus === 'paid' || order?.status === 'cancelled') return order
+      order = await accountApi.reconcilePayment(id, token);
+      if (stop()) return order;
+      onOrder?.(order);
+      if (order?.paymentStatus === 'paid' || order?.status === 'cancelled') return order;
     } catch {
       // Offline or a transient API error — keep trying, then give up quietly.
     }
-    if (i < tries - 1) await new Promise((r) => setTimeout(r, interval))
+    if (i < tries - 1) await new Promise(r => setTimeout(r, interval));
   }
-  return order
+  return order;
 }
 
 // True while an order is waiting on money: an online order that hasn't been paid
 // and hasn't been cancelled.
-export const isAwaitingPayment = (order) =>
-  order?.paymentMethod === PAYMENT_WHISH && order?.paymentStatus !== 'paid' && order?.status !== 'cancelled'
+export const isAwaitingPayment = order => order?.paymentMethod === PAYMENT_WHISH && order?.paymentStatus !== 'paid' && order?.status !== 'cancelled';

@@ -1,13 +1,13 @@
 // Eyebrow + heading + optional "See all" action. The recurring section title
 // pattern used across the home, store and events screens.
 
-import { Pressable, View } from 'react-native'
-import { useTheme } from '@/src/theme'
-import Text from './Text'
-import Icon from './Icon'
+import { Pressable, View } from 'react-native';
+import { useTheme } from '@/src/theme';
+import Text from './Text';
+import Icon from './Icon';
 
 export default function SectionHeader({ eyebrow, title, subtitle, actionLabel, onAction, onInverse = false, style }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <View style={[{ marginBottom: theme.spacing.lg }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
@@ -36,5 +36,5 @@ export default function SectionHeader({ eyebrow, title, subtitle, actionLabel, o
         ) : null}
       </View>
     </View>
-  )
+  );
 }

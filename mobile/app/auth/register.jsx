@@ -2,74 +2,74 @@
 // 6-digit code, and the server attaches the profile once the code proves the
 // address is theirs (the OTP flow carrying a `profile`). Mirrors the web register.
 
-import { useEffect, useState } from 'react'
-import { Pressable, View } from 'react-native'
-import { router, useLocalSearchParams } from 'expo-router'
-import { useAccount, accountApi } from '@/src/lib/account'
-import { useContent } from '@/src/content/ContentProvider'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Card } from '@/src/ui'
-import { Field, Input } from '@/src/ui/Input'
-import { AuthShell, CodeForm } from '@/src/components/auth'
+import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useAccount, accountApi } from '@/src/lib/account';
+import { useContent } from '@/src/content/ContentProvider';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Card } from '@/src/ui';
+import { Field, Input } from '@/src/ui/Input';
+import { AuthShell, CodeForm } from '@/src/components/auth';
 
-const RESEND_SECONDS = 30
+const RESEND_SECONDS = 30;
 
 export default function RegisterScreen() {
-  const theme = useTheme()
-  const { loginWithOtp } = useAccount()
-  const { refresh } = useContent()
-  const params = useLocalSearchParams()
-  const next = params.next || '/account'
+  const theme = useTheme();
+  const { loginWithOtp } = useAccount();
+  const { refresh } = useContent();
+  const params = useLocalSearchParams();
+  const next = params.next || '/account';
 
-  const [step, setStep] = useState('form') // form | code
-  const [form, setForm] = useState({ name: '', email: '', mobile: '', address: '' })
-  const [code, setCode] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [cooldown, setCooldown] = useState(0)
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const [step, setStep] = useState('form'); // form | code
+  const [form, setForm] = useState({ name: '', email: '', mobile: '', address: '' });
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (cooldown <= 0) return
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
-    return () => clearTimeout(t)
-  }, [cooldown])
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const requestCode = async () => {
     if (!form.name.trim() || !form.email.trim()) {
-      setError('Please add your name and email.')
-      return
+      setError('Please add your name and email.');
+      return;
     }
-    setBusy(true)
-    setError('')
+    setBusy(true);
+    setError('');
     try {
-      await accountApi.requestOtp('email', form.email.trim())
-      setStep('code')
-      setCode('')
-      setCooldown(RESEND_SECONDS)
+      await accountApi.requestOtp('email', form.email.trim());
+      setStep('code');
+      setCode('');
+      setCooldown(RESEND_SECONDS);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   const verify = async () => {
-    setBusy(true)
-    setError('')
+    setBusy(true);
+    setError('');
     try {
       await loginWithOtp('email', form.email.trim(), code, {
         name: form.name.trim(),
         mobile: form.mobile.trim(),
-        address: form.address.trim(),
-      })
-      await refresh()
-      router.replace(next)
+        address: form.address.trim()
+      });
+      await refresh();
+      router.replace(next);
     } catch (err) {
-      setError(err.message)
-      setBusy(false)
+      setError(err.message);
+      setBusy(false);
     }
-  }
+  };
 
   return (
     <Screen edges={['top']} keyboardAware contentStyle={{ paddingHorizontal: 0 }}>
@@ -82,7 +82,10 @@ export default function RegisterScreen() {
             step === 'form' ? (
               <Pressable onPress={() => router.replace('/auth/login')}>
                 <Text variant="callout" muted>
-                  Already have an account? <Text variant="callout" color="primary">Sign in</Text>
+                  Already have an account?{' '}
+                  <Text variant="callout" color="primary">
+                    Sign in
+                  </Text>
                 </Text>
               </Pressable>
             ) : (
@@ -105,32 +108,24 @@ export default function RegisterScreen() {
           {step === 'form' ? (
             <View style={{ gap: theme.spacing.md }}>
               <Field label="Full name">
-                <Input value={form.name} onChangeText={(v) => set('name', v)} autoCapitalize="words" placeholder="Your name" />
+                <Input value={form.name} onChangeText={v => set('name', v)} autoCapitalize="words" placeholder="Your name" />
               </Field>
               <Field label="Email address">
-                <Input value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
+                <Input value={form.email} onChangeText={v => set('email', v)} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
               </Field>
               <Field label="Mobile number (optional)">
-                <Input value={form.mobile} onChangeText={(v) => set('mobile', v)} keyboardType="phone-pad" placeholder="70 123 456" />
+                <Input value={form.mobile} onChangeText={v => set('mobile', v)} keyboardType="phone-pad" placeholder="70 123 456" />
               </Field>
               <Field label="Delivery address (optional)">
-                <Input value={form.address} onChangeText={(v) => set('address', v)} placeholder="Street, building, floor…" />
+                <Input value={form.address} onChangeText={v => set('address', v)} placeholder="Street, building, floor…" />
               </Field>
               <Button label={busy ? 'Sending code…' : 'Continue'} loading={busy} onPress={requestCode} fullWidth />
             </View>
           ) : (
-            <CodeForm
-              value={code}
-              onChange={setCode}
-              onSubmit={verify}
-              busy={busy}
-              submitLabel="Create account"
-              onBack={() => setStep('form')}
-              backLabel="Edit my details"
-            />
+            <CodeForm value={code} onChange={setCode} onSubmit={verify} busy={busy} submitLabel="Create account" onBack={() => setStep('form')} backLabel="Edit my details" />
           )}
         </AuthShell>
       </View>
     </Screen>
-  )
+  );
 }

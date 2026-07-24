@@ -1,25 +1,22 @@
 // Event card — tapping it opens the event detail. Mirrors the marketing site's
 // EventCard: image, category chip, title, date + venue, and a "past" dimming.
 
-import { Pressable, View } from 'react-native'
-import { router } from 'expo-router'
-import { useTheme, useThemedStyles } from '@/src/theme'
-import { isEventPast } from '@/src/lib/format'
-import Text from '@/src/ui/Text'
-import Badge from '@/src/ui/Badge'
-import Icon from '@/src/ui/Icon'
-import RemoteImage from './RemoteImage'
+import { Pressable, View } from 'react-native';
+import { router } from 'expo-router';
+import { useTheme, useThemedStyles } from '@/src/theme';
+import { isEventPast } from '@/src/lib/format';
+import Text from '@/src/ui/Text';
+import Badge from '@/src/ui/Badge';
+import Icon from '@/src/ui/Icon';
+import RemoteImage from './RemoteImage';
 
 export default function EventCard({ event, wide = false }) {
-  const theme = useTheme()
-  const styles = useThemedStyles(makeStyles)
-  const past = isEventPast(event)
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const past = isEventPast(event);
 
   return (
-    <Pressable
-      onPress={() => router.push(`/events/${event.id}`)}
-      style={({ pressed }) => [styles.card, wide && styles.wide, pressed && { opacity: 0.92 }]}
-    >
+    <Pressable onPress={() => router.push(`/events/${event.id}`)} style={({ pressed }) => [styles.card, wide && styles.wide, pressed && { opacity: 0.92 }]}>
       <View style={styles.imageWrap}>
         <RemoteImage uri={event.image} style={styles.image} fallbackIcon="ticket" />
         {event.categoryName ? <Badge label={event.categoryName} tone="ink" style={styles.cat} /> : null}
@@ -51,17 +48,17 @@ export default function EventCard({ event, wide = false }) {
         ) : null}
       </View>
     </Pressable>
-  )
+  );
 }
 
-const makeStyles = (t) => ({
+const makeStyles = t => ({
   card: {
     borderRadius: t.radii['2xl'],
     borderWidth: 1,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surface,
     overflow: 'hidden',
-    ...t.shadows.card,
+    ...t.shadows.card
   },
   wide: { width: '100%' },
   imageWrap: { width: '100%', aspectRatio: 16 / 10, backgroundColor: t.colors.surfaceAlt },
@@ -69,5 +66,5 @@ const makeStyles = (t) => ({
   cat: { position: 'absolute', left: t.spacing.md, top: t.spacing.md },
   pastOverlay: { position: 'absolute', right: t.spacing.md, top: t.spacing.md },
   body: { padding: t.spacing.lg, gap: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-})
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }
+});

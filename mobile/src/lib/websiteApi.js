@@ -3,35 +3,35 @@
 // the API JSON into the shapes the screens consume — a trimmed port of the web
 // app's src/lib/api.js. Everything fails soft to the static defaults.
 
-import { WEBSITE_API_URL } from '@/src/config/env'
-import { defaultWebsiteContent } from '@/src/content/websiteDefaults'
-import { whatsappBookingUrl } from './whatsapp'
-import { eventDateLabel } from './format'
+import { WEBSITE_API_URL } from '@/src/config/env';
+import { defaultWebsiteContent } from '@/src/content/websiteDefaults';
+import { whatsappBookingUrl } from './whatsapp';
+import { eventDateLabel } from './format';
 
-const API = WEBSITE_API_URL
+const API = WEBSITE_API_URL;
 
 async function req(path, { method = 'GET', body, token } = {}) {
-  const headers = {}
-  if (body != null) headers['Content-Type'] = 'application/json'
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers = {};
+  if (body != null) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, {
     method,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
-  })
+    body: body != null ? JSON.stringify(body) : undefined
+  });
   if (!res.ok) {
-    let message = `Request failed (${res.status})`
+    let message = `Request failed (${res.status})`;
     try {
-      message = (await res.json()).error || message
+      message = (await res.json()).error || message;
     } catch {
       /* ignore */
     }
-    throw new Error(message)
+    throw new Error(message);
   }
-  return res.status === 204 ? null : res.json()
+  return res.status === 204 ? null : res.json();
 }
 
-const pick = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v)
+const pick = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v);
 
 // ---- Mappers (API JSON → screen shapes) ----
 export function mapEvent(e) {
@@ -50,8 +50,8 @@ export function mapEvent(e) {
     description: e.description,
     categorySlug: e.categorySlug || '',
     categoryName: e.categoryName || '',
-    dates: Array.isArray(e.dates) ? e.dates : [],
-  }
+    dates: Array.isArray(e.dates) ? e.dates : []
+  };
 }
 
 function mapSolution(s) {
@@ -64,19 +64,19 @@ function mapSolution(s) {
     image: s.imageUrl || '',
     intro: s.intro || '',
     outro: s.outro || '',
-    items: Array.isArray(s.items) ? s.items.filter((it) => it && (it.title || it.description)) : [],
+    items: Array.isArray(s.items) ? s.items.filter(it => it && (it.title || it.description)) : [],
     sort: s.sort || 0,
-    visible: s.visible !== false,
-  }
+    visible: s.visible !== false
+  };
 }
 
 function mapCategory(c) {
-  return { id: c.id, name: c.name, slug: c.slug, image: c.imageUrl || '', visible: c.visible !== false }
+  return { id: c.id, name: c.name, slug: c.slug, image: c.imageUrl || '', visible: c.visible !== false };
 }
 
 function mapWhatWeDo(meta) {
-  const d = defaultWebsiteContent.whatWeDo
-  if (!meta) return d
+  const d = defaultWebsiteContent.whatWeDo;
+  if (!meta) return d;
   return {
     enabled: meta.enabled !== false,
     eyebrow: pick(meta.eyebrow, d.eyebrow),
@@ -90,12 +90,12 @@ function mapWhatWeDo(meta) {
     mission: pick(meta.mission, d.mission),
     divisionsHeading: pick(meta.divisionsHeading, d.divisionsHeading),
     divisionsIntro: pick(meta.divisionsIntro, d.divisionsIntro),
-    divisions: Array.isArray(meta.divisions) && meta.divisions.length ? meta.divisions : d.divisions,
-  }
+    divisions: Array.isArray(meta.divisions) && meta.divisions.length ? meta.divisions : d.divisions
+  };
 }
 
 function mergeSettings(s) {
-  const d = defaultWebsiteContent
+  const d = defaultWebsiteContent;
   return {
     ...d,
     published: Boolean(s.published),
@@ -106,19 +106,15 @@ function mergeSettings(s) {
     eventsSection: { ...d.eventsSection, heading: pick(s.eventsHeading, d.eventsSection.heading), intro: pick(s.eventsIntro, d.eventsSection.intro) },
     about: { ...d.about, heading: pick(s.aboutHeading, d.about.heading), body: Array.isArray(s.aboutBody) && s.aboutBody.length ? s.aboutBody : d.about.body, stats: Array.isArray(s.aboutStats) && s.aboutStats.length ? s.aboutStats : d.about.stats },
     contact: { ...d.contact, heading: pick(s.contactHeading, d.contact.heading), subheading: pick(s.contactSubheading, d.contact.subheading), email: pick(s.contactEmail, d.contact.email), whatsapp: pick(s.contactWhatsapp, d.contact.whatsapp), instagram: pick(s.contactInstagram, d.contact.instagram), instagramHandle: pick(s.contactInstagramHandle, d.contact.instagramHandle) },
-    store: { ...d.store, title: pick(s.storeTitle, d.store.title), eyebrow: pick(s.storeEyebrow, d.store.eyebrow), description: pick(s.storeDescription, d.store.description), url: pick(s.storeUrl, d.store.url) },
-  }
+    store: { ...d.store, title: pick(s.storeTitle, d.store.title), eyebrow: pick(s.storeEyebrow, d.store.eyebrow), description: pick(s.storeDescription, d.store.description), url: pick(s.storeUrl, d.store.url) }
+  };
 }
 
 function mapPredictor(meta, matches) {
-  if (!meta || meta.enabled === false) return null
-  const list = Array.isArray(matches)
-    ? matches
-        .filter((m) => m.visible !== false)
-        .map((m) => ({ id: m.id, stage: m.stage || '', teamA: m.teamA || '', teamB: m.teamB || '', logoA: m.teamAFlag || '', logoB: m.teamBFlag || '', kickoff: m.kickoff || null }))
-    : []
-  if (!list.length) return null
-  const deadlinePassed = meta.deadline ? new Date(meta.deadline).getTime() < Date.now() : false
+  if (!meta || meta.enabled === false) return null;
+  const list = Array.isArray(matches) ? matches.filter(m => m.visible !== false).map(m => ({ id: m.id, stage: m.stage || '', teamA: m.teamA || '', teamB: m.teamB || '', logoA: m.teamAFlag || '', logoB: m.teamBFlag || '', kickoff: m.kickoff || null })) : [];
+  if (!list.length) return null;
+  const deadlinePassed = meta.deadline ? new Date(meta.deadline).getTime() < Date.now() : false;
   return {
     title: meta.title || 'Guess the Score',
     subtitle: meta.subtitle || '',
@@ -131,54 +127,44 @@ function mapPredictor(meta, matches) {
     closed: meta.closed === true || deadlinePassed,
     successMessage: meta.successMessage || '',
     matches: list,
-    match: list[0],
-  }
+    match: list[0]
+  };
 }
 
 // Load the whole marketing site content in one call. Returns { content, events }
 // or null when the API is unreachable (screens fall back to defaults).
 export async function loadWebsiteContent() {
   try {
-    const [settings, services, events, categories, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
-      await Promise.all([
-        req('/api/settings'),
-        req('/api/services').catch(() => []),
-        req('/api/events').catch(() => []),
-        req('/api/categories').catch(() => []),
-        req('/api/what-we-do').catch(() => null),
-        req('/api/solutions').catch(() => []),
-        req('/api/predictor').catch(() => null),
-        req('/api/predictor-matches').catch(() => []),
-      ])
+    const [settings, services, events, categories, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] = await Promise.all([req('/api/settings'), req('/api/services').catch(() => []), req('/api/events').catch(() => []), req('/api/categories').catch(() => []), req('/api/what-we-do').catch(() => null), req('/api/solutions').catch(() => []), req('/api/predictor').catch(() => null), req('/api/predictor-matches').catch(() => [])]);
 
-    const content = settings ? mergeSettings(settings) : { ...defaultWebsiteContent }
+    const content = settings ? mergeSettings(settings) : { ...defaultWebsiteContent };
 
     if (Array.isArray(services) && services.length) {
       content.services = {
         ...content.services,
-        items: services.map((s) => ({ title: s.title, description: s.description, icon: s.icon || 'chip' })),
-      }
+        items: services.map(s => ({ title: s.title, description: s.description, icon: s.icon || 'chip' }))
+      };
     }
 
-    const mappedEvents = (Array.isArray(events) ? events.map(mapEvent) : []).map((e) => ({
+    const mappedEvents = (Array.isArray(events) ? events.map(mapEvent) : []).map(e => ({
       ...e,
       bookingUrl: whatsappBookingUrl(content.whatsappNumber, e) || e.ticketUrl,
-      dateLabel: eventDateLabel(e),
-    }))
+      dateLabel: eventDateLabel(e)
+    }));
 
-    content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter((c) => c.visible) : []
-    content.whatWeDo = mapWhatWeDo(whatWeDoMeta)
-    const mappedSolutions = Array.isArray(solutionsList) ? solutionsList.map(mapSolution).filter((s) => s.visible) : []
-    content.solutions = mappedSolutions.length ? mappedSolutions : defaultWebsiteContent.solutions
-    content.predictor = mapPredictor(predictorMeta, predictorMatches)
+    content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter(c => c.visible) : [];
+    content.whatWeDo = mapWhatWeDo(whatWeDoMeta);
+    const mappedSolutions = Array.isArray(solutionsList) ? solutionsList.map(mapSolution).filter(s => s.visible) : [];
+    content.solutions = mappedSolutions.length ? mappedSolutions : defaultWebsiteContent.solutions;
+    content.predictor = mapPredictor(predictorMeta, predictorMatches);
 
-    return { content, events: mappedEvents }
+    return { content, events: mappedEvents };
   } catch {
-    return null
+    return null;
   }
 }
 
 // Submit a public prediction entry (Guess the Score).
-export const submitPrediction = (data) => req('/api/predictions', { method: 'POST', body: data })
+export const submitPrediction = data => req('/api/predictions', { method: 'POST', body: data });
 
-export { req as websiteRequest, API as WEBSITE_API }
+export { req as websiteRequest, API as WEBSITE_API };

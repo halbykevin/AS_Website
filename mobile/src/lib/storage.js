@@ -1,48 +1,48 @@
 // Thin async wrapper over AsyncStorage — the RN replacement for the web's
 // localStorage. All persistence (auth tokens, the cart) goes through here.
 
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const storage = {
   async get(key) {
     try {
-      return await AsyncStorage.getItem(key)
+      return await AsyncStorage.getItem(key);
     } catch {
-      return null
+      return null;
     }
   },
   async set(key, value) {
     try {
-      await AsyncStorage.setItem(key, value)
+      await AsyncStorage.setItem(key, value);
     } catch {
       /* ignore */
     }
   },
   async remove(key) {
     try {
-      await AsyncStorage.removeItem(key)
+      await AsyncStorage.removeItem(key);
     } catch {
       /* ignore */
     }
   },
   async getJSON(key, fallback = null) {
-    const raw = await storage.get(key)
-    if (raw == null) return fallback
+    const raw = await storage.get(key);
+    if (raw == null) return fallback;
     try {
-      return JSON.parse(raw)
+      return JSON.parse(raw);
     } catch {
-      return fallback
+      return fallback;
     }
   },
   async setJSON(key, value) {
-    await storage.set(key, JSON.stringify(value))
-  },
-}
+    await storage.set(key, JSON.stringify(value));
+  }
+};
 
 // Storage keys (kept in one place so nothing collides).
 export const KEYS = {
   customerToken: 'as_store_customer_token',
-  cart: 'as_store_cart',
-}
+  cart: 'as_store_cart'
+};
 
-export default storage
+export default storage;

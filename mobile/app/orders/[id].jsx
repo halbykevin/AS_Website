@@ -8,117 +8,117 @@
 // payment succeeded — it asks the API to re-check with Whish, a few times, until
 // the order settles. The bag is emptied only once that confirms.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, AppState, View } from 'react-native'
-import { Image } from 'expo-image'
-import { router, useLocalSearchParams } from 'expo-router'
-import { useDispatch } from 'react-redux'
-import { useAccount, accountApi } from '@/src/lib/account'
-import { clearCart } from '@/src/store/cartSlice'
-import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH } from '@/src/lib/payments'
-import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Card, Badge, Icon, Divider, Skeleton, EmptyState } from '@/src/ui'
-import RemoteImage from '@/src/components/RemoteImage'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, View } from 'react-native';
+import { Image } from 'expo-image';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useDispatch } from 'react-redux';
+import { useAccount, accountApi } from '@/src/lib/account';
+import { clearCart } from '@/src/store/cartSlice';
+import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH } from '@/src/lib/payments';
+import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Card, Badge, Icon, Divider, Skeleton, EmptyState } from '@/src/ui';
+import RemoteImage from '@/src/components/RemoteImage';
 
-const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' }
-const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
-const WHISH_LOGO = require('../../assets/whish.png')
+const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' };
+const STEPS = ['pending', 'confirmed', 'shipped', 'delivered'];
+const WHISH_LOGO = require('../../assets/whish.png');
 
 export default function OrderDetailScreen() {
-  const theme = useTheme()
-  const { id, placed, failed, paying, t } = useLocalSearchParams()
-  const account = useAccount()
-  const dispatch = useDispatch()
-  const [order, setOrder] = useState(null)
-  const [error, setError] = useState('')
-  const [checking, setChecking] = useState(false)
-  const [resuming, setResuming] = useState(false)
-  const justPlaced = placed === '1'
-  const paymentFailed = failed === '1'
+  const theme = useTheme();
+  const { id, placed, failed, paying, t } = useLocalSearchParams();
+  const account = useAccount();
+  const dispatch = useDispatch();
+  const [order, setOrder] = useState(null);
+  const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const justPlaced = placed === '1';
+  const paymentFailed = failed === '1';
   // Fresh from checkout / the payment page — poll instead of trusting the flag.
-  const fromPayment = justPlaced || paymentFailed || paying === '1'
-  const clearedRef = useRef(false) // empties the bag once, when payment confirms
+  const fromPayment = justPlaced || paymentFailed || paying === '1';
+  const clearedRef = useRef(false); // empties the bag once, when payment confirms
 
   useEffect(() => {
-    let active = true
-    ;(async () => {
+    let active = true;
+    (async () => {
       try {
         // Prefer the track token (works signed-out); fall back to the authed
         // endpoint for a signed-in customer viewing their history.
-        const data = t ? await accountApi.trackOrder(id, t) : await accountApi.getOrder(id)
-        if (active) setOrder(data)
+        const data = t ? await accountApi.trackOrder(id, t) : await accountApi.getOrder(id);
+        if (active) setOrder(data);
       } catch (e) {
-        if (active) setError(e.message || 'Order not found.')
+        if (active) setError(e.message || 'Order not found.');
       }
-    })()
+    })();
     return () => {
-      active = false
-    }
-  }, [id, t])
+      active = false;
+    };
+  }, [id, t]);
 
-  const awaiting = isAwaitingPayment(order)
+  const awaiting = isAwaitingPayment(order);
 
   // Ask the server to re-check the payment with Whish. Used on arrival, when the
   // app comes back to the foreground, and by the manual "Check again" button.
   // One poll at a time — overlapping runs would just race each other.
-  const runningRef = useRef(false)
+  const runningRef = useRef(false);
   const recheck = useCallback(
     async (tries = 1) => {
-      if (runningRef.current) return
-      runningRef.current = true
-      setChecking(true)
+      if (runningRef.current) return;
+      runningRef.current = true;
+      setChecking(true);
       try {
-        await pollPayment({ id, token: t, tries, onOrder: setOrder })
+        await pollPayment({ id, token: t, tries, onOrder: setOrder });
       } finally {
-        runningRef.current = false
-        setChecking(false)
+        runningRef.current = false;
+        setChecking(false);
       }
     },
-    [id, t],
-  )
+    [id, t]
+  );
 
   // Arriving from the payment page the order often still reads unpaid: the Whish
   // callback may not have landed yet. Poll a few times — the server settles it as
   // soon as the status API says success.
-  const polledRef = useRef(false)
+  const polledRef = useRef(false);
   useEffect(() => {
-    if (!awaiting || !fromPayment || polledRef.current) return
-    polledRef.current = true
-    recheck(5)
-  }, [awaiting, fromPayment, recheck])
+    if (!awaiting || !fromPayment || polledRef.current) return;
+    polledRef.current = true;
+    recheck(5);
+  }, [awaiting, fromPayment, recheck]);
 
   // Payments can also complete while the app is backgrounded (the customer paid in
   // the Whish app). Re-check whenever we come back to the foreground.
   useEffect(() => {
-    if (!awaiting) return
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') recheck(2)
-    })
-    return () => sub.remove()
-  }, [awaiting, recheck])
+    if (!awaiting) return;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') recheck(2);
+    });
+    return () => sub.remove();
+  }, [awaiting, recheck]);
 
   // The bag was kept through the payment in case it was abandoned — empty it now
   // that the money is in.
   useEffect(() => {
     if (order?.paymentMethod === PAYMENT_WHISH && order?.paymentStatus === 'paid' && !clearedRef.current) {
-      clearedRef.current = true
-      dispatch(clearCart())
+      clearedRef.current = true;
+      dispatch(clearCart());
     }
-  }, [order, dispatch])
+  }, [order, dispatch]);
 
   // Reopen the hosted payment page for an unpaid order (closed the tab, payment
   // failed, or came back to it from the orders list) — the link stays payable.
   const resumePayment = async () => {
-    if (!order?.collectUrl || resuming) return
-    setResuming(true)
+    if (!order?.collectUrl || resuming) return;
+    setResuming(true);
     try {
-      await openWhishCheckout(order.collectUrl)
-      await recheck(5)
+      await openWhishCheckout(order.collectUrl);
+      await recheck(5);
     } finally {
-      setResuming(false)
+      setResuming(false);
     }
-  }
+  };
 
   if (error) {
     return (
@@ -128,7 +128,7 @@ export default function OrderDetailScreen() {
           <EmptyState icon="box" title="Not found" message={error} actionLabel="Your orders" onAction={() => router.replace('/orders')} />
         </View>
       </Screen>
-    )
+    );
   }
 
   if (!order) {
@@ -140,11 +140,11 @@ export default function OrderDetailScreen() {
           <Skeleton height={200} radius="2xl" />
         </View>
       </Screen>
-    )
+    );
   }
 
-  const stepIndex = STEPS.indexOf(order.status)
-  const online = order.paymentMethod === PAYMENT_WHISH
+  const stepIndex = STEPS.indexOf(order.status);
+  const online = order.paymentMethod === PAYMENT_WHISH;
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
@@ -160,17 +160,13 @@ export default function OrderDetailScreen() {
                 <View style={{ flex: 1 }}>
                   <Text variant="title">{checking ? 'Confirming your payment…' : paymentFailed ? 'Payment not completed' : 'Waiting for payment'}</Text>
                   <Text variant="caption" muted style={{ marginTop: 2 }}>
-                    {checking
-                      ? 'Checking with Whish. This only takes a moment.'
-                      : 'Your order is saved. Finish the payment to confirm it — nothing is charged until you do.'}
+                    {checking ? 'Checking with Whish. This only takes a moment.' : 'Your order is saved. Finish the payment to confirm it — nothing is charged until you do.'}
                   </Text>
                 </View>
               </View>
               {!checking ? (
                 <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-                  {order.collectUrl ? (
-                    <Button label="Complete payment" onPress={resumePayment} loading={resuming} size="sm" style={{ flex: 1 }} />
-                  ) : null}
+                  {order.collectUrl ? <Button label="Complete payment" onPress={resumePayment} loading={resuming} size="sm" style={{ flex: 1 }} /> : null}
                   <Button label="Check again" variant="ghost" size="sm" onPress={() => recheck(2)} style={{ flex: 1 }} />
                 </View>
               ) : null}
@@ -269,14 +265,9 @@ export default function OrderDetailScreen() {
             ) : null}
             <Divider style={{ marginVertical: theme.spacing.sm }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {online ? (
-                <Image source={WHISH_LOGO} style={{ width: 44, height: 17 }} contentFit="contain" />
-              ) : (
-                <Icon name="truck" size={16} color={theme.colors.primary} />
-              )}
+              {online ? <Image source={WHISH_LOGO} style={{ width: 44, height: 17 }} contentFit="contain" /> : <Icon name="truck" size={16} color={theme.colors.primary} />}
               <Text variant="caption" muted style={{ flex: 1 }}>
-                {online ? (order.paymentStatus === 'paid' ? 'Paid online' : 'Awaiting payment') : 'Cash on delivery'} · Placed{' '}
-                {formatDateTime(order.createdAt)}
+                {online ? (order.paymentStatus === 'paid' ? 'Paid online' : 'Awaiting payment') : 'Cash on delivery'} · Placed {formatDateTime(order.createdAt)}
               </Text>
               {online && order.paymentStatus === 'paid' ? <Badge label="Paid" tone="success" /> : null}
             </View>
@@ -284,5 +275,5 @@ export default function OrderDetailScreen() {
         </View>
       </View>
     </Screen>
-  )
+  );
 }

@@ -1,61 +1,57 @@
 // Your orders — the signed-in customer's order history. Requires a session;
 // bounces to sign-in when signed out.
 
-import { useEffect, useState } from 'react'
-import { RefreshControl, View } from 'react-native'
-import { router } from 'expo-router'
-import { useAccount, accountApi } from '@/src/lib/account'
-import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format'
-import { PAYMENT_WHISH } from '@/src/lib/payments'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui'
+import { useEffect, useState } from 'react';
+import { RefreshControl, View } from 'react-native';
+import { router } from 'expo-router';
+import { useAccount, accountApi } from '@/src/lib/account';
+import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
+import { PAYMENT_WHISH } from '@/src/lib/payments';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui';
 
-const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' }
+const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' };
 
 export default function OrdersScreen() {
-  const theme = useTheme()
-  const account = useAccount()
-  const [orders, setOrders] = useState(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const theme = useTheme();
+  const account = useAccount();
+  const [orders, setOrders] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
     try {
-      const data = await accountApi.listOrders()
-      setOrders(data)
+      const data = await accountApi.listOrders();
+      setOrders(data);
     } catch {
-      setOrders([])
+      setOrders([]);
     }
-  }
+  };
 
   useEffect(() => {
-    if (account?.loading) return
+    if (account?.loading) return;
     if (!account?.customer) {
-      router.replace('/auth/login?next=/orders')
-      return
+      router.replace('/auth/login?next=/orders');
+      return;
     }
-    load()
-  }, [account?.loading, account?.customer])
+    load();
+  }, [account?.loading, account?.customer]);
 
   const onRefresh = async () => {
-    setRefreshing(true)
-    await load()
-    setRefreshing(false)
-  }
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
   return (
-    <Screen
-      edges={['top']}
-      contentStyle={{ paddingHorizontal: 0 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-    >
+    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}>
       <Header title="Your orders" />
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.md, paddingTop: theme.spacing.sm }}>
         {orders === null ? (
-          [0, 1, 2].map((i) => <Skeleton key={i} height={90} radius="2xl" />)
+          [0, 1, 2].map(i => <Skeleton key={i} height={90} radius="2xl" />)
         ) : orders.length === 0 ? (
           <EmptyState icon="box" title="No orders yet" message="When you place an order, it'll show up here." actionLabel="Start shopping" onAction={() => router.replace('/')} />
         ) : (
-          orders.map((o) => (
+          orders.map(o => (
             <Card key={o.id} onPress={() => router.push(`/orders/${o.id}`)} style={{ gap: theme.spacing.sm }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text variant="title">Order #{o.id}</Text>
@@ -67,12 +63,7 @@ export default function OrdersScreen() {
                     {formatDateTime(o.createdAt)}
                   </Text>
                   <Text variant="caption" muted>
-                    {o.itemCount} item{o.itemCount === 1 ? '' : 's'} ·{' '}
-                    {o.paymentMethod === PAYMENT_WHISH
-                      ? o.paymentStatus === 'paid'
-                        ? 'Paid with Whish'
-                        : 'Payment pending'
-                      : 'Cash on delivery'}
+                    {o.itemCount} item{o.itemCount === 1 ? '' : 's'} · {o.paymentMethod === PAYMENT_WHISH ? (o.paymentStatus === 'paid' ? 'Paid with Whish' : 'Payment pending') : 'Cash on delivery'}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -85,5 +76,5 @@ export default function OrdersScreen() {
         )}
       </View>
     </Screen>
-  )
+  );
 }

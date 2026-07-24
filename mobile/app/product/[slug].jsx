@@ -2,38 +2,38 @@
 // colour dots, description, specs, and an Add-to-Bag footer that respects the
 // 2-per-item cap. Mirrors the AS Store web ProductDetail.
 
-import { useMemo, useState } from 'react'
-import { Dimensions, Pressable, ScrollView, View } from 'react-native'
-import { useLocalSearchParams, router } from 'expo-router'
-import { useDispatch, useSelector } from 'react-redux'
-import { useProduct } from '@/src/lib/queries'
-import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice'
-import { money } from '@/src/lib/format'
-import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp'
-import { useContent } from '@/src/content/ContentProvider'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState } from '@/src/ui'
-import RemoteImage from '@/src/components/RemoteImage'
+import { useMemo, useState } from 'react';
+import { Dimensions, Pressable, ScrollView, View } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
+import { useProduct } from '@/src/lib/queries';
+import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice';
+import { money } from '@/src/lib/format';
+import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
+import { useContent } from '@/src/content/ContentProvider';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState } from '@/src/ui';
+import RemoteImage from '@/src/components/RemoteImage';
 
-const { width: SCREEN_W } = Dimensions.get('window')
+const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
-  const theme = useTheme()
-  const { slug } = useLocalSearchParams()
-  const { data: product, isLoading } = useProduct(slug)
-  const { storeSettings } = useContent()
-  const dispatch = useDispatch()
-  const items = useSelector(selectCartItems)
-  const [active, setActive] = useState(0)
+  const theme = useTheme();
+  const { slug } = useLocalSearchParams();
+  const { data: product, isLoading } = useProduct(slug);
+  const { storeSettings } = useContent();
+  const dispatch = useDispatch();
+  const items = useSelector(selectCartItems);
+  const [active, setActive] = useState(0);
 
-  const inCart = items.find((i) => i.id === product?.id)?.qty || 0
-  const atCap = inCart >= MAX_QTY
+  const inCart = items.find(i => i.id === product?.id)?.qty || 0;
+  const atCap = inCart >= MAX_QTY;
 
   const images = useMemo(() => {
-    if (!product) return []
-    const list = Array.isArray(product.images) && product.images.length ? product.images : [product.image].filter(Boolean)
-    return list
-  }, [product])
+    if (!product) return [];
+    const list = Array.isArray(product.images) && product.images.length ? product.images : [product.image].filter(Boolean);
+    return list;
+  }, [product]);
 
   if (isLoading) {
     return (
@@ -45,7 +45,7 @@ export default function ProductDetailScreen() {
           <Skeleton height={18} width="40%" />
         </View>
       </Screen>
-    )
+    );
   }
 
   if (!product) {
@@ -56,20 +56,20 @@ export default function ProductDetailScreen() {
           <EmptyState icon="box" title="Not found" message="This product isn't available." actionLabel="Back to store" onAction={() => router.replace('/')} />
         </View>
       </Screen>
-    )
+    );
   }
 
-  const priceNum = Number(product.price) || 0
-  const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
-  const onSale = Boolean(oldPrice) && oldPrice > priceNum
-  const pct = onSale ? product.salePercent || Math.round((1 - priceNum / oldPrice) * 100) : 0
+  const priceNum = Number(product.price) || 0;
+  const oldPrice = product.oldPrice ? Number(product.oldPrice) : null;
+  const onSale = Boolean(oldPrice) && oldPrice > priceNum;
+  const pct = onSale ? product.salePercent || Math.round((1 - priceNum / oldPrice) * 100) : 0;
 
   const add = () => {
-    if (atCap) return
-    dispatch(addItem({ id: product.id, title: product.name, image: product.image || images[0], price: priceNum, slug: product.slug }))
-  }
+    if (atCap) return;
+    dispatch(addItem({ id: product.id, title: product.name, image: product.image || images[0], price: priceNum, slug: product.slug }));
+  };
 
-  const galleryWidth = Math.min(SCREEN_W, theme.layout.maxContentWidth)
+  const galleryWidth = Math.min(SCREEN_W, theme.layout.maxContentWidth);
 
   return (
     <Screen
@@ -85,14 +85,7 @@ export default function ProductDetailScreen() {
               {money(priceNum)}
             </Text>
           </View>
-          <Button
-            label={atCap ? 'Max in bag' : 'Add to Bag'}
-            icon={atCap ? 'check' : 'bag'}
-            onPress={add}
-            disabled={atCap}
-            size="lg"
-            style={{ flex: 1 }}
-          />
+          <Button label={atCap ? 'Max in bag' : 'Add to Bag'} icon={atCap ? 'check' : 'bag'} onPress={add} disabled={atCap} size="lg" style={{ flex: 1 }} />
         </View>
       }
     >
@@ -100,12 +93,7 @@ export default function ProductDetailScreen() {
 
       {/* Gallery */}
       <View>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => setActive(Math.round(e.nativeEvent.contentOffset.x / galleryWidth))}
-        >
+        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e => setActive(Math.round(e.nativeEvent.contentOffset.x / galleryWidth))}>
           {(images.length ? images : ['']).map((img, i) => (
             <View key={i} style={{ width: galleryWidth, aspectRatio: 1, backgroundColor: theme.colors.surfaceAlt }}>
               <RemoteImage uri={img} style={{ width: '100%', height: '100%' }} contentFit="contain" fallbackIcon="box" />
@@ -212,24 +200,16 @@ export default function ProductDetailScreen() {
         ) : null}
 
         {/* Larger quantities via WhatsApp (mirrors the store's max-qty note) */}
-        {atCap && storeSettings?.contact?.whatsapp ? (
-          <Button
-            variant="ghost"
-            icon="whatsapp"
-            label="Need more? Order on WhatsApp"
-            onPress={() => openUrl(whatsappChatUrl(storeSettings.contact.whatsapp, `Hi, I'd like to order more of: ${product.name}`))}
-            fullWidth
-          />
-        ) : null}
+        {atCap && storeSettings?.contact?.whatsapp ? <Button variant="ghost" icon="whatsapp" label="Need more? Order on WhatsApp" onPress={() => openUrl(whatsappChatUrl(storeSettings.contact.whatsapp, `Hi, I'd like to order more of: ${product.name}`))} fullWidth /> : null}
       </View>
     </Screen>
-  )
+  );
 }
 
 // Bag shortcut in the header.
 function CartButton() {
-  const theme = useTheme()
-  const count = useSelector(selectCartCount)
+  const theme = useTheme();
+  const count = useSelector(selectCartCount);
   return (
     <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
       <Icon name="bag" size={22} />
@@ -241,5 +221,5 @@ function CartButton() {
         </View>
       ) : null}
     </Pressable>
-  )
+  );
 }

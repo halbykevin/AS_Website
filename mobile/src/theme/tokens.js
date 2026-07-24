@@ -26,8 +26,8 @@ export const palette = {
   asBg: '#EAEDED',
   asFog: '#F5F5F7',
   white: '#FFFFFF',
-  black: '#000000',
-}
+  black: '#000000'
+};
 
 // Semantic color roles for the (default) light theme. Components reference these
 // names, so a future dark theme only needs to swap this object.
@@ -69,8 +69,8 @@ export const lightColors = {
 
   // Overlays / scrims
   scrim: 'rgba(0,0,0,0.45)',
-  skeleton: 'rgba(21,24,26,0.08)',
-}
+  skeleton: 'rgba(21,24,26,0.08)'
+};
 
 // Spacing scale (multiples of 4). Use `theme.spacing(n)` for arbitrary values.
 export const spacing = {
@@ -83,8 +83,8 @@ export const spacing = {
   '3xl': 32,
   '4xl': 40,
   '5xl': 56,
-  '6xl': 72,
-}
+  '6xl': 72
+};
 
 // Corner radii — the store leans on big soft radii (28px product cards).
 export const radii = {
@@ -96,8 +96,8 @@ export const radii = {
   '2xl': 24,
   '3xl': 28,
   pill: 999,
-  full: 9999,
-}
+  full: 9999
+};
 
 // Type scale. `-0.022em` Apple tracking → RN letterSpacing is in points, so we
 // approximate per size at render time (see typography.js helper in ThemeProvider).
@@ -107,8 +107,8 @@ export const fontFamily = {
   regular: undefined, // RN system font
   medium: undefined,
   semibold: undefined,
-  bold: undefined,
-}
+  bold: undefined
+};
 
 export const fontWeight = {
   regular: '400',
@@ -116,8 +116,8 @@ export const fontWeight = {
   semibold: '600',
   bold: '700',
   heavy: '800',
-  black: '900',
-}
+  black: '900'
+};
 
 export const typeScale = {
   // { fontSize, lineHeight, weight, tracking }
@@ -130,8 +130,8 @@ export const typeScale = {
   bodyLg: { fontSize: 17, lineHeight: 25, weight: '400', tracking: 0 },
   callout: { fontSize: 14, lineHeight: 20, weight: '500', tracking: 0 },
   caption: { fontSize: 12, lineHeight: 16, weight: '500', tracking: 0.1 },
-  overline: { fontSize: 11, lineHeight: 14, weight: '700', tracking: 0.8 },
-}
+  overline: { fontSize: 11, lineHeight: 14, weight: '700', tracking: 0.8 }
+};
 
 // Elevation presets (iOS shadow + Android elevation together).
 export const shadows = {
@@ -141,23 +141,23 @@ export const shadows = {
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    elevation: 2
   },
   raised: {
     shadowColor: '#0F1111',
     shadowOpacity: 0.18,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    elevation: 6
   },
   brand: {
     shadowColor: palette.asRed,
     shadowOpacity: 0.35,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 14 },
-    elevation: 8,
-  },
-}
+    elevation: 8
+  }
+};
 
 // Layout constants shared across screens (content width caps, nav heights…).
 export const layout = {
@@ -165,11 +165,11 @@ export const layout = {
   screenPadding: spacing.xl, // default horizontal gutter (20)
   tabBarHeight: 60,
   headerHeight: 52,
-  hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
-}
+  hitSlop: { top: 8, bottom: 8, left: 8, right: 8 }
+};
 
 export const timing = {
   fast: 150,
   base: 250,
-  slow: 400,
-}
+  slow: 400
+};

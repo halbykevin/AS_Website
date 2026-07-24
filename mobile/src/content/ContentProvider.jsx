@@ -6,39 +6,36 @@
 // pull-to-refresh anywhere can call refresh(). Falls back to static defaults so
 // the app renders even with both APIs offline.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { loadWebsiteContent } from '@/src/lib/websiteApi'
-import { loadStoreSettings, defaultStoreSettings } from '@/src/lib/storeApi'
-import { defaultWebsiteContent } from './websiteDefaults'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { loadWebsiteContent } from '@/src/lib/websiteApi';
+import { loadStoreSettings, defaultStoreSettings } from '@/src/lib/storeApi';
+import { defaultWebsiteContent } from './websiteDefaults';
 
-const ContentContext = createContext(null)
+const ContentContext = createContext(null);
 
 export function ContentProvider({ children }) {
-  const [website, setWebsite] = useState({ content: defaultWebsiteContent, events: [] })
-  const [storeSettings, setStoreSettings] = useState(defaultStoreSettings)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [website, setWebsite] = useState({ content: defaultWebsiteContent, events: [] });
+  const [storeSettings, setStoreSettings] = useState(defaultStoreSettings);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    setError(false)
-    const [site, settings] = await Promise.all([
-      loadWebsiteContent(),
-      loadStoreSettings(),
-    ])
-    if (site) setWebsite(site)
-    else setError(true)
-    setStoreSettings(settings)
-    setLoading(false)
-  }, [])
+    setError(false);
+    const [site, settings] = await Promise.all([loadWebsiteContent(), loadStoreSettings()]);
+    if (site) setWebsite(site);
+    else setError(true);
+    setStoreSettings(settings);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
 
   const refresh = useCallback(async () => {
-    setLoading(true)
-    await load()
-  }, [load])
+    setLoading(true);
+    await load();
+  }, [load]);
 
   const value = useMemo(
     () => ({
@@ -47,16 +44,16 @@ export function ContentProvider({ children }) {
       refresh,
       content: website.content,
       events: website.events,
-      storeSettings,
+      storeSettings
     }),
-    [loading, error, refresh, website, storeSettings],
-  )
+    [loading, error, refresh, website, storeSettings]
+  );
 
-  return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>
+  return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }
 
 export function useContent() {
-  const ctx = useContext(ContentContext)
-  if (!ctx) throw new Error('useContent must be used within ContentProvider')
-  return ctx
+  const ctx = useContext(ContentContext);
+  if (!ctx) throw new Error('useContent must be used within ContentProvider');
+  return ctx;
 }

@@ -1,6 +1,7 @@
-{"semi": true,
+{
+  "semi": true,
   "trailingComma": "none",
-  "singleQuote": false,
+  "singleQuote": true,
   "printWidth": 500,
   "tabWidth": 2,
   "useTabs": false,
@@ -55,5 +56,5 @@
     "^@/components/(.*)$",
     "^@/features/(.*)$",
     "^[./]"
-  ]  
+  ]
 }

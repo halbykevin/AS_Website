@@ -1,18 +1,18 @@
 // Account tab — signed-out shows a sign-in CTA; signed-in shows the profile,
 // links to orders + addresses, quick links into the app, and sign-out.
 
-import { View } from 'react-native'
-import { router } from 'expo-router'
-import { useAccount } from '@/src/lib/account'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Card, Icon, Divider } from '@/src/ui'
-import BrandBar from '@/src/components/BrandBar'
+import { View } from 'react-native';
+import { router } from 'expo-router';
+import { useAccount } from '@/src/lib/account';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Card, Icon, Divider } from '@/src/ui';
+import BrandBar from '@/src/components/BrandBar';
 
 export default function AccountScreen() {
-  const theme = useTheme()
-  const account = useAccount()
-  const customer = account?.customer
-  const loading = account?.loading
+  const theme = useTheme();
+  const account = useAccount();
+  const customer = account?.customer;
+  const loading = account?.loading;
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
@@ -74,11 +74,11 @@ export default function AccountScreen() {
         )}
       </View>
     </Screen>
-  )
+  );
 }
 
 function MenuRow({ icon, label, onPress }) {
-  const theme = useTheme()
+  const theme = useTheme();
   return (
     <Card onPress={onPress} bordered={false} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
       <Icon name={icon} size={22} color={theme.colors.primary} />
@@ -87,5 +87,5 @@ function MenuRow({ icon, label, onPress }) {
       </Text>
       <Icon name="chevronRight" size={20} color={theme.colors.textFaint} />
     </Card>
-  )
+  );
 }

@@ -8,64 +8,64 @@
 // order screen confirms the result with the server. The bag is deliberately not
 // emptied until the payment lands, so an abandoned payment doesn't lose the cart.
 
-import { useEffect, useRef, useState } from 'react'
-import { View } from 'react-native'
-import { Image } from 'expo-image'
-import { router } from 'expo-router'
-import { useDispatch, useSelector } from 'react-redux'
-import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice'
-import { useAccount, accountApi } from '@/src/lib/account'
-import { usePaymentMethods } from '@/src/lib/queries'
-import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments'
-import { money } from '@/src/lib/format'
-import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Card, Icon, Divider, EmptyState } from '@/src/ui'
-import { Field, Input } from '@/src/ui/Input'
-import RemoteImage from '@/src/components/RemoteImage'
+import { useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice';
+import { useAccount, accountApi } from '@/src/lib/account';
+import { usePaymentMethods } from '@/src/lib/queries';
+import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
+import { money } from '@/src/lib/format';
+import { useTheme } from '@/src/theme';
+import { Screen, Text, Header, Button, Card, Icon, Divider, EmptyState } from '@/src/ui';
+import { Field, Input } from '@/src/ui/Input';
+import RemoteImage from '@/src/components/RemoteImage';
 
-const WHISH_LOGO = require('../assets/whish.png')
+const WHISH_LOGO = require('../assets/whish.png');
 
 export default function CheckoutScreen() {
-  const theme = useTheme()
-  const { customer, setCustomer } = useAccount()
-  const items = useSelector(selectCartItems)
-  const total = useSelector(selectCartTotal)
-  const dispatch = useDispatch()
+  const theme = useTheme();
+  const { customer, setCustomer } = useAccount();
+  const items = useSelector(selectCartItems);
+  const total = useSelector(selectCartTotal);
+  const dispatch = useDispatch();
 
-  const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
-  const [addrId, setAddrId] = useState(null)
-  const [pay, setPay] = useState(PAYMENT_COD) // 'cod' | 'whish'
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const seeded = useRef(false)
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true });
+  const [addrId, setAddrId] = useState(null);
+  const [pay, setPay] = useState(PAYMENT_COD); // 'cod' | 'whish'
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const seeded = useRef(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   // Online payment is only offered when the server actually has Whish configured.
-  const { data: methods } = usePaymentMethods()
-  const whishAvailable = Boolean(methods?.whish)
-  const payingOnline = pay === PAYMENT_WHISH && whishAvailable
+  const { data: methods } = usePaymentMethods();
+  const whishAvailable = Boolean(methods?.whish);
+  const payingOnline = pay === PAYMENT_WHISH && whishAvailable;
 
-  const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : []
+  const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : [];
 
-  const applyAddress = (a) => {
-    setAddrId(a.id)
-    setForm((f) => ({ ...f, fullName: a.fullName || f.fullName, phone: a.phone || f.phone, address: a.address || '', city: a.city || '' }))
-  }
+  const applyAddress = a => {
+    setAddrId(a.id);
+    setForm(f => ({ ...f, fullName: a.fullName || f.fullName, phone: a.phone || f.phone, address: a.address || '', city: a.city || '' }));
+  };
 
   // Prefill once when a session exists.
   useEffect(() => {
     if (customer && !seeded.current) {
-      seeded.current = true
-      const addrs = Array.isArray(customer.addresses) ? customer.addresses : []
-      const def = addrs.find((a) => a.isDefault) || addrs[0]
+      seeded.current = true;
+      const addrs = Array.isArray(customer.addresses) ? customer.addresses : [];
+      const def = addrs.find(a => a.isDefault) || addrs[0];
       if (def) {
-        setAddrId(def.id)
-        setForm((f) => ({ ...f, fullName: def.fullName || customer.name || '', phone: def.phone || customer.phone || customer.mobile || '', email: customer.email || '', address: def.address || '', city: def.city || '' }))
+        setAddrId(def.id);
+        setForm(f => ({ ...f, fullName: def.fullName || customer.name || '', phone: def.phone || customer.phone || customer.mobile || '', email: customer.email || '', address: def.address || '', city: def.city || '' }));
       } else {
-        setForm((f) => ({ ...f, fullName: customer.name || '', phone: customer.phone || customer.mobile || '', email: customer.email || '', address: customer.address || '' }))
+        setForm(f => ({ ...f, fullName: customer.name || '', phone: customer.phone || customer.mobile || '', email: customer.email || '', address: customer.address || '' }));
       }
     }
-  }, [customer])
+  }, [customer]);
 
   if (items.length === 0) {
     return (
@@ -75,20 +75,20 @@ export default function CheckoutScreen() {
           <EmptyState icon="bag" title="Your bag is empty" message="Add a few things before checking out." actionLabel="Continue shopping" onAction={() => router.replace('/')} />
         </View>
       </Screen>
-    )
+    );
   }
 
   const placeOrder = async () => {
     if (!form.fullName.trim() || !form.phone.trim() || !form.address.trim()) {
-      setError('Name, mobile number and address are required.')
-      return
+      setError('Name, mobile number and address are required.');
+      return;
     }
-    setBusy(true)
-    setError('')
-    const online = payingOnline
+    setBusy(true);
+    setError('');
+    const online = payingOnline;
     try {
       const order = await accountApi.createOrder({
-        items: items.map((i) => ({ productId: i.id, qty: i.qty })),
+        items: items.map(i => ({ productId: i.id, qty: i.qty })),
         fullName: form.fullName,
         phone: form.phone,
         email: form.email,
@@ -99,30 +99,30 @@ export default function CheckoutScreen() {
         paymentMethod: online ? PAYMENT_WHISH : PAYMENT_COD,
         // Tells the API this payment comes from the app: Whish returns the browser
         // to the API, which deep-links back here with the order id appended.
-        ...(online ? { returnUrl: paymentReturnUrl() } : null),
-      })
+        ...(online ? { returnUrl: paymentReturnUrl() } : null)
+      });
       if (form.saveAddress && customer) {
-        setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
+        setCustomer(c => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c));
       }
-      const track = encodeURIComponent(order.trackToken || '')
+      const track = encodeURIComponent(order.trackToken || '');
 
       if (online) {
-        if (!order.collectUrl) throw new Error('Could not start the online payment. Please try again.')
+        if (!order.collectUrl) throw new Error('Could not start the online payment. Please try again.');
         // Blocks until the customer is handed back (deep link) or closes the tab.
         // Either way the order screen is where the payment gets confirmed — the
         // server's status check is the only source of truth.
-        await openWhishCheckout(order.collectUrl)
-        router.replace(`/orders/${order.id}?paying=1&t=${track}`)
-        return
+        await openWhishCheckout(order.collectUrl);
+        router.replace(`/orders/${order.id}?paying=1&t=${track}`);
+        return;
       }
 
-      dispatch(clearCart())
-      router.replace(`/orders/${order.id}?placed=1&t=${track}`)
+      dispatch(clearCart());
+      router.replace(`/orders/${order.id}?placed=1&t=${track}`);
     } catch (err) {
-      setError(err.message)
-      setBusy(false)
+      setError(err.message);
+      setBusy(false);
     }
-  }
+  };
 
   return (
     <Screen
@@ -137,13 +137,7 @@ export default function CheckoutScreen() {
             </Text>
             <Text variant="h2">{money(total)}</Text>
           </View>
-          <Button
-            label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'}
-            loading={busy}
-            onPress={placeOrder}
-            size="lg"
-            fullWidth
-          />
+          <Button label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'} loading={busy} onPress={placeOrder} size="lg" fullWidth />
           <Text variant="caption" faint center>
             Free delivery on orders over $100 · 12 months warranty
           </Text>
@@ -156,7 +150,7 @@ export default function CheckoutScreen() {
         {/* Order summary */}
         <Card style={{ gap: theme.spacing.md }}>
           <Text variant="h3">Order summary</Text>
-          {items.map((i) => (
+          {items.map(i => (
             <View key={i.id} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
               <View style={{ width: 44, height: 44, borderRadius: theme.radii.md, overflow: 'hidden', backgroundColor: theme.colors.surfaceAlt }}>
                 <RemoteImage uri={i.image} style={{ width: '100%', height: '100%' }} fallbackIcon="box" />
@@ -177,7 +171,7 @@ export default function CheckoutScreen() {
             <Text variant="callout" muted>
               Deliver to
             </Text>
-            {savedAddresses.map((a) => (
+            {savedAddresses.map(a => (
               <Card key={a.id} onPress={() => applyAddress(a)} style={{ borderColor: addrId === a.id ? theme.colors.primary : theme.colors.border, borderWidth: addrId === a.id ? 2 : 1 }}>
                 <Text variant="title">
                   {a.title || 'Address'}
@@ -202,22 +196,22 @@ export default function CheckoutScreen() {
             </Card>
           ) : null}
           <Field label="Full name">
-            <Input value={form.fullName} onChangeText={(v) => set('fullName', v)} autoCapitalize="words" />
+            <Input value={form.fullName} onChangeText={v => set('fullName', v)} autoCapitalize="words" />
           </Field>
           <Field label="Mobile number">
-            <Input value={form.phone} onChangeText={(v) => set('phone', v)} keyboardType="phone-pad" placeholder="70 123 456" />
+            <Input value={form.phone} onChangeText={v => set('phone', v)} keyboardType="phone-pad" placeholder="70 123 456" />
           </Field>
           <Field label="Email (optional)" hint="For your order confirmation.">
-            <Input value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
+            <Input value={form.email} onChangeText={v => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
           </Field>
           <Field label="City / area">
-            <Input value={form.city} onChangeText={(v) => set('city', v)} />
+            <Input value={form.city} onChangeText={v => set('city', v)} />
           </Field>
           <Field label="Address">
-            <Input value={form.address} onChangeText={(v) => set('address', v)} placeholder="Street, building, floor…" />
+            <Input value={form.address} onChangeText={v => set('address', v)} placeholder="Street, building, floor…" />
           </Field>
           <Field label="Notes (optional)">
-            <Input value={form.notes} onChangeText={(v) => set('notes', v)} placeholder="Delivery instructions…" />
+            <Input value={form.notes} onChangeText={v => set('notes', v)} placeholder="Delivery instructions…" />
           </Field>
 
           <Card onPress={() => set('saveAddress', !form.saveAddress)} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
@@ -242,7 +236,7 @@ export default function CheckoutScreen() {
                 alignItems: 'flex-start',
                 gap: theme.spacing.md,
                 borderColor: pay === PAYMENT_COD ? theme.colors.primary : theme.colors.border,
-                borderWidth: pay === PAYMENT_COD ? 2 : 1,
+                borderWidth: pay === PAYMENT_COD ? 2 : 1
               }}
             >
               <Icon name="truck" size={22} color={pay === PAYMENT_COD ? theme.colors.primary : theme.colors.textFaint} />
@@ -263,7 +257,7 @@ export default function CheckoutScreen() {
                 alignItems: 'flex-start',
                 gap: theme.spacing.md,
                 borderColor: pay === PAYMENT_WHISH ? theme.colors.primary : theme.colors.border,
-                borderWidth: pay === PAYMENT_WHISH ? 2 : 1,
+                borderWidth: pay === PAYMENT_WHISH ? 2 : 1
               }}
             >
               <Icon name="shield" size={22} color={pay === PAYMENT_WHISH ? theme.colors.primary : theme.colors.textFaint} />
@@ -299,5 +293,5 @@ export default function CheckoutScreen() {
         ) : null}
       </View>
     </Screen>
-  )
+  );
 }

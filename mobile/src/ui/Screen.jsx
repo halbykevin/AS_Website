@@ -5,27 +5,15 @@
 //   <Screen scroll>…</Screen>                     // padded, scrollable
 //   <Screen scroll={false} padded={false}>…</Screen>  // full-bleed (hero pages)
 
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StatusBar } from 'expo-status-bar'
-import { useTheme } from '@/src/theme'
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '@/src/theme';
 
-export default function Screen({
-  children,
-  scroll = true,
-  padded = true,
-  edges = ['top', 'left', 'right'],
-  background = 'background',
-  statusBarStyle = 'dark',
-  contentStyle,
-  keyboardAware = false,
-  refreshControl,
-  footer,
-  ...rest
-}) {
-  const theme = useTheme()
-  const insets = useSafeAreaInsets()
-  const bg = theme.colors[background] || background
+export default function Screen({ children, scroll = true, padded = true, edges = ['top', 'left', 'right'], background = 'background', statusBarStyle = 'dark', contentStyle, keyboardAware = false, refreshControl, footer, ...rest }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const bg = theme.colors[background] || background;
 
   const inner = (
     <View
@@ -34,41 +22,32 @@ export default function Screen({
           width: '100%',
           maxWidth: theme.layout.maxContentWidth,
           alignSelf: 'center',
-          paddingHorizontal: padded ? theme.layout.screenPadding : 0,
+          paddingHorizontal: padded ? theme.layout.screenPadding : 0
         },
         // Non-scroll screens fill the height so their content can center.
         !scroll && { flex: 1 },
-        contentStyle,
+        contentStyle
       ]}
     >
       {children}
     </View>
-  )
+  );
 
   const body = scroll ? (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }}
-      refreshControl={refreshControl}
-      {...rest}
-    >
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }} refreshControl={refreshControl} {...rest}>
       {inner}
     </ScrollView>
   ) : (
     <View style={{ flex: 1 }} {...rest}>
       {inner}
     </View>
-  )
+  );
 
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
       <StatusBar style={statusBarStyle} />
       {keyboardAware ? (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {body}
         </KeyboardAvoidingView>
       ) : (
@@ -76,5 +55,5 @@ export default function Screen({
       )}
       {footer ? <View style={{ paddingBottom: insets.bottom }}>{footer}</View> : null}
     </SafeAreaView>
-  )
+  );
 }
