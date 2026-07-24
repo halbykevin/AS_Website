@@ -220,8 +220,12 @@ export default function CheckoutPage() {
                   }`}
                 >
                   <input type="radio" name="pay" value="whish" checked={pay === 'whish'} onChange={() => setPay('whish')} className="mt-1 h-4 w-4 accent-as-red" />
-                  <span>
-                    <span className="block text-sm font-semibold text-as-ink">Pay online — Whish</span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-as-ink">Pay online with</span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/whish_v2.png" alt="Whish" className="h-8 w-auto" />
+                    </span>
                     <span className="mt-0.5 block text-sm text-as-ink/55">Pay securely now with Whish. You’ll be taken to Whish to complete payment, then returned here.</span>
                   </span>
                 </label>
