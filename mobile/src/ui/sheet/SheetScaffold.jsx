@@ -7,14 +7,18 @@
 //     …rows…
 //   </SheetScaffold>
 
-import { View } from 'react-native';
-import { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { Pressable, View } from 'react-native';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pressable } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from '../Text';
 import Icon from '../Icon';
 
+// `scroll` uses a BottomSheetScrollView and needs a bounded height, so only pass
+// it inside a sheet opened with explicit snapPoints. Non-scroll content is a
+// plain View that measures its own height — that's what dynamic-sizing sheets
+// (the default) rely on, and SheetProvider provides the single BottomSheetView
+// wrapper around it, so never nest another one here.
 export default function SheetScaffold({ title, subtitle, onClose, footer, scroll = false, children, contentStyle }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -23,13 +27,13 @@ export default function SheetScaffold({ title, subtitle, onClose, footer, scroll
   // With a pinned footer the safe-area padding lives on the footer; otherwise it
   // pads the body so the last row clears the home indicator.
   const bottomPad = Math.max(insets.bottom, theme.spacing.md);
-  const Body = scroll ? BottomSheetScrollView : BottomSheetView;
+  const Body = scroll ? BottomSheetScrollView : View;
   const bodyProps = scroll
-    ? { showsVerticalScrollIndicator: false, contentContainerStyle: [styles.body, !footer && { paddingBottom: bottomPad }, contentStyle] }
+    ? { style: styles.rootFill, showsVerticalScrollIndicator: false, contentContainerStyle: [styles.body, { paddingBottom: bottomPad }, contentStyle] }
     : { style: [styles.body, !footer && { paddingBottom: bottomPad }, contentStyle] };
 
   return (
-    <View style={styles.root}>
+    <View style={[scroll && styles.rootFill]}>
       {title != null ? (
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
@@ -58,7 +62,7 @@ export default function SheetScaffold({ title, subtitle, onClose, footer, scroll
 }
 
 const makeStyles = t => ({
-  root: { flex: 1 },
+  rootFill: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',

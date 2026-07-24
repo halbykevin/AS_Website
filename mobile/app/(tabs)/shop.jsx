@@ -5,8 +5,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { useCategories } from '@/src/lib/queries';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Card, Chip, Icon, SectionHeader, Skeleton } from '@/src/ui';
-import BrandBar from '@/src/components/BrandBar';
-import AnnouncementBar from '@/src/components/AnnouncementBar';
+import AppHeader from '@/src/components/AppHeader';
 import ComingSoon from '@/src/components/ComingSoon';
 import SearchPill from '@/src/components/SearchPill';
 import CategoryTile from '@/src/components/CategoryTile';
@@ -48,11 +47,8 @@ export default function ShopScreen() {
   }
 
   return (
-    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={cats.isLoading} onRefresh={onRefresh} tintColor={theme.colors.primary} />}>
-      <AnnouncementBar announcement={storeSettings?.announcement} />
-      <BrandBar variant="store" title="Shop" />
-
-      <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['2xl'], paddingTop: theme.spacing.xs }}>
+    <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={cats.isLoading} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" title="Shop" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
+      <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['2xl'], paddingTop: theme.spacing.lg }}>
         <SearchPill />
 
         {/* All products shortcut */}

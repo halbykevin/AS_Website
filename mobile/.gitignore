@@ -39,3 +39,6 @@ export.log
 # them — they are intentionally NOT ignored here.
 *-service-account*.json
 *-firebase-adminsdk-*.json
+# GCP/Firebase service-account keys download as "<project>-<hash>.json".
+as-company-lb-*.json
+!google-services.json

@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/theme';
@@ -29,7 +29,6 @@ import SheetScaffold from './SheetScaffold';
 import Button from '../Button';
 import Text from '../Text';
 import Icon from '../Icon';
-import { Pressable } from 'react-native';
 
 const SheetContext = createContext(null);
 
@@ -170,18 +169,7 @@ function DynamicSheet({ descriptor, onClosed }) {
   const ref = useRef(null);
   const dismissSeen = useRef(descriptor._dismiss || 0);
 
-  const {
-    variant = 'sheet',
-    snapPoints,
-    render,
-    content,
-    dismissible = true,
-    enablePanDownToClose = true,
-    showHandle = true,
-    backdropOpacity = 0.45,
-    maxHeight = 0.92,
-    onDismiss
-  } = descriptor;
+  const { variant = 'sheet', snapPoints, render, content, dismissible = true, enablePanDownToClose = true, showHandle = true, backdropOpacity = 0.45, maxHeight = 0.92, onDismiss } = descriptor;
 
   const detached = variant === 'modal';
 
@@ -206,10 +194,7 @@ function DynamicSheet({ descriptor, onClosed }) {
 
   const close = useCallback(() => ref.current?.dismiss(), []);
 
-  const renderBackdrop = useCallback(
-    props => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={backdropOpacity} pressBehavior={dismissible ? 'close' : 'none'} />,
-    [backdropOpacity, dismissible]
-  );
+  const renderBackdrop = useCallback(props => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={backdropOpacity} pressBehavior={dismissible ? 'close' : 'none'} />, [backdropOpacity, dismissible]);
 
   // Fullscreen is a single tall snap point; modal floats detached near the
   // bottom with side margins; sheet uses dynamic (content-measured) height
@@ -251,30 +236,28 @@ function Dialog({ title, message, icon, tone = 'primary', actions = [] }) {
   const theme = useTheme();
   const toneColor = tone === 'danger' ? theme.colors.danger : theme.colors.primary;
   return (
-    <BottomSheetView>
-      <View style={{ padding: theme.spacing.xl, paddingTop: theme.spacing.lg, gap: theme.spacing.md }}>
-        {icon ? (
-          <View style={{ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.alpha(toneColor, 0.12), alignSelf: 'center' }}>
-            <Icon name={icon} size={26} color={toneColor} />
-          </View>
-        ) : null}
-        {title ? (
-          <Text variant="h3" center>
-            {title}
-          </Text>
-        ) : null}
-        {message ? (
-          <Text variant="body" muted center>
-            {message}
-          </Text>
-        ) : null}
-        <View style={{ flexDirection: 'row', gap: theme.spacing.md, marginTop: theme.spacing.sm }}>
-          {actions.map((a, i) => (
-            <Button key={i} label={a.label} variant={a.variant} onPress={a.onPress} style={{ flex: 1 }} />
-          ))}
+    <View style={{ padding: theme.spacing.xl, paddingTop: theme.spacing.lg, gap: theme.spacing.md }}>
+      {icon ? (
+        <View style={{ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.alpha(toneColor, 0.12), alignSelf: 'center' }}>
+          <Icon name={icon} size={26} color={toneColor} />
         </View>
+      ) : null}
+      {title ? (
+        <Text variant="h3" center>
+          {title}
+        </Text>
+      ) : null}
+      {message ? (
+        <Text variant="body" muted center>
+          {message}
+        </Text>
+      ) : null}
+      <View style={{ flexDirection: 'row', gap: theme.spacing.md, marginTop: theme.spacing.sm }}>
+        {actions.map((a, i) => (
+          <Button key={i} label={a.label} variant={a.variant} onPress={a.onPress} style={{ flex: 1 }} />
+        ))}
       </View>
-    </BottomSheetView>
+    </View>
   );
 }
 

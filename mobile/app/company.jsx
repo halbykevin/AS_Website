@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';
 import { openUrl } from '@/src/lib/whatsapp';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Button, Card, Header, Icon, SectionHeader, Divider } from '@/src/ui';
+import { Screen, Text, Button, Card, Icon, SectionHeader, Divider } from '@/src/ui';
+import AppHeader from '@/src/components/AppHeader';
 
 export default function CompanyScreen() {
   const theme = useTheme();
@@ -11,9 +12,7 @@ export default function CompanyScreen() {
   const services = content.services?.items || [];
 
   return (
-    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-      <Header title={content.brand?.name || 'AS Company'} />
-
+    <Screen edges={['left', 'right']} contentStyle={{ paddingHorizontal: 0 }} header={s => <AppHeader brand="company" title={content.brand?.name || 'AS Company'} showBack bell scrolled={s} />}>
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['3xl'], paddingTop: theme.spacing.lg }}>
         {/* Hero */}
         <View style={{ gap: theme.spacing.md }}>

@@ -15,4 +15,5 @@ export { default as EmptyState } from './EmptyState';
 export { Input, Field } from './Input';
 export { default as Switch } from './Switch';
 export { default as RangeSlider } from './RangeSlider';
+export { default as useScrolled } from './useScrolled';
 export { SheetProvider, useSheet, SheetScaffold } from './sheet';

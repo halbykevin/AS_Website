@@ -1,19 +1,27 @@
 // The layout primitive every screen builds on. Handles safe-area insets, the
 // standard horizontal gutter, an optional scroll view, a max content width (so
-// text lines never over-stretch on tablets/web), and a themed status bar.
+// text lines never over-stretch on tablets/web), a themed status bar and an
+// optional FIXED header that never scrolls away.
 //
-//   <Screen scroll>…</Screen>                     // padded, scrollable
-//   <Screen scroll={false} padded={false}>…</Screen>  // full-bleed (hero pages)
+//   <Screen scroll>…</Screen>                          // padded, scrollable
+//   <Screen scroll={false} padded={false}>…</Screen>   // full-bleed (hero pages)
+//   <Screen header={s => <AppHeader scrolled={s} />}>… // fixed, scroll-aware header
+//
+// `header` can be a node or a function `(scrolled) => node`. When Screen owns the
+// ScrollView it tracks the scroll offset and feeds `scrolled` in, so a dynamic
+// header can reveal its divider/shadow the moment content slides underneath.
 
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '@/src/theme';
+import useScrolled from './useScrolled';
 
-export default function Screen({ children, scroll = true, padded = true, edges = ['top', 'left', 'right'], background = 'background', statusBarStyle = 'dark', contentStyle, keyboardAware = false, refreshControl, footer, ...rest }) {
+export default function Screen({ children, scroll = true, padded = true, edges = ['top', 'left', 'right'], background = 'background', statusBarStyle = 'dark', contentStyle, keyboardAware = false, refreshControl, header, footer, onScroll, ...rest }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const bg = theme.colors[background] || background;
+  const { scrolled, onScroll: trackScroll } = useScrolled();
 
   const inner = (
     <View
@@ -33,8 +41,15 @@ export default function Screen({ children, scroll = true, padded = true, edges =
     </View>
   );
 
+  const handleScroll = header
+    ? e => {
+        trackScroll(e);
+        onScroll?.(e);
+      }
+    : onScroll;
+
   const body = scroll ? (
-    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }} refreshControl={refreshControl} {...rest}>
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }} refreshControl={refreshControl} onScroll={handleScroll} scrollEventThrottle={16} {...rest}>
       {inner}
     </ScrollView>
   ) : (
@@ -43,9 +58,14 @@ export default function Screen({ children, scroll = true, padded = true, edges =
     </View>
   );
 
+  // Header is capped to the same content width so it aligns with the body on
+  // wide screens, but is otherwise full-bleed (it manages its own gutters).
+  const headerNode = header ? (typeof header === 'function' ? header(scrolled) : header) : null;
+
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
       <StatusBar style={statusBarStyle} />
+      {headerNode ? <View style={{ width: '100%', maxWidth: theme.layout.maxContentWidth, alignSelf: 'center' }}>{headerNode}</View> : null}
       {keyboardAware ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {body}

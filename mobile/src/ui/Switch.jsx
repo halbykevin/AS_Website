@@ -17,13 +17,7 @@ export default function Switch({ value, onValueChange, disabled = false }) {
   const knobX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
 
   return (
-    <Pressable
-      onPress={() => !disabled && onValueChange?.(!value)}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value, disabled }}
-      hitSlop={theme.layout.hitSlop}
-      style={{ opacity: disabled ? 0.5 : 1 }}
-    >
+    <Pressable onPress={() => !disabled && onValueChange?.(!value)} accessibilityRole="switch" accessibilityState={{ checked: value, disabled }} hitSlop={theme.layout.hitSlop} style={{ opacity: disabled ? 0.5 : 1 }}>
       <Animated.View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
         <Animated.View
           style={{

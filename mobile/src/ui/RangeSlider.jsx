@@ -62,6 +62,9 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
 
   const makePan = (frac, start, isLow) =>
     Gesture.Pan()
+      // Claim horizontal intent so dragging a thumb never scrolls the sheet.
+      .activeOffsetX([-6, 6])
+      .failOffsetY([-12, 12])
       .onBegin(() => {
         'worklet';
         start.value = frac.value;

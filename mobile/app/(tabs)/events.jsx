@@ -4,7 +4,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { isEventPast } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Chip, EmptyState } from '@/src/ui';
-import BrandBar from '@/src/components/BrandBar';
+import AppHeader from '@/src/components/AppHeader';
 import EventCard from '@/src/components/EventCard';
 
 export default function EventsScreen() {
@@ -24,10 +24,8 @@ export default function EventsScreen() {
   }, [events, category]);
 
   return (
-    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.primary} />}>
-      <BrandBar variant="company" title="Events" />
-
-      <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl }}>
+    <Screen edges={['left', 'right']} contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="company" title="Events" bell scrolled={s} />}>
+      <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.lg }}>
         <View style={{ gap: 6 }}>
           <Text variant="h1">{content.eventsSection?.heading || 'Upcoming Events'}</Text>
           <Text variant="body" muted>

@@ -1,78 +1,65 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { FlatList, useWindowDimensions, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';
 import { useProducts, useCategories } from '@/src/lib/queries';
-import { selectCartCount } from '@/src/store/cartSlice';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Chip, Icon, Skeleton, EmptyState } from '@/src/ui';
+import { Screen, Text, Skeleton, EmptyState, useScrolled } from '@/src/ui';
 import ProductTile from '@/src/components/ProductTile';
-import AnnouncementBar from '@/src/components/AnnouncementBar';
+import AppHeader from '@/src/components/AppHeader';
+import CatalogToolbar from '@/src/components/store/CatalogToolbar';
+import { applyFilters, sortProducts, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
 
-const SORTS = [
-  { id: 'featured', label: 'Featured' },
-  { id: 'price-asc', label: 'Price ↑' },
-  { id: 'price-desc', label: 'Price ↓' },
-  { id: 'name', label: 'A–Z' }
-];
+const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
 
 export default function CategoryScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
   const { slug } = useLocalSearchParams();
   const { storeSettings } = useContent();
   const isAll = slug === 'all';
 
   const { data: categories = [] } = useCategories();
   const { data: products = [], isLoading } = useProducts(isAll ? {} : { category: slug });
+
   const [sort, setSort] = useState('featured');
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const { scrolled, onScroll } = useScrolled();
 
   const category = categories.find(c => c.slug === slug);
   const title = isAll ? 'All products' : category?.name || 'Products';
 
-  const sorted = useMemo(() => {
-    const list = [...products];
-    switch (sort) {
-      case 'price-asc':
-        return list.sort((a, b) => (a.price || 0) - (b.price || 0));
-      case 'price-desc':
-        return list.sort((a, b) => (b.price || 0) - (a.price || 0));
-      case 'name':
-        return list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-      default:
-        return list;
-    }
-  }, [products, sort]);
+  // Facets + bounds are derived from the loaded list, exactly like the website.
+  const facets = useMemo(() => ({ categories: categoryFacets(products), brands: brandFacets(products) }), [products]);
+  const bounds = useMemo(() => priceBounds(products), [products]);
+  // On a single category page the category facet is redundant, so hide it there.
+  const showCategory = isAll && facets.categories.length > 1;
 
-  // Stable callbacks so memoized tiles never re-render on list re-renders.
+  const visible = useMemo(() => sortProducts(applyFilters(products, filters), sort), [products, filters, sort]);
+
+  const columns = resolveColumns(filters.cols, width);
+
   const renderItem = useCallback(
     ({ item }) => (
-      <View style={{ flex: 1, maxWidth: '50%' }}>
+      <View style={{ flex: 1 / columns, maxWidth: `${100 / columns}%` }}>
         <ProductTile product={item} fluid />
       </View>
     ),
-    []
+    [columns]
   );
   const keyExtractor = useCallback(item => String(item.id), []);
 
   const header = (
-    <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.lg }}>
+    <View style={{ paddingBottom: theme.spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <Text variant="h1">{title}</Text>
-        <Text variant="caption" faint>
-          {sorted.length} item{sorted.length === 1 ? '' : 's'}
-        </Text>
       </View>
       {category?.tagline ? (
-        <Text variant="body" muted>
+        <Text variant="body" muted style={{ marginTop: 4 }}>
           {category.tagline}
         </Text>
       ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -theme.layout.screenPadding }} contentContainerStyle={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.sm }}>
-        {SORTS.map(s => (
-          <Chip key={s.id} label={s.label} selected={sort === s.id} onPress={() => setSort(s.id)} />
-        ))}
-      </ScrollView>
+      <CatalogToolbar total={visible.length} sort={sort} filters={filters} facets={facets} bounds={bounds} products={products} showCategory={showCategory} onSortChange={setSort} onFiltersChange={setFilters} />
     </View>
   );
 
@@ -86,20 +73,20 @@ export default function CategoryScreen() {
       ))}
     </View>
   ) : (
-    <EmptyState icon="bag" message="No products in this category yet." />
+    <EmptyState icon="bag" message="No products match these filters." />
   );
 
   return (
-    <Screen edges={['top']} scroll={false} padded={false} contentStyle={{ flex: 1 }}>
-      <AnnouncementBar announcement={storeSettings?.announcement} />
-      <Header title={title} right={<HeaderActions />} />
-
+    <Screen edges={['left', 'right']} scroll={false} padded={false} contentStyle={{ flex: 1 }} statusBarStyle="light" header={<AppHeader brand="store" title={title} showBack search bag scrolled={scrolled} announcement={storeSettings?.announcement} />}>
       <FlatList
-        data={sorted}
+        key={`cols-${columns}`}
+        data={visible}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        numColumns={2}
-        columnWrapperStyle={{ gap: theme.spacing.md }}
+        numColumns={columns > 1 ? columns : undefined}
+        columnWrapperStyle={columns > 1 ? { gap: theme.spacing.md } : undefined}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{
           paddingHorizontal: theme.layout.screenPadding,
           paddingTop: theme.spacing.md,
@@ -108,7 +95,6 @@ export default function CategoryScreen() {
         }}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
-        // Virtualization tuning: render a screenful first, keep the window tight.
         initialNumToRender={6}
         maxToRenderPerBatch={8}
         windowSize={7}
@@ -116,28 +102,5 @@ export default function CategoryScreen() {
         showsVerticalScrollIndicator={false}
       />
     </Screen>
-  );
-}
-
-// Search + bag shortcuts on the header's right side.
-function HeaderActions() {
-  const theme = useTheme();
-  const count = useSelector(selectCartCount);
-  return (
-    <View style={{ flexDirection: 'row', gap: theme.spacing.lg, alignItems: 'center' }}>
-      <Pressable onPress={() => router.push('/search')} hitSlop={theme.layout.hitSlop}>
-        <Icon name="search" size={22} />
-      </Pressable>
-      <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
-        <Icon name="bag" size={22} />
-        {count > 0 ? (
-          <View style={{ position: 'absolute', right: -8, top: -6, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Text variant="overline" color="textOnPrimary" style={{ fontSize: 10 }}>
-              {count}
-            </Text>
-          </View>
-        ) : null}
-      </Pressable>
-    </View>
   );
 }
