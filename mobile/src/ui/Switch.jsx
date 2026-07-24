@@ -2,8 +2,9 @@
 // on). A tiny spring animates the knob. Use for boolean filters / settings.
 
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable } from 'react-native';
+import { Animated } from 'react-native';
 import { useTheme } from '@/src/theme';
+import SheetPressable from './sheet/SheetPressable';
 
 export default function Switch({ value, onValueChange, disabled = false }) {
   const theme = useTheme();
@@ -17,7 +18,7 @@ export default function Switch({ value, onValueChange, disabled = false }) {
   const knobX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
 
   return (
-    <Pressable onPress={() => !disabled && onValueChange?.(!value)} accessibilityRole="switch" accessibilityState={{ checked: value, disabled }} hitSlop={theme.layout.hitSlop} style={{ opacity: disabled ? 0.5 : 1 }}>
+    <SheetPressable onPress={() => !disabled && onValueChange?.(!value)} activeOpacity={0.8} accessibilityRole="switch" accessibilityState={{ checked: value, disabled }} hitSlop={theme.layout.hitSlop} style={{ opacity: disabled ? 0.5 : 1 }}>
       <Animated.View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
         <Animated.View
           style={{
@@ -30,6 +31,6 @@ export default function Switch({ value, onValueChange, disabled = false }) {
           }}
         />
       </Animated.View>
-    </Pressable>
+    </SheetPressable>
   );
 }

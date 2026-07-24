@@ -8,9 +8,9 @@
 // which is exactly what the global Sheet stack is for.
 
 import { useMemo, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { useTheme } from '@/src/theme';
-import { SheetScaffold, useSheet, Switch, RangeSlider } from '@/src/ui';
+import { SheetScaffold, SheetPressable, useSheet, Switch, RangeSlider } from '@/src/ui';
 import Text from '@/src/ui/Text';
 import Icon from '@/src/ui/Icon';
 import Button from '@/src/ui/Button';
@@ -127,28 +127,25 @@ function Row({ children }) {
 function SelectRow({ label, active, onPress }) {
   const theme = useTheme();
   return (
-    <Pressable
+    <SheetPressable
       onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: 48,
-          paddingHorizontal: theme.spacing.lg,
-          borderRadius: theme.radii.lg,
-          borderWidth: 1,
-          borderColor: active ? theme.colors.borderStrong : theme.colors.border,
-          backgroundColor: theme.colors.surface
-        },
-        pressed && { opacity: 0.7 }
-      ]}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: 48,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.radii.lg,
+        borderWidth: 1,
+        borderColor: active ? theme.colors.borderStrong : theme.colors.border,
+        backgroundColor: theme.colors.surface
+      }}
     >
       <Text variant="body" weight={active ? 'semibold' : 'regular'} numberOfLines={1} style={{ flex: 1 }}>
         {label}
       </Text>
       <Icon name="chevronDown" size={18} color={theme.colors.textFaint} />
-    </Pressable>
+    </SheetPressable>
   );
 }
 
@@ -161,26 +158,23 @@ function OptionPicker({ title, options, value, onPick, onClose }) {
         {options.map((o, i) => {
           const selected = (value || '') === o.value;
           return (
-            <Pressable
+            <SheetPressable
               key={o.value || 'all'}
               onPress={() => onPick(o.value)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: theme.spacing.md + 2,
-                  borderTopWidth: i === 0 ? 0 : 1,
-                  borderTopColor: theme.colors.border
-                },
-                pressed && { opacity: 0.6 }
-              ]}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: theme.spacing.md + 2,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: theme.colors.border
+              }}
             >
               <Text variant="bodyLg" weight={selected ? 'semibold' : 'regular'} color={selected ? 'primary' : 'text'}>
                 {o.label}
               </Text>
               {selected ? <Icon name="check" size={20} color={theme.colors.primary} /> : null}
-            </Pressable>
+            </SheetPressable>
           );
         })}
       </View>

@@ -1,8 +1,9 @@
 // "Per row" segmented control — Auto · 2 · 3 · 4, each drawn with little bars
 // (the RN port of the web store's <DensityToggle>). Selected pill = dark ink.
 
-import { View, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
+import { SheetPressable } from '@/src/ui';
 import Text from '@/src/ui/Text';
 import { COLS } from '@/src/lib/catalogFilters';
 
@@ -21,9 +22,9 @@ export default function DensityToggle({ value = '', onChange }) {
   const styles = useThemedStyles(makeStyles);
 
   const Item = ({ active, onPress, children, label }) => (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }} style={[styles.item, active && styles.itemActive]}>
+    <SheetPressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }} style={[styles.item, active && styles.itemActive]}>
       {children}
-    </Pressable>
+    </SheetPressable>
   );
 
   return (

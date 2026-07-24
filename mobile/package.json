@@ -5,7 +5,7 @@
   "description": "AS Company mobile app — the AS Website (events + what we do) and AS Store (e-commerce) in one Expo app, sharing a single design system.",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start --port 8082",
+    "start": "expo start --clear --port 8082",
     "android": "expo start --android --port 8082",
     "ios": "expo start --ios --port 8082",
     "web": "expo start --web --port 8082",
@@ -40,6 +40,7 @@
     "expo-router": "~6.0.24",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
+    "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",
