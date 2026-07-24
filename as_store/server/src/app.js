@@ -885,6 +885,7 @@ app.post(
     // Whish: create a hosted payment and hand back its URL. No confirmation email
     // yet — the order stays unpaid until the callback / status check confirms it.
     if (paymentMethod === 'whish') {
+      console.log(`[whish] order #${orderId} created (unpaid), starting payment: subtotal=${subtotal} USD`)
       try {
         const { collectUrl } = await whishCreatePayment({
           amount: subtotal,
@@ -901,6 +902,7 @@ app.post(
           String(orderId),
           collectUrl,
         ])
+        console.log(`[whish] order #${orderId} → redirecting customer to ${collectUrl}`)
         const detail = await loadOrderDetail(orderId)
         return res.status(201).json({ ...detail, trackToken, collectUrl })
       } catch (e) {
@@ -930,7 +932,11 @@ async function markWhishPaid(orderId) {
      RETURNING id`,
     [orderId],
   )
-  if (!rows[0]) return false
+  if (!rows[0]) {
+    console.log(`[whish] order #${orderId} already settled — skipping (idempotent)`)
+    return false
+  }
+  console.log(`[whish] order #${orderId} → marked PAID + confirmed, sending emails`)
   const detail = await loadOrderDetail(orderId)
   sendOrderEmails(detail, signOrderToken(orderId)).catch((e) => console.error('[mail]', e?.message || e))
   return true
@@ -941,9 +947,11 @@ async function markWhishPaid(orderId) {
 // left as unpaid — the payment link stays payable, so the shopper can still retry.
 async function reconcileWhishOrder(order) {
   if (order.paymentMethod !== 'whish' || order.paymentStatus === 'paid') return order
+  console.log(`[whish] reconcile order #${order.id} (currently ${order.paymentStatus})`)
   try {
     const { collectStatus } = await whishStatus({ externalId: order.id, currency: order.currency || 'USD' })
     if (collectStatus === 'success') await markWhishPaid(order.id)
+    else console.log(`[whish] order #${order.id} not paid yet (collectStatus=${collectStatus}) — leaving unpaid`)
   } catch (e) {
     console.error('[whish] status check failed:', e?.message || e)
   }
@@ -956,9 +964,11 @@ app.get(
   '/api/orders/whish/callback',
   ah(async (req, res) => {
     const ext = Number(req.query.ext)
+    console.log(`[whish] CALLBACK received: ext=${req.query.ext} query=${JSON.stringify(req.query)}`)
     if (ext) {
       const order = await loadOrderDetail(ext)
       if (order) await reconcileWhishOrder(order)
+      else console.log(`[whish] callback: no order found for ext=${ext}`)
     }
     res.json({ ok: true })
   }),
