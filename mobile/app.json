@@ -40,8 +40,8 @@
       "typedRoutes": false
     },
     "extra": {
-      "websiteApiUrl": "http://localhost:8080",
-      "storeApiUrl": "http://localhost:8081"
+      "websiteApiUrl": "https://asapi.as.com.lb",
+      "storeApiUrl": "https://store-api.as.com.lb"
     }
   }
 }
