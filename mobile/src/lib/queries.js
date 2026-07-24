@@ -7,6 +7,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { loadProducts, loadProduct, loadCategories, loadBrands } from './storeApi'
+import { accountApi } from './account'
 
 export function useProducts(filters = {}) {
   const key = ['products', filters.category || 'all', filters.featured || 0, filters.search || '', filters.limit || 0]
@@ -27,4 +28,15 @@ export function useBrands() {
 
 export function useProduct(slug) {
   return useQuery({ queryKey: ['product', slug], queryFn: () => loadProduct(slug), enabled: Boolean(slug) })
+}
+
+// What checkout may offer. Cash on delivery is always available; online payment
+// only when the server has Whish configured. An unreachable (or older) API means
+// COD-only rather than a broken checkout.
+export function usePaymentMethods() {
+  return useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: () => accountApi.paymentMethods().catch(() => ({ cod: true, whish: false })),
+    staleTime: 10 * 60 * 1000,
+  })
 }

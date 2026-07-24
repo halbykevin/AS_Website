@@ -1,19 +1,29 @@
-// Checkout — cash on delivery. Works signed-out (the mobile number finds or
-// creates the account). Prefills from the signed-in profile / saved addresses,
-// creates the order, then routes to the confirmation screen with a track token.
-// Direct port of the AS Store web checkout.
+// Checkout — cash on delivery or online payment with Whish. Works signed-out (the
+// mobile number finds or creates the account). Prefills from the signed-in profile
+// / saved addresses, creates the order, then routes to the confirmation screen
+// with a track token. Direct port of the AS Store web checkout.
+//
+// Whish orders are placed **unpaid**: the server creates the payment and returns a
+// hosted `collectUrl`, we hand the customer to it in an in-app browser, and the
+// order screen confirms the result with the server. The bag is deliberately not
+// emptied until the payment lands, so an abandoned payment doesn't lose the cart.
 
 import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { useDispatch, useSelector } from 'react-redux'
 import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice'
 import { useAccount, accountApi } from '@/src/lib/account'
+import { usePaymentMethods } from '@/src/lib/queries'
+import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments'
 import { money } from '@/src/lib/format'
 import { useTheme } from '@/src/theme'
 import { Screen, Text, Header, Button, Card, Icon, Divider, EmptyState } from '@/src/ui'
 import { Field, Input } from '@/src/ui/Input'
 import RemoteImage from '@/src/components/RemoteImage'
+
+const WHISH_LOGO = require('../assets/whish.png')
 
 export default function CheckoutScreen() {
   const theme = useTheme()
@@ -24,10 +34,16 @@ export default function CheckoutScreen() {
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
   const [addrId, setAddrId] = useState(null)
+  const [pay, setPay] = useState(PAYMENT_COD) // 'cod' | 'whish'
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const seeded = useRef(false)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Online payment is only offered when the server actually has Whish configured.
+  const { data: methods } = usePaymentMethods()
+  const whishAvailable = Boolean(methods?.whish)
+  const payingOnline = pay === PAYMENT_WHISH && whishAvailable
 
   const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : []
 
@@ -69,6 +85,7 @@ export default function CheckoutScreen() {
     }
     setBusy(true)
     setError('')
+    const online = payingOnline
     try {
       const order = await accountApi.createOrder({
         items: items.map((i) => ({ productId: i.id, qty: i.qty })),
@@ -79,12 +96,28 @@ export default function CheckoutScreen() {
         city: form.city,
         notes: form.notes,
         saveAddress: form.saveAddress,
+        paymentMethod: online ? PAYMENT_WHISH : PAYMENT_COD,
+        // Tells the API this payment comes from the app: Whish returns the browser
+        // to the API, which deep-links back here with the order id appended.
+        ...(online ? { returnUrl: paymentReturnUrl() } : null),
       })
       if (form.saveAddress && customer) {
         setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
       }
+      const track = encodeURIComponent(order.trackToken || '')
+
+      if (online) {
+        if (!order.collectUrl) throw new Error('Could not start the online payment. Please try again.')
+        // Blocks until the customer is handed back (deep link) or closes the tab.
+        // Either way the order screen is where the payment gets confirmed — the
+        // server's status check is the only source of truth.
+        await openWhishCheckout(order.collectUrl)
+        router.replace(`/orders/${order.id}?paying=1&t=${track}`)
+        return
+      }
+
       dispatch(clearCart())
-      router.replace(`/orders/${order.id}?placed=1&t=${encodeURIComponent(order.trackToken || '')}`)
+      router.replace(`/orders/${order.id}?placed=1&t=${track}`)
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -104,7 +137,13 @@ export default function CheckoutScreen() {
             </Text>
             <Text variant="h2">{money(total)}</Text>
           </View>
-          <Button label={busy ? 'Placing order…' : 'Place order'} loading={busy} onPress={placeOrder} size="lg" fullWidth />
+          <Button
+            label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'}
+            loading={busy}
+            onPress={placeOrder}
+            size="lg"
+            fullWidth
+          />
           <Text variant="caption" faint center>
             Free delivery on orders over $100 · 12 months warranty
           </Text>
@@ -190,17 +229,68 @@ export default function CheckoutScreen() {
         </View>
 
         {/* Payment */}
-        <Card style={{ backgroundColor: theme.colors.surfaceAlt }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-            <Icon name="truck" size={22} color={theme.colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text variant="title">Cash on delivery</Text>
-              <Text variant="caption" muted style={{ marginTop: 2 }}>
-                Pay in cash when your order arrives. We'll confirm it shortly after you place it.
-              </Text>
-            </View>
+        {whishAvailable ? (
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="h3">Payment</Text>
+
+            <Card
+              onPress={() => setPay(PAYMENT_COD)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: pay === PAYMENT_COD }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: theme.spacing.md,
+                borderColor: pay === PAYMENT_COD ? theme.colors.primary : theme.colors.border,
+                borderWidth: pay === PAYMENT_COD ? 2 : 1,
+              }}
+            >
+              <Icon name="truck" size={22} color={pay === PAYMENT_COD ? theme.colors.primary : theme.colors.textFaint} />
+              <View style={{ flex: 1 }}>
+                <Text variant="title">Cash on delivery</Text>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>
+                  Pay in cash when your order arrives. We'll confirm it shortly after you place it.
+                </Text>
+              </View>
+            </Card>
+
+            <Card
+              onPress={() => setPay(PAYMENT_WHISH)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: pay === PAYMENT_WHISH }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: theme.spacing.md,
+                borderColor: pay === PAYMENT_WHISH ? theme.colors.primary : theme.colors.border,
+                borderWidth: pay === PAYMENT_WHISH ? 2 : 1,
+              }}
+            >
+              <Icon name="shield" size={22} color={pay === PAYMENT_WHISH ? theme.colors.primary : theme.colors.textFaint} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                  <Text variant="title">Pay now with</Text>
+                  <Image source={WHISH_LOGO} style={{ width: 62, height: 24 }} contentFit="contain" />
+                </View>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>
+                  Secure payment through Whish. You'll finish in the Whish page, then come straight back here.
+                </Text>
+              </View>
+            </Card>
           </View>
-        </Card>
+        ) : (
+          <Card style={{ backgroundColor: theme.colors.surfaceAlt }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+              <Icon name="truck" size={22} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text variant="title">Cash on delivery</Text>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>
+                  Pay in cash when your order arrives. We'll confirm it shortly after you place it.
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
 
         {!customer ? (
           <Text variant="caption" faint>

@@ -40,7 +40,32 @@ npm start                 # http://localhost:8081
 
 Quick check: http://localhost:8081/api/health → `{"ok":true}`.
 
+## Online payment (Whish Pay)
+
+An order is either `cod` or `whish`. For `whish` the API creates the payment (`src/whish.js` — the
+secret never leaves the server), stores the hosted `collectUrl` on the order and leaves it **unpaid**;
+only Whish's own status endpoint may flip it to paid, so a callback or a redirect is just a trigger to
+re-check, never proof.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/payment/methods` | — | `{ cod, whish }` — what checkout may offer (the mobile app asks first) |
+| GET | `/api/orders/whish/callback` | — | Whish server-to-server ping → re-check + settle |
+| GET | `/api/orders/whish/return` | — | Browser return leg for **app** payments: settles, then deep-links back into the app |
+| POST | `/api/orders/:id/reconcile` | session or track token | Force a re-check (missed callback, local testing) |
+
+**Web** checkout redirects back to the storefront order page. The **mobile app** can't be redirected
+to directly (Whish only sends browsers to http(s)), so it posts its deep link as `returnUrl` on the
+order and Whish returns through `/api/orders/whish/return`, which bounces to
+`<scheme>://orders/<id>?placed=1|failed=1&t=<trackToken>`. Only schemes listed in
+`APP_RETURN_SCHEMES` are honoured — anything else falls back to the storefront, so the bridge can't be
+used as an open redirect.
+
 ## Env (`.env`)
 
 `DATABASE_URL` · `PORT` (8081) · `PUBLIC_URL` (builds uploaded image URLs) · `UPLOAD_DIR` ·
 `CORS_ORIGIN` (storefront 5180 + admin 5173) · `ADMIN_EMAIL` / `ADMIN_PASSWORD` · `JWT_SECRET`.
+
+Payments: `WHISH_BASE_URL` / `WHISH_CHANNEL` / `WHISH_SECRET` / `WHISH_WEBSITE_URL` ·
+`PUBLIC_API_URL` + `STORE_PUBLIC_URL` (Whish rejects `localhost` — use a tunnel or the real domains) ·
+`APP_RETURN_SCHEMES` (default `ascompany,exp,exps`; drop the Expo Go ones once the app ships).

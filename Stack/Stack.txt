@@ -1,7 +1,8 @@
 Front End:
 	1. e store
 	2. basic website
-	3. front end for backend 
+	3. mobile app
+	4. front end for backend 
 
 Back End:
 	1. backend for website (Ads, SEO, ticketing...)

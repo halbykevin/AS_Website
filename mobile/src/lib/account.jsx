@@ -63,6 +63,16 @@ export const accountApi = {
   listOrders: () => req('/api/orders', { auth: true }),
   getOrder: (id) => req(`/api/orders/${id}`, { auth: true }),
   trackOrder: (id, token) => req(`/api/orders/track/${id}?token=${encodeURIComponent(token)}`),
+  // Which payment methods checkout may offer (online payment needs Whish creds
+  // on the server). Older servers don't have this route — treat that as COD-only.
+  paymentMethods: () => req('/api/payment/methods'),
+  // Ask the server to re-check an online payment against Whish and settle the
+  // order if it's been paid. Authorized by the session or the order's track token.
+  reconcilePayment: (id, token) =>
+    req(`/api/orders/${id}/reconcile${token ? `?token=${encodeURIComponent(token)}` : ''}`, {
+      method: 'POST',
+      auth: true,
+    }),
 }
 
 const AccountContext = createContext(null)

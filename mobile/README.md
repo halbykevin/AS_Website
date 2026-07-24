@@ -115,12 +115,43 @@ Because `makeStyles` receives the theme, a component written months from now can
 | Store catalog, categories, search, sale pricing | Store tab, `category/[slug]`, `search`, `ProductTile` |
 | Product detail + Add to Bag (max 2) | `product/[slug]` with gallery + sticky add‑to‑bag |
 | Cart drawer + on‑site checkout (COD) | `cart` + `checkout` (guest or signed‑in) |
+| Online payment with **Whish** | `checkout` payment picker → hosted Whish page → `orders/[id]` confirms |
 | Accounts: email/WhatsApp code, Google | `auth/login` + `auth/register` (OTP). Google prepared — see below |
 | Orders + guest tracking, saved addresses | `orders`, `orders/[id]` (track token), `account/addresses` |
 | Events + pre‑filled WhatsApp reservation | Events tab, `events/[id]` → opens WhatsApp |
 | What We Do + solution pages | `what-we-do` + `what-we-do/[slug]` |
 | Guess the Score predictor | `predictor` (3‑step: score → share → details) |
 | Publish gate (Coming Soon) | Store tab respects `settings.published` |
+
+### Paying with Whish
+
+Same model as the web store — **the server owns the payment**, the app only starts it and then asks
+how it went. The Whish secret is never in the app.
+
+```
+checkout                POST /api/orders { paymentMethod:'whish', returnUrl:'ascompany://orders' }
+   │                         └─ server creates the Whish payment → { collectUrl, trackToken }
+   ├─ openAuthSessionAsync(collectUrl, 'ascompany://orders')     ← in-app browser tab
+   │        customer pays on Whish ─► GET /api/orders/whish/return (API re-checks + settles)
+   │                                     └─ 302 ascompany://orders/<id>?placed=1&t=…
+   └─ orders/[id]  → POST /api/orders/:id/reconcile ×5           ← the only source of truth
+```
+
+- **Offered only when it works.** `usePaymentMethods()` (`GET /api/payment/methods`) hides the option
+  unless the API has Whish credentials, so checkout can never start a payment that would 400.
+- **Nothing is trusted client‑side.** `placed=1` is a hint; the screen still asks the API to re‑check
+  with Whish (`src/lib/payments.js` → `pollPayment`), and re‑checks again whenever the app returns to
+  the foreground — covering a payment finished in the Whish app or a missed callback.
+- **The bag survives an abandoned payment.** Unlike COD, the cart is emptied only once the order reads
+  `paid`. An unpaid order keeps its `collectUrl`, so **Complete payment** on `orders/[id]` (and the
+  "Payment pending" line in `orders`) resumes the very same payment link.
+- **Deep link back:** the app sends `Linking.createURL('/orders')` — `ascompany://orders` in a build,
+  `exp://<host>/--/orders` in Expo Go — and the API appends `/<orderId>`. The server only honours
+  schemes in its `APP_RETURN_SCHEMES` allow‑list. Changing `expo.scheme` in `app.json` means changing
+  that list too.
+- Whish rejects `localhost`, so testing the flow against a local API needs a tunnel
+  (`cloudflared` / `ngrok`) in `PUBLIC_API_URL`. Without the deep link the flow still completes — the
+  customer closes the tab and the order screen polls.
 
 ### Google sign‑in on mobile
 

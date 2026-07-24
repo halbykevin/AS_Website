@@ -38,6 +38,28 @@ const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/
 // Default to the API/store URLs; override when tunnelling for local payment tests.
 const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || PUBLIC_URL).replace(/\/$/, '')
 const STORE_PUBLIC_URL = (process.env.STORE_PUBLIC_URL || STORE_URL).replace(/\/$/, '')
+// Custom URL schemes we're willing to hand a paying customer back to — the mobile
+// app (`ascompany://`) and Expo Go while developing (`exp://`). Whish can only
+// redirect a browser to an http(s) URL, so the app pays via a bridge on this API
+// which then deep-links back; everything off this list is refused so that bridge
+// can never be turned into an open redirect.
+const APP_RETURN_SCHEMES = (process.env.APP_RETURN_SCHEMES || 'ascompany,exp,exps')
+  .split(',')
+  .map((s) => s.trim().toLowerCase().replace(/:$/, ''))
+  .filter(Boolean)
+
+// Validate a client-supplied app return URL. Returns '' (ignore it) unless it
+// parses and its scheme is allow-listed.
+function appReturnUrl(url) {
+  if (!url) return ''
+  try {
+    const u = new URL(String(url))
+    const scheme = u.protocol.replace(/:$/, '').toLowerCase()
+    return APP_RETURN_SCHEMES.includes(scheme) ? u.toString().replace(/\/$/, '') : ''
+  } catch {
+    return ''
+  }
+}
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 export const app = express()
@@ -794,6 +816,11 @@ app.put(
 // storefront cart) — larger quantities go through WhatsApp.
 const MAX_ITEM_QTY = 2
 
+// Which payment methods checkout should offer. Public: the mobile app asks before
+// rendering so it never shows online payment when Whish isn't configured (the same
+// idea as /api/account/auth/methods for sign-in).
+app.get('/api/payment/methods', (_req, res) => res.json({ cod: true, whish: whishEnabled() }))
+
 // Place an order (cash on delivery). Prices/names are taken from the DB, never
 // trusted from the client. Works logged-out: the mobile number finds or creates
 // the customer account. Optionally saves the delivery details to the profile.
@@ -886,6 +913,15 @@ app.post(
     // yet — the order stays unpaid until the callback / status check confirms it.
     if (paymentMethod === 'whish') {
       console.log(`[whish] order #${orderId} created (unpaid), starting payment: subtotal=${subtotal} USD`)
+      // The mobile app sends the deep link it wants back (e.g. `ascompany://orders`).
+      // Whish only redirects browsers to http(s), so we point it at our own return
+      // bridge and let that bounce into the app. Web checkout sends none of this and
+      // keeps returning straight to the storefront.
+      const appReturn = appReturnUrl(b.returnUrl)
+      const bridge = (result) =>
+        `${PUBLIC_API_URL}/api/orders/whish/return?ext=${orderId}&result=${result}` +
+        `&t=${encodeURIComponent(trackToken)}&to=${encodeURIComponent(appReturn)}`
+      if (appReturn) console.log(`[whish] order #${orderId} is an app payment → returning to ${appReturn}`)
       try {
         const { collectUrl } = await whishCreatePayment({
           amount: subtotal,
@@ -894,8 +930,12 @@ app.post(
           invoice: `AS Store order #${orderId}`,
           successCallbackUrl: `${PUBLIC_API_URL}/api/orders/whish/callback?ext=${orderId}`,
           failureCallbackUrl: `${PUBLIC_API_URL}/api/orders/whish/callback?ext=${orderId}`,
-          successRedirectUrl: `${STORE_PUBLIC_URL}/account/orders/${orderId}?placed=1&t=${encodeURIComponent(trackToken)}`,
-          failureRedirectUrl: `${STORE_PUBLIC_URL}/account/orders/${orderId}?failed=1&t=${encodeURIComponent(trackToken)}`,
+          successRedirectUrl: appReturn
+            ? bridge('success')
+            : `${STORE_PUBLIC_URL}/account/orders/${orderId}?placed=1&t=${encodeURIComponent(trackToken)}`,
+          failureRedirectUrl: appReturn
+            ? bridge('failure')
+            : `${STORE_PUBLIC_URL}/account/orders/${orderId}?failed=1&t=${encodeURIComponent(trackToken)}`,
         })
         await query(`UPDATE orders SET whish_external_id = $2, whish_collect_url = $3 WHERE id = $1`, [
           orderId,
@@ -971,6 +1011,33 @@ app.get(
       else console.log(`[whish] callback: no order found for ext=${ext}`)
     }
     res.json({ ok: true })
+  }),
+)
+
+// Browser return leg for an **app** payment (public). Whish sends the customer's
+// browser here; we settle the order against the status API first — so the app is
+// already up to date when it reopens — then deep-link back into the app. The
+// target scheme is re-validated here, not trusted from the query string.
+app.get(
+  '/api/orders/whish/return',
+  ah(async (req, res) => {
+    const ext = Number(req.query.ext)
+    const token = String(req.query.t || '')
+    const to = appReturnUrl(req.query.to)
+    console.log(`[whish] RETURN ext=${req.query.ext} result=${req.query.result} to=${to || '(none)'}`)
+    let paid = false
+    if (ext) {
+      const order = await loadOrderDetail(ext)
+      if (order) {
+        const fresh = await reconcileWhishOrder(order)
+        paid = fresh?.paymentStatus === 'paid'
+      }
+    }
+    const q = `${paid ? 'placed=1' : 'failed=1'}&t=${encodeURIComponent(token)}`
+    // No usable app link (web payment, or a scheme we don't allow) — fall back to
+    // the storefront order page, which polls the same way.
+    if (!to) return res.redirect(`${STORE_PUBLIC_URL}/account/orders/${ext}?${q}`)
+    res.redirect(`${to}/${ext}?${q}`)
   }),
 )
 
