@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "lb.com.as.company",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#A41E22"

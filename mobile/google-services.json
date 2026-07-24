@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1091949544691",
+    "project_id": "as-company-lb",
+    "storage_bucket": "as-company-lb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091949544691:android:3cbdbee4914cb6ad97a386",
+        "android_client_info": {
+          "package_name": "lb.com.as.company"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6saqCfC6iPESQQb0jVQpiT0STCdUGgLM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

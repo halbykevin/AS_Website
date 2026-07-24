@@ -32,3 +32,10 @@ yarn-error.*
 # Local validation artifacts
 .expo-export-check/
 export.log
+
+# FCM/APNs push SECRETS — never commit (uploaded to EAS credentials instead).
+# NOTE: google-services.json / GoogleService-Info.plist are client configs that
+# ship inside the app binary and (private repo) are tracked so EAS Build includes
+# them — they are intentionally NOT ignored here.
+*-service-account*.json
+*-firebase-adminsdk-*.json

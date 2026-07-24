@@ -13,3 +13,6 @@ export { default as SectionHeader } from './SectionHeader';
 export { default as Skeleton } from './Skeleton';
 export { default as EmptyState } from './EmptyState';
 export { Input, Field } from './Input';
+export { default as Switch } from './Switch';
+export { default as RangeSlider } from './RangeSlider';
+export { SheetProvider, useSheet, SheetScaffold } from './sheet';

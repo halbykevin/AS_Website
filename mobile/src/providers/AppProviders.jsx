@@ -11,6 +11,8 @@ import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { SheetProvider } from '@/src/ui/sheet';
 import { store } from '@/src/store';
 import { hydrateCart } from '@/src/store/cartSlice';
 import { storage, KEYS } from '@/src/lib/storage';
@@ -62,7 +64,11 @@ export default function AppProviders({ children }) {
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: DAY }}>
           <AccountProvider>
             <NotificationsProvider>
-              <ContentProvider>{children}</ContentProvider>
+              <ContentProvider>
+                <BottomSheetModalProvider>
+                  <SheetProvider>{children}</SheetProvider>
+                </BottomSheetModalProvider>
+              </ContentProvider>
             </NotificationsProvider>
           </AccountProvider>
         </PersistQueryClientProvider>
