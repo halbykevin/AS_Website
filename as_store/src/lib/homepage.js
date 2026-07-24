@@ -1,6 +1,9 @@
-// Loads the CMS-driven homepage blocks (server-side, no cache so edits show
-// immediately). Falls back to the original hardcoded layout if the API is
-// offline, so the homepage never renders empty.
+// Loads the CMS-driven homepage blocks (server-side). Cached under the shared
+// 'store' tag and purged on admin writes so edits show immediately. Falls back
+// to the original hardcoded layout if the API is offline, so the homepage never
+// renders empty.
+
+import { STORE_CACHE } from './catalog'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -91,7 +94,7 @@ export const defaultSections = [
 
 export async function loadHomepageSections() {
   try {
-    const res = await fetch(`${API}/api/homepage-sections`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/homepage-sections`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const sections = await res.json()
     // If the table hasn't been seeded yet, use the default layout.

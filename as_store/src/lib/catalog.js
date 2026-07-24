@@ -1,13 +1,20 @@
 // Server-side catalog loaders for the storefront (categories + their products).
-// Like lib/site.js: `cache: 'no-store'` so CMS/scraper changes show immediately,
-// with safe fallbacks so a page never crashes when the API is offline.
+// Cached on Vercel's data cache under the shared 'store' tag with a 1-hour
+// safety-net TTL; an admin content save purges the tag (via /api/revalidate) so
+// edits show immediately. Safe fallbacks keep a page from crashing when the API
+// is offline.
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+
+// Cache options shared by every storefront loader. `revalidateTag('store')`
+// (fired on admin writes) invalidates all of these at once; `revalidate` is a
+// self-healing fallback in case a purge is ever missed.
+export const STORE_CACHE = { next: { tags: ['store'], revalidate: 3600 } }
 
 // Visible categories, sorted (sort, id) by the API.
 export async function loadCategories() {
   try {
-    const res = await fetch(`${API}/api/categories`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/categories`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
@@ -23,7 +30,7 @@ export async function loadCategory(slug) {
 // Visible brands, sorted by the API. Used on the About page's brand wall.
 export async function loadBrands() {
   try {
-    const res = await fetch(`${API}/api/brands`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/brands`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
@@ -34,9 +41,7 @@ export async function loadBrands() {
 // Visible products in one category (by slug).
 export async function loadCategoryProducts(slug) {
   try {
-    const res = await fetch(`${API}/api/products?category=${encodeURIComponent(slug)}`, {
-      cache: 'no-store',
-    })
+    const res = await fetch(`${API}/api/products?category=${encodeURIComponent(slug)}`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
@@ -47,7 +52,7 @@ export async function loadCategoryProducts(slug) {
 // Every visible product (the /shop all-products page).
 export async function loadAllProducts() {
   try {
-    const res = await fetch(`${API}/api/products`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/products`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
@@ -60,7 +65,7 @@ export async function searchProducts(q) {
   const term = (q || '').trim()
   if (!term) return []
   try {
-    const res = await fetch(`${API}/api/products?search=${encodeURIComponent(term)}`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/products?search=${encodeURIComponent(term)}`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch {
@@ -71,7 +76,7 @@ export async function searchProducts(q) {
 // Single product by slug (full image gallery). Returns null if not found.
 export async function loadProduct(slug) {
   try {
-    const res = await fetch(`${API}/api/products/${encodeURIComponent(slug)}`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/products/${encodeURIComponent(slug)}`, STORE_CACHE)
     if (!res.ok) return null
     return await res.json()
   } catch {
