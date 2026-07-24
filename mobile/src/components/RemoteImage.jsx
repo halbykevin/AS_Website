@@ -40,6 +40,11 @@ export default function RemoteImage({
       style={[{ borderRadius: radius }, style]}
       contentFit={contentFit}
       transition={transition}
+      // Aggressive caching: hit RAM first, then disk — a product photo is only
+      // ever downloaded once. recyclingKey lets virtualized lists reuse the
+      // underlying native view without flashing stale images.
+      cachePolicy="memory-disk"
+      recyclingKey={uri}
       onError={() => setFailed(true)}
       {...rest}
     />

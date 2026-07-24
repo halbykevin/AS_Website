@@ -14,11 +14,11 @@ const extra = Constants.expoConfig?.extra ?? Constants.manifest?.extra ?? {}
 const stripSlash = (u) => String(u || '').replace(/\/$/, '')
 
 export const WEBSITE_API_URL = stripSlash(
-  process.env.EXPO_PUBLIC_WEBSITE_API_URL || extra.websiteApiUrl || 'http://localhost:8080',
+  process.env.EXPO_PUBLIC_WEBSITE_API_URL || extra.websiteApiUrl || 'https://asapi.as.com.lb',
 )
 
 export const STORE_API_URL = stripSlash(
-  process.env.EXPO_PUBLIC_STORE_API_URL || extra.storeApiUrl || 'http://localhost:8081',
+  process.env.EXPO_PUBLIC_STORE_API_URL || extra.storeApiUrl || 'https://store-api.as.com.lb',
 )
 
 // App-wide constants mirrored from the web stores.

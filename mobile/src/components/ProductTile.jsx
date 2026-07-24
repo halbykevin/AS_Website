@@ -3,7 +3,7 @@
 // (with sale strike-through) and an Add-to-Bag pill wired to Redux. `fluid`
 // fills its grid column; otherwise it's a fixed-width rail card.
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { useDispatch } from 'react-redux'
@@ -15,7 +15,7 @@ import Button from '@/src/ui/Button'
 import Badge from '@/src/ui/Badge'
 import RemoteImage from './RemoteImage'
 
-export default function ProductTile({ product, fluid = false, width }) {
+function ProductTile({ product, fluid = false, width }) {
   const theme = useTheme()
   const styles = useThemedStyles(makeStyles)
   const dispatch = useDispatch()
@@ -117,3 +117,7 @@ const makeStyles = (t) => ({
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.spacing.sm },
   strike: { textDecorationLine: 'line-through' },
 })
+
+// Memoized: inside virtualized lists the tile only re-renders when its product
+// actually changes, not on every parent render.
+export default memo(ProductTile, (prev, next) => prev.product === next.product && prev.fluid === next.fluid && prev.width === next.width)

@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { RefreshControl, View } from 'react-native'
 import { router } from 'expo-router'
 import { useContent } from '@/src/content/ContentProvider'
-import { useCategories, useProducts } from '@/src/lib/queries'
+import { useCategories } from '@/src/lib/queries'
 import { useTheme } from '@/src/theme'
 import { Screen, Text, Card, Chip, Icon, SectionHeader, Skeleton } from '@/src/ui'
 import BrandBar from '@/src/components/BrandBar'
@@ -24,7 +24,6 @@ export default function ShopScreen() {
   const theme = useTheme()
   const { storeSettings, refresh: refreshContent } = useContent()
   const cats = useCategories()
-  const all = useProducts({})
 
   const categories = cats.data || []
   const topCats = useMemo(() => categories.filter((c) => !c.parentId), [categories])
@@ -38,12 +37,10 @@ export default function ShopScreen() {
     return map
   }, [categories])
 
-  const productCount = (all.data || []).length
 
   const onRefresh = () => {
     refreshContent()
     cats.refetch()
-    all.refetch()
   }
 
   if (storeSettings && storeSettings.published === false) {
@@ -83,7 +80,7 @@ export default function ShopScreen() {
           <View style={{ flex: 1 }}>
             <Text variant="title">All products</Text>
             <Text variant="caption" muted>
-              {productCount > 0 ? `Browse the full catalog · ${productCount} items` : 'Browse the full catalog'}
+              Browse the full catalog
             </Text>
           </View>
           <Icon name="chevronRight" size={20} color={theme.colors.textFaint} />

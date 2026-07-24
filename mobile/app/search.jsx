@@ -1,13 +1,13 @@
-// Product search — debounced query against the store API. Presented as a modal.
+// Product search — debounced query, results in a virtualized 2-column FlatList.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { FlatList, Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { loadProducts } from '@/src/lib/storeApi'
 import { useTheme } from '@/src/theme'
 import { Screen, Text, Icon, EmptyState, Skeleton } from '@/src/ui'
 import { Input } from '@/src/ui/Input'
-import ProductGrid from '@/src/components/ProductGrid'
+import ProductTile from '@/src/components/ProductTile'
 
 export default function SearchScreen() {
   const theme = useTheme()
@@ -36,8 +36,32 @@ export default function SearchScreen() {
     return () => timer.current && clearTimeout(timer.current)
   }, [term])
 
+  const renderItem = useCallback(
+    ({ item }) => (
+      <View style={{ flex: 1, maxWidth: '50%' }}>
+        <ProductTile product={item} fluid />
+      </View>
+    ),
+    [],
+  )
+  const keyExtractor = useCallback((item) => String(item.id), [])
+
+  const empty = loading ? (
+    <View style={{ gap: theme.spacing.md }}>
+      <Skeleton height={20} width="50%" />
+      <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+        <Skeleton height={300} radius="3xl" style={{ flex: 1 }} />
+        <Skeleton height={300} radius="3xl" style={{ flex: 1 }} />
+      </View>
+    </View>
+  ) : searched ? (
+    <EmptyState icon="search" title="No matches" message={`Nothing found for "${term.trim()}". Try a different term.`} />
+  ) : (
+    <EmptyState icon="search" message="Search the AS Store for smartphones, audio, computing and more." />
+  )
+
   return (
-    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
+    <Screen edges={['top']} scroll={false} padded={false} contentStyle={{ flex: 1 }}>
       {/* Search bar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.layout.screenPadding, paddingVertical: theme.spacing.sm }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, paddingHorizontal: theme.spacing.lg }}>
@@ -63,25 +87,33 @@ export default function SearchScreen() {
         </Pressable>
       </View>
 
-      <View style={{ paddingHorizontal: theme.layout.screenPadding, paddingTop: theme.spacing.md }}>
-        {loading ? (
-          <View style={{ gap: theme.spacing.md }}>
-            <Skeleton height={20} width="50%" />
-            <Skeleton height={260} radius="3xl" />
-          </View>
-        ) : searched && results.length === 0 ? (
-          <EmptyState icon="search" title="No matches" message={`Nothing found for "${term.trim()}". Try a different term.`} />
-        ) : results.length > 0 ? (
-          <>
-            <Text variant="caption" faint style={{ marginBottom: theme.spacing.md }}>
+      <FlatList
+        data={loading ? [] : results}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={2}
+        columnWrapperStyle={{ gap: theme.spacing.md }}
+        contentContainerStyle={{
+          paddingHorizontal: theme.layout.screenPadding,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing['4xl'],
+          gap: theme.spacing.md,
+        }}
+        ListHeaderComponent={
+          results.length > 0 && !loading ? (
+            <Text variant="caption" faint style={{ marginBottom: theme.spacing.sm }}>
               {results.length} result{results.length === 1 ? '' : 's'}
             </Text>
-            <ProductGrid products={results} loading={false} />
-          </>
-        ) : (
-          <EmptyState icon="search" message="Search the AS Store for smartphones, audio, computing and more." />
-        )}
-      </View>
+          ) : null
+        }
+        ListEmptyComponent={empty}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      />
     </Screen>
   )
 }

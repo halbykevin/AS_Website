@@ -1,17 +1,18 @@
-// Category / all-products listing. `slug === 'all'` shows the whole catalog;
-// otherwise it filters to the category (a parent slug also matches its
-// subcategories, handled server-side). Supports a simple client-side sort.
+// Category / all-products listing — a fully virtualized 2-column FlatList, so
+// only the rows on screen are mounted no matter how big the catalog gets.
+// `slug === 'all'` shows the whole catalog; a parent slug also matches its
+// subcategories (server-side). Simple client-side sort via chips.
 
-import { useMemo, useState } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { useCallback, useMemo, useState } from 'react'
+import { FlatList, Pressable, ScrollView, View } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { useSelector } from 'react-redux'
 import { useContent } from '@/src/content/ContentProvider'
 import { useProducts, useCategories } from '@/src/lib/queries'
 import { selectCartCount } from '@/src/store/cartSlice'
 import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Chip, Icon } from '@/src/ui'
-import ProductGrid from '@/src/components/ProductGrid'
+import { Screen, Text, Header, Chip, Icon, Skeleton, EmptyState } from '@/src/ui'
+import ProductTile from '@/src/components/ProductTile'
 import AnnouncementBar from '@/src/components/AnnouncementBar'
 
 const SORTS = [
@@ -48,45 +49,88 @@ export default function CategoryScreen() {
     }
   }, [products, sort])
 
-  return (
-    <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-      <AnnouncementBar announcement={storeSettings?.announcement} />
-      <Header title={title} right={<BrandBarRight />} />
-
-      <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.lg, paddingTop: theme.spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <Text variant="h1">{title}</Text>
-          <Text variant="caption" faint>
-            {sorted.length} item{sorted.length === 1 ? '' : 's'}
-          </Text>
-        </View>
-
-        {category?.tagline ? (
-          <Text variant="body" muted>
-            {category.tagline}
-          </Text>
-        ) : null}
-
-        {/* Sort chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginHorizontal: -theme.layout.screenPadding }}
-          contentContainerStyle={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.sm }}
-        >
-          {SORTS.map((s) => (
-            <Chip key={s.id} label={s.label} selected={sort === s.id} onPress={() => setSort(s.id)} />
-          ))}
-        </ScrollView>
-
-        <ProductGrid products={sorted} loading={isLoading} emptyMessage="No products in this category yet." />
+  // Stable callbacks so memoized tiles never re-render on list re-renders.
+  const renderItem = useCallback(
+    ({ item }) => (
+      <View style={{ flex: 1, maxWidth: '50%' }}>
+        <ProductTile product={item} fluid />
       </View>
+    ),
+    [],
+  )
+  const keyExtractor = useCallback((item) => String(item.id), [])
+
+  const header = (
+    <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <Text variant="h1">{title}</Text>
+        <Text variant="caption" faint>
+          {sorted.length} item{sorted.length === 1 ? '' : 's'}
+        </Text>
+      </View>
+      {category?.tagline ? (
+        <Text variant="body" muted>
+          {category.tagline}
+        </Text>
+      ) : null}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -theme.layout.screenPadding }}
+        contentContainerStyle={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.sm }}
+      >
+        {SORTS.map((s) => (
+          <Chip key={s.id} label={s.label} selected={sort === s.id} onPress={() => setSort(s.id)} />
+        ))}
+      </ScrollView>
+    </View>
+  )
+
+  const empty = isLoading ? (
+    <View style={{ gap: theme.spacing.md }}>
+      {[0, 1].map((r) => (
+        <View key={r} style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+          <Skeleton height={300} radius="3xl" style={{ flex: 1 }} />
+          <Skeleton height={300} radius="3xl" style={{ flex: 1 }} />
+        </View>
+      ))}
+    </View>
+  ) : (
+    <EmptyState icon="bag" message="No products in this category yet." />
+  )
+
+  return (
+    <Screen edges={['top']} scroll={false} padded={false} contentStyle={{ flex: 1 }}>
+      <AnnouncementBar announcement={storeSettings?.announcement} />
+      <Header title={title} right={<HeaderActions />} />
+
+      <FlatList
+        data={sorted}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={2}
+        columnWrapperStyle={{ gap: theme.spacing.md }}
+        contentContainerStyle={{
+          paddingHorizontal: theme.layout.screenPadding,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing['4xl'],
+          gap: theme.spacing.md,
+        }}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty}
+        // Virtualization tuning: render a screenful first, keep the window tight.
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        showsVerticalScrollIndicator={false}
+      />
     </Screen>
   )
 }
 
-// Reuse the store bag/search actions on the header's right side.
-function BrandBarRight() {
+// Search + bag shortcuts on the header's right side.
+function HeaderActions() {
   const theme = useTheme()
   const count = useSelector(selectCartCount)
   return (

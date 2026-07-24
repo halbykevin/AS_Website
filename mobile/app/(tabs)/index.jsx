@@ -1,15 +1,16 @@
-// Home tab — the AS Store storefront, front and center. Announcement, search,
-// category chips, hot deals, "new in" + featured rails, the full product grid,
-// plus compact entry points to the predictor game and the company page.
-// Gated by settings.published (Coming Soon when the store isn't live).
+// Home tab — the AS Store storefront, front and center.
+//
+// Performance-first: ONE capped feed query (limit 48) drives the hero rails,
+// deals and a small grid preview — the full catalog never mounts here. The
+// complete list lives in /category/all, which is a virtualized FlatList.
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { RefreshControl, ScrollView, View } from 'react-native'
 import { router } from 'expo-router'
 import { useContent } from '@/src/content/ContentProvider'
 import { useProducts, useCategories } from '@/src/lib/queries'
 import { useTheme } from '@/src/theme'
-import { Screen, Text, Card, Chip, Icon, SectionHeader } from '@/src/ui'
+import { Screen, Text, Card, Chip, Icon, SectionHeader, Button } from '@/src/ui'
 import BrandBar from '@/src/components/BrandBar'
 import AnnouncementBar from '@/src/components/AnnouncementBar'
 import ComingSoon from '@/src/components/ComingSoon'
@@ -18,35 +19,38 @@ import ProductTile from '@/src/components/ProductTile'
 import ProductGrid from '@/src/components/ProductGrid'
 import HRail from '@/src/components/HRail'
 
+const FEED_LIMIT = 48 // one bounded request feeds every section below
+const PREVIEW_COUNT = 8 // grid preview size — the rest lives in /category/all
+
 export default function HomeScreen() {
   const theme = useTheme()
   const { content, storeSettings, refresh: refreshContent } = useContent()
 
-  const all = useProducts({})
+  const feed = useProducts({ limit: FEED_LIMIT })
   const featured = useProducts({ featured: 1, limit: 10 })
-  const newIn = useProducts({ limit: storeSettings?.homeNew?.count || 8 })
   const cats = useCategories()
 
-  const loading = all.isLoading
-  const products = all.data || []
+  const products = feed.data || []
   const predictor = content.predictor
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     refreshContent()
-    all.refetch()
+    feed.refetch()
     featured.refetch()
-    newIn.refetch()
     cats.refetch()
-  }
+  }, [refreshContent, feed.refetch, featured.refetch, cats.refetch])
 
-  // Top-level categories drive the quick chips row.
+  // All derived from the single feed — no extra network requests.
   const topCats = useMemo(() => (cats.data || []).filter((c) => !c.parentId), [cats.data])
-
-  // Running promotions — anything the API priced down.
+  const newIn = useMemo(() => products.slice(0, 8), [products])
   const deals = useMemo(
-    () => products.filter((p) => p.salePercent || (p.oldPrice && Number(p.oldPrice) > Number(p.price))),
+    () =>
+      products
+        .filter((p) => p.salePercent || (p.oldPrice && Number(p.oldPrice) > Number(p.price)))
+        .slice(0, 10),
     [products],
   )
+  const preview = useMemo(() => products.slice(0, PREVIEW_COUNT), [products])
 
   if (storeSettings && storeSettings.published === false) {
     return (
@@ -60,7 +64,13 @@ export default function HomeScreen() {
     <Screen
       edges={['top']}
       contentStyle={{ paddingHorizontal: 0 }}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={feed.isRefetching}
+          onRefresh={onRefresh}
+          tintColor={theme.colors.primary}
+        />
+      }
     >
       <AnnouncementBar announcement={storeSettings?.announcement} />
       <BrandBar variant="store" />
@@ -95,7 +105,7 @@ export default function HomeScreen() {
           </ScrollView>
         ) : null}
 
-        {/* Hot deals — dark spotlight section, only when a promotion is running */}
+        {/* Hot deals — dark spotlight, only when a promotion is running */}
         {deals.length > 0 ? (
           <View
             style={{
@@ -107,7 +117,7 @@ export default function HomeScreen() {
           >
             <SectionHeader eyebrow="Limited time" title="Hot deals" onInverse style={{ marginBottom: theme.spacing.md }} />
             <HRail
-              data={deals.slice(0, 10)}
+              data={deals}
               itemWidth={220}
               edgePadding={theme.spacing.lg}
               renderItem={(p) => <ProductTile product={p} width={220} />}
@@ -116,7 +126,7 @@ export default function HomeScreen() {
         ) : null}
 
         {/* New in rail */}
-        {(newIn.data || []).length > 0 ? (
+        {newIn.length > 0 ? (
           <View>
             <SectionHeader
               eyebrow={storeSettings?.homeNew?.eyebrow}
@@ -124,7 +134,7 @@ export default function HomeScreen() {
               actionLabel="Shop all"
               onAction={() => router.push('/category/all')}
             />
-            <HRail data={newIn.data} itemWidth={220} renderItem={(p) => <ProductTile product={p} width={220} />} />
+            <HRail data={newIn} itemWidth={220} renderItem={(p) => <ProductTile product={p} width={220} />} />
           </View>
         ) : null}
 
@@ -154,10 +164,20 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
-        {/* All products */}
+        {/* Product preview grid + the door to the full (virtualized) catalog */}
         <View>
-          <SectionHeader title="All products" />
-          <ProductGrid products={products} loading={loading} emptyMessage="No products yet. Pull to refresh." />
+          <SectionHeader title="Popular right now" actionLabel="View all" onAction={() => router.push('/category/all')} />
+          <ProductGrid products={preview} loading={feed.isLoading} emptyMessage="No products yet. Pull to refresh." />
+          {products.length > PREVIEW_COUNT ? (
+            <Button
+              label="View all products"
+              variant="ghost"
+              iconRight="arrowRight"
+              onPress={() => router.push('/category/all')}
+              fullWidth
+              style={{ marginTop: theme.spacing.lg }}
+            />
+          ) : null}
         </View>
 
         {/* Company entry — the informative website lives one tap away */}
