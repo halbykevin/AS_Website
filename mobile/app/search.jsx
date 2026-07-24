@@ -1,5 +1,3 @@
-// Product search — debounced query, results in a virtualized 2-column FlatList.
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { router } from 'expo-router';

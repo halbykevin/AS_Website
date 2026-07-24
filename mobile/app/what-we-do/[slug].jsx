@@ -1,6 +1,3 @@
-// Solution detail — intro, the list of capabilities (title + optional
-// description), and an outro. Content comes from the loaded solutions list.
-
 import { View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';

@@ -1,6 +1,3 @@
-// Saved addresses — list, add, edit, delete, set default. The whole book is
-// saved at once (PUT /api/account/addresses), matching the web account page.
-
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';

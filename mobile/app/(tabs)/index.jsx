@@ -1,9 +1,3 @@
-// Home tab — the AS Store storefront, front and center.
-//
-// Performance-first: ONE capped feed query (limit 48) drives the hero rails,
-// deals and a small grid preview — the full catalog never mounts here. The
-// complete list lives in /category/all, which is a virtualized FlatList.
-
 import { useCallback, useMemo } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';

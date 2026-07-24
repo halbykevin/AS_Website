@@ -1,7 +1,3 @@
-// Events tab — the full events list with category filter chips. Upcoming events
-// first, past events dimmed at the end. Tapping a card opens its detail, where
-// the reservation happens over WhatsApp.
-
 import { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useContent } from '@/src/content/ContentProvider';

@@ -1,6 +1,3 @@
-// Account tab — signed-out shows a sign-in CTA; signed-in shows the profile,
-// links to orders + addresses, quick links into the app, and sign-out.
-
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount } from '@/src/lib/account';

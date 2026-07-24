@@ -1,4 +1,3 @@
-// Fallback for any unknown route.
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Screen, Header, EmptyState } from '@/src/ui';

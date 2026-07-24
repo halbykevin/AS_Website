@@ -1,6 +1,3 @@
-// What We Do — the Absolute Solution division page: intro, the solution tiles
-// (each opens a detail screen), vision & mission, and the company divisions.
-
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';

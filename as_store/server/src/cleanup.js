@@ -1,7 +1,3 @@
-// One-off (re-runnable) catalog cleanup: decodes HTML entities and collapses
-// breadcrumb category names to a clean leaf, merging any duplicates that result
-// (products are repointed to the kept row). Also decodes product text.
-//   npm run clean
 import 'dotenv/config'
 import { pool, query } from './db.js'
 import { decodeEntities, cleanCategoryName } from './scraper.js'
@@ -9,8 +5,6 @@ import { decodeEntities, cleanCategoryName } from './scraper.js'
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-// Rename + dedupe a lookup table (categories|brands). `fkColumn` is the column on
-// products that references it. `computeName(oldName)` returns the cleaned name.
 async function cleanTable(table, fkColumn, computeName) {
   const { rows } = await query(`SELECT id, name FROM ${table} ORDER BY id`)
   const targets = rows.map((r) => {

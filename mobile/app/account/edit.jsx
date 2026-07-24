@@ -1,5 +1,3 @@
-// Edit profile — name / phone / email. Saves via PUT /api/account.
-
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';

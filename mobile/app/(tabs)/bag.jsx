@@ -1,6 +1,3 @@
-// Bag tab — the cart as a first-class destination. Line items with quantity
-// steppers (2-per-item cap + WhatsApp note at the cap), subtotal and checkout.
-
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';

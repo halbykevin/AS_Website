@@ -192,18 +192,32 @@ checkout                POST /api/orders { paymentMethod:'whish', returnUrl:'asc
 
 ### Google sign‑in on mobile
 
-Email and WhatsApp one‑time codes work out of the box against the existing API.
-**Google** is a full browser round‑trip that currently returns the shopper to
-the _web_ storefront (`STORE_URL/auth/google`). To finish it in the app:
+Google is a full browser round‑trip (app → API → Google → API) that **returns the
+shopper to the app**, not the web storefront — same deep‑link bridge as the Whish
+payment return.
 
-1. Add a mobile redirect on the store API that returns the token to the app's
-   deep link (scheme `ascompany://auth/google#token=…`).
-2. Register that redirect URI in the Google console.
-3. Have the app open the flow with `expo-web-browser`'s `openAuthSessionAsync`
-   and call `useAccount().adoptToken(token)` on return.
+```
+GoogleButton  → openAuthSessionAsync(
+                  /api/account/google/start?next=…&appReturn=ascompany://auth/google,
+                  'ascompany://auth/google')            ← in-app browser tab
+                pick Google account ─► /api/account/google/callback
+                  └─ 302 ascompany://auth/google?token=…&next=…
+              → tab closes itself, parse token → useAccount().adoptToken(token)
+              → router.replace(next)
+```
 
-The button is already wired to open the web flow (`src/components/auth.jsx` →
-`GoogleButton`); only the return trip needs the server change.
+- The app passes `Linking.createURL('/auth/google')` as `appReturn`; the API carries
+  it inside the **signed OAuth state**, then redirects the token there. The web flow
+  sends no `appReturn` and keeps returning to `STORE_URL/auth/google`.
+- `appReturn` is re‑validated against the server's `APP_RETURN_SCHEMES` allow‑list at
+  redirect time, so it can't be turned into an open redirect. A **failed** sign‑in is
+  also bounced back to the app link (`?error=google`) so the browser still closes.
+- No change is needed in the Google Cloud console — Google still redirects to the
+  API's own `GOOGLE_REDIRECT_URI`; the API does the final hop into the app.
+- Lives in [`src/lib/googleAuth.js`](src/lib/googleAuth.js) (`signInWithGoogle`) +
+  `GoogleButton` in [`src/components/auth.jsx`](src/components/auth.jsx).
+
+Email and WhatsApp one‑time codes still work out of the box against the same API.
 
 ---
 

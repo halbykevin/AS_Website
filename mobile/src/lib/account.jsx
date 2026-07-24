@@ -39,10 +39,13 @@ async function req(path, { method = 'GET', body, auth = false } = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-// Google sign-in is a full browser round-trip (app → API → Google → API). The
-// app hands over this URL; wiring the return trip needs a mobile redirect on the
-// server (documented in the README) — email/WhatsApp codes work out of the box.
-export const googleSignInUrl = (next = '/') => `${API}/api/account/google/start?next=${encodeURIComponent(next)}`;
+// Google sign-in is a full browser round-trip (app → API → Google → API). We hand
+// the API our deep link as `appReturn`, so its callback redirects the token back
+// into the app (the browser tab then closes itself) instead of the web storefront.
+// See `src/lib/googleAuth.js` for the browser flow that drives this.
+export const googleSignInUrl = (next = '/', appReturn = '') =>
+  `${API}/api/account/google/start?next=${encodeURIComponent(next)}` +
+  (appReturn ? `&appReturn=${encodeURIComponent(appReturn)}` : '');
 
 export const accountApi = {
   authMethods: () => req('/api/account/auth/methods'),

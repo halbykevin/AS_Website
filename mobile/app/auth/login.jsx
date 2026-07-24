@@ -1,7 +1,3 @@
-// Sign in — choose a method, then verify a 6-digit code. Email is always
-// available; WhatsApp and Google appear only when the API reports them
-// configured. Direct port of the AS Store web login flow.
-
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -114,7 +110,16 @@ export default function LoginScreen() {
 
           {step === 'choose' ? (
             <View style={{ gap: theme.spacing.md }}>
-              {methods.google ? <GoogleButton next={next} onDone={() => refresh()} /> : null}
+              {methods.google ? (
+                <GoogleButton
+                  next={next}
+                  onDone={async ({ next: dest }) => {
+                    await refresh();
+                    router.replace(dest || next);
+                  }}
+                  onError={setError}
+                />
+              ) : null}
               {methods.otpChannels.map(ch => (
                 <Button
                   key={ch}

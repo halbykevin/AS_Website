@@ -1,6 +1,3 @@
-// AS Company — the informative (website) side, one tap away from the store:
-// hero, what-we-do services, about stats and contact. Linked from Home + Account.
-
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';

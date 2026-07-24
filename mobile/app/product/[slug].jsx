@@ -1,7 +1,3 @@
-// Product detail — swipeable image gallery, brand/name/price (with sale),
-// colour dots, description, specs, and an Add-to-Bag footer that respects the
-// 2-per-item cap. Mirrors the AS Store web ProductDetail.
-
 import { useMemo, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';

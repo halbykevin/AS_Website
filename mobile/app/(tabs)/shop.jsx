@@ -1,6 +1,3 @@
-// Shop tab — the browse hub: search, category tiles (with their subcategories),
-// and quick collection shortcuts. Gated by settings.published like Home.
-
 import { useMemo } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';

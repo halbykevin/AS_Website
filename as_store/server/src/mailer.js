@@ -1,9 +1,3 @@
-// Transactional emails over the company mailbox (orders@as.com.lb, SMTP SSL :465).
-// Inert unless SMTP_HOST/SMTP_USER/SMTP_PASS are set. Every email shares one
-// branded shell (logo header + footer) via emailShell(). Sends:
-//   - order confirmation (customer) + new-order copy (shop inbox)
-//   - contact-form message (shop inbox)
-//   - login OTP code (customer)
 import nodemailer from 'nodemailer'
 import { OTP_TTL_MINUTES } from './otp.js'
 
@@ -15,8 +9,6 @@ const FROM = process.env.MAIL_FROM || (USER ? `AS Store <${USER}>` : '')
 const NOTIFY = process.env.ORDERS_NOTIFY_TO || USER
 const CONTACT_TO = process.env.CONTACT_TO || NOTIFY
 const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/$/, '')
-// The store logo is a public asset served by the storefront. Emails reference it
-// by absolute URL. Override with MAIL_LOGO_URL if it ever lives elsewhere.
 const LOGO_URL = process.env.MAIL_LOGO_URL || `${STORE_URL}/as-store-logo.png`
 
 export const mailEnabled = () => Boolean(HOST && USER && PASS)
@@ -27,7 +19,7 @@ function getTransport() {
     transport = nodemailer.createTransport({
       host: HOST,
       port: PORT,
-      secure: PORT === 465, // SSL/TLS on 465, STARTTLS otherwise
+      secure: PORT === 465, 
       auth: { user: USER, pass: PASS },
     })
   }
@@ -42,9 +34,6 @@ const RED = '#A41E22'
 const INK = '#1d1d1f'
 const MUTED = '#6e6e73'
 
-// Shared branded layout: light-gray page → white card with the AS Store logo at
-// the top → the message body → a small footer. All inline styles for email
-// clients.
 function emailShell(innerHtml) {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;margin:0;padding:24px">
@@ -153,9 +142,6 @@ export async function sendOrderEmails(order, trackToken) {
   }
 }
 
-// Contact-form message → the shop inbox (CONTACT_TO, defaults to the orders
-// notify address). Replies go straight to the visitor via reply-to. When SMTP
-// isn't configured (e.g. local dev) it just logs the message so nothing is lost.
 export async function sendContactEmail({ name, email, phone, message }) {
   if (!mailEnabled()) {
     console.log('[contact] (mail disabled) message from', name, email, phone, '\n', message)
@@ -180,8 +166,6 @@ export async function sendContactEmail({ name, email, phone, message }) {
   return { delivered: true }
 }
 
-// Login OTP code → the customer's email. When SMTP is off (dev) it logs instead
-// (the API also echoes the code in dev via otpDevEcho).
 export async function sendOtpEmail(email, code) {
   if (!mailEnabled()) {
     console.log(`[otp] sign-in code for ${email}: ${code}`)

@@ -1,11 +1,8 @@
-// Shared auth building blocks for the login/register screens — the RN port of
-// the store's AccountUI: an AuthShell wrapper, the 6-digit CodeForm, a channel
-// toggle (email / WhatsApp code) and the Google button.
-
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { useTheme, useThemedStyles } from '@/src/theme';
-import { googleSignInUrl } from '@/src/lib/account';
+import { useAccount } from '@/src/lib/account';
+import { signInWithGoogle } from '@/src/lib/googleAuth';
 import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
 import Icon from '@/src/ui/Icon';
@@ -71,15 +68,25 @@ export function ChannelToggle({ channels, value, onChange }) {
   );
 }
 
-// Google sign-in — opens the web OAuth flow in a browser tab. Completing the
-// round-trip back into the app needs a mobile redirect on the server (see
-// README → "Google sign-in on mobile").
-export function GoogleButton({ next = '/', onDone }) {
+export function GoogleButton({ next = '/', onDone, onError }) {
+  const { adoptToken } = useAccount();
+  const [busy, setBusy] = useState(false);
+
   const open = async () => {
-    await WebBrowser.openBrowserAsync(googleSignInUrl(next));
-    onDone?.();
+    setBusy(true);
+    try {
+      const result = await signInWithGoogle(next);
+      if (!result) return; // dismissed the browser — stay on the sign-in screen
+      await adoptToken(result.token);
+      onDone?.({ next: result.next });
+    } catch (e) {
+      onError?.(e.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
-  return <Button label="Continue with Google" icon="google" variant="ghost" onPress={open} fullWidth />;
+
+  return <Button label="Continue with Google" icon="google" variant="ghost" onPress={open} loading={busy} fullWidth />;
 }
 
 const makeToggleStyles = t => ({

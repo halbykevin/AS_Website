@@ -1,7 +1,3 @@
-// Event detail — image, title, date(s), venue, description, and the reserve CTA.
-// Reserving opens a pre-filled WhatsApp chat to the admin number (falls back to
-// the Ticketing Box Office link), exactly like the website.
-
 import { View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';

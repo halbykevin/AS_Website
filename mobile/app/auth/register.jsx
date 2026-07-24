@@ -1,7 +1,3 @@
-// Create an account — collect the shopper's details, verify their email with a
-// 6-digit code, and the server attaches the profile once the code proves the
-// address is theirs (the OTP flow carrying a `profile`). Mirrors the web register.
-
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';

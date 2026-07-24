@@ -1,9 +1,3 @@
-// Guess the Score — the marketing predictor game as a 3-step flow:
-//   1. Predict the exact final score of the featured match.
-//   2. Share any AS Store item to a story/status (platform is recorded).
-//   3. Full name + mobile → a draw ticket (POST /api/predictions).
-// Gated by the same enabled/closed/deadline checks as the web.
-
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';

@@ -1,4 +1,3 @@
-// The AS red announcement strip from store settings (free delivery / warranty).
 import { View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import Text from '@/src/ui/Text';

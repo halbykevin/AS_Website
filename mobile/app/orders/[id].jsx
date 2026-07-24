@@ -1,13 +1,3 @@
-// Order detail / confirmation. Loads via the signed-in endpoint, or — for guest
-// checkout — via the track token passed as ?t=. Shows a celebratory header right
-// after placing (?placed=1), the item lines, delivery details and status.
-//
-// It is also where an **online (Whish) payment** lands: the app returns here after
-// the hosted payment page (deep link `…/orders/<id>?placed=1|failed=1&t=…`, or
-// `?paying=1` when the customer just closed the tab). The app never decides that a
-// payment succeeded — it asks the API to re-check with Whish, a few times, until
-// the order settles. The bag is emptied only once that confirms.
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -36,16 +26,13 @@ export default function OrderDetailScreen() {
   const [resuming, setResuming] = useState(false);
   const justPlaced = placed === '1';
   const paymentFailed = failed === '1';
-  // Fresh from checkout / the payment page — poll instead of trusting the flag.
   const fromPayment = justPlaced || paymentFailed || paying === '1';
-  const clearedRef = useRef(false); // empties the bag once, when payment confirms
+  const clearedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        // Prefer the track token (works signed-out); fall back to the authed
-        // endpoint for a signed-in customer viewing their history.
         const data = t ? await accountApi.trackOrder(id, t) : await accountApi.getOrder(id);
         if (active) setOrder(data);
       } catch (e) {
@@ -59,9 +46,6 @@ export default function OrderDetailScreen() {
 
   const awaiting = isAwaitingPayment(order);
 
-  // Ask the server to re-check the payment with Whish. Used on arrival, when the
-  // app comes back to the foreground, and by the manual "Check again" button.
-  // One poll at a time — overlapping runs would just race each other.
   const runningRef = useRef(false);
   const recheck = useCallback(
     async (tries = 1) => {
@@ -78,9 +62,6 @@ export default function OrderDetailScreen() {
     [id, t]
   );
 
-  // Arriving from the payment page the order often still reads unpaid: the Whish
-  // callback may not have landed yet. Poll a few times — the server settles it as
-  // soon as the status API says success.
   const polledRef = useRef(false);
   useEffect(() => {
     if (!awaiting || !fromPayment || polledRef.current) return;
@@ -88,8 +69,6 @@ export default function OrderDetailScreen() {
     recheck(5);
   }, [awaiting, fromPayment, recheck]);
 
-  // Payments can also complete while the app is backgrounded (the customer paid in
-  // the Whish app). Re-check whenever we come back to the foreground.
   useEffect(() => {
     if (!awaiting) return;
     const sub = AppState.addEventListener('change', state => {
@@ -98,8 +77,6 @@ export default function OrderDetailScreen() {
     return () => sub.remove();
   }, [awaiting, recheck]);
 
-  // The bag was kept through the payment in case it was abandoned — empty it now
-  // that the money is in.
   useEffect(() => {
     if (order?.paymentMethod === PAYMENT_WHISH && order?.paymentStatus === 'paid' && !clearedRef.current) {
       clearedRef.current = true;
@@ -107,8 +84,6 @@ export default function OrderDetailScreen() {
     }
   }, [order, dispatch]);
 
-  // Reopen the hosted payment page for an unpaid order (closed the tab, payment
-  // failed, or came back to it from the orders list) — the link stays payable.
   const resumePayment = async () => {
     if (!order?.collectUrl || resuming) return;
     setResuming(true);
@@ -152,8 +127,6 @@ export default function OrderDetailScreen() {
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
         {online ? (
           awaiting ? (
-            // Unpaid online order: either we're still waiting on Whish's callback
-            // or the payment wasn't completed. Both offer the link again.
             <Card style={{ gap: theme.spacing.md, backgroundColor: theme.alpha(theme.colors.accent, 0.12) }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 {checking ? <ActivityIndicator color={theme.colors.primary} /> : <Icon name="info" size={24} color={theme.colors.primary} />}

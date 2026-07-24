@@ -1,8 +1,3 @@
-// Category / all-products listing — a fully virtualized 2-column FlatList, so
-// only the rows on screen are mounted no matter how big the catalog gets.
-// `slug === 'all'` shows the whole catalog; a parent slug also matches its
-// subcategories (server-side). Simple client-side sort via chips.
-
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';

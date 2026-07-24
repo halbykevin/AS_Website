@@ -2,21 +2,6 @@ import 'dotenv/config'
 import { pool, query } from './db.js'
 import { localizeImage, isLocalImage } from './scraper.js'
 
-// One-time backfill: download every hotlinked product image onto our own disk
-// (/uploads) and rewrite product_images.url to the local copy, so the catalog
-// stops depending on the shops it was scraped from (and becomes eligible for
-// Google Merchant Center / image optimization).
-//
-// Idempotent: rows already local are skipped, so it's safe to re-run — it only
-// picks up whatever is still remote (e.g. after adding more scraped products).
-//
-//   npm run backfill-images                 # everything still remote
-//   npm run backfill-images -- --limit 50   # test on a subset first
-//
-// IMPORTANT: run this on the SAME machine that serves /uploads (the VPS), with
-// PUBLIC_URL set to the public API origin — the files land on that disk and the
-// stored urls are built from PUBLIC_URL.
-
 const args = process.argv.slice(2)
 const li = args.indexOf('--limit')
 const limit = li >= 0 ? Number(args[li + 1]) : null
@@ -47,8 +32,6 @@ for (const row of todo) {
     await query(`UPDATE product_images SET url = $1 WHERE id = $2`, [local, row.id])
     done++
   } catch (e) {
-    // Two different remote urls for the same product collapsed to one local file
-    // → the unique (product_id, url) blocks the update. Drop the now-duplicate.
     if (e.code === '23505') {
       await query(`DELETE FROM product_images WHERE id = $1`, [row.id])
       merged++

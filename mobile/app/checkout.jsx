@@ -1,13 +1,3 @@
-// Checkout — cash on delivery or online payment with Whish. Works signed-out (the
-// mobile number finds or creates the account). Prefills from the signed-in profile
-// / saved addresses, creates the order, then routes to the confirmation screen
-// with a track token. Direct port of the AS Store web checkout.
-//
-// Whish orders are placed **unpaid**: the server creates the payment and returns a
-// hosted `collectUrl`, we hand the customer to it in an in-app browser, and the
-// order screen confirms the result with the server. The bag is deliberately not
-// emptied until the payment lands, so an abandoned payment doesn't lose the cart.
-
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Image } from 'expo-image';
