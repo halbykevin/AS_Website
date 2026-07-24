@@ -32,12 +32,42 @@ async function req(path, { method = 'GET', body, token } = {}) {
   return res.status === 204 ? null : res.json()
 }
 
-// Absolutize a possibly-relative image path against the API origin. Product
-// images are already absolute (PUBLIC_URL/uploads/…) but this is a safe guard.
-export function absUrl(url) {
+// Normalize an image URL so it always points at the host the app can actually
+// reach. The store API bakes its own PUBLIC_URL into every image URL (e.g.
+// `http://localhost:8081/uploads/…`); on a physical device `localhost` is the
+// phone, so those images 404. We rebase any local/loopback or relative URL onto
+// STORE_API_URL (which the device *can* reach), while leaving genuine remote
+// URLs (a CDN, an external product image) untouched.
+const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.0\.2\.2)(:\d+)?/i
+
+export function mediaUrl(url) {
   if (!url) return ''
-  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url
+  if (url.startsWith('data:')) return url
+  // Absolute URL: rebase only loopback hosts; pass real remote URLs through.
+  if (/^https?:\/\//i.test(url)) {
+    return LOOPBACK_ORIGIN.test(url) ? url.replace(LOOPBACK_ORIGIN, API) : url
+  }
+  // Relative path (e.g. `/uploads/…`) → absolutize against the API origin.
   return `${API}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
+// Back-compat alias — same behavior for callers that referenced absUrl.
+export const absUrl = mediaUrl
+
+// Rewrite a product's image fields through mediaUrl so they load on any device.
+function mapProduct(p) {
+  if (!p) return p
+  return {
+    ...p,
+    image: mediaUrl(p.image),
+    images: Array.isArray(p.images) ? p.images.map(mediaUrl) : [],
+  }
+}
+
+// The API returns categories with `imageUrl`; the tiles read `image`. Bridge the
+// field name and normalize the host in one place.
+function mapCategory(c) {
+  return { ...c, image: mediaUrl(c.image || c.imageUrl) }
 }
 
 // ---- Settings (announcement, contact, socials, publish gate, homeNew…) ----
@@ -71,7 +101,8 @@ export async function loadStoreSettings() {
 // ---- Catalog ----
 export async function loadCategories() {
   try {
-    return await req('/api/categories')
+    const rows = await req('/api/categories')
+    return Array.isArray(rows) ? rows.map(mapCategory) : []
   } catch {
     return []
   }
@@ -94,7 +125,8 @@ export async function loadProducts({ category, featured, search, limit } = {}) {
   if (limit) params.set('limit', String(limit))
   const qs = params.toString() ? `?${params}` : ''
   try {
-    return await req(`/api/products${qs}`)
+    const rows = await req(`/api/products${qs}`)
+    return Array.isArray(rows) ? rows.map(mapProduct) : []
   } catch {
     return []
   }
@@ -103,7 +135,7 @@ export async function loadProducts({ category, featured, search, limit } = {}) {
 // Single product by slug (full image gallery). null when missing.
 export async function loadProduct(slug) {
   try {
-    return await req(`/api/products/${encodeURIComponent(slug)}`)
+    return mapProduct(await req(`/api/products/${encodeURIComponent(slug)}`))
   } catch {
     return null
   }
@@ -112,7 +144,7 @@ export async function loadProduct(slug) {
 // Single product by numeric id — used to backfill slugs on old cart items.
 export async function loadProductById(id) {
   try {
-    return await req(`/api/products/id/${id}`)
+    return mapProduct(await req(`/api/products/id/${id}`))
   } catch {
     return null
   }
