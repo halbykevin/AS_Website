@@ -1,6 +1,9 @@
-// Loads site-wide settings + content pages from the API (server-side, no cache
-// so CMS edits show immediately). Falls back to sensible defaults if the API is
-// offline so the storefront never breaks.
+// Loads site-wide settings + content pages from the API (server-side). Cached
+// under the shared 'store' tag and purged on admin writes so CMS edits show
+// immediately. Falls back to sensible defaults if the API is offline so the
+// storefront never breaks.
+
+import { STORE_CACHE } from './catalog'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -31,7 +34,7 @@ export const defaultSettings = {
 
 export async function loadSettings() {
   try {
-    const res = await fetch(`${API}/api/settings`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/settings`, STORE_CACHE)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const s = await res.json()
     return {
@@ -52,7 +55,7 @@ export async function loadSettings() {
 
 export async function loadPage(slug) {
   try {
-    const res = await fetch(`${API}/api/pages/${encodeURIComponent(slug)}`, { cache: 'no-store' })
+    const res = await fetch(`${API}/api/pages/${encodeURIComponent(slug)}`, STORE_CACHE)
     if (!res.ok) return null
     return await res.json()
   } catch {

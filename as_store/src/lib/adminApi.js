@@ -12,6 +12,18 @@ export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t)
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 export const isAuthed = () => Boolean(getToken())
 
+// Content endpoints whose writes change what the public storefront renders — a
+// successful write to any of these purges the SSR cache so the edit shows at once.
+const STOREFRONT_CONTENT = /\/api\/(products|categories|brands|sales|homepage-sections|pages|settings|uploads)/
+
+// Fire-and-forget the storefront cache purge (same-origin Next route). Best-effort:
+// a failure just means the 1-hour TTL eventually refreshes the data instead.
+function purgeStorefrontCache() {
+  const t = getToken()
+  if (!t) return
+  fetch('/api/revalidate', { method: 'POST', headers: { Authorization: `Bearer ${t}` } }).catch(() => {})
+}
+
 async function req(path, { method = 'GET', body, auth = false, form = false } = {}) {
   const headers = {}
   if (!form) headers['Content-Type'] = 'application/json'
@@ -32,7 +44,9 @@ async function req(path, { method = 'GET', body, auth = false, form = false } = 
     const e = await res.json().catch(() => ({}))
     throw new Error(e.error || `Request failed (${res.status})`)
   }
-  return res.status === 204 ? null : res.json()
+  const data = res.status === 204 ? null : await res.json()
+  if (method !== 'GET' && STOREFRONT_CONTENT.test(path)) purgeStorefrontCache()
+  return data
 }
 
 export const adminApi = {
