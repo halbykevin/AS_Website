@@ -48,9 +48,11 @@ See [`src/config/env.js`](src/config/env.js).
 ```
 app/                         # Expo Router (file-based) routes
   _layout.jsx                #   root: providers + Stack
-  (tabs)/                    #   bottom tabs: Home · Store · Events · Account
+  (tabs)/                    #   bottom tabs (store-first): Home (storefront) ·
+                             #   Shop (browse) · Bag (cart) · Events · Account
+  company.jsx                #   the informative AS Company (website) page
   what-we-do/  events/       #   marketing detail screens
-  product/ category/ cart    #   store screens
+  product/ category/         #   store screens
   checkout  search  orders/  #   commerce flow
   account/ auth/             #   profile + OTP sign in / register
   predictor.jsx              #   Guess the Score game

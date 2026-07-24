@@ -16,7 +16,7 @@ export default function AccountScreen() {
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-      <BrandBar variant="company" title="Account" />
+      <BrandBar variant="store" title="Account" />
 
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
         {!customer ? (
@@ -62,9 +62,11 @@ export default function AccountScreen() {
             </Card>
 
             <Card padded={false}>
-              <MenuRow icon="bag" label="Continue shopping" onPress={() => router.push('/store')} />
+              <MenuRow icon="bag" label="Continue shopping" onPress={() => router.push('/')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="calendar" label="Browse events" onPress={() => router.push('/events')} />
+              <Divider inset={theme.spacing.lg} />
+              <MenuRow icon="info" label="About AS Company" onPress={() => router.push('/company')} />
             </Card>
 
             <Button label="Sign out" variant="ghost" icon="logout" onPress={() => account.logout()} fullWidth />

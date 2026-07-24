@@ -66,7 +66,7 @@ export default function OrderDetailScreen() {
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-      <Header title={`Order #${order.id}`} onBack={() => (account?.customer ? router.replace('/orders') : router.replace('/store'))} />
+      <Header title={`Order #${order.id}`} onBack={() => (account?.customer ? router.replace('/orders') : router.replace('/'))} />
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
         {justPlaced ? (
           <Card style={{ alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.alpha(theme.colors.success, 0.08) }}>

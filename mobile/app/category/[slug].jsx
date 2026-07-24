@@ -94,7 +94,7 @@ function BrandBarRight() {
       <Pressable onPress={() => router.push('/search')} hitSlop={theme.layout.hitSlop}>
         <Icon name="search" size={22} />
       </Pressable>
-      <Pressable onPress={() => router.push('/cart')} hitSlop={theme.layout.hitSlop}>
+      <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
         <Icon name="bag" size={22} />
         {count > 0 ? (
           <View style={{ position: 'absolute', right: -8, top: -6, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>

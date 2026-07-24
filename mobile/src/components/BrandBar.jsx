@@ -22,7 +22,7 @@ export default function BrandBar({ variant = 'company', showSearch = false, show
 
   return (
     <View style={styles.bar}>
-      <Pressable onPress={() => router.push(variant === 'store' ? '/store' : '/')} style={styles.logoWrap}>
+      <Pressable onPress={() => router.push('/')} style={styles.logoWrap}>
         <Image source={LOGOS[variant]} style={styles.logo} contentFit="contain" />
         {title ? (
           <Text variant="title" style={{ marginLeft: 8 }}>
@@ -38,7 +38,7 @@ export default function BrandBar({ variant = 'company', showSearch = false, show
           </Pressable>
         ) : null}
         {showBag ? (
-          <Pressable onPress={() => router.push('/cart')} hitSlop={theme.layout.hitSlop} style={styles.action}>
+          <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop} style={styles.action}>
             <Icon name="bag" size={22} />
             {cartCount > 0 ? (
               <View style={styles.badge}>

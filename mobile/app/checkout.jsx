@@ -56,7 +56,7 @@ export default function CheckoutScreen() {
       <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
         <Header title="Checkout" onBack={() => router.back()} />
         <View style={{ paddingHorizontal: theme.layout.screenPadding }}>
-          <EmptyState icon="bag" title="Your bag is empty" message="Add a few things before checking out." actionLabel="Continue shopping" onAction={() => router.replace('/store')} />
+          <EmptyState icon="bag" title="Your bag is empty" message="Add a few things before checking out." actionLabel="Continue shopping" onAction={() => router.replace('/')} />
         </View>
       </Screen>
     )

@@ -53,7 +53,7 @@ export default function ProductDetailScreen() {
       <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
         <Header title="Product" />
         <View style={{ paddingHorizontal: theme.layout.screenPadding }}>
-          <EmptyState icon="box" title="Not found" message="This product isn't available." actionLabel="Back to store" onAction={() => router.replace('/store')} />
+          <EmptyState icon="box" title="Not found" message="This product isn't available." actionLabel="Back to store" onAction={() => router.replace('/')} />
         </View>
       </Screen>
     )
@@ -231,7 +231,7 @@ function CartButton() {
   const theme = useTheme()
   const count = useSelector(selectCartCount)
   return (
-    <Pressable onPress={() => router.push('/cart')} hitSlop={theme.layout.hitSlop}>
+    <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
       <Icon name="bag" size={22} />
       {count > 0 ? (
         <View style={{ position: 'absolute', right: -8, top: -6, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>

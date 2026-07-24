@@ -14,7 +14,6 @@ export default function RootLayout() {
         <AppProviders>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#ffffff' } }}>
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="cart" options={{ presentation: 'modal' }} />
             <Stack.Screen name="search" options={{ presentation: 'modal' }} />
           </Stack>
         </AppProviders>

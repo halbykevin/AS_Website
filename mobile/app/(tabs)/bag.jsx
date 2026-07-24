@@ -1,5 +1,5 @@
-// Cart (bag) — line items with quantity steppers (2-per-item cap, with a
-// WhatsApp note at the cap), subtotal, and checkout. Presented as a modal.
+// Bag tab — the cart as a first-class destination. Line items with quantity
+// steppers (2-per-item cap + WhatsApp note at the cap), subtotal and checkout.
 
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
@@ -17,10 +17,11 @@ import { useContent } from '@/src/content/ContentProvider'
 import { money } from '@/src/lib/format'
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp'
 import { useTheme } from '@/src/theme'
-import { Screen, Text, Header, Button, Icon, Divider, EmptyState } from '@/src/ui'
+import { Screen, Text, Button, Icon, Divider, EmptyState } from '@/src/ui'
+import BrandBar from '@/src/components/BrandBar'
 import RemoteImage from '@/src/components/RemoteImage'
 
-export default function CartScreen() {
+export default function BagScreen() {
   const theme = useTheme()
   const dispatch = useDispatch()
   const items = useSelector(selectCartItems)
@@ -28,12 +29,20 @@ export default function CartScreen() {
   const { storeSettings } = useContent()
   const [maxHitId, setMaxHitId] = useState(null)
 
+  const count = items.reduce((n, i) => n + i.qty, 0)
+
   if (items.length === 0) {
     return (
       <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-        <Header title="Your bag" onBack={() => router.back()} />
+        <BrandBar variant="store" title="Bag" />
         <View style={{ paddingHorizontal: theme.layout.screenPadding }}>
-          <EmptyState icon="bag" title="Your bag is empty" message="Add a few things to get started." actionLabel="Continue shopping" onAction={() => router.replace('/store')} />
+          <EmptyState
+            icon="bag"
+            title="Your bag is empty"
+            message="Add a few things to get started."
+            actionLabel="Start shopping"
+            onAction={() => router.push('/')}
+          />
         </View>
       </Screen>
     )
@@ -44,7 +53,15 @@ export default function CartScreen() {
       edges={['top']}
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
-        <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background, gap: theme.spacing.md }}>
+        <View
+          style={{
+            padding: theme.layout.screenPadding,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+            backgroundColor: theme.colors.background,
+            gap: theme.spacing.md,
+          }}
+        >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Text variant="body" muted>
               Subtotal
@@ -52,17 +69,21 @@ export default function CartScreen() {
             <Text variant="h2">{money(total)}</Text>
           </View>
           <Button label="Checkout" size="lg" onPress={() => router.push('/checkout')} fullWidth />
-          <Pressable onPress={() => dispatch(clearCart())} style={{ alignItems: 'center', paddingVertical: 4 }}>
-            <Text variant="callout" faint>
-              Clear bag
-            </Text>
-          </Pressable>
         </View>
       }
     >
-      <Header title="Your bag" onBack={() => router.back()} />
+      <BrandBar variant="store" title="Bag" />
 
-      <View style={{ paddingHorizontal: theme.layout.screenPadding, paddingTop: theme.spacing.sm }}>
+      <View style={{ paddingHorizontal: theme.layout.screenPadding, paddingTop: theme.spacing.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
+          <Text variant="h1">Your bag</Text>
+          <Pressable onPress={() => dispatch(clearCart())} hitSlop={theme.layout.hitSlop}>
+            <Text variant="callout" faint>
+              Clear ({count})
+            </Text>
+          </Pressable>
+        </View>
+
         {items.map((item, idx) => (
           <View key={item.id}>
             {idx > 0 ? <Divider style={{ marginVertical: theme.spacing.md }} /> : null}
@@ -76,7 +97,12 @@ export default function CartScreen() {
 
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm }}>
-                  <Text variant="title" numberOfLines={2} style={{ flex: 1 }} onPress={() => item.slug && router.push(`/product/${item.slug}`)}>
+                  <Text
+                    variant="title"
+                    numberOfLines={2}
+                    style={{ flex: 1 }}
+                    onPress={() => item.slug && router.push(`/product/${item.slug}`)}
+                  >
                     {item.title}
                   </Text>
                   <Pressable onPress={() => dispatch(removeItem(item.id))} hitSlop={theme.layout.hitSlop}>

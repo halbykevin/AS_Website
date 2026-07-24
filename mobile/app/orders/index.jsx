@@ -52,7 +52,7 @@ export default function OrdersScreen() {
         {orders === null ? (
           [0, 1, 2].map((i) => <Skeleton key={i} height={90} radius="2xl" />)
         ) : orders.length === 0 ? (
-          <EmptyState icon="box" title="No orders yet" message="When you place an order, it'll show up here." actionLabel="Start shopping" onAction={() => router.replace('/store')} />
+          <EmptyState icon="box" title="No orders yet" message="When you place an order, it'll show up here." actionLabel="Start shopping" onAction={() => router.replace('/')} />
         ) : (
           orders.map((o) => (
             <Card key={o.id} onPress={() => router.push(`/orders/${o.id}`)} style={{ gap: theme.spacing.sm }}>
