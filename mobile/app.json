@@ -13,7 +13,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lb.com.as.company"
@@ -46,7 +48,12 @@
     },
     "extra": {
       "websiteApiUrl": "https://asapi.as.com.lb",
-      "storeApiUrl": "https://store-api.as.com.lb"
-    }
+      "storeApiUrl": "https://store-api.as.com.lb",
+      "router": {},
+      "eas": {
+        "projectId": "40636c10-bbe0-4f53-8893-e31deedf3cda"
+      }
+    },
+    "owner": "ascompany.lb4"
   }
 }
