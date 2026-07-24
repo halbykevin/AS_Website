@@ -307,6 +307,16 @@ CREATE TABLE IF NOT EXISTS orders (
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
 
+-- Online payment (Whish Pay). payment_method is 'cod' or 'whish'; payment_status
+-- tracks the money axis independently of the fulfilment `status`, so a COD order
+-- can be confirmed+unpaid while a Whish order only confirms once paid. The
+-- external id (= our order id) + collect url tie the order to its Whish payment.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status    TEXT DEFAULT 'unpaid';   -- unpaid|paid|failed|refunded
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS whish_external_id  TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS whish_collect_url  TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency           TEXT DEFAULT 'USD';
+CREATE INDEX IF NOT EXISTS idx_orders_external ON orders(whish_external_id);
+
 CREATE TABLE IF NOT EXISTS order_items (
   id         SERIAL PRIMARY KEY,
   order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

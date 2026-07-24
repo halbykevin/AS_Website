@@ -1,9 +1,11 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useDispatch } from 'react-redux'
 import Icon from '@/components/Icon.jsx'
+import { clearCart } from '@/store/cartSlice'
 import { useAccount, accountApi } from '@/lib/account'
 import { statusMeta, statusClasses, money, orderDate } from '@/lib/orders'
 
@@ -13,14 +15,18 @@ export default function OrderPage({ params }) {
   const id = params.id
   const { customer, loading } = useAccount()
   const router = useRouter()
+  const dispatch = useDispatch()
   const search = useSearchParams()
   const placed = search.get('placed') === '1'
+  const failed = search.get('failed') === '1'
   // Track token from a guest checkout — grants read access to this one order
   // without a signed-in session.
   const trackToken = search.get('t') || ''
 
   const [order, setOrder] = useState(null)
   const [state, setState] = useState('loading') // loading | ready | error
+  const polledRef = useRef(false) // guards the one-time payment re-check loop
+  const clearedRef = useRef(false) // clears the bag once, when payment confirms
 
   useEffect(() => {
     if (loading) return
@@ -51,6 +57,43 @@ export default function OrderPage({ params }) {
       })
   }, [loading, customer, id, trackToken, router])
 
+  // Returning from Whish, the order may still read unpaid until the callback lands
+  // (and in local testing without a public callback, until we ask). Re-check the
+  // payment against the API a few times; the server settles it on a paid status.
+  useEffect(() => {
+    if (state !== 'ready' || !order) return
+    if (order.paymentMethod !== 'whish' || order.paymentStatus === 'paid') return
+    if (polledRef.current) return
+    polledRef.current = true
+    let cancelled = false
+    let tries = 0
+    const tick = async () => {
+      tries += 1
+      try {
+        const fresh = await accountApi.reconcilePayment(order.id, trackToken)
+        if (cancelled) return
+        setOrder(fresh)
+        if (fresh.paymentStatus === 'paid' || fresh.status === 'cancelled') return
+      } catch {
+        /* keep trying */
+      }
+      if (!cancelled && tries < 4) setTimeout(tick, 2500)
+    }
+    tick()
+    return () => {
+      cancelled = true
+    }
+  }, [state, order, trackToken])
+
+  // Empty the bag only once payment is confirmed (the checkout deferred this for
+  // online orders so an abandoned payment doesn't lose the cart).
+  useEffect(() => {
+    if (order?.paymentMethod === 'whish' && order?.paymentStatus === 'paid' && !clearedRef.current) {
+      clearedRef.current = true
+      dispatch(clearCart())
+    }
+  }, [order, dispatch])
+
   if (state === 'loading' || loading) {
     return (
       <section className="bg-white pt-28 sm:pt-32">
@@ -79,14 +122,41 @@ export default function OrderPage({ params }) {
           <Icon name="chevronLeft" className="h-4 w-4" /> Your account
         </Link>
 
-        {placed && (
-          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800">
-            <Icon name="check" className="h-6 w-6" />
-            <div>
-              <p className="font-semibold">Order placed — thank you!</p>
-              <p className="text-sm text-emerald-700/80">We’ll confirm it shortly. You can track its status below.</p>
+        {order.paymentMethod === 'whish' ? (
+          order.paymentStatus === 'paid' ? (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800">
+              <Icon name="check" className="h-6 w-6" />
+              <div>
+                <p className="font-semibold">Payment received — thank you!</p>
+                <p className="text-sm text-emerald-700/80">Your order is confirmed. You can track its status below.</p>
+              </div>
             </div>
-          </div>
+          ) : order.status === 'cancelled' ? null : (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 text-amber-800">
+              <Icon name="box" className="h-6 w-6" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">{failed ? 'Payment not completed' : 'Confirming your payment…'}</p>
+                <p className="text-sm text-amber-700/80">
+                  {failed
+                    ? 'Your payment wasn’t completed. You can finish paying below.'
+                    : 'This can take a few seconds. If it doesn’t update on its own, use the button to finish paying.'}
+                </p>
+              </div>
+              {order.collectUrl && (
+                <a href={order.collectUrl} className="pill shrink-0">Complete payment</a>
+              )}
+            </div>
+          )
+        ) : (
+          placed && (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800">
+              <Icon name="check" className="h-6 w-6" />
+              <div>
+                <p className="font-semibold">Order placed — thank you!</p>
+                <p className="text-sm text-emerald-700/80">We’ll confirm it shortly. You can track its status below.</p>
+              </div>
+            </div>
+          )
         )}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -150,7 +220,14 @@ export default function OrderPage({ params }) {
               ))}
             </ul>
             <div className="mt-4 flex items-center justify-between border-t border-as-ink/10 pt-4">
-              <span className="text-as-ink/60">Total · Cash on delivery</span>
+              <span className="text-as-ink/60">
+                Total ·{' '}
+                {order.paymentMethod === 'whish'
+                  ? order.paymentStatus === 'paid'
+                    ? 'Paid online'
+                    : 'Online payment'
+                  : 'Cash on delivery'}
+              </span>
               <span className="text-xl font-semibold text-as-ink">{money(order.subtotal)}</span>
             </div>
           </div>

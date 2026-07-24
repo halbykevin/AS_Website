@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const dispatch = useDispatch()
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
+  const [pay, setPay] = useState('cod') // 'cod' | 'whish'
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [addrId, setAddrId] = useState(null) // selected saved-address id | 'new' | null
@@ -94,9 +95,18 @@ export default function CheckoutPage() {
         city: form.city,
         notes: form.notes,
         saveAddress: form.saveAddress,
+        paymentMethod: pay,
       })
       if (form.saveAddress) {
         setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
+      }
+      // Online payment: hand the shopper to Whish's hosted page. The bag is NOT
+      // cleared yet — it's emptied on the order page only once payment confirms,
+      // so an abandoned payment doesn't lose the cart.
+      if (pay === 'whish') {
+        if (!order.collectUrl) throw new Error('Could not start the online payment. Please try again.')
+        window.location.href = order.collectUrl
+        return
       }
       dispatch(clearCart())
       // The track token lets the confirmation page load without a session.
@@ -190,9 +200,32 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            <div className="mt-6 rounded-xl bg-as-fog p-4">
-              <p className="text-sm font-semibold text-as-ink">Payment — Cash on delivery</p>
-              <p className="mt-1 text-sm text-as-ink/55">Pay in cash when your order arrives. We’ll confirm it shortly after you place it.</p>
+            <div className="mt-6">
+              <p className="mb-2 text-sm font-medium text-as-ink/70">Payment</p>
+              <div className="grid grid-cols-1 gap-2">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                    pay === 'cod' ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
+                  }`}
+                >
+                  <input type="radio" name="pay" value="cod" checked={pay === 'cod'} onChange={() => setPay('cod')} className="mt-1 h-4 w-4 accent-as-red" />
+                  <span>
+                    <span className="block text-sm font-semibold text-as-ink">Cash on delivery</span>
+                    <span className="mt-0.5 block text-sm text-as-ink/55">Pay in cash when your order arrives. We’ll confirm it shortly after you place it.</span>
+                  </span>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                    pay === 'whish' ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
+                  }`}
+                >
+                  <input type="radio" name="pay" value="whish" checked={pay === 'whish'} onChange={() => setPay('whish')} className="mt-1 h-4 w-4 accent-as-red" />
+                  <span>
+                    <span className="block text-sm font-semibold text-as-ink">Pay online — Whish</span>
+                    <span className="mt-0.5 block text-sm text-as-ink/55">Pay securely now with Whish. You’ll be taken to Whish to complete payment, then returned here.</span>
+                  </span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -221,7 +254,7 @@ export default function CheckoutPage() {
               <span className="text-xl font-semibold text-as-ink">{money(total)}</span>
             </div>
             <button type="submit" disabled={busy} className="pill mt-5 w-full justify-center">
-              {busy ? 'Placing order…' : 'Place order'}
+              {busy ? 'Please wait…' : pay === 'whish' ? 'Continue to payment' : 'Place order'}
             </button>
             <p className="mt-3 text-center text-xs text-as-ink/45">Free delivery on orders over $100 · 12 months warranty</p>
           </div>

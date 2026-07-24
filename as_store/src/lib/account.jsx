@@ -66,6 +66,13 @@ export const accountApi = {
   listOrders: () => req('/api/orders', { auth: true }),
   getOrder: (id) => req(`/api/orders/${id}`, { auth: true }),
   trackOrder: (id, token) => req(`/api/orders/track/${id}?token=${encodeURIComponent(token)}`),
+  // Re-check an online (Whish) payment and settle the order if it's been paid.
+  // Works signed-in (token attached if present) or as a guest via the track token.
+  reconcilePayment: (id, token) =>
+    req(`/api/orders/${id}/reconcile${token ? `?token=${encodeURIComponent(token)}` : ''}`, {
+      method: 'POST',
+      auth: true,
+    }),
 }
 
 const AccountContext = createContext(null)

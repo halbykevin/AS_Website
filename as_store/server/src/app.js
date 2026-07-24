@@ -27,12 +27,17 @@ import { sendOrderEmails, sendContactEmail, sendOtpEmail } from './mailer.js'
 import { sendOtpWhatsApp, whatsappOtpEnabled, whatsappRouter } from './whatsapp.js'
 import { beginGoogleAuth, finishGoogleAuth, googleEnabled } from './google.js'
 import { scraperRouter } from './scraper.js'
+import { whishEnabled, createPayment as whishCreatePayment, getCollectStatus as whishStatus } from './whish.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
 const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:8081').replace(/\/$/, '')
 // Where the storefront lives — Google sign-in hands the shopper back to it.
 const STORE_URL = (process.env.STORE_URL || 'http://localhost:5180').replace(/\/$/, '')
+// Public bases Whish uses for server-to-server callbacks and browser redirects.
+// Default to the API/store URLs; override when tunnelling for local payment tests.
+const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || PUBLIC_URL).replace(/\/$/, '')
+const STORE_PUBLIC_URL = (process.env.STORE_PUBLIC_URL || STORE_URL).replace(/\/$/, '')
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 export const app = express()
@@ -218,6 +223,9 @@ const orderJson = (r) => ({
   notes: r.notes || '',
   subtotal: r.subtotal,
   paymentMethod: r.payment_method || 'cod',
+  paymentStatus: r.payment_status || 'unpaid',
+  currency: r.currency || 'USD',
+  collectUrl: r.whish_collect_url || '', // hosted Whish page, for resuming an unpaid payment
   customerId: r.customer_id,
   customerEmail: r.customer_email, // present on admin queries
   itemCount: r.item_count, // present on list queries
@@ -844,10 +852,15 @@ app.post(
     }
     if (!items.length) return res.status(400).json({ error: 'None of those items are available' })
 
+    const paymentMethod = b.paymentMethod === 'whish' ? 'whish' : 'cod'
+    if (paymentMethod === 'whish' && !whishEnabled()) {
+      return res.status(400).json({ error: 'Online payment is unavailable right now' })
+    }
+
     const { rows } = await query(
-      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, payment_method)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,'cod') RETURNING id`,
-      [customerId, fullName, phone, email, address, b.city || '', b.notes || '', subtotal],
+      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, payment_method, payment_status, currency)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,'unpaid','USD') RETURNING id`,
+      [customerId, fullName, phone, email, address, b.city || '', b.notes || '', subtotal, paymentMethod],
     )
     const orderId = rows[0].id
     for (const it of items) {
@@ -867,11 +880,104 @@ app.post(
     }
     // The track token lets the confirmation page show this order without a
     // signed-in session (guest checkout).
-    const detail = await loadOrderDetail(orderId)
     const trackToken = signOrderToken(orderId)
+
+    // Whish: create a hosted payment and hand back its URL. No confirmation email
+    // yet — the order stays unpaid until the callback / status check confirms it.
+    if (paymentMethod === 'whish') {
+      try {
+        const { collectUrl } = await whishCreatePayment({
+          amount: subtotal,
+          currency: 'USD',
+          externalId: orderId,
+          invoice: `AS Store order #${orderId}`,
+          successCallbackUrl: `${PUBLIC_API_URL}/api/orders/whish/callback?ext=${orderId}`,
+          failureCallbackUrl: `${PUBLIC_API_URL}/api/orders/whish/callback?ext=${orderId}`,
+          successRedirectUrl: `${STORE_PUBLIC_URL}/account/orders/${orderId}?placed=1&t=${encodeURIComponent(trackToken)}`,
+          failureRedirectUrl: `${STORE_PUBLIC_URL}/account/orders/${orderId}?failed=1&t=${encodeURIComponent(trackToken)}`,
+        })
+        await query(`UPDATE orders SET whish_external_id = $2, whish_collect_url = $3 WHERE id = $1`, [
+          orderId,
+          String(orderId),
+          collectUrl,
+        ])
+        const detail = await loadOrderDetail(orderId)
+        return res.status(201).json({ ...detail, trackToken, collectUrl })
+      } catch (e) {
+        // Couldn't start the payment — cancel the dangling order so it doesn't
+        // linger as pending, and ask the shopper to try again.
+        console.error('[whish] create failed:', e?.message || e)
+        await query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [orderId])
+        return res.status(502).json({ error: 'Could not start the online payment. Please try again.' })
+      }
+    }
+
+    // COD: confirmed by delivery — send the confirmation email immediately.
+    const detail = await loadOrderDetail(orderId)
     // Fire-and-forget: confirmation to the customer + copy to the shop inbox.
     sendOrderEmails(detail, trackToken).catch((e) => console.error('[mail]', e?.message || e))
     res.status(201).json({ ...detail, trackToken })
+  }),
+)
+
+// Flip a Whish order to paid exactly once. The conditional UPDATE is the
+// idempotency guard: only the first caller to move it off 'unpaid' returns a row,
+// so the confirmation email fires a single time even if the callback repeats.
+async function markWhishPaid(orderId) {
+  const { rows } = await query(
+    `UPDATE orders SET payment_status = 'paid', status = 'confirmed'
+     WHERE id = $1 AND payment_method = 'whish' AND payment_status <> 'paid'
+     RETURNING id`,
+    [orderId],
+  )
+  if (!rows[0]) return false
+  const detail = await loadOrderDetail(orderId)
+  sendOrderEmails(detail, signOrderToken(orderId)).catch((e) => console.error('[mail]', e?.message || e))
+  return true
+}
+
+// Re-check an unpaid Whish order against the status API (the source of truth) and
+// settle it if paid. Safe to call repeatedly. A 'failed' status is intentionally
+// left as unpaid — the payment link stays payable, so the shopper can still retry.
+async function reconcileWhishOrder(order) {
+  if (order.paymentMethod !== 'whish' || order.paymentStatus === 'paid') return order
+  try {
+    const { collectStatus } = await whishStatus({ externalId: order.id, currency: order.currency || 'USD' })
+    if (collectStatus === 'success') await markWhishPaid(order.id)
+  } catch (e) {
+    console.error('[whish] status check failed:', e?.message || e)
+  }
+  return loadOrderDetail(order.id)
+}
+
+// Whish server-to-server callback (public, unauthenticated). We ignore any result
+// hint in the URL and re-verify against the status API before settling anything.
+app.get(
+  '/api/orders/whish/callback',
+  ah(async (req, res) => {
+    const ext = Number(req.query.ext)
+    if (ext) {
+      const order = await loadOrderDetail(ext)
+      if (order) await reconcileWhishOrder(order)
+    }
+    res.json({ ok: true })
+  }),
+)
+
+// Force a payment re-check for one order — the storefront calls this when it lands
+// on an unpaid Whish order (covers a missed callback and enables local testing).
+// Authorized by the signed-in owner or a valid track token.
+app.post(
+  '/api/orders/:id/reconcile',
+  optionalCustomer,
+  ah(async (req, res) => {
+    const order = await loadOrderDetail(req.params.id)
+    if (!order) return res.status(404).json({ error: 'Not found' })
+    const token = req.query.token || req.body?.token
+    const owner = req.customerId && order.customerId === req.customerId
+    const tokenOk = token && String(verifyOrderToken(token)) === String(order.id)
+    if (!owner && !tokenOk) return res.status(404).json({ error: 'Not found' })
+    res.json(await reconcileWhishOrder(order))
   }),
 )
 

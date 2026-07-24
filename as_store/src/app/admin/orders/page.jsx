@@ -127,6 +127,17 @@ export default function OrdersAdmin() {
                   <span className="text-xs text-as-ink/50">
                     {orderDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
                   </span>
+                  {o.paymentMethod === 'whish' ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
+                      Whish · {o.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-as-ink/8 px-2 py-0.5 text-[11px] font-medium text-as-ink/55">COD</span>
+                  )}
                   <span className="ml-auto font-medium text-as-ink">{money(o.subtotal)}</span>
                   {/* Select is w-full by design, so its width is set by this wrapper. */}
                   <span className="w-36 shrink-0">
@@ -195,7 +206,12 @@ function OrderModal({ id, onClose }) {
               ))}
             </ul>
             <div className="mt-3 flex items-center justify-between border-t border-as-ink/10 pt-3">
-              <span className="text-sm text-as-ink/60">Total · Cash on delivery</span>
+              <span className="text-sm text-as-ink/60">
+                Total ·{' '}
+                {order.paymentMethod === 'whish'
+                  ? `Whish — ${order.paymentStatus === 'paid' ? 'paid' : 'unpaid'}`
+                  : 'Cash on delivery'}
+              </span>
               <span className="text-lg font-semibold text-as-ink">{money(order.subtotal)}</span>
             </div>
           </div>
