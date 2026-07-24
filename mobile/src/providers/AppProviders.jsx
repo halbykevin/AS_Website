@@ -12,7 +12,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { SheetProvider } from '@/src/ui/sheet';
+import { SheetProvider, SheetHost } from '@/src/ui/sheet';
 import { store } from '@/src/store';
 import { hydrateCart } from '@/src/store/cartSlice';
 import { storage, KEYS } from '@/src/lib/storage';
@@ -65,9 +65,15 @@ export default function AppProviders({ children }) {
           <AccountProvider>
             <NotificationsProvider>
               <ContentProvider>
-                <BottomSheetModalProvider>
-                  <SheetProvider>{children}</SheetProvider>
-                </BottomSheetModalProvider>
+                {/* SheetProvider (context) wraps the modal provider so sheet
+                    content rendered through gorhom's portal can still useSheet().
+                    SheetHost (the actual BottomSheetModals) lives inside. */}
+                <SheetProvider>
+                  <BottomSheetModalProvider>
+                    <SheetHost />
+                    {children}
+                  </BottomSheetModalProvider>
+                </SheetProvider>
               </ContentProvider>
             </NotificationsProvider>
           </AccountProvider>

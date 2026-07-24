@@ -44,6 +44,8 @@ const MAP = {
   pin: 'location-outline',
   ticket: 'ticket-outline',
   signal: 'cellular-outline',
+  network: 'git-network-outline',
+  pen: 'create-outline',
   chip: 'hardware-chip-outline',
   support: 'headset-outline',
   sparkles: 'sparkles-outline',

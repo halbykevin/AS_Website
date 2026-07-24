@@ -8,7 +8,15 @@ import Button from '../Button';
 import Text from '../Text';
 import Icon from '../Icon';
 
+// Two contexts on purpose:
+//  • SheetContext     — the public imperative api (open/close/…). Provided HIGH,
+//    above BottomSheetModalProvider, so even sheet content that gorhom renders
+//    through its PORTAL (which re-mounts under the modal provider) can still call
+//    useSheet(). This is the whole reason for the split.
+//  • SheetHostContext — the live stack, consumed by <SheetHost/> which must live
+//    INSIDE BottomSheetModalProvider (BottomSheetModal requires that context).
 const SheetContext = createContext(null);
+const SheetHostContext = createContext(null);
 
 let SEQ = 0;
 const nextId = () => `sheet-${++SEQ}`;
@@ -115,15 +123,21 @@ export function SheetProvider({ children }) {
   );
 
   const api = useMemo(() => ({ open, close, closeAll, alert, confirm, actions }), [open, close, closeAll, alert, confirm, actions]);
+  const host = useMemo(() => ({ stack, remove }), [stack, remove]);
 
   return (
     <SheetContext.Provider value={api}>
-      {children}
-      {stack.map(descriptor => (
-        <DynamicSheet key={descriptor.id} descriptor={descriptor} onClosed={() => remove(descriptor.id)} />
-      ))}
+      <SheetHostContext.Provider value={host}>{children}</SheetHostContext.Provider>
     </SheetContext.Provider>
   );
+}
+
+// Renders the live sheet stack. MUST be mounted inside <BottomSheetModalProvider>
+// (and inside <SheetProvider>) — place it right under the modal provider.
+export function SheetHost() {
+  const ctx = useContext(SheetHostContext);
+  if (!ctx) return null;
+  return ctx.stack.map(descriptor => <DynamicSheet key={descriptor.id} descriptor={descriptor} onClosed={() => ctx.remove(descriptor.id)} />);
 }
 
 export function useSheet() {
