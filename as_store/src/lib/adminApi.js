@@ -115,6 +115,45 @@ export const adminApi = {
   startScrape: (opts) => req('/api/scrape', { method: 'POST', auth: true, body: opts }),
   getScrape: (id) => req(`/api/scrape/${id}`, { auth: true }),
 
+  // notifications — campaigns
+  notifOverview: () => req('/api/admin/notifications/overview', { auth: true }),
+  listCampaigns: () => req('/api/admin/notifications/campaigns', { auth: true }),
+  getCampaign: (id) => req(`/api/admin/notifications/campaigns/${id}`, { auth: true }),
+  createCampaign: (data) =>
+    req('/api/admin/notifications/campaigns', { method: 'POST', auth: true, body: data }),
+  updateCampaign: (id, data) =>
+    req(`/api/admin/notifications/campaigns/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteCampaign: (id) =>
+    req(`/api/admin/notifications/campaigns/${id}`, { method: 'DELETE', auth: true }),
+  sendCampaign: (id) =>
+    req(`/api/admin/notifications/campaigns/${id}/send`, { method: 'POST', auth: true }),
+  scheduleCampaign: (id, at) =>
+    req(`/api/admin/notifications/campaigns/${id}/schedule`, { method: 'POST', auth: true, body: { at } }),
+  pauseCampaign: (id) =>
+    req(`/api/admin/notifications/campaigns/${id}/pause`, { method: 'POST', auth: true }),
+  cancelCampaign: (id) =>
+    req(`/api/admin/notifications/campaigns/${id}/cancel`, { method: 'POST', auth: true }),
+  duplicateCampaign: (id) =>
+    req(`/api/admin/notifications/campaigns/${id}/duplicate`, { method: 'POST', auth: true }),
+  testCampaign: (id, target) =>
+    req(`/api/admin/notifications/campaigns/${id}/test`, { method: 'POST', auth: true, body: target }),
+  previewAudience: (audience) =>
+    req('/api/admin/notifications/audience/preview', { method: 'POST', auth: true, body: { audience } }),
+
+  // notifications — templates, activity, audit
+  listNotifTemplates: () => req('/api/admin/notifications/templates', { auth: true }),
+  updateNotifTemplate: (id, data) =>
+    req(`/api/admin/notifications/templates/${id}`, { method: 'PUT', auth: true, body: data }),
+  recentNotifications: () => req('/api/admin/notifications/recent', { auth: true }),
+  notifAudit: () => req('/api/admin/notifications/audit', { auth: true }),
+
+  // surveys
+  listSurveys: () => req('/api/admin/surveys', { auth: true }),
+  createSurvey: (data) => req('/api/admin/surveys', { method: 'POST', auth: true, body: data }),
+  updateSurvey: (id, data) => req(`/api/admin/surveys/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteSurvey: (id) => req(`/api/admin/surveys/${id}`, { method: 'DELETE', auth: true }),
+  surveyResponses: (id) => req(`/api/admin/surveys/${id}/responses`, { auth: true }),
+
   // orders
   listOrders: (status) =>
     req(`/api/admin/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`, { auth: true }),

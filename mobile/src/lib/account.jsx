@@ -6,6 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { STORE_API_URL } from '@/src/config/env';
 import { storage, KEYS } from './storage';
+import { detachDeviceFromCustomer } from './pushToken';
 
 const API = STORE_API_URL;
 
@@ -124,6 +125,8 @@ export function AccountProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Stop account-targeted pushes on this device (keeps guest broadcasts).
+    detachDeviceFromCustomer();
     await clearPersistedToken();
     setCustomer(null);
   }, []);

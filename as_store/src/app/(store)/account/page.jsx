@@ -45,6 +45,20 @@ export default function AccountPage() {
           </button>
         </div>
 
+        <Link
+          href="/account/notifications"
+          className="mt-10 flex items-center gap-3 rounded-2xl border border-as-ink/10 p-5 transition hover:border-as-ink/25"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-as-red/10 text-as-red">
+            <Icon name="bell" className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-as-ink">Notifications</span>
+            <span className="block text-sm text-as-ink/55">Your inbox and notification preferences</span>
+          </span>
+          <Icon name="chevronRight" className="h-5 w-5 text-as-ink/40" />
+        </Link>
+
         <OrdersList />
 
         <AddressBook customer={customer} onSaved={setCustomer} />

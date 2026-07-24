@@ -53,9 +53,13 @@ export default function AccountScreen() {
             <Card padded={false}>
               <MenuRow icon="box" label="Your orders" onPress={() => router.push('/orders')} />
               <Divider inset={theme.spacing.lg} />
+              <MenuRow icon="bell" label="Notifications" onPress={() => router.push('/notifications')} />
+              <Divider inset={theme.spacing.lg} />
               <MenuRow icon="pin" label="Saved addresses" onPress={() => router.push('/account/addresses')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="settings" label="Edit profile" onPress={() => router.push('/account/edit')} />
+              <Divider inset={theme.spacing.lg} />
+              <MenuRow icon="mail" label="Notification settings" onPress={() => router.push('/account/notifications')} />
             </Card>
 
             <Card padded={false}>

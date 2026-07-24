@@ -10,7 +10,8 @@
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
     "clean": "node src/cleanup.js",
-    "backfill-images": "node src/backfill-images.js"
+    "backfill-images": "node src/backfill-images.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",

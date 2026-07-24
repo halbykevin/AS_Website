@@ -42,7 +42,9 @@ export const storage = {
 // Storage keys (kept in one place so nothing collides).
 export const KEYS = {
   customerToken: 'as_store_customer_token',
-  cart: 'as_store_cart'
+  cart: 'as_store_cart',
+  pushToken: 'as_push_token',
+  pushPromptSeen: 'as_push_prompt_seen'
 };
 
 export default storage;

@@ -36,6 +36,8 @@ import {
   createPayment as whishCreatePayment,
   getCollectStatus as whishStatus,
 } from "./whish.js";
+import { notificationsRouter } from "./notifications/router.js";
+import { emitEvent } from "./notifications/service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.resolve(
@@ -984,6 +986,20 @@ app.post(
         [customerId, fullName, phone, address, email],
       );
     }
+    // Transactional outbox: the notification worker turns this into the
+    // "order received" message. Never blocks or fails the order.
+    await emitEvent(
+      "order_created",
+      {
+        orderId,
+        customerId,
+        name: fullName,
+        itemCount: items.reduce((n, it) => n + it.qty, 0),
+        total: subtotal,
+      },
+      `order:${orderId}:created`,
+    ).catch((e) => console.error("[notify] emit order_created:", e?.message || e));
+
     const trackToken = signOrderToken(orderId);
     if (paymentMethod === "whish") {
       console.log(
@@ -1060,6 +1076,11 @@ async function markWhishPaid(orderId) {
   sendOrderEmails(detail, signOrderToken(orderId)).catch((e) =>
     console.error("[mail]", e?.message || e),
   );
+  await emitEvent(
+    "payment_paid",
+    { orderId: detail.id, customerId: detail.customerId, total: detail.subtotal },
+    `order:${detail.id}:paid`,
+  ).catch((e) => console.error("[notify] emit payment_paid:", e?.message || e));
   return true;
 }
 
@@ -1217,12 +1238,25 @@ app.put(
     const status = req.body?.status;
     if (!ORDER_STATUSES.includes(status))
       return res.status(400).json({ error: "Invalid status" });
+    // Only a real transition emits a notification event (idempotent anyway via
+    // the dedupe key, but this avoids no-op outbox rows).
     const { rows } = await query(
-      `UPDATE orders SET status = $2 WHERE id = $1 RETURNING id`,
+      `UPDATE orders SET status = $2 WHERE id = $1 AND status <> $2
+       RETURNING id, customer_id, status`,
       [req.params.id, status],
     );
-    if (!rows[0]) return res.status(404).json({ error: "Not found" });
-    res.json(await loadOrderDetail(rows[0].id));
+    if (rows[0]) {
+      await emitEvent(
+        "order_status_changed",
+        { orderId: rows[0].id, customerId: rows[0].customer_id, status },
+        `order:${rows[0].id}:status:${status}`,
+      ).catch((e) =>
+        console.error("[notify] emit order_status_changed:", e?.message || e),
+      );
+    }
+    const detail = await loadOrderDetail(req.params.id);
+    if (!detail) return res.status(404).json({ error: "Not found" });
+    res.json(detail);
   }),
 );
 
@@ -2007,6 +2041,7 @@ app.post("/api/uploads", requireAuth, upload.single("file"), (req, res) => {
 
 app.use(whatsappRouter);
 app.use(scraperRouter);
+app.use(notificationsRouter);
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {

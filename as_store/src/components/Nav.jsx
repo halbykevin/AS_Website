@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -8,8 +8,42 @@ import Icon from './Icon.jsx'
 import SearchBox from './SearchBox.jsx'
 import { selectCartCount } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
-import { useAccount } from '@/lib/account'
+import { useAccount, accountApi } from '@/lib/account'
 import { defaultSettings } from '@/lib/site'
+
+// Bell + unread badge for signed-in customers; polls gently so a fresh order
+// update shows without a reload.
+function NotificationsBell() {
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    let active = true
+    const load = () =>
+      accountApi
+        .unreadNotifications()
+        .then((d) => active && setUnread(d.unreadCount || 0))
+        .catch(() => {})
+    load()
+    const t = setInterval(load, 60_000)
+    return () => {
+      active = false
+      clearInterval(t)
+    }
+  }, [])
+  return (
+    <Link
+      href="/account/notifications"
+      className="relative transition-colors hover:text-white"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+    >
+      <Icon name="bell" className="h-[18px] w-[18px]" />
+      {unread > 0 && (
+        <span className="absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-as-red px-1 text-center text-[9px] font-bold leading-[15px] text-white">
+          {unread > 99 ? '99+' : unread}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 // Renders an internal link with <Link> (instant client nav) and external/hash
 // links with <a>.
@@ -133,6 +167,7 @@ export default function Nav({ settings, categories = [] }) {
             <button onClick={() => setSearchOpen(true)} className="transition-colors hover:text-white" aria-label="Search">
               <Icon name="search" className="h-[18px] w-[18px]" />
             </button>
+            {customer && <NotificationsBell />}
             <Link
               href={customer ? '/account' : '/login'}
               className="transition-colors hover:text-white"

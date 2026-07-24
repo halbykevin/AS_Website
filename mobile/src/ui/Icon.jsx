@@ -27,6 +27,9 @@ const MAP = {
   shield: 'shield-checkmark-outline',
   box: 'cube-outline',
 
+  bell: 'notifications-outline',
+  bellFilled: 'notifications',
+
   // nav / chrome
   menu: 'menu',
   close: 'close',

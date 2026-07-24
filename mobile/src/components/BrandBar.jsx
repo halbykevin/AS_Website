@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import { selectCartCount } from '@/src/store/cartSlice';
+import { useNotifications } from '@/src/lib/notifications';
 import Icon from '@/src/ui/Icon';
 import Text from '@/src/ui/Text';
 
@@ -15,10 +16,11 @@ const LOGOS = {
   store: require('../../assets/as-store-logo-clear.png')
 };
 
-export default function BrandBar({ variant = 'company', showSearch = false, showBag = false, title }) {
+export default function BrandBar({ variant = 'company', showSearch = false, showBag = false, showBell = true, title }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const cartCount = useSelector(selectCartCount);
+  const { unreadCount } = useNotifications();
 
   return (
     <View style={styles.bar}>
@@ -32,6 +34,23 @@ export default function BrandBar({ variant = 'company', showSearch = false, show
       </Pressable>
 
       <View style={styles.actions}>
+        {showBell ? (
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            hitSlop={theme.layout.hitSlop}
+            style={styles.action}
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          >
+            <Icon name="bell" size={22} />
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text variant="overline" color="textOnPrimary" style={{ fontSize: 10 }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
         {showSearch ? (
           <Pressable onPress={() => router.push('/search')} hitSlop={theme.layout.hitSlop} style={styles.action}>
             <Icon name="search" size={22} />

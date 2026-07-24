@@ -16,6 +16,7 @@ import { hydrateCart } from '@/src/store/cartSlice';
 import { storage, KEYS } from '@/src/lib/storage';
 import { ThemeProvider } from '@/src/theme';
 import { AccountProvider } from '@/src/lib/account';
+import { NotificationsProvider } from '@/src/lib/notifications';
 import { ContentProvider } from '@/src/content/ContentProvider';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -60,7 +61,9 @@ export default function AppProviders({ children }) {
       <ReduxProvider store={store}>
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: DAY }}>
           <AccountProvider>
-            <ContentProvider>{children}</ContentProvider>
+            <NotificationsProvider>
+              <ContentProvider>{children}</ContentProvider>
+            </NotificationsProvider>
           </AccountProvider>
         </PersistQueryClientProvider>
       </ReduxProvider>

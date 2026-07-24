@@ -73,6 +73,19 @@ export const accountApi = {
       method: 'POST',
       auth: true,
     }),
+  // notifications (inbox, preferences, surveys)
+  listNotifications: (before) =>
+    req(`/api/notifications${before ? `?before=${before}` : ''}`, { auth: true }),
+  unreadNotifications: () => req('/api/notifications/unread-count', { auth: true }),
+  readNotification: (id) => req(`/api/notifications/${id}/read`, { method: 'POST', auth: true }),
+  clickNotification: (id) => req(`/api/notifications/${id}/click`, { method: 'POST', auth: true }),
+  readAllNotifications: () => req('/api/notifications/read-all', { method: 'POST', auth: true }),
+  getNotificationPrefs: () => req('/api/notifications/prefs', { auth: true }),
+  saveNotificationPrefs: (prefs) =>
+    req('/api/notifications/prefs', { method: 'PUT', auth: true, body: prefs }),
+  getSurvey: (id) => req(`/api/surveys/${id}`),
+  respondSurvey: (id, orderId, answers) =>
+    req(`/api/surveys/${id}/responses`, { method: 'POST', auth: true, body: { orderId, answers } }),
 }
 
 const AccountContext = createContext(null)

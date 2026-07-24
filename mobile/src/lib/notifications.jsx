@@ -1,0 +1,228 @@
+// Mobile notification layer: API client, push-token registration, foreground /
+// background / cold-start handling, deep-link routing, and a provider exposing
+// the unread count + permission onboarding to the UI.
+
+import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { STORE_API_URL } from '@/src/config/env';
+import { storage, KEYS } from './storage';
+import { getCustomerToken, useAccount } from './account';
+import { rememberPushToken } from './pushToken';
+
+const API = STORE_API_URL;
+
+async function req(path, { method = 'GET', body, auth = true } = {}) {
+  const headers = {};
+  if (body != null) headers['Content-Type'] = 'application/json';
+  const token = getCustomerToken();
+  if (auth && token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers,
+    body: body != null ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    const err = new Error(e.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+export const notificationsApi = {
+  list: before => req(`/api/notifications${before ? `?before=${before}` : ''}`),
+  unreadCount: () => req('/api/notifications/unread-count'),
+  markRead: id => req(`/api/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => req('/api/notifications/read-all', { method: 'POST' }),
+  click: id => req(`/api/notifications/${id}/click`, { method: 'POST' }),
+  getPrefs: () => req('/api/notifications/prefs'),
+  savePrefs: prefs => req('/api/notifications/prefs', { method: 'PUT', body: prefs }),
+  registerDevice: data => req('/api/devices', { method: 'POST', body: data }),
+  removeDevice: (token, mode) => req('/api/devices', { method: 'DELETE', body: { token, mode } }),
+  getSurvey: id => req(`/api/surveys/${id}`, { auth: false }),
+  respondSurvey: (id, orderId, answers) =>
+    req(`/api/surveys/${id}/responses`, { method: 'POST', body: { orderId, answers } })
+};
+
+// Foreground pushes still show a banner (and play no sound to stay polite).
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: true
+  })
+});
+
+// --- Deep links -------------------------------------------------------------
+
+// Server deep links are store-web paths; translate them onto this app's routes
+// and refuse anything we don't recognize (a bad link lands on the inbox).
+export function resolveDeepLink(link) {
+  let path = String(link || '').trim();
+  if (!path) return '/notifications';
+  if (/^https?:\/\//i.test(path)) {
+    try {
+      path = new URL(path).pathname || '/';
+    } catch {
+      return '/notifications';
+    }
+  }
+  if (!path.startsWith('/')) return '/notifications';
+  path = path.replace(/^\/account\/orders\//, '/orders/'); // web → app route
+  const allowed = [
+    /^\/$/,
+    /^\/orders(\/\d+)?$/,
+    /^\/product\/[\w-]+$/,
+    /^\/category\/[\w-]+$/,
+    /^\/shop$/,
+    /^\/bag$/,
+    /^\/events(\/\d+)?$/,
+    /^\/what-we-do(\/[\w-]+)?$/,
+    /^\/account(\/(edit|addresses|notifications))?$/,
+    /^\/account\/survey\/\d+/,
+    /^\/notifications$/,
+    /^\/predictor$/
+  ];
+  return allowed.some(re => re.test(path.split('?')[0])) ? path : '/notifications';
+}
+
+function openFromPush(data) {
+  const target = resolveDeepLink(data?.deepLink);
+  // Mark the tapped notification read/clicked (best-effort, needs a session).
+  if (data?.notificationId && getCustomerToken()) {
+    notificationsApi.click(data.notificationId).catch(() => {});
+  }
+  router.push(target);
+}
+
+// --- Push registration ------------------------------------------------------
+
+async function ensureAndroidChannels() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'General',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 250],
+    lightColor: '#A41E22'
+  });
+  await Notifications.setNotificationChannelAsync('orders', {
+    name: 'Order updates',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#A41E22'
+  });
+}
+
+// Register this device's Expo push token with the API. `interactive` also asks
+// the OS for permission (call it only from the explainer UI); otherwise it
+// no-ops unless permission was already granted.
+export async function registerForPush({ interactive = false } = {}) {
+  try {
+    if (!Device.isDevice) return null; // simulators have no push
+    await ensureAndroidChannels();
+
+    let { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted' && interactive) {
+      ({ status } = await Notifications.requestPermissionsAsync());
+    }
+    if (status !== 'granted') return null;
+
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    const { data: token } = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
+    if (!token) return null;
+
+    await rememberPushToken(token);
+    await notificationsApi.registerDevice({
+      token,
+      platform: Platform.OS,
+      appVersion: Constants.expoConfig?.version || '',
+      locale: 'en'
+    });
+    return token;
+  } catch (e) {
+    // Expo Go can't receive remote pushes (SDK 53+) — the inbox still works.
+    console.log('[push] registration unavailable:', e?.message || e);
+    return null;
+  }
+}
+
+// --- Provider ---------------------------------------------------------------
+
+const NotificationsContext = createContext(null);
+
+export function NotificationsProvider({ children }) {
+  const account = useAccount();
+  const customer = account?.customer;
+  const qc = useQueryClient();
+  const respondedTo = useRef(null);
+
+  // Unread badge for the whole app; polls gently and refetches on foreground.
+  const { data: unread } = useQuery({
+    queryKey: ['notifications', 'unread', customer?.id ?? null],
+    queryFn: notificationsApi.unreadCount,
+    enabled: Boolean(customer),
+    refetchInterval: 60_000,
+    staleTime: 30_000
+  });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active') qc.invalidateQueries({ queryKey: ['notifications'] });
+    });
+    return () => sub.remove();
+  }, [qc]);
+
+  // (Re-)register the token whenever the signed-in customer changes, so the
+  // device row follows the session (guest → user on login). Never prompts.
+  useEffect(() => {
+    if (account?.loading) return;
+    registerForPush();
+  }, [account?.loading, customer?.id]);
+
+  // Taps on notifications: background/foreground taps + cold starts.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(resp => {
+      const data = resp?.notification?.request?.content?.data;
+      openFromPush(data);
+    });
+    Notifications.getLastNotificationResponseAsync().then(resp => {
+      const id = resp?.notification?.request?.identifier;
+      if (resp && respondedTo.current !== id) {
+        respondedTo.current = id;
+        openFromPush(resp.notification.request.content.data);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Any received push means the inbox changed.
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(() => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    });
+    return () => sub.remove();
+  }, [qc]);
+
+  const enablePush = useCallback(async () => {
+    await storage.set(KEYS.pushPromptSeen, '1');
+    return registerForPush({ interactive: true });
+  }, []);
+
+  return (
+    <NotificationsContext.Provider value={{ unreadCount: unread?.unreadCount ?? 0, enablePush }}>
+      {children}
+    </NotificationsContext.Provider>
+  );
+}
+
+export const useNotifications = () => useContext(NotificationsContext) || { unreadCount: 0, enablePush: async () => null };

@@ -8,6 +8,12 @@ const paths = {
       <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
     </>
   ),
+  bell: (
+    <>
+      <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+      <path d="M10.3 19a2 2 0 0 0 3.4 0" />
+    </>
+  ),
   menu: <path d="M3 7h18M3 12h18M3 17h18" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
