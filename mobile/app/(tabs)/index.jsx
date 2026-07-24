@@ -50,8 +50,6 @@ export default function HomeScreen() {
   return (
     <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['2xl'], paddingTop: theme.spacing.lg }}>
-        {/* Search */}
-        <SearchPill />
 
         {/* Hero copy */}
         <View style={{ gap: 4 }}>
