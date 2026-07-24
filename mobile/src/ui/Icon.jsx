@@ -1,16 +1,7 @@
-// Central icon component. Maps the app's semantic icon names (the same names the
-// web apps used in their custom Icon components) onto Ionicons, so screens ask
-// for `name="bag"` and never touch the icon library directly. Swap the library
-// here once and the whole app follows.
-
-// Import the Ionicons entry directly (not the '@expo/vector-icons' barrel) so
-// only the Ionicons font is bundled — the barrel pulls in every icon family.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/src/theme';
 
-// Semantic name → Ionicons glyph.
 const MAP = {
-  // store / commerce
   bag: 'bag-handle-outline',
   bagFilled: 'bag-handle',
   cart: 'cart-outline',

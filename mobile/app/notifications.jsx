@@ -1,6 +1,3 @@
-// Notification inbox — every in-app message for the signed-in customer, with
-// unread state, mark-all-read, load-more, and deep links into the app.
-
 import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';

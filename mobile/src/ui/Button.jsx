@@ -1,7 +1,3 @@
-// The app's button — the RN equivalent of the web `.pill` / `.pill-ghost`.
-// Variants keep every CTA on-brand: primary (AS red pill), ghost (outline),
-// inverse (on dark chrome), subtle (fog), link (text + chevron).
-
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from './Text';

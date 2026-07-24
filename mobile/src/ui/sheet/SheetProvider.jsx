@@ -1,25 +1,3 @@
-// ---------------------------------------------------------------------------
-// Global sheet/modal system — one imperative API for every overlay in the app.
-//
-// Mount <SheetProvider> once (inside BottomSheetModalProvider) and any component
-// can open a fully-custom overlay from anywhere:
-//
-//   const sheet = useSheet();
-//   const id = sheet.open({
-//     variant: 'sheet',                 // 'sheet' | 'modal' | 'fullscreen'
-//     snapPoints: ['50%'],              // omit → content-measured dynamic height
-//     render: ({ close }) => <MyContent onDone={close} />,
-//   });
-//   sheet.close(id);                    // or sheet.close() for the top-most
-//
-// Built on @gorhom/bottom-sheet: gesture-driven, safe-area aware, and it stacks
-// (open a sheet from inside a sheet). Everything is themed from design tokens, so
-// a new overlay written months from now inherits the exact same chrome.
-//
-// Convenience wrappers cover the everyday cases so screens never hand-roll a
-// modal again:  sheet.confirm(...)  ·  sheet.actions(...)  ·  sheet.alert(...)
-// ---------------------------------------------------------------------------
-
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
@@ -36,8 +14,6 @@ let SEQ = 0;
 const nextId = () => `sheet-${++SEQ}`;
 
 export function SheetProvider({ children }) {
-  // The live stack of open sheets. Each entry is an immutable descriptor; the
-  // matching <DynamicSheet> presents itself on mount and pops itself on dismiss.
   const [stack, setStack] = useState([]);
   const stackRef = useRef(stack);
   stackRef.current = stack;
@@ -52,8 +28,6 @@ export function SheetProvider({ children }) {
     return id;
   }, []);
 
-  // close(id) closes that sheet; close() closes the top-most. The DynamicSheet
-  // animates out then calls remove() via onDismiss, so we just flag it.
   const close = useCallback(id => {
     setStack(s => {
       if (!s.length) return s;
@@ -158,10 +132,6 @@ export function useSheet() {
   return ctx;
 }
 
-// ---------------------------------------------------------------------------
-// A single presented sheet. Owns its own BottomSheetModal ref, presents on
-// mount, and reacts to the descriptor's `_dismiss` counter to animate out.
-// ---------------------------------------------------------------------------
 function DynamicSheet({ descriptor, onClosed }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -173,13 +143,10 @@ function DynamicSheet({ descriptor, onClosed }) {
 
   const detached = variant === 'modal';
 
-  // Present as soon as we're mounted.
   useEffect(() => {
     ref.current?.present();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Programmatic close: whenever the provider bumps `_dismiss`, dismiss.
   useEffect(() => {
     if ((descriptor._dismiss || 0) > dismissSeen.current) {
       dismissSeen.current = descriptor._dismiss;
@@ -196,9 +163,6 @@ function DynamicSheet({ descriptor, onClosed }) {
 
   const renderBackdrop = useCallback(props => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={backdropOpacity} pressBehavior={dismissible ? 'close' : 'none'} />, [backdropOpacity, dismissible]);
 
-  // Fullscreen is a single tall snap point; modal floats detached near the
-  // bottom with side margins; sheet uses dynamic (content-measured) height
-  // unless the caller pins explicit snap points.
   const resolvedSnapPoints = variant === 'fullscreen' ? ['92%'] : snapPoints;
   const dynamic = !resolvedSnapPoints;
 
@@ -229,8 +193,6 @@ function DynamicSheet({ descriptor, onClosed }) {
     </BottomSheetModal>
   );
 }
-
-// ---- Building blocks for the convenience overlays --------------------------
 
 function Dialog({ title, message, icon, tone = 'primary', actions = [] }) {
   const theme = useTheme();

@@ -1,4 +1,3 @@
-// Centered empty/error state with an icon, message and optional action.
 import { View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import Text from './Text';

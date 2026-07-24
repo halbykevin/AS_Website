@@ -1,6 +1,3 @@
-// Themed text input + a labelled Field wrapper — the RN port of the store's
-// `inputCls` + `<Field>`. Focus ring uses the brand red, like the web.
-
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
@@ -27,8 +24,6 @@ export function Input({ style, onFocus, onBlur, invalid = false, ...rest }) {
   );
 }
 
-// Labelled field: label + control + optional hint/error. Pass children to use a
-// custom control, or `inputProps` to render a plain Input.
 export function Field({ label, hint, error, children, inputProps, style }) {
   const styles = useThemedStyles(makeStyles);
   return (

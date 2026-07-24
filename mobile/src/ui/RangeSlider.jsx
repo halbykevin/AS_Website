@@ -1,12 +1,3 @@
-// Dual-handle price range slider — the RN port of the web store's <PriceSlider>.
-// Built on gesture-handler + reanimated so dragging is smooth on the UI thread;
-// values commit on release (onCommit) with an optional live onChange while
-// dragging. Handles are clamped to the bounds and can't cross each other.
-//
-//   <RangeSlider bounds={{ min: 0, max: 7150 }} low={100} high={5000}
-//     onChange={(lo, hi) => setLabel(lo, hi)}
-//     onCommit={(lo, hi) => setParams(lo, hi)} />
-
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -23,12 +14,8 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
   const styles = useThemedStyles(makeStyles);
   const { min, max } = bounds;
   const span = Math.max(1, max - min);
-
   const [trackW, setTrackW] = useState(0);
-  // Live labels shown above the track (JS state, updated from the UI thread).
   const [labels, setLabels] = useState({ lo: low ?? min, hi: high ?? max });
-
-  // Handle positions as fractions [0..1] of the track — width-independent.
   const loFrac = useSharedValue((clamp(low ?? min, min, max) - min) / span);
   const hiFrac = useSharedValue((clamp(high ?? max, min, max) - min) / span);
   const loStart = useSharedValue(0);
@@ -62,7 +49,6 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
 
   const makePan = (frac, start, isLow) =>
     Gesture.Pan()
-      // Claim horizontal intent so dragging a thumb never scrolls the sheet.
       .activeOffsetX([-6, 6])
       .failOffsetY([-12, 12])
       .onBegin(() => {
@@ -73,7 +59,6 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
         'worklet';
         const delta = w.value > 0 ? e.translationX / w.value : 0;
         let next = clamp(start.value + delta, 0, 1);
-        // Keep the low handle below the high handle and vice-versa.
         if (isLow) next = Math.min(next, hiFrac.value);
         else next = Math.max(next, loFrac.value);
         frac.value = next;

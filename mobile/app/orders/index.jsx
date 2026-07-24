@@ -1,6 +1,3 @@
-// Your orders — the signed-in customer's order history. Requires a session;
-// bounces to sign-in when signed out.
-
 import { useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';

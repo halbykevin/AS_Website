@@ -1,5 +1,3 @@
-// The app's UI kit. Import primitives from one place:
-//   import { Screen, Text, Button, Card } from '@/src/ui'
 export { default as Screen } from './Screen';
 export { default as Text } from './Text';
 export { default as Button } from './Button';

@@ -1,6 +1,3 @@
-// Eyebrow + heading + optional "See all" action. The recurring section title
-// pattern used across the home, store and events screens.
-
 import { Pressable, View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import Text from './Text';

@@ -1,4 +1,3 @@
-// Selectable filter chip (category filters, sort options). Selected = AS red.
 import { Pressable } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from './Text';

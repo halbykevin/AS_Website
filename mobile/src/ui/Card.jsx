@@ -1,6 +1,3 @@
-// Surface container with the app's rounded corners, border and card shadow.
-// `onPress` turns it into a pressable tile (used across the store + events).
-
 import { Pressable, View } from 'react-native';
 import { useThemedStyles, useTheme } from '@/src/theme';
 

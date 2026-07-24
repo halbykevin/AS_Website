@@ -1,6 +1,3 @@
-// Reusable top app bar for stack screens: back button, centered title, optional
-// right-side actions. Keeps every screen's chrome identical.
-
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme, useThemedStyles } from '@/src/theme';

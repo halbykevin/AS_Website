@@ -1,16 +1,3 @@
-// The layout primitive every screen builds on. Handles safe-area insets, the
-// standard horizontal gutter, an optional scroll view, a max content width (so
-// text lines never over-stretch on tablets/web), a themed status bar and an
-// optional FIXED header that never scrolls away.
-//
-//   <Screen scroll>…</Screen>                          // padded, scrollable
-//   <Screen scroll={false} padded={false}>…</Screen>   // full-bleed (hero pages)
-//   <Screen header={s => <AppHeader scrolled={s} />}>… // fixed, scroll-aware header
-//
-// `header` can be a node or a function `(scrolled) => node`. When Screen owns the
-// ScrollView it tracks the scroll offset and feeds `scrolled` in, so a dynamic
-// header can reveal its divider/shadow the moment content slides underneath.
-
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -49,7 +36,7 @@ export default function Screen({ children, scroll = true, padded = true, edges =
     : onScroll;
 
   const body = scroll ? (
-    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }} refreshControl={refreshControl} onScroll={handleScroll} scrollEventThrottle={16} {...rest}>
+    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: theme.spacing['4xl'], flexGrow: 1 }} refreshControl={refreshControl} onScroll={handleScroll} scrollEventThrottle={16} {...rest}>
       {inner}
     </ScrollView>
   ) : (

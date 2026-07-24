@@ -1,4 +1,3 @@
-// Small pill labels: sale flags, statuses, counts. `tone` picks the palette.
 import { View } from 'react-native';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from './Text';
