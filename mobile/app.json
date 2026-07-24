@@ -13,7 +13,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lb.com.as.company"
@@ -32,10 +34,7 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-image",
-        { "cacheDurationInSeconds": 604800 }
-      ]
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": false

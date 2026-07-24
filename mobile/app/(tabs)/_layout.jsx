@@ -3,7 +3,7 @@
 // a live cart-count badge.
 
 import { Tabs } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSelector } from 'react-redux'
 import { useTheme } from '@/src/theme'
 import { selectCartCount } from '@/src/store/cartSlice'

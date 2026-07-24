@@ -28,3 +28,7 @@ android/
 npm-debug.*
 yarn-error.*
 *.log
+
+# Local validation artifacts
+.expo-export-check/
+export.log
