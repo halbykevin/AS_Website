@@ -33,7 +33,7 @@ Responses are **camelCase**; DB columns are snake_case (mapped in `src/app.js`).
 cd as_store/server
 cp .env.example .env      # set DATABASE_URL (postgres://postgres:PASSWORD@127.0.0.1:5432/as_store)
 npm install
-npm run migrate           # optional — re-applies db/schema.sql (already run via pgAdmin)
+npm run migrate           # required after schema changes; safe to re-run
 npm run seed              # optional — re-loads db/seed.sql
 npm start                 # http://localhost:8081
 ```
@@ -61,6 +61,19 @@ order and Whish returns through `/api/orders/whish/return`, which bounces to
 `APP_RETURN_SCHEMES` are honoured — anything else falls back to the storefront, so the bridge can't be
 used as an open redirect.
 
+Whish is advertised by `/api/payment/methods` only when its credentials and both
+public HTTPS return origins are configured. This prevents checkout from offering
+a payment route that cannot complete.
+
+## Google sign-in for the mobile app
+
+The mobile app starts the normal Google OAuth flow at
+`/api/account/google/start`, passing an allow-listed `appReturn` deep link. After
+Google's server callback, the API sends the app a 120-second, single-use code
+instead of exposing a customer session in the redirect URL. The app exchanges it
+with `POST /api/account/google/mobile-exchange`. Run `npm run migrate` before
+deploying this flow so the `mobile_auth_codes` table exists.
+
 ## Env (`.env`)
 
 `DATABASE_URL` · `PORT` (8081) · `PUBLIC_URL` (builds uploaded image URLs) · `UPLOAD_DIR` ·
@@ -68,4 +81,4 @@ used as an open redirect.
 
 Payments: `WHISH_BASE_URL` / `WHISH_CHANNEL` / `WHISH_SECRET` / `WHISH_WEBSITE_URL` ·
 `PUBLIC_API_URL` + `STORE_PUBLIC_URL` (Whish rejects `localhost` — use a tunnel or the real domains) ·
-`APP_RETURN_SCHEMES` (default `ascompany,exp,exps`; drop the Expo Go ones once the app ships).
+`APP_RETURN_SCHEMES` (default `ascompany`; add Expo Go schemes explicitly for development only).

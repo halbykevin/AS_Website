@@ -88,7 +88,9 @@ assets/                      # brand logos, icons
 
 State mirrors the web store for parity: **Redux Toolkit** (cart, persisted to
 `AsyncStorage`), **React Query** (server data cache), and a small **Account
-context** holding the signed‑in customer (token in `AsyncStorage`).
+context** holding the signed‑in customer. The customer token is stored in the
+native keychain/Keystore through `expo-secure-store`; web builds use
+`AsyncStorage` as a compatibility fallback.
 
 ---
 
@@ -201,14 +203,17 @@ GoogleButton  → openAuthSessionAsync(
                   /api/account/google/start?next=…&appReturn=ascompany://auth/google,
                   'ascompany://auth/google')            ← in-app browser tab
                 pick Google account ─► /api/account/google/callback
-                  └─ 302 ascompany://auth/google?token=…&next=…
-              → tab closes itself, parse token → useAccount().adoptToken(token)
+                  └─ 302 ascompany://auth/google?code=…&next=…
+              → tab closes itself → POST /api/account/google/mobile-exchange
+              → useAccount().adoptToken(token)
               → router.replace(next)
 ```
 
 - The app passes `Linking.createURL('/auth/google')` as `appReturn`; the API carries
-  it inside the **signed OAuth state**, then redirects the token there. The web flow
-  sends no `appReturn` and keeps returning to `STORE_URL/auth/google`.
+  it inside the **signed OAuth state**, then redirects a 120-second, single-use
+  authorization code there. The app exchanges that code for its customer session
+  token. The web flow sends no `appReturn` and keeps returning to
+  `STORE_URL/auth/google`.
 - `appReturn` is re‑validated against the server's `APP_RETURN_SCHEMES` allow‑list at
   redirect time, so it can't be turned into an open redirect. A **failed** sign‑in is
   also bounced back to the app link (`?error=google`) so the browser still closes.

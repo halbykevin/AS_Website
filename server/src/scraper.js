@@ -9,7 +9,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { requireAuth } from './auth.js'
 import { query } from './db.js'
 
@@ -352,7 +352,7 @@ scraperRouter.get('/:id/zip', (req, res) => {
   if (!fs.existsSync(outDir)) return res.status(404).json({ error: 'Nothing to download' })
 
   res.attachment(`scrape-${job.id}.zip`)
-  const archive = archiver('zip', { zlib: { level: 9 } })
+  const archive = new ZipArchive({ zlib: { level: 9 } })
   archive.on('error', (err) => res.status(500).end(String(err)))
   archive.pipe(res)
   archive.directory(outDir, false)
