@@ -22,7 +22,7 @@
     "submit:android": "eas submit --platform android --profile production"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
+    "@expo/vector-icons": "15.0.3",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@reduxjs/toolkit": "^2.2.7",
@@ -33,6 +33,7 @@
     "expo-asset": "~12.0.13",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.9",
+    "expo-font": "~14.0.12",
     "expo-image": "~3.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
@@ -57,5 +58,9 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "babel-preset-expo": "~54.0.12",
     "prettier": "^3.7.4"
+  },
+  "//overrides": "Force expo-font to the SDK 54 version. @expo/vector-icons declares expo-font as a peer (>=14.0.4), so npm otherwise auto-installs the latest (57.x, built for a newer expo-modules-core) which crashes release builds with NoSuchMethodError: getDirectConverter.",
+  "overrides": {
+    "expo-font": "$expo-font"
   }
 }
