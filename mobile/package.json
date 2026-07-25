@@ -66,7 +66,6 @@
   "//overrides": "Force expo-font to the SDK 54 version. @expo/vector-icons declares expo-font as a peer (>=14.0.4), so npm otherwise auto-installs the latest (57.x, built for a newer expo-modules-core) which crashes release builds with NoSuchMethodError: getDirectConverter.",
   "overrides": {
     "expo-font": "$expo-font",
-    "brace-expansion": "5.0.8",
     "postcss": "8.5.23",
     "uuid": "11.1.1"
   }
