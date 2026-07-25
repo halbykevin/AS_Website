@@ -27,6 +27,7 @@ import { useNotifications } from '@/src/lib/notifications';
 import Text from '@/src/ui/Text';
 import Icon from '@/src/ui/Icon';
 import AnnouncementBar from './AnnouncementBar';
+import { useGlobalPromoVisible } from './GlobalPromoBanner';
 
 const LOGOS = {
   company: require('../../assets/as-company-logo.jpg'),
@@ -49,11 +50,10 @@ export default function AppHeader({
   const styles = useThemedStyles(makeStyles);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const globalPromoVisible = useGlobalPromoVisible();
 
   const dark = brand === 'store';
   const fg = dark ? theme.colors.textOnInverse : theme.colors.text;
-  const muted = dark ? theme.colors.textOnInverseMuted : theme.colors.textMuted;
-
   // Responsive sizing: tighten on small phones, breathe on wide screens.
   const compact = width < 360;
   const logoW = brand === 'company' ? (compact ? 104 : 128) : compact ? 96 : 116;
@@ -68,8 +68,8 @@ export default function AppHeader({
   const back = onBack || (() => (router.canGoBack() ? router.back() : router.replace('/')));
 
   return (
-    <View style={[styles.root, dark && styles.rootDark, { paddingTop: insets.top }]}>
-      {announcement ? <AnnouncementBar announcement={announcement} /> : null}
+    <View style={[styles.root, dark && styles.rootDark, { paddingTop: globalPromoVisible ? 0 : insets.top }]}>
+      {!globalPromoVisible && announcement ? <AnnouncementBar announcement={announcement} /> : null}
 
       <Animated.View
         style={[

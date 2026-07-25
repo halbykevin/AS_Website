@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, use, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDispatch } from 'react-redux'
@@ -12,6 +12,7 @@ import { statusMeta, statusClasses, money, orderDate } from '@/lib/orders'
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
 
 export default function OrderPage({ params }) {
+  params = use(params)
   const id = params.id
   const { customer, loading } = useAccount()
   const router = useRouter()

@@ -32,7 +32,7 @@ export default function SurveyScreen() {
         setState('ready');
       })
       .catch(() => setState('missing'));
-  }, [account?.loading, account?.customer, id]);
+  }, [account?.loading, account?.customer, id, order]);
 
   const submit = async () => {
     setState('submitting');

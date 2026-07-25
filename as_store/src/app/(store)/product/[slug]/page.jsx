@@ -13,6 +13,7 @@ import {
 } from '@/lib/seo'
 
 export async function generateMetadata({ params }) {
+  params = await params
   const product = await loadProduct(params.slug)
   if (!product) return { title: 'Product not found' }
 
@@ -46,6 +47,7 @@ export async function generateMetadata({ params }) {
 // Single product page: gallery + buy box, then related products from the same
 // category.
 export default async function ProductPage({ params }) {
+  params = await params
   const [product, settings, cats] = await Promise.all([
     loadProduct(params.slug),
     loadSettings(),

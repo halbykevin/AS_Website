@@ -36,6 +36,10 @@ export default function CategoryWall({ categories = [], eyebrow = 'Find your thi
         </Pressable>
       </View>
 
+      <Text accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.watermark}>
+        CATEGORIES
+      </Text>
+
       <View style={styles.grid}>
         {categories.map(c => (
           <View key={c.id ?? c.slug} style={styles.cell}>
@@ -78,7 +82,18 @@ const makeStyles = t => ({
     backgroundColor: t.colors.inverse,
     paddingHorizontal: t.layout.screenPadding,
     paddingVertical: t.spacing['3xl'],
-    borderRadius: t.radii['3xl']
+    borderRadius: t.radii['3xl'],
+    overflow: 'hidden'
+  },
+  watermark: {
+    position: 'absolute',
+    top: -22,
+    left: -8,
+    color: 'rgba(255,255,255,0.035)',
+    fontSize: 72,
+    lineHeight: 80,
+    fontWeight: '900',
+    letterSpacing: -3
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: t.spacing.xl },
   eyebrow: { color: t.colors.primaryLight, letterSpacing: 1.5 },

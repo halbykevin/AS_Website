@@ -7,10 +7,10 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Card, Chip, Icon, SectionHeader, Button } from '@/src/ui';
 import AppHeader from '@/src/components/AppHeader';
 import ComingSoon from '@/src/components/ComingSoon';
-import SearchPill from '@/src/components/SearchPill';
 import ProductTile from '@/src/components/ProductTile';
 import ProductGrid from '@/src/components/ProductGrid';
 import HRail from '@/src/components/HRail';
+import CategoryWall from '@/src/components/store/CategoryWall';
 
 const FEED_LIMIT = 48; // one bounded request feeds every section below
 const PREVIEW_COUNT = 8; // grid preview size — the rest lives in /category/all
@@ -19,22 +19,22 @@ export default function HomeScreen() {
   const theme = useTheme();
   const { content, storeSettings, refresh: refreshContent } = useContent();
 
-  const feed = useProducts({ limit: FEED_LIMIT });
-  const featured = useProducts({ featured: 1, limit: 10 });
-  const cats = useCategories();
+  const { data: feedData, isLoading: feedLoading, isRefetching, refetch: refetchFeed } = useProducts({ limit: FEED_LIMIT });
+  const { data: featuredData, refetch: refetchFeatured } = useProducts({ featured: 1, limit: 10 });
+  const { data: categoryData, refetch: refetchCategories } = useCategories();
 
-  const products = feed.data || [];
+  const products = useMemo(() => feedData || [], [feedData]);
   const predictor = content.predictor;
 
   const onRefresh = useCallback(() => {
     refreshContent();
-    feed.refetch();
-    featured.refetch();
-    cats.refetch();
-  }, [refreshContent, feed.refetch, featured.refetch, cats.refetch]);
+    refetchFeed();
+    refetchFeatured();
+    refetchCategories();
+  }, [refreshContent, refetchFeed, refetchFeatured, refetchCategories]);
 
   // All derived from the single feed — no extra network requests.
-  const topCats = useMemo(() => (cats.data || []).filter(c => !c.parentId), [cats.data]);
+  const topCats = useMemo(() => (categoryData || []).filter(c => !c.parentId), [categoryData]);
   const newIn = useMemo(() => products.slice(0, 8), [products]);
   const deals = useMemo(() => products.filter(p => p.salePercent || (p.oldPrice && Number(p.oldPrice) > Number(p.price))).slice(0, 10), [products]);
   const preview = useMemo(() => products.slice(0, PREVIEW_COUNT), [products]);
@@ -48,7 +48,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
+    <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['2xl'], paddingTop: theme.spacing.lg }}>
 
         {/* Hero copy */}
@@ -95,11 +95,20 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
+        {/* Same editorial category wall as the web storefront home. */}
+        {topCats.length > 0 ? (
+          <CategoryWall
+            categories={topCats.slice(0, 6)}
+            onViewAll={() => router.push('/shop')}
+            style={{ marginHorizontal: -theme.layout.screenPadding, borderRadius: 0 }}
+          />
+        ) : null}
+
         {/* Featured rail */}
-        {(featured.data || []).length > 0 ? (
+        {(featuredData || []).length > 0 ? (
           <View>
             <SectionHeader eyebrow="Featured" title="Editor's picks" />
-            <HRail data={featured.data} itemWidth={220} renderItem={p => <ProductTile product={p} width={220} />} />
+            <HRail data={featuredData} itemWidth={220} renderItem={p => <ProductTile product={p} width={220} />} />
           </View>
         ) : null}
 
@@ -124,7 +133,7 @@ export default function HomeScreen() {
         {/* Product preview grid + the door to the full (virtualized) catalog */}
         <View>
           <SectionHeader title="Popular right now" actionLabel="View all" onAction={() => router.push('/category/all')} />
-          <ProductGrid products={preview} loading={feed.isLoading} emptyMessage="No products yet. Pull to refresh." />
+          <ProductGrid products={preview} loading={feedLoading} emptyMessage="No products yet. Pull to refresh." />
           {products.length > PREVIEW_COUNT ? <Button label="View all products" variant="ghost" iconRight="arrowRight" onPress={() => router.push('/category/all')} fullWidth style={{ marginTop: theme.spacing.lg }} /> : null}
         </View>
 

@@ -5,7 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { STORE_API_URL } from '@/src/config/env';
-import { storage, KEYS } from './storage';
+import { secureStorage, KEYS } from './storage';
 import { detachDeviceFromCustomer } from './pushToken';
 
 const API = STORE_API_URL;
@@ -16,11 +16,11 @@ export const getCustomerToken = () => cachedToken;
 
 async function persistToken(t) {
   cachedToken = t;
-  await storage.set(KEYS.customerToken, t);
+  await secureStorage.set(KEYS.customerToken, t);
 }
 async function clearPersistedToken() {
   cachedToken = null;
-  await storage.remove(KEYS.customerToken);
+  await secureStorage.remove(KEYS.customerToken);
 }
 
 async function req(path, { method = 'GET', body, auth = false } = {}) {
@@ -50,6 +50,7 @@ export const googleSignInUrl = (next = '/', appReturn = '') =>
 
 export const accountApi = {
   authMethods: () => req('/api/account/auth/methods'),
+  exchangeGoogleCode: code => req('/api/account/google/mobile-exchange', { method: 'POST', body: { code } }),
   requestOtp: (channel, identifier) => req('/api/account/otp/request', { method: 'POST', body: { channel, identifier } }),
   verifyOtp: (channel, identifier, code, profile) => req('/api/account/otp/verify', { method: 'POST', body: { channel, identifier, code, profile } }),
   requestLink: (channel, identifier) => req('/api/account/link/request', { method: 'POST', auth: true, body: { channel, identifier } }),
@@ -83,7 +84,7 @@ export function AccountProvider({ children }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const t = await storage.get(KEYS.customerToken);
+      const t = await secureStorage.get(KEYS.customerToken);
       cachedToken = t;
       if (!t) {
         if (active) setLoading(false);

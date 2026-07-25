@@ -1,9 +1,5 @@
-// Whish Pay client — a thin fetch wrapper around the itel-service payment API.
-// The secret lives only in env and is never exposed to the browser. The status
-// endpoint (getCollectStatus) is the source of truth for whether an order is
-// paid; the inbound callback is only a faster trigger for the same check.
-//
-// Docs: https://whish-partners.pages.dev/whish-pay-9z366gc6922w/
+// Whish Pay server client. Credentials never leave the API process.
+// Current reference: https://whish-partners.pages.dev/whish-pay-9z366gc6922w/
 
 const BASE = (process.env.WHISH_BASE_URL || 'https://partner.api.sbx.whish.money/itel-service/api').replace(
   /\/$/,
@@ -12,14 +8,12 @@ const BASE = (process.env.WHISH_BASE_URL || 'https://partner.api.sbx.whish.money
 const CHANNEL = process.env.WHISH_CHANNEL || ''
 const SECRET = process.env.WHISH_SECRET || ''
 const WEBSITE_URL = process.env.WHISH_WEBSITE_URL || ''
-const USER_AGENT = process.env.WHISH_USER_AGENT || 'AS-Store/1.0 (store.as.com.lb; orders@as.com.lb)'
+const USER_AGENT = process.env.WHISH_USER_AGENT || 'AS-Store/1.0 (https://store.as.com.lb; orders@as.com.lb)'
 
-// Only offer online payment when the credentials are actually configured.
 export const whishEnabled = () => Boolean(CHANNEL && SECRET && WEBSITE_URL)
 
-// Verbose flow logging (prefixed [whish]) so the payment path is traceable in the
-// PM2 out log. The secret is never logged — only the channel identifier.
-const log = (...a) => console.log('[whish]', ...a)
+const log = (...args) => console.log('[whish]', ...args)
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 log(
   `config: base=${BASE} channel=${CHANNEL || '(unset)'} website=${WEBSITE_URL || '(unset)'} enabled=${whishEnabled()}`,
@@ -30,42 +24,69 @@ function headers() {
     'Content-Type': 'application/json',
     channel: CHANNEL,
     secret: SECRET,
-    websiteurl: WEBSITE_URL,
+    websiteUrl: WEBSITE_URL,
     'User-Agent': USER_AGENT,
   }
 }
 
-// POST helper. Whish wraps responses as { status: bool, code, dialog, data }.
-// A false `status` is a business error even on HTTP 200, so surface it.
+// Whish uses an HTTP-200 envelope. status:false/code:500 is an unknown result,
+// not a final failure. Errors mark whether the exact same externalId is safe to
+// retry so callers cannot accidentally create a second payment.
 async function call(path, body) {
-  log(`→ POST ${path}`, JSON.stringify(body))
-  let res
+  log(`POST ${path}`, JSON.stringify(body))
+  let response
   try {
-    res = await fetch(`${BASE}${path}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) })
-  } catch (e) {
-    log(`✗ ${path} unreachable:`, e?.message || e)
-    throw new Error(`Whish ${path} unreachable: ${e?.message || e}`)
+    response = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body),
+    })
+  } catch (cause) {
+    const error = new Error(`Whish ${path} unreachable: ${cause?.message || cause}`)
+    error.retryable = true
+    throw error
   }
-  const text = await res.text()
-  let j = {}
+
+  const text = await response.text()
+  let payload = {}
   try {
-    j = text ? JSON.parse(text) : {}
+    payload = text ? JSON.parse(text) : {}
   } catch {
-    j = { raw: text }
+    payload = { raw: text }
   }
-  log(`← ${path} HTTP ${res.status}:`, text ? text.slice(0, 800) : '(empty body)')
-  if (!res.ok) throw new Error(`Whish ${path} HTTP ${res.status}: ${text?.slice(0, 300)}`)
-  if (j.status === false) {
-    const msg = j?.dialog?.message || j?.message || j?.code || 'request failed'
-    log(`✗ ${path} business error:`, msg)
-    throw new Error(`Whish ${path}: ${msg}`)
+
+  log(`${path} HTTP ${response.status}:`, text ? text.slice(0, 800) : '(empty body)')
+  if (!response.ok) {
+    const error = new Error(`Whish ${path} HTTP ${response.status}: ${text?.slice(0, 300)}`)
+    error.retryable = response.status >= 500
+    throw error
   }
-  return j
+  if (payload.status === false) {
+    const message = payload?.dialog?.message || payload?.message || payload?.code || 'request failed'
+    const error = new Error(`Whish ${path}: ${message}`)
+    error.code = String(payload?.code ?? '')
+    error.retryable = error.code === '500'
+    throw error
+  }
+  return payload
 }
 
-// Create a payment link. externalId is our own unique reference (the order id);
-// currency USD amounts carry 2 decimals. Returns the hosted collectUrl to send
-// the customer to. All four URLs must be publicly reachable (Whish 403s localhost).
+async function callWithRetry(path, body, attempts = 3) {
+  let lastError
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await call(path, body)
+    } catch (error) {
+      lastError = error
+      if (!error?.retryable || attempt === attempts) throw error
+      const waitMs = 250 * 2 ** (attempt - 1)
+      log(`retrying ${path} with the same externalId in ${waitMs}ms (attempt ${attempt + 1}/${attempts})`)
+      await delay(waitMs)
+    }
+  }
+  throw lastError
+}
+
 export async function createPayment({
   amount,
   currency = 'USD',
@@ -76,35 +97,43 @@ export async function createPayment({
   successRedirectUrl,
   failureRedirectUrl,
 }) {
-  const amt = Number(Number(amount).toFixed(currency === 'USD' ? 2 : 0))
-  log(`createPayment: externalId=${externalId} amount=${amt} ${currency} invoice="${invoice}"`)
-  const j = await call('/payment/whish', {
-    amount: amt,
+  const numericAmount = Number(amount)
+  const minimum = currency === 'USD' ? 1 : 1000
+  if (!Number.isFinite(numericAmount) || numericAmount < minimum) {
+    throw new Error(`Whish: ${currency} amount must be at least ${minimum}`)
+  }
+
+  // The v1.4.4 contract requires amount and externalId to be JSON strings.
+  const normalizedAmount = numericAmount.toFixed(currency === 'USD' ? 2 : 0)
+  const normalizedExternalId = String(externalId)
+  log(
+    `createPayment: externalId=${normalizedExternalId} amount=${normalizedAmount} ${currency} invoice="${invoice}"`,
+  )
+  const payload = await callWithRetry('/payment/whish', {
+    amount: normalizedAmount,
     currency,
     invoice,
-    externalId: Number(externalId),
+    externalId: normalizedExternalId,
     successCallbackUrl,
     failureCallbackUrl,
     successRedirectUrl,
     failureRedirectUrl,
   })
-  const data = j?.data ?? j
+  const data = payload?.data ?? payload
   const collectUrl = data.collectUrl || data.collecturl || data.url
-  if (!collectUrl) {
-    log('✗ createPayment: no collectUrl in response', JSON.stringify(j).slice(0, 500))
-    throw new Error('Whish: no collectUrl in response')
-  }
-  log(`createPayment: collectUrl=${collectUrl}`)
-  return { collectUrl, raw: j }
+  if (!collectUrl) throw new Error('Whish: no collectUrl in response')
+  return { collectUrl, raw: payload }
 }
 
-// Ask Whish for the settled status of a payment. collectStatus is one of
-// pending | success | failed | refunded | unknown — only success/failed are final.
 export async function getCollectStatus({ externalId, currency = 'USD' }) {
-  log(`getCollectStatus: externalId=${externalId} ${currency}`)
-  const j = await call('/payment/collect/status', { externalId: Number(externalId), currency })
-  const data = j?.data ?? j
+  const normalizedExternalId = String(externalId)
+  log(`getCollectStatus: externalId=${normalizedExternalId} ${currency}`)
+  const payload = await callWithRetry('/payment/collect/status', {
+    externalId: normalizedExternalId,
+    currency,
+  })
+  const data = payload?.data ?? payload
   const collectStatus = data.collectStatus || 'unknown'
-  log(`getCollectStatus: externalId=${externalId} → collectStatus=${collectStatus}`)
-  return { collectStatus, raw: j }
+  log(`getCollectStatus: externalId=${normalizedExternalId} -> collectStatus=${collectStatus}`)
+  return { collectStatus, raw: payload }
 }

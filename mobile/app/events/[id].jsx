@@ -10,7 +10,7 @@ import RemoteImage from '@/src/components/RemoteImage';
 export default function EventDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams();
-  const { events, content } = useContent();
+  const { events } = useContent();
   const event = (events || []).find(e => e.id === id);
 
   if (!event) {

@@ -259,6 +259,23 @@ CREATE TABLE IF NOT EXISTS otp_codes (
 
 CREATE INDEX IF NOT EXISTS idx_otp_codes_mobile ON otp_codes(mobile);
 
+-- --- Mobile OAuth handoff codes --------------------------------------------
+-- Google returns to the API first. A native app receives only a short-lived,
+-- single-use opaque code in its deep link, then exchanges it for the normal
+-- customer token over HTTPS. This keeps long-lived bearer tokens out of URLs.
+CREATE TABLE IF NOT EXISTS mobile_auth_codes (
+  id          BIGSERIAL PRIMARY KEY,
+  code_hash   TEXT UNIQUE NOT NULL,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  next_path   TEXT NOT NULL DEFAULT '/',
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_auth_codes_expiry
+  ON mobile_auth_codes(expires_at);
+
 -- --- Sales / promotions ------------------------------------------------------
 -- One row per running promotion. Prices are never rewritten on the products
 -- table: the API computes the discounted price at read time from the best

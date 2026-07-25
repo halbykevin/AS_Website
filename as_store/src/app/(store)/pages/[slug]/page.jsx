@@ -12,6 +12,7 @@ const CONTACT_SLUGS = new Set(['support', 'contact'])
 // blank lines. Some slugs render bespoke pages instead of CMS text: "support"/
 // "contact" → the contact form, "about" → the full About page.
 export async function generateMetadata({ params }) {
+  params = await params
   if (CONTACT_SLUGS.has(params.slug)) return { title: 'Support — AS Store' }
   if (params.slug === 'about') return { title: 'About AS Store' }
   if (params.slug === 'privacy')
@@ -24,6 +25,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ContentPage({ params }) {
+  params = await params
   // About = the bespoke brand/story page with the brand wall.
   if (params.slug === 'about') {
     const [settings, brands] = await Promise.all([loadSettings(), loadBrands()])

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { useTheme, useThemedStyles } from '@/src/theme';
+import { useThemedStyles } from '@/src/theme';
 import Text from './Text';
 
 const THUMB = 26;
@@ -10,7 +10,6 @@ const money = n => `$${Number(n || 0).toLocaleString()}`;
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 export default function RangeSlider({ bounds, low, high, step = 1, onChange, onCommit }) {
-  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { min, max } = bounds;
   const span = Math.max(1, max - min);
@@ -27,7 +26,7 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
       const raw = min + frac * span;
       return clamp(Math.round(raw / step) * step, min, max);
     },
-    [min, span, step]
+    [min, max, span, step]
   );
 
   const report = useCallback(

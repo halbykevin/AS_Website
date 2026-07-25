@@ -2,11 +2,13 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '@/src/theme';
+import { useGlobalPromoVisible } from '@/src/components/GlobalPromoBanner';
 import useScrolled from './useScrolled';
 
 export default function Screen({ children, scroll = true, padded = true, edges = ['top', 'left', 'right'], background = 'background', statusBarStyle = 'dark', contentStyle, keyboardAware = false, refreshControl, header, footer, onScroll, ...rest }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const globalPromoVisible = useGlobalPromoVisible();
   const bg = theme.colors[background] || background;
   const { scrolled, onScroll: trackScroll } = useScrolled();
 
@@ -50,8 +52,8 @@ export default function Screen({ children, scroll = true, padded = true, edges =
   const headerNode = header ? (typeof header === 'function' ? header(scrolled) : header) : null;
 
   return (
-    <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg }}>
-      <StatusBar style={statusBarStyle} />
+    <SafeAreaView edges={globalPromoVisible ? edges.filter(edge => edge !== 'top') : edges} style={{ flex: 1, backgroundColor: bg }}>
+      <StatusBar style={globalPromoVisible ? 'light' : statusBarStyle} />
       {headerNode ? <View style={{ width: '100%', maxWidth: theme.layout.maxContentWidth, alignSelf: 'center' }}>{headerNode}</View> : null}
       {keyboardAware ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

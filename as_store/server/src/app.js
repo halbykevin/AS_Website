@@ -3,6 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { query, withTransaction } from "./db.js";
 import { login, requireAuth, optionalAuth } from "./auth.js";
@@ -60,11 +61,32 @@ const STORE_PUBLIC_URL = (process.env.STORE_PUBLIC_URL || STORE_URL).replace(
   "",
 );
 const APP_RETURN_SCHEMES = (
-  process.env.APP_RETURN_SCHEMES || "ascompany,exp,exps"
+  process.env.APP_RETURN_SCHEMES || "ascompany"
 )
   .split(",")
   .map((s) => s.trim().toLowerCase().replace(/:$/, ""))
   .filter(Boolean);
+
+const isPublicHttpsUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(
+        url.hostname.toLowerCase(),
+      )
+    );
+  } catch {
+    return false;
+  }
+};
+
+// Whish rejects non-public callback/redirect URLs. Credentials alone are not
+// enough to expose a working payment method to either storefront.
+const whishPaymentReady = () =>
+  whishEnabled() &&
+  isPublicHttpsUrl(PUBLIC_API_URL) &&
+  isPublicHttpsUrl(STORE_PUBLIC_URL);
 
 function appReturnUrl(url) {
   if (!url) return "";
@@ -77,6 +99,51 @@ function appReturnUrl(url) {
   } catch {
     return "";
   }
+}
+
+const MOBILE_AUTH_CODE_TTL_SECONDS = 120;
+const mobileAuthCodeHash = (value) =>
+  crypto.createHash("sha256").update(String(value)).digest("hex");
+
+async function issueMobileAuthCode(customerId, nextPath) {
+  const code = crypto.randomBytes(32).toString("base64url");
+  await query(
+    `INSERT INTO mobile_auth_codes (code_hash, customer_id, next_path, expires_at)
+     VALUES ($1, $2, $3, now() + make_interval(secs => $4))`,
+    [
+      mobileAuthCodeHash(code),
+      customerId,
+      nextPath || "/",
+      MOBILE_AUTH_CODE_TTL_SECONDS,
+    ],
+  );
+  // Opportunistic bounded cleanup; no scheduled job is required.
+  await query(
+    `DELETE FROM mobile_auth_codes
+     WHERE expires_at < now() - interval '1 day' OR used_at < now() - interval '1 day'`,
+  ).catch(() => {});
+  return code;
+}
+
+async function consumeMobileAuthCode(code) {
+  if (!code || String(code).length > 256) return null;
+  return withTransaction(async (client) => {
+    const { rows: claimed } = await client.query(
+      `UPDATE mobile_auth_codes
+       SET used_at = now()
+       WHERE code_hash = $1 AND used_at IS NULL AND expires_at > now()
+       RETURNING customer_id, next_path`,
+      [mobileAuthCodeHash(code)],
+    );
+    if (!claimed[0]) return null;
+    const { rows } = await client.query(
+      `SELECT * FROM customers WHERE id = $1`,
+      [claimed[0].customer_id],
+    );
+    return rows[0]
+      ? { customer: rows[0], next: claimed[0].next_path || "/" }
+      : null;
+  });
 }
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -609,14 +676,31 @@ app.get(
 
     const { customer } = await findOrCreateCustomerByEmail(profile.email);
     const row = await fillProfile(customer, { name: profile.name });
-    const token = signCustomerToken(row);
     const to = appReturnUrl(profile.appReturn);
-    if (to)
+    if (to) {
+      const code = await issueMobileAuthCode(row.id, profile.next);
       return res.redirect(
-        `${to}?${new URLSearchParams({ token, next: profile.next })}`,
+        `${to}?${new URLSearchParams({ code, next: profile.next })}`,
       );
+    }
+    const token = signCustomerToken(row);
     const params = new URLSearchParams({ token, next: profile.next });
     res.redirect(`${STORE_URL}/auth/google#${params}`);
+  }),
+);
+
+app.post(
+  "/api/account/google/mobile-exchange",
+  ah(async (req, res) => {
+    const result = await consumeMobileAuthCode(req.body?.code);
+    if (!result)
+      return res
+        .status(400)
+        .json({ error: "Sign-in link expired or was already used" });
+    res.json({
+      token: signCustomerToken(result.customer),
+      next: result.next,
+    });
   }),
 );
 
@@ -874,7 +958,7 @@ app.put(
 const MAX_ITEM_QTY = 2;
 
 app.get("/api/payment/methods", (_req, res) =>
-  res.json({ cod: true, whish: whishEnabled() }),
+  res.json({ cod: true, whish: whishPaymentReady() }),
 );
 
 app.post(
@@ -949,7 +1033,7 @@ app.post(
         .json({ error: "None of those items are available" });
 
     const paymentMethod = b.paymentMethod === "whish" ? "whish" : "cod";
-    if (paymentMethod === "whish" && !whishEnabled()) {
+    if (paymentMethod === "whish" && !whishPaymentReady()) {
       return res
         .status(400)
         .json({ error: "Online payment is unavailable right now" });

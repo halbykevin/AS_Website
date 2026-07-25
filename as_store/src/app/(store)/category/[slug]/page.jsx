@@ -16,6 +16,7 @@ const prettify = (slug) =>
   String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 export async function generateMetadata({ params }) {
+  params = await params
   const cats = await loadCategories()
   const cat = cats.find((c) => c.slug === params.slug)
   const name = cat?.name || prettify(params.slug)
@@ -40,6 +41,8 @@ export async function generateMetadata({ params }) {
 // Category browse page: the landing spot for a nav/category tile. Lists the
 // category's products with a sort + filter bar (driven by URL search params).
 export default async function CategoryPage({ params, searchParams }) {
+  params = await params
+  searchParams = await searchParams
   const { slug } = params
   const [cats, all] = await Promise.all([loadCategories(), loadCategoryProducts(slug)])
   const category = cats.find((c) => c.slug === slug)

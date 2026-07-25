@@ -9,6 +9,7 @@ import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridCla
 export const metadata = { title: 'Search — AS Store' }
 
 export default async function SearchPage({ searchParams }) {
+  searchParams = await searchParams
   const q = (searchParams.q || '').trim()
   const all = q ? await searchProducts(q) : []
 

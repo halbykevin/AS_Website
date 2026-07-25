@@ -11,11 +11,25 @@
 
 import * as WebBrowser from 'expo-web-browser'
 import * as ExpoLinking from 'expo-linking'
-import { googleSignInUrl } from './account'
+import { accountApi, googleSignInUrl } from './account'
+
+WebBrowser.maybeCompleteAuthSession()
+
+// Android can deliver the same deep link both to Expo Router and to the active
+// auth-session promise. Sharing the exchange promise keeps the server's
+// single-use code exactly-once while both UI paths converge on the same result.
+const exchanges = new Map()
 
 // Where the API sends the customer back: `ascompany://auth/google` in a build,
 // `exp://<host>/--/auth/google` in Expo Go.
 export const googleReturnUrl = () => ExpoLinking.createURL('/auth/google')
+
+export function completeGoogleCode(code) {
+  const value = String(code || '')
+  if (!value) throw new Error('Google sign-in returned no authorization code.')
+  if (!exchanges.has(value)) exchanges.set(value, accountApi.exchangeGoogleCode(value))
+  return exchanges.get(value)
+}
 
 // Run the flow. Resolves to:
 //   { token, next }  — signed in; caller adopts the token
@@ -28,7 +42,14 @@ export async function signInWithGoogle(next = '/') {
 
   const { queryParams } = ExpoLinking.parse(result.url)
   if (queryParams?.error) throw new Error('Google sign-in was cancelled. Please try again.')
-  const token = queryParams?.token ? String(queryParams.token) : ''
-  if (!token) return null
-  return { token, next: queryParams?.next ? String(queryParams.next) : next }
+  // Rolling-deploy compatibility: an older API may still return its signed
+  // customer token directly. New deployments always return the one-time code.
+  const legacyToken = queryParams?.token ? String(queryParams.token) : ''
+  if (legacyToken) {
+    return { token: legacyToken, next: queryParams?.next ? String(queryParams.next) : next }
+  }
+  const code = queryParams?.code ? String(queryParams.code) : ''
+  if (!code) return null
+  const session = await completeGoogleCode(code)
+  return { token: session.token, next: session.next || next }
 }

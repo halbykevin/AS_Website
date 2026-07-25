@@ -1,11 +1,10 @@
 // Image tile for a store/event category. Tapping it filters the relevant list.
 import { Pressable, View } from 'react-native';
-import { useTheme, useThemedStyles } from '@/src/theme';
+import { useThemedStyles } from '@/src/theme';
 import Text from '@/src/ui/Text';
 import RemoteImage from './RemoteImage';
 
 export default function CategoryTile({ category, onPress, height = 120 }) {
-  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, { height }, pressed && { opacity: 0.9 }]}>

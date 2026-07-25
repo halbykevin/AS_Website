@@ -7,7 +7,7 @@
 // underneath the sheet). Category/Brand open a nested option-picker sheet —
 // which is exactly what the global Sheet stack is for.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import { SheetScaffold, SheetPressable, useSheet, Switch, RangeSlider } from '@/src/ui';
@@ -29,6 +29,13 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
 
   const count = useMemo(() => applyFilters(products, draft).length, [products, draft]);
 
+  // Keep the catalog behind the sheet live. This also removes the old failure
+  // mode where a valid selection looked like it did nothing until "Show" was
+  // pressed (or was lost when Android dismissed a nested picker).
+  useEffect(() => {
+    onApply?.(draft);
+  }, [draft, onApply]);
+
   const money = n => `$${Number(n || 0).toLocaleString()}`;
   const catLabel = facets.categories.find(c => c.value === draft.cat)?.label || 'All categories';
   const brandLabel = facets.brands.find(b => b.value === draft.brand)?.label || 'All brands';
@@ -37,6 +44,9 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
   // Open a nested picker sheet and resolve the chosen value back into the draft.
   const openPicker = (title, options, current, onPick) => {
     sheet.open({
+      // SheetScaffold uses BottomSheetScrollView here, which must have a bounded
+      // height. Without this the nested picker can measure to zero on Android.
+      snapPoints: ['70%'],
       render: ({ close }) => (
         <OptionPicker
           title={title}
@@ -59,7 +69,6 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
         label={`Show ${count}`}
         variant="primary"
         onPress={() => {
-          onApply?.(draft);
           onClose?.();
         }}
         style={{ flex: 1.4 }}

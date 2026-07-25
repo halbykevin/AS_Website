@@ -15,8 +15,7 @@ export default function ShopScreen() {
   const { storeSettings, refresh: refreshContent } = useContent();
   const cats = useCategories();
 
-  const categories = cats.data || [];
-  const topCats = useMemo(() => categories.filter(c => !c.parentId), [categories]);
+  const topCats = useMemo(() => (cats.data || []).filter(c => !c.parentId), [cats.data]);
 
   const onRefresh = () => {
     refreshContent();

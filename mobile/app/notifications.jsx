@@ -3,7 +3,7 @@ import { Pressable, RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAccount } from '@/src/lib/account';
-import { notificationsApi, resolveDeepLink, useNotifications } from '@/src/lib/notifications';
+import { notificationsApi, resolveDeepLink } from '@/src/lib/notifications';
 import { formatDateTime } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Icon, Button, EmptyState, Skeleton } from '@/src/ui';
@@ -20,7 +20,6 @@ export default function NotificationsScreen() {
   const theme = useTheme();
   const account = useAccount();
   const qc = useQueryClient();
-  const { enablePush } = useNotifications();
   const [extra, setExtra] = useState([]); // older pages appended by "load more"
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);

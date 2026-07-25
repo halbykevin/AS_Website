@@ -9,7 +9,7 @@ import { usePaymentMethods } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
 import { money } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Button, Card, Icon, Divider, EmptyState } from '@/src/ui';
+import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 import RemoteImage from '@/src/components/RemoteImage';
 

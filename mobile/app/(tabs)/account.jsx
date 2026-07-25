@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount } from '@/src/lib/account';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Button, Card, Icon, Divider } from '@/src/ui';
+import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
 import BrandBar from '@/src/components/BrandBar';
 
 export default function AccountScreen() {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, useWindowDimensions, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';
@@ -15,7 +15,8 @@ const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, c
 export default function CategoryScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const { slug } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const { storeSettings } = useContent();
   const isAll = slug === 'all';
 
@@ -25,6 +26,14 @@ export default function CategoryScreen() {
   const [sort, setSort] = useState('featured');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const { scrolled, onScroll } = useScrolled();
+
+  // Expo Router may reuse this dynamic-route instance when moving directly
+  // between categories. Never carry a category/brand/price selection into a
+  // different catalog scope.
+  useEffect(() => {
+    setSort('featured');
+    setFilters({ ...EMPTY_FILTERS });
+  }, [slug]);
 
   const category = categories.find(c => c.slug === slug);
   const title = isAll ? 'All products' : category?.name || 'Products';

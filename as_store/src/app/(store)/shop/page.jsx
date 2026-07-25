@@ -23,6 +23,7 @@ export const metadata = {
 // The whole catalog on one browsable page: same sort/filter bar as a category
 // page, plus a category facet since the list spans everything.
 export default async function ShopPage({ searchParams }) {
+  searchParams = await searchParams
   const all = await loadAllProducts()
 
   const categories = categoryFacets(all)

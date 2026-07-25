@@ -1,9 +1,8 @@
 import { Pressable } from 'react-native';
-import { useTheme, useThemedStyles } from '@/src/theme';
+import { useThemedStyles } from '@/src/theme';
 import Text from './Text';
 
 export default function Chip({ label, selected = false, onPress, style }) {
-  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, selected && styles.selected, pressed && { opacity: 0.85 }, style]}>
