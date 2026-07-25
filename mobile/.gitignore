@@ -42,3 +42,8 @@ export.log
 # GCP/Firebase service-account keys download as "<project>-<hash>.json".
 as-company-lb-*.json
 !google-services.json
+
+# Android upload keystore backed up from EAS + its plaintext passwords.
+# Losing these means Play Store can never accept a new build — keep an offline copy.
+credentials/
+credentials.json
