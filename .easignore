@@ -1,0 +1,52 @@
+# What EAS Build excludes from the uploaded project archive.
+#
+# This file must live at the GIT REPO ROOT, not in mobile/ — eas-cli archives the
+# whole repository (mobile/ is a subdirectory) and only reads .easignore from the root.
+#
+# IMPORTANT: when this file exists, eas-cli ignores ALL .gitignore files, so every
+# exclusion the build needs must be repeated here. Only .git and node_modules stay
+# excluded automatically.
+#
+# Do NOT add trailing slashes: on Windows a trailing slash stops the directory
+# itself from being pruned, so it gets walked anyway.
+
+# Native projects — EAS runs prebuild on its own. Uploading these ships ~1.8 GB
+# of local Gradle cache and build output.
+mobile/android
+mobile/ios
+
+# Local/tooling state
+.expo
+mobile/.expo
+dist
+dist-ssr
+web-build
+*.local
+
+# Secrets — must never reach the build container
+.env
+.env.local
+mobile/credentials
+mobile/credentials.json
+mobile/as-company-lb-*.json
+*.jks
+*.keystore
+*.p8
+*.p12
+
+# Website / backend / scraper — not part of the mobile build.
+# Leading slash anchors these to the repo root so they cannot also match
+# mobile/src, mobile/assets, etc.
+/src
+/public
+/server
+/as_store
+/Assets
+/WebScarping
+/prompts
+/Stack
+
+# Misc
+.vscode
+.DS_Store
+*.log
