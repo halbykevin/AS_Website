@@ -1,15 +1,28 @@
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { useAccount } from '@/src/lib/account';
+import { useAccount, accountApi } from '@/src/lib/account';
+import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
+import { GoogleButton } from '@/src/components/auth';
 import BrandBar from '@/src/components/BrandBar';
 
 export default function AccountScreen() {
   const theme = useTheme();
   const account = useAccount();
+  const { refresh } = useContent();
   const customer = account?.customer;
   const loading = account?.loading;
+  const [google, setGoogle] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    accountApi
+      .authMethods()
+      .then(r => setGoogle(Boolean(r.google)))
+      .catch(() => {});
+  }, []);
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
@@ -25,9 +38,17 @@ export default function AccountScreen() {
             <Text variant="body" muted center>
               Track your orders, save delivery addresses and check out faster.
             </Text>
+            {error ? (
+              <Card bordered={false} style={{ backgroundColor: theme.colors.dangerBg, alignSelf: 'stretch' }}>
+                <Text variant="callout" color="danger">
+                  {error}
+                </Text>
+              </Card>
+            ) : null}
             {!loading ? (
               <View style={{ gap: theme.spacing.sm, alignSelf: 'stretch', marginTop: theme.spacing.sm }}>
                 <Button label="Sign in" onPress={() => router.push('/auth/login')} fullWidth />
+                {google ? <GoogleButton next="/account" onDone={() => refresh()} onError={setError} /> : null}
                 <Button label="Create an account" variant="ghost" onPress={() => router.push('/auth/register')} fullWidth />
               </View>
             ) : null}
