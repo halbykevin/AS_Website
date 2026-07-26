@@ -16,6 +16,7 @@ import Icon from '@/src/ui/Icon';
 import Button from '@/src/ui/Button';
 import DensityToggle from './DensityToggle';
 import { applyFilters } from '@/src/lib/catalogFilters';
+import { logSheet, logPick, logDraft, logApply } from '@/src/lib/filterDebug';
 
 const EMPTY = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
 
@@ -29,10 +30,24 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
 
   const count = useMemo(() => applyFilters(products, draft).length, [products, draft]);
 
+  // Mount/unmount tracing: if this sheet unmounts while the nested Category or
+  // Brand picker is open, the pick lands on a dead component and silently does
+  // nothing — which looks exactly like "the filter doesn't work".
+  useEffect(() => {
+    logSheet('FilterSheet mounted', { initial, products: products.length, showCategory });
+    return () => logSheet('FilterSheet UNMOUNTED');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    logDraft(draft, count);
+  }, [draft, count]);
+
   // Keep the catalog behind the sheet live. This also removes the old failure
   // mode where a valid selection looked like it did nothing until "Show" was
   // pressed (or was lost when Android dismissed a nested picker).
   useEffect(() => {
+    logApply(draft);
     onApply?.(draft);
   }, [draft, onApply]);
 
@@ -43,6 +58,10 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
 
   // Open a nested picker sheet and resolve the chosen value back into the draft.
   const openPicker = (title, options, current, onPick) => {
+    logSheet('openPicker', { title, options: options.length, current: current || '(all)' });
+    if (!options.length) {
+      console.warn(`[filters] "${title}" picker opened with 0 options — nothing to choose.`);
+    }
     sheet.open({
       // SheetScaffold uses BottomSheetScrollView here, which must have a bounded
       // height. Without this the nested picker can measure to zero on Android.
@@ -53,6 +72,8 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
           options={[{ value: '', label: title.includes('categor') ? 'All categories' : 'All brands' }, ...options.map(o => ({ value: o.value, label: `${o.label} (${o.count})` }))]}
           value={current}
           onPick={v => {
+            const label = options.find(o => o.value === v)?.label || 'All';
+            logPick(title.toLowerCase().includes('categor') ? 'cat' : 'brand', v, label);
             onPick(v);
             close();
           }}

@@ -9,6 +9,7 @@ import ProductTile from '@/src/components/ProductTile';
 import AppHeader from '@/src/components/AppHeader';
 import CatalogToolbar from '@/src/components/store/CatalogToolbar';
 import { applyFilters, sortProducts, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
+import { logCatalogLoad, logFacets, logFilterResult } from '@/src/lib/filterDebug';
 
 const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
 
@@ -47,6 +48,19 @@ export default function CategoryScreen() {
   const visible = useMemo(() => sortProducts(applyFilters(products, filters), sort), [products, filters, sort]);
 
   const columns = resolveColumns(filters.cols, width);
+
+  // --- filter diagnostics (src/lib/filterDebug.js — set FILTER_DEBUG=false to mute)
+  useEffect(() => {
+    logCatalogLoad(`category/${slug}`, products);
+  }, [products, slug]);
+
+  useEffect(() => {
+    logFacets(`category/${slug}`, facets, bounds, showCategory);
+  }, [facets, bounds, showCategory, slug]);
+
+  useEffect(() => {
+    logFilterResult(`category/${slug}`, products, filters, visible.length);
+  }, [products, filters, visible.length, slug]);
 
   const renderItem = useCallback(
     ({ item }) => (
