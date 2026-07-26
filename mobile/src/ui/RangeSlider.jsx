@@ -6,6 +6,16 @@ import { useThemedStyles } from '@/src/theme';
 import Text from './Text';
 
 const THUMB = 26;
+// A thumb is CENTRED on its end of the rail, so half of it hangs past the rail's
+// extremes. Reserving that overhang as padding keeps the thumbs — and their
+// touch targets — inside the control instead of spilling toward the screen
+// edges, where Android's back-swipe gesture swallows the drag before RN sees it.
+// It also lines the thumb's outer edge up with the labels above it.
+const EDGE = THUMB / 2;
+// Tall but narrow: easy to grab vertically without widening the target back into
+// the edge-gesture zone we just moved it out of.
+const THUMB_HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
+
 const money = n => `$${Number(n || 0).toLocaleString()}`;
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
@@ -86,29 +96,32 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
         </Text>
       </View>
 
-      <View style={styles.track} onLayout={onLayout}>
-        <View style={styles.rail} />
-        <Animated.View style={[styles.fill, fillStyle]} />
-        {trackW > 0 ? (
-          <>
-            <GestureDetector gesture={loPan}>
-              <Animated.View style={[styles.thumb, loStyle]} hitSlop={12} accessibilityRole="adjustable" accessibilityLabel="Minimum price" />
-            </GestureDetector>
-            <GestureDetector gesture={hiPan}>
-              <Animated.View style={[styles.thumb, hiStyle]} hitSlop={12} accessibilityRole="adjustable" accessibilityLabel="Maximum price" />
-            </GestureDetector>
-          </>
-        ) : null}
+      <View style={styles.trackWrap}>
+        <View style={styles.track} onLayout={onLayout}>
+          <View style={styles.rail} />
+          <Animated.View style={[styles.fill, fillStyle]} />
+          {trackW > 0 ? (
+            <>
+              <GestureDetector gesture={loPan}>
+                <Animated.View style={[styles.thumb, loStyle]} hitSlop={THUMB_HIT_SLOP} accessibilityRole="adjustable" accessibilityLabel="Minimum price" />
+              </GestureDetector>
+              <GestureDetector gesture={hiPan}>
+                <Animated.View style={[styles.thumb, hiStyle]} hitSlop={THUMB_HIT_SLOP} accessibilityRole="adjustable" accessibilityLabel="Maximum price" />
+              </GestureDetector>
+            </>
+          ) : null}
+        </View>
       </View>
     </View>
   );
 }
 
 const makeStyles = t => ({
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: t.spacing.md },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: t.spacing.sm },
+  trackWrap: { paddingHorizontal: EDGE },
   track: { height: THUMB, justifyContent: 'center' },
-  rail: { position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: t.alpha(t.colors.text, 0.14) },
-  fill: { position: 'absolute', height: 4, borderRadius: 2, backgroundColor: t.colors.primary },
+  rail: { position: 'absolute', left: 0, right: 0, height: 5, borderRadius: 3, backgroundColor: t.alpha(t.colors.text, 0.12) },
+  fill: { position: 'absolute', height: 5, borderRadius: 3, backgroundColor: t.colors.primary },
   thumb: {
     position: 'absolute',
     left: 0,

@@ -28,8 +28,10 @@ export default function CatalogToolbar({ total = 0, sort, filters, facets, bound
 
   const openFilter = () =>
     sheet.open({
-      // A tallish sheet — the filter panel has several sections.
-      snapPoints: ['85%'],
+      // Sized to the panel's content (~535dp) rather than the screen, so it
+      // doesn't open with a third of it blank. The body scrolls, so shorter
+      // phones just get a scrollbar instead of a clipped sheet.
+      snapPoints: ['68%'],
       render: ({ close }) => <FilterSheet facets={facets} bounds={bounds} products={products} initial={filters} showCategory={showCategory} onApply={onFiltersChange} onClose={close} />
     });
 
