@@ -2,12 +2,12 @@
 // panel: Category, Brand, Price range, On-sale toggle and a Per-row density
 // control, with a live "Show N" count in the footer and a "Clear all" reset.
 //
-// It keeps a local DRAFT of the selection and only pushes it to the screen when
-// the shopper taps "Show N" (so a half-made choice never reshuffles the grid
-// underneath the sheet). Category/Brand open a nested option-picker sheet —
-// which is exactly what the global Sheet stack is for.
+// Selections apply live: every change goes to the screen immediately and the
+// footer's "Show N" just closes the sheet. Category/Brand open a nested
+// option-picker sheet on top of this one, which is what the global Sheet stack
+// is for — see `patch` for why the pick is written through to the screen.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import { SheetScaffold, SheetPressable, useSheet, Switch, RangeSlider } from '@/src/ui';
@@ -23,9 +23,25 @@ const EMPTY = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' 
 export default function FilterSheet({ facets, bounds, products = [], initial, showCategory = true, onApply, onClose }) {
   const theme = useTheme();
   const sheet = useSheet();
-  const [draft, setDraft] = useState({ ...EMPTY, ...initial });
+  const [draft, setDraft] = useState(() => ({ ...EMPTY, ...initial }));
+  const draftRef = useRef(draft);
 
-  const patch = p => setDraft(d => ({ ...d, ...p }));
+  // Single writer for the draft, and it pushes straight to the screen instead of
+  // waiting for an effect. Category/Brand are picked in a NESTED sheet, so this
+  // component can be torn down while the picker is still on top; a bare setDraft
+  // would then land on an unmounted component and the pick would vanish. onApply
+  // belongs to the screen, which is always mounted, so the choice always lands.
+  const patch = useCallback(
+    p => {
+      const next = { ...draftRef.current, ...p };
+      draftRef.current = next;
+      setDraft(next);
+      logApply(next);
+      onApply?.(next);
+    },
+    [onApply]
+  );
+
   const hasPrice = bounds.max > bounds.min;
 
   const count = useMemo(() => applyFilters(products, draft).length, [products, draft]);
@@ -43,14 +59,6 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
     logDraft(draft, count);
   }, [draft, count]);
 
-  // Keep the catalog behind the sheet live. This also removes the old failure
-  // mode where a valid selection looked like it did nothing until "Show" was
-  // pressed (or was lost when Android dismissed a nested picker).
-  useEffect(() => {
-    logApply(draft);
-    onApply?.(draft);
-  }, [draft, onApply]);
-
   const money = n => `$${Number(n || 0).toLocaleString()}`;
   const catLabel = facets.categories.find(c => c.value === draft.cat)?.label || 'All categories';
   const brandLabel = facets.brands.find(b => b.value === draft.brand)?.label || 'All brands';
@@ -58,6 +66,7 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
 
   // Open a nested picker sheet and resolve the chosen value back into the draft.
   const openPicker = (title, options, current, onPick) => {
+    const isCategory = title.toLowerCase().includes('categor');
     logSheet('openPicker', { title, options: options.length, current: current || '(all)' });
     if (!options.length) {
       console.warn(`[filters] "${title}" picker opened with 0 options — nothing to choose.`);
@@ -69,11 +78,10 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
       render: ({ close }) => (
         <OptionPicker
           title={title}
-          options={[{ value: '', label: title.includes('categor') ? 'All categories' : 'All brands' }, ...options.map(o => ({ value: o.value, label: `${o.label} (${o.count})` }))]}
+          options={[{ value: '', label: isCategory ? 'All categories' : 'All brands' }, ...options.map(o => ({ value: o.value, label: `${o.label} (${o.count})` }))]}
           value={current}
           onPick={v => {
-            const label = options.find(o => o.value === v)?.label || 'All';
-            logPick(title.toLowerCase().includes('categor') ? 'cat' : 'brand', v, label);
+            logPick(isCategory ? 'cat' : 'brand', v, options.find(o => o.value === v)?.label || 'All');
             onPick(v);
             close();
           }}
@@ -85,7 +93,7 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
 
   const footer = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-      <Button label="Clear all" variant="ghost" onPress={() => setDraft({ ...EMPTY })} style={{ flex: 1 }} />
+      <Button label="Clear all" variant="ghost" onPress={() => patch(EMPTY)} style={{ flex: 1 }} />
       <Button
         label={`Show ${count}`}
         variant="primary"

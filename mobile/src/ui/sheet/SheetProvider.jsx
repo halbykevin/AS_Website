@@ -153,7 +153,14 @@ function DynamicSheet({ descriptor, onClosed }) {
   const ref = useRef(null);
   const dismissSeen = useRef(descriptor._dismiss || 0);
 
-  const { variant = 'sheet', snapPoints, render, content, dismissible = true, enablePanDownToClose = true, showHandle = true, backdropOpacity = 0.45, maxHeight = 0.92, onDismiss } = descriptor;
+  // stackBehavior 'push' is deliberate and load-bearing. This provider models an
+  // explicit push stack (open() appends, close() pops), so gorhom must stack the
+  // same way. Its default is 'switch', which MINIMIZES the parent modal when a
+  // child presents — and a minimize that doesn't settle as MINIMIZING is treated
+  // as a dismiss, which unmounts the parent. That silently destroyed the Filter
+  // sheet whenever its nested Category/Brand picker opened, so every pick landed
+  // on a dead component and the filter appeared to do nothing.
+  const { variant = 'sheet', snapPoints, render, content, dismissible = true, enablePanDownToClose = true, showHandle = true, backdropOpacity = 0.45, maxHeight = 0.92, stackBehavior = 'push', onDismiss } = descriptor;
 
   const detached = variant === 'modal';
 
@@ -189,6 +196,7 @@ function DynamicSheet({ descriptor, onClosed }) {
       enableDynamicSizing={dynamic}
       maxDynamicContentSize={Math.round((windowHeight - insets.top) * maxHeight)}
       index={0}
+      stackBehavior={stackBehavior}
       onDismiss={handleDismiss}
       enablePanDownToClose={enablePanDownToClose}
       handleComponent={showHandle ? undefined : null}
