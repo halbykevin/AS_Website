@@ -8,7 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { loadWebsiteContent } from '@/src/lib/websiteApi';
-import { loadStoreSettings, defaultStoreSettings } from '@/src/lib/storeApi';
+import { loadStoreSettings, loadPopup, defaultStoreSettings } from '@/src/lib/storeApi';
 import { defaultWebsiteContent } from './websiteDefaults';
 
 const ContentContext = createContext(null);
@@ -16,15 +16,21 @@ const ContentContext = createContext(null);
 export function ContentProvider({ children }) {
   const [website, setWebsite] = useState({ content: defaultWebsiteContent, events: [] });
   const [storeSettings, setStoreSettings] = useState(defaultStoreSettings);
+  const [popup, setPopup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     setError(false);
-    const [site, settings] = await Promise.all([loadWebsiteContent(), loadStoreSettings()]);
+    const [site, settings, promo] = await Promise.all([
+      loadWebsiteContent(),
+      loadStoreSettings(),
+      loadPopup()
+    ]);
     if (site) setWebsite(site);
     else setError(true);
     setStoreSettings(settings);
+    setPopup(promo);
     setLoading(false);
   }, []);
 
@@ -44,9 +50,10 @@ export function ContentProvider({ children }) {
       refresh,
       content: website.content,
       events: website.events,
-      storeSettings
+      storeSettings,
+      popup
     }),
-    [loading, error, refresh, website, storeSettings]
+    [loading, error, refresh, website, storeSettings, popup]
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

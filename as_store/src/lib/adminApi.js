@@ -14,7 +14,7 @@ export const isAuthed = () => Boolean(getToken())
 
 // Content endpoints whose writes change what the public storefront renders — a
 // successful write to any of these purges the SSR cache so the edit shows at once.
-const STOREFRONT_CONTENT = /\/api\/(products|categories|brands|sales|homepage-sections|pages|settings|uploads)/
+const STOREFRONT_CONTENT = /\/api\/(products|categories|brands|sales|homepage-sections|pages|settings|uploads|admin\/popup)/
 
 // Fire-and-forget the storefront cache purge (same-origin Next route). Best-effort:
 // a failure just means the 1-hour TTL eventually refreshes the data instead.
@@ -76,6 +76,10 @@ export const adminApi = {
   // settings
   getSettings: () => req('/api/settings'),
   updateSettings: (data) => req('/api/settings', { method: 'PUT', auth: true, body: data }),
+
+  // Promotions / announcements popup (singleton)
+  getPopup: () => req('/api/admin/popup', { auth: true }),
+  updatePopup: (data) => req('/api/admin/popup', { method: 'PUT', auth: true, body: data }),
 
   // pages
   listPages: () => req('/api/pages?all=1', { auth: true }),

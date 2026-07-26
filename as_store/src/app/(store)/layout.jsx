@@ -1,9 +1,10 @@
 import Nav from '@/components/Nav.jsx'
 import Footer from '@/components/Footer.jsx'
 import CartDrawer from '@/components/CartDrawer.jsx'
+import StorePopup from '@/components/StorePopup.jsx'
 import PublishGate from '@/components/PublishGate.jsx'
 import ComingSoon from '@/components/ComingSoon.jsx'
-import { loadSettings } from '@/lib/site'
+import { loadSettings, loadPopup } from '@/lib/site'
 import { loadCategories } from '@/lib/catalog'
 
 // Storefront chrome — loads CMS settings (announcement, footer, contact,
@@ -15,7 +16,11 @@ import { loadCategories } from '@/lib/catalog'
 // The whole public storefront sits behind the publish gate (settings.published,
 // toggled in /admin/settings) — /admin has its own layout and is never gated.
 export default async function StoreLayout({ children }) {
-  const [settings, categories] = await Promise.all([loadSettings(), loadCategories()])
+  const [settings, categories, popup] = await Promise.all([
+    loadSettings(),
+    loadCategories(),
+    loadPopup(),
+  ])
   return (
     <PublishGate published={Boolean(settings.published)} fallback={<ComingSoon settings={settings} />}>
       {/* overflow-x-clip (not hidden — sticky still works) so no wide
@@ -25,6 +30,7 @@ export default async function StoreLayout({ children }) {
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />
         <CartDrawer whatsapp={settings?.contact?.whatsapp} />
+        <StorePopup popup={popup} />
       </div>
     </PublishGate>
   )

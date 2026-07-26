@@ -1920,6 +1920,133 @@ app.put(
   }),
 );
 
+// ========================= Popup =========================
+// Promotions / offers / announcements modal, shown by the storefront and the
+// mobile app. Content, targeting, schedule, behavior and style are all admin
+// controlled; `updated_at` is the version clients store as "seen".
+
+const POPUP_TRIGGERS = ["load", "scroll"];
+const POPUP_FREQUENCIES = ["once", "daily", "always"];
+const POPUP_LAYOUTS = ["card", "banner", "text"];
+const POPUP_THEMES = ["light", "dark"];
+
+const popupJson = (r) => ({
+  enabled: Boolean(r.enabled),
+  showOnWeb: r.show_on_web ?? true,
+  showOnApp: r.show_on_app ?? true,
+  eyebrow: r.eyebrow || "",
+  title: r.title || "",
+  body: r.body || "",
+  image: r.image_url || "",
+  link: r.link_url || "",
+  linkLabel: r.link_label || "",
+  startsAt: r.starts_at,
+  endsAt: r.ends_at,
+  trigger: POPUP_TRIGGERS.includes(r.trigger_type) ? r.trigger_type : "load",
+  delaySeconds: r.delay_seconds ?? 2,
+  scrollPercent: r.scroll_percent ?? 40,
+  frequency: POPUP_FREQUENCIES.includes(r.frequency) ? r.frequency : "once",
+  layout: POPUP_LAYOUTS.includes(r.layout) ? r.layout : "card",
+  theme: POPUP_THEMES.includes(r.theme) ? r.theme : "light",
+  accentColor: r.accent_color || "#A41E22",
+  // The version clients remember as "seen" — changes on every admin save.
+  version: r.updated_at ? new Date(r.updated_at).toISOString() : "0",
+});
+
+// Public: what visitors should (maybe) see. Disabled or out-of-window popups
+// return null so no draft content ever leaks; each surface still checks its
+// own showOnWeb/showOnApp flag client-side.
+app.get(
+  "/api/popup",
+  ah(async (_req, res) => {
+    const { rows } = await query(`SELECT * FROM popup WHERE id = 1`);
+    const r = rows[0];
+    const now = Date.now();
+    const live =
+      r &&
+      r.enabled &&
+      (!r.starts_at || new Date(r.starts_at).getTime() <= now) &&
+      (!r.ends_at || new Date(r.ends_at).getTime() > now) &&
+      (r.title || r.body || r.image_url);
+    res.json(live ? popupJson(r) : null);
+  }),
+);
+
+// Admin: always the full row, so the editor can work on a disabled draft.
+app.get(
+  "/api/admin/popup",
+  requireAuth,
+  ah(async (_req, res) => {
+    await query(`INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+    const { rows } = await query(`SELECT * FROM popup WHERE id = 1`);
+    res.json(popupJson(rows[0]));
+  }),
+);
+
+app.put(
+  "/api/admin/popup",
+  requireAuth,
+  ah(async (req, res) => {
+    const b = req.body || {};
+    const clamp = (v, lo, hi) =>
+      Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Math.round(Number(v)))) : null;
+    const oneOf = (v, list) => (list.includes(v) ? v : null);
+    const ts = (v) => {
+      if (v === null || v === "") return null; // explicit clear
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    await query(`INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+    const { rows } = await query(
+      `UPDATE popup SET
+         enabled        = COALESCE($1, enabled),
+         show_on_web    = COALESCE($2, show_on_web),
+         show_on_app    = COALESCE($3, show_on_app),
+         eyebrow        = COALESCE($4, eyebrow),
+         title          = COALESCE($5, title),
+         body           = COALESCE($6, body),
+         image_url      = COALESCE($7, image_url),
+         link_url       = COALESCE($8, link_url),
+         link_label     = COALESCE($9, link_label),
+         starts_at      = CASE WHEN $10::boolean THEN $11::timestamptz ELSE starts_at END,
+         ends_at        = CASE WHEN $12::boolean THEN $13::timestamptz ELSE ends_at END,
+         trigger_type   = COALESCE($14, trigger_type),
+         delay_seconds  = COALESCE($15, delay_seconds),
+         scroll_percent = COALESCE($16, scroll_percent),
+         frequency      = COALESCE($17, frequency),
+         layout         = COALESCE($18, layout),
+         theme          = COALESCE($19, theme),
+         accent_color   = COALESCE($20, accent_color),
+         updated_at     = now()
+       WHERE id = 1 RETURNING *`,
+      [
+        typeof b.enabled === "boolean" ? b.enabled : null,
+        typeof b.showOnWeb === "boolean" ? b.showOnWeb : null,
+        typeof b.showOnApp === "boolean" ? b.showOnApp : null,
+        typeof b.eyebrow === "string" ? b.eyebrow.slice(0, 60) : null,
+        typeof b.title === "string" ? b.title.slice(0, 120) : null,
+        typeof b.body === "string" ? b.body.slice(0, 1000) : null,
+        typeof b.image === "string" ? b.image : null,
+        typeof b.link === "string" ? b.link.slice(0, 500) : null,
+        typeof b.linkLabel === "string" ? b.linkLabel.slice(0, 60) : null,
+        // $10/$12 = "was the field provided" so an explicit null clears the bound.
+        "startsAt" in b,
+        "startsAt" in b ? ts(b.startsAt) : null,
+        "endsAt" in b,
+        "endsAt" in b ? ts(b.endsAt) : null,
+        oneOf(b.trigger, POPUP_TRIGGERS),
+        clamp(b.delaySeconds, 0, 120),
+        clamp(b.scrollPercent, 1, 100),
+        oneOf(b.frequency, POPUP_FREQUENCIES),
+        oneOf(b.layout, POPUP_LAYOUTS),
+        oneOf(b.theme, POPUP_THEMES),
+        /^#[0-9a-fA-F]{6}$/.test(b.accentColor || "") ? b.accentColor : null,
+      ],
+    );
+    res.json(popupJson(rows[0]));
+  }),
+);
+
 // ========================= Pages =========================
 app.get(
   "/api/pages",

@@ -46,7 +46,9 @@ export const KEYS = {
   customerToken: 'as_store_customer_token',
   cart: 'as_store_cart',
   pushToken: 'as_push_token',
-  pushPromptSeen: 'as_push_prompt_seen'
+  pushPromptSeen: 'as_push_prompt_seen',
+  // {v: popup version, t: dismissed-at} — drives the popup's once/daily rules.
+  popupSeen: 'as_store_popup_seen'
 };
 
 // Authentication credentials belong in the OS keychain/keystore, not plain

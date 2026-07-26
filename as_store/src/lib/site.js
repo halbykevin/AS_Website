@@ -53,6 +53,19 @@ export async function loadSettings() {
   }
 }
 
+// The promotions/announcements popup. Null when disabled or outside its
+// schedule window (the API gates that server-side); cached under the shared
+// 'store' tag so an admin save shows up immediately.
+export async function loadPopup() {
+  try {
+    const res = await fetch(`${API}/api/popup`, STORE_CACHE)
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 export async function loadPage(slug) {
   try {
     const res = await fetch(`${API}/api/pages/${encodeURIComponent(slug)}`, STORE_CACHE)

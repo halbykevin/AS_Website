@@ -352,3 +352,37 @@ DROP TRIGGER IF EXISTS trg_orders_updated ON orders;
 CREATE TRIGGER trg_orders_updated
   BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Promotions / offers / announcements popup — one singleton row (id = 1), fully
+-- CMS-driven: content, platform targeting (web storefront + mobile app),
+-- schedule window, reveal behavior and visual style all live here. `updated_at`
+-- doubles as the content version: clients remember it as "seen", so saving in
+-- the admin re-shows the popup to everyone (frequency 'once').
+CREATE TABLE IF NOT EXISTS popup (
+  id             INTEGER PRIMARY KEY DEFAULT 1,
+  enabled        BOOLEAN DEFAULT false,
+  show_on_web    BOOLEAN DEFAULT true,        -- storefront (store.as.com.lb)
+  show_on_app    BOOLEAN DEFAULT true,        -- mobile app
+  -- content
+  eyebrow        TEXT DEFAULT '',             -- small badge line, e.g. "Limited offer"
+  title          TEXT DEFAULT '',
+  body           TEXT DEFAULT '',
+  image_url      TEXT DEFAULT '',
+  link_url       TEXT DEFAULT '',             -- "/shop?sale=1" (in-app) or https URL
+  link_label     TEXT DEFAULT '',
+  -- schedule (either bound optional; server gates the public payload)
+  starts_at      TIMESTAMPTZ,
+  ends_at        TIMESTAMPTZ,
+  -- behavior
+  trigger_type   TEXT DEFAULT 'load',         -- load | scroll (app always uses load+delay)
+  delay_seconds  INTEGER DEFAULT 2,
+  scroll_percent INTEGER DEFAULT 40,
+  frequency      TEXT DEFAULT 'once',         -- once (per saved version) | daily | always
+  -- style
+  layout         TEXT DEFAULT 'card',         -- card (image top) | banner (image bg) | text
+  theme          TEXT DEFAULT 'light',        -- light | dark
+  accent_color   TEXT DEFAULT '#A41E22',      -- CTA / eyebrow accent
+  updated_at     TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT popup_singleton CHECK (id = 1)
+);
+INSERT INTO popup (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

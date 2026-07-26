@@ -98,6 +98,19 @@ export async function loadStoreSettings() {
   }
 }
 
+// ---- Promotions popup ----
+// Null when the CMS has it disabled or it's outside its schedule window (the
+// API decides that, so nothing unpublished reaches the app). The image is
+// rebased through mediaUrl so `/uploads/...` paths resolve on a device.
+export async function loadPopup() {
+  try {
+    const p = await req('/api/popup');
+    return p ? { ...p, image: mediaUrl(p.image) } : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Catalog ----
 export async function loadCategories() {
   try {
