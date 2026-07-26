@@ -75,6 +75,7 @@ Write-Ok "ssh: $($ssh.Source)"
 # 2. Connection settings - params > deploy.env > prompt (then remembered)
 # --------------------------------------------------------------------------
 $cfg = @{}
+$script:Prompted = $false
 if (Test-Path $CfgPath) {
   foreach ($line in Get-Content $CfgPath) {
     if ($line -match '^\s*#') { continue }
@@ -86,25 +87,49 @@ if (Test-Path $CfgPath) {
 }
 
 function Resolve-Setting {
-  param([string]$Value, [string]$Key, [string]$Prompt, [string]$Default)
-  if ($Value) { return $Value }
-  if ($cfg.ContainsKey($Key) -and $cfg[$Key]) { return $cfg[$Key] }
-  $fromEnv = [Environment]::GetEnvironmentVariable($Key)
-  if ($fromEnv) { return $fromEnv }
+  param(
+    [string]$Value, [string]$Key, [string]$Prompt, [string]$Default,
+    [string]$Pattern,       # a valid answer must match this
+    [string]$Hint           # shown when it does not
+  )
+  $preset = $null
+  if ($Value) { $preset = $Value }
+  elseif ($cfg.ContainsKey($Key) -and $cfg[$Key]) { $preset = $cfg[$Key] }
+  else {
+    $fromEnv = [Environment]::GetEnvironmentVariable($Key)
+    if ($fromEnv) { $preset = $fromEnv }
+  }
+  if ($preset) {
+    if ($Pattern -and ($preset -notmatch $Pattern)) { Fail "$Key is not valid ($Hint). Fix it in deploy.env - current value: $preset" }
+    return $preset
+  }
+
+  # No stored value: ask, and keep asking until the answer is usable. This
+  # matters because these prompts are NEVER for a password - a mistyped secret
+  # would otherwise be written to deploy.env in the clear.
   $suffix = ""
   if ($Default) { $suffix = " [$Default]" }
-  $answer = Read-Host "  $Prompt$suffix"
-  if (-not $answer -and $Default) { return $Default }
-  if (-not $answer) { Fail "$Key is required." }
-  return $answer
+  $script:Prompted = $true
+  for ($i = 0; $i -lt 3; $i++) {
+    $answer = Read-Host "  $Prompt$suffix"
+    if (-not $answer -and $Default) { return $Default }
+    if (-not $answer) { Write-Warn2 "$Key is required."; continue }
+    if ($Pattern -and ($answer -notmatch $Pattern)) { Write-Warn2 "That does not look like $Hint. This prompt is not asking for a password."; continue }
+    return $answer
+  }
+  Fail "$Key was not provided."
 }
 
 Write-Step "Connection settings"
-$Server     = Resolve-Setting $Server     'DEPLOY_HOST' 'VPS host or IP'        '95.217.2.105'
-$User       = Resolve-Setting $User       'DEPLOY_USER' 'SSH user'              'root'
-$RemotePath = Resolve-Setting $RemotePath 'DEPLOY_PATH' 'Repo path on the VPS'  '/opt/as-company'
+Write-Dim "(none of these is a password - SSH will ask for that separately if needed)"
+$Server     = Resolve-Setting $Server     'DEPLOY_HOST' 'VPS host or IP'       '95.217.2.105' `
+                '^[A-Za-z0-9][A-Za-z0-9._\-]*$' 'a hostname or IP address'
+$User       = Resolve-Setting $User       'DEPLOY_USER' 'SSH user'             'root' `
+                '^[A-Za-z0-9._\-]+$' 'a Linux username'
+$RemotePath = Resolve-Setting $RemotePath 'DEPLOY_PATH' 'Repo path on the VPS' '/opt/as-company' `
+                '^/[A-Za-z0-9._\-/]*$' 'an absolute Linux path (e.g. /opt/as-company)'
 if ($Port -le 0) {
-  $p = Resolve-Setting '' 'DEPLOY_PORT' 'SSH port' '22'
+  $p = Resolve-Setting '' 'DEPLOY_PORT' 'SSH port' '22' '^[0-9]{1,5}$' 'a port number'
   $Port = [int]$p
 }
 if (-not $IdentityFile) {
@@ -114,7 +139,9 @@ if (-not $IdentityFile) {
 Write-Info "$User@$Server`:$Port  ->  $RemotePath"
 Write-Dim  "key: $IdentityFile"
 
-# Remember for next time (never contains a password).
+# Remember the answers - but ONLY the ones we had to ask for, so a one-off
+# -Server / -RemotePath override never overwrites your saved target.
+if ($script:Prompted -or -not (Test-Path $CfgPath)) {
 $cfgOut = @(
   "# AS Company deploy target - used by deploy.ps1. Git-ignored.",
   "DEPLOY_HOST=$Server",
@@ -123,7 +150,9 @@ $cfgOut = @(
   "DEPLOY_PATH=$RemotePath",
   "DEPLOY_KEY=$IdentityFile"
 )
-Set-Content -Path $CfgPath -Value $cfgOut -Encoding utf8
+  Set-Content -Path $CfgPath -Value $cfgOut -Encoding utf8
+  Write-Dim "saved to deploy.env"
+}
 
 # --------------------------------------------------------------------------
 # 3. SSH key - create it if missing, install it on the VPS if not authorised
@@ -134,7 +163,11 @@ if (-not (Test-Path $sshDir)) { New-Item -ItemType Directory -Path $sshDir -Forc
 
 if (-not (Test-Path $IdentityFile)) {
   Write-Info "No key at $IdentityFile - generating an ed25519 key..."
-  & ssh-keygen -t ed25519 -f $IdentityFile -N '' -C "as-deploy@$env:COMPUTERNAME" -q | Out-Null
+  # Via cmd.exe on purpose: PowerShell 5.1 DROPS empty-string arguments when
+  # calling native exes, so `-N ''` disappears and ssh-keygen mis-parses the
+  # rest of the line. cmd passes `-N ""` through as a real empty argument.
+  $kg = 'ssh-keygen -t ed25519 -f "' + $IdentityFile + '" -N "" -C "as-deploy@' + $env:COMPUTERNAME + '" -q'
+  & cmd.exe /c $kg
   if (-not (Test-Path $IdentityFile)) { Fail "ssh-keygen did not produce $IdentityFile." }
   Write-Ok "key generated"
 } else {
@@ -166,7 +199,15 @@ if (Test-KeyAuth) {
              "grep -qxF '$pub' ~/.ssh/authorized_keys || printf '%s\n' '$pub' >> ~/.ssh/authorized_keys; " +
              "chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; echo KEY_INSTALLED"
   & ssh '-p' "$Port" '-o' 'StrictHostKeyChecking=accept-new' $Target $install
-  if ($LASTEXITCODE -ne 0) { Fail "Could not install the key on $Target (wrong password, or password auth is disabled)." }
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "X  Could not install the key on $Target. The ssh error above says which:" -ForegroundColor Red
+    Write-Info "  'Connection refused' / 'timed out'  -> wrong host or port, or a firewall"
+    Write-Info "  'Permission denied'                 -> wrong password, or the VPS has PasswordAuthentication no"
+    Write-Info "In the last case, paste this into the VPS's ~/.ssh/authorized_keys yourself:"
+    Write-Host "  $pub" -ForegroundColor DarkGray
+    exit 1
+  }
   if (-not (Test-KeyAuth)) { Fail "The key was installed but authentication still fails. Check the VPS sshd config / permissions on ~/.ssh." }
   Write-Ok "key installed - future deploys will not prompt"
 }
