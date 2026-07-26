@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:setup": "node scripts/deploy.mjs --remote --setup"
   },
   "dependencies": {
     "framer-motion": "^12.40.0",

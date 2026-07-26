@@ -10,6 +10,10 @@ dist-ssr
 # Web scraper run output (per-job folders created at runtime)
 server/scrapes/
 
+# Deploy: local SSH target + the VPS-side state (schema fingerprint, db dumps)
+deploy.env
+.deploy-state/
+
 # Dev server logs
 dev-server.log
 **/dev-server.log

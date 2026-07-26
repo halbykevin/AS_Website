@@ -27,6 +27,16 @@ Browser ──► Vercel (React static site, this repo root)
 Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
+**Deploy the API:** `npm run deploy` (from either folder, on any OS).
+[scripts/deploy.mjs](scripts/deploy.mjs) routes to [deploy.ps1](deploy.ps1) on Windows/macOS —
+which checks/creates the SSH key, installs it on the VPS on first run, remembers the target in
+`deploy.env` (git-ignored), pushes the branch, then runs [deploy.sh](deploy.sh) over SSH — or
+straight to `deploy.sh` when already on the VPS. `deploy.sh` fast-forwards the branch, installs
+deps only when the manifests changed, **fingerprints every schema-bearing file under `server/`**
+to decide whether `npm run migrate` is needed (taking a `pg_dump` first), restarts PM2, health-checks
+`/api/health`, and rolls the code back if the API doesn't come up. Flags: `--branch`, `--dry-run`,
+`--force-migrate`, `--skip-migrate`. Details in [server/README.md](server/README.md).
+
 ## Backend
 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.

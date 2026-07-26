@@ -9,7 +9,9 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
-    "deploy": "bash ../deploy.sh"
+    "deploy": "node ../scripts/deploy.mjs",
+    "deploy:setup": "node ../scripts/deploy.mjs --remote --setup",
+    "deploy:vps": "bash ../deploy.sh"
   },
   "dependencies": {
     "archiver": "^8.0.0",

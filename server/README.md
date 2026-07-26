@@ -46,7 +46,45 @@ Quick check: open http://localhost:8080/api/health → `{"ok":true}`.
 
 ---
 
+## Shipping a change: `npm run deploy`
+
+From **anywhere** (Windows, macOS, or the VPS itself):
+
+```bash
+cd server
+npm run deploy                       # deploys the branch you are on
+npm run deploy -- --branch main      # deploy a specific branch
+npm run deploy -- --dry-run          # show what would happen, change nothing
+npm run deploy -- --force-migrate    # migrate even if the schema looks unchanged
+```
+
+`scripts/deploy.mjs` picks the right path for the machine:
+
+| You are on | What runs | What it does |
+| --- | --- | --- |
+| Windows / macOS | [`deploy.ps1`](../deploy.ps1) | Verifies the OpenSSH client, **creates + installs an SSH key on first run** (one password prompt, never again), remembers the target in `deploy.env`, pushes your branch, then runs `deploy.sh` on the VPS over SSH |
+| The VPS (Linux) | [`deploy.sh`](../deploy.sh) | The deploy itself |
+
+First time on a new machine: `npm run deploy:setup` does only the SSH key + repo
+check. Connection details live in **`deploy.env`** at the repo root (git-ignored —
+see `deploy.env.example`); the script asks for them once and writes them there.
+
+**What `deploy.sh` does on the VPS**
+
+1. `git fetch` + **fast-forward only** to `origin/<branch>` (refuses to merge or run on a dirty tree).
+2. Installs dependencies **only if** `server/package.json` / `package-lock.json` changed (`npm ci`, falling back to `npm install`).
+3. **Detects schema changes.** There is no migration-file runner — `src/migrate.js` is one idempotent DDL blob — so the script fingerprints *every* schema-bearing file under `server/` (anything containing `CREATE/ALTER/DROP TABLE|INDEX|SEQUENCE…`, plus any `*.sql`) and compares it with the previous deploy, stored in `.deploy-state/schema.manifest`. Changed → **`pg_dump` backup first** (last 5 kept in `.deploy-state/backups/`), then `npm run migrate`. Unchanged → skipped. It reports which files changed.
+4. Restarts PM2 — or `pm2 start` + `pm2 save` if the process does not exist yet.
+5. Health-checks `http://127.0.0.1:$PORT/api/health`. If the API does not come up, it prints the PM2 log and **rolls the code back** to the previous commit (the database is *not* rolled back — restore the dump if needed).
+
+`bash deploy.sh --help` lists every flag. The frontend is never built here — Vercel
+rebuilds it on push.
+
+---
+
 ## Deploy on the VPS (Ubuntu + ISPmanager)
+
+First-time setup only — after this, use `npm run deploy` above.
 
 ### 1. Create the PostgreSQL database
 In **ISPmanager → Databases**: create a database (e.g. `as_company`) and a user with a
@@ -57,12 +95,8 @@ password. Note them — they form your `DATABASE_URL`:
 Copy `server/` to the VPS (e.g. `/opt/as-api`), then:
 
 > **The live AS Company install** clones the whole repo to **`/opt/as-company`**, so the API
-> lives at `/opt/as-company/server` (not `/opt/as-api`). To ship a backend change:
-> ```bash
-> cd /opt/as-company && git pull
-> cd server && npm run migrate   # only when migrate.js changed
-> pm2 restart as-api
-> ```
+> lives at `/opt/as-company/server` (not `/opt/as-api`). Once it is set up, ship backend
+> changes with `npm run deploy` (above) — don't pull/migrate/restart by hand.
 
 ```bash
 cd /opt/as-api
