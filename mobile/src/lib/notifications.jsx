@@ -63,18 +63,23 @@ Notifications.setNotificationHandler({
 // --- Deep links -------------------------------------------------------------
 
 // Server deep links are store-web paths; translate them onto this app's routes
-// and refuse anything we don't recognize (a bad link lands on the inbox).
-export function resolveDeepLink(link) {
+// and refuse anything we don't recognize.
+//
+// `fallback` is what an empty/unusable link resolves to. Tapping a *push* with
+// no link should land on the inbox, so that's the default — but the inbox's own
+// rows pass '' instead: resolving to '/notifications' from the notifications
+// screen pushed a second copy of itself, and repeat taps stacked up forever.
+export function resolveDeepLink(link, fallback = '/notifications') {
   let path = String(link || '').trim();
-  if (!path) return '/notifications';
+  if (!path) return fallback;
   if (/^https?:\/\//i.test(path)) {
     try {
       path = new URL(path).pathname || '/';
     } catch {
-      return '/notifications';
+      return fallback;
     }
   }
-  if (!path.startsWith('/')) return '/notifications';
+  if (!path.startsWith('/')) return fallback;
   path = path.replace(/^\/account\/orders\//, '/orders/'); // web → app route
   const allowed = [
     /^\/$/,
@@ -90,7 +95,7 @@ export function resolveDeepLink(link) {
     /^\/notifications$/,
     /^\/predictor$/
   ];
-  return allowed.some(re => re.test(path.split('?')[0])) ? path : '/notifications';
+  return allowed.some(re => re.test(path.split('?')[0])) ? path : fallback;
 }
 
 function openFromPush(data) {
@@ -99,7 +104,9 @@ function openFromPush(data) {
   if (data?.notificationId && getCustomerToken()) {
     notificationsApi.click(data.notificationId).catch(() => {});
   }
-  router.push(target);
+  // navigate (not push): if that screen is already in the stack it is reused
+  // instead of duplicated, so tapping several pushes can't pile up screens.
+  if (target) router.navigate(target);
 }
 
 // --- Push registration ------------------------------------------------------

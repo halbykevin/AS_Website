@@ -61,7 +61,11 @@ export default function NotificationsScreen() {
   const open = async n => {
     // Optimistic read state, then navigate along the (validated) deep link.
     notificationsApi.click(n.id).catch(() => {}).finally(invalidate);
-    router.push(resolveDeepLink(n.deepLink));
+    // No fallback here: an announcement without a link has nowhere to go, and
+    // the inbox's own route as a fallback would just re-open this screen.
+    // `navigate` also reuses a screen already in the stack rather than stacking.
+    const target = resolveDeepLink(n.deepLink, '');
+    if (target) router.navigate(target);
   };
 
   const markAllRead = async () => {
