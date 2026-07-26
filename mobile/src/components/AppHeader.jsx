@@ -30,7 +30,7 @@ import AnnouncementBar from './AnnouncementBar';
 import { useGlobalPromoVisible } from './GlobalPromoBanner';
 
 const LOGOS = {
-  company: require('../../assets/as-company-logo.jpg'),
+  company: require('../../assets/as-logo-clear.png'),
   store: require('../../assets/as-store-logo-clear.png')
 };
 
