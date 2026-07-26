@@ -243,5 +243,16 @@ npm run web        # run in the browser
   maps the app's semantic icon names.
 - **Images:** `expo-image` via `src/components/RemoteImage.jsx` (caching +
   branded fallback).
+- **Splash:** `assets/as-logo-full-clear.png` — the full brand lockup with the
+  flat `#F7F7F7` studio backdrop keyed out, so it sits on the white splash
+  without a grey card behind it. Source of truth is `as-logo-full.png`; the
+  `-clear` suffix means "background removed", same as `as-logo-clear.png`.
+  `imageWidth` is **per platform on purpose**: expo centres the logo on a 288dp
+  canvas and hands it to Android 12's `windowSplashScreenAnimatedIcon`, which
+  only shows the inner **192dp circle** — the lockup's widest ink sits at
+  `0.527 x imageWidth` from centre, so anything over **182dp clips "COMPPANY"**
+  on Android. iOS draws the same image into a plain centred aspect-fit frame
+  with no mask, so it gets the roomier 260dp. Re-measure that ratio if the
+  artwork changes.
 - Building a native binary (EAS): `npx eas build` after configuring an Expo
   account.
