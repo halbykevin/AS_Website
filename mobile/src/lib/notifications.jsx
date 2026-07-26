@@ -104,19 +104,27 @@ function openFromPush(data) {
 
 // --- Push registration ------------------------------------------------------
 
+// Channel importance is what makes a push audible and heads-up on Android —
+// the server can only ask for it; the channel decides. NOTE: Android freezes a
+// channel's settings at first creation, so bumps here only apply to fresh
+// installs (or after the user clears app data).
 async function ensureAndroidChannels() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'General',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
     vibrationPattern: [0, 250],
-    lightColor: '#A41E22'
+    lightColor: '#A41E22',
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
   });
   await Notifications.setNotificationChannelAsync('orders', {
     name: 'Order updates',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: Notifications.AndroidImportance.MAX,
+    sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#A41E22'
+    lightColor: '#A41E22',
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
   });
 }
 
@@ -182,11 +190,28 @@ export function NotificationsProvider({ children }) {
     return () => sub.remove();
   }, [qc]);
 
-  // (Re-)register the token whenever the signed-in customer changes, so the
-  // device row follows the session (guest → user on login). Never prompts.
+  // Ask for the OS permission once, up front — the way messaging apps do — so
+  // pushes work without the user having to discover the settings screen. A
+  // decline is remembered (we never re-prompt; the "Enable notifications" card
+  // in settings stays as the re-entry point). After that first ask, this
+  // effect just (re-)registers the token whenever the signed-in customer
+  // changes, so the device row follows the session (guest → user on login).
   useEffect(() => {
     if (account?.loading) return;
-    registerForPush();
+    let active = true;
+    (async () => {
+      const prompted = await storage.get(KEYS.pushPromptSeen);
+      if (!active) return;
+      if (prompted) {
+        registerForPush();
+      } else {
+        await storage.set(KEYS.pushPromptSeen, '1');
+        registerForPush({ interactive: true });
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [account?.loading, customer?.id]);
 
   // Taps on notifications: background/foreground taps + cold starts.

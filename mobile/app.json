@@ -47,7 +47,8 @@
         "expo-notifications",
         {
           "color": "#A41E22",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "icon": "./assets/notification-icon.png"
         }
       ],
       "expo-secure-store"

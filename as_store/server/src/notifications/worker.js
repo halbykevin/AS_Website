@@ -9,6 +9,7 @@
 import { query, pool } from '../db.js'
 import { eventHandlers, fanoutCampaign, audit } from './service.js'
 import { sendExpoPush, buildPushMessage, isExpoToken } from './expoPush.js'
+import { TRANSACTIONAL } from './templates.js'
 
 const LOCK_KEY = 0x61_73_6e_66 // "asnf"
 const INTERVAL_MS = Math.max(2000, Number(process.env.NOTIFY_WORKER_INTERVAL_MS) || 15_000)
@@ -150,7 +151,9 @@ async function dispatchDeliveries() {
         body: d.body,
         deepLink: d.deep_link,
         data: { ...(d.data || {}), notificationId: d.notification_id },
-        priority: d.priority,
+        // Order/account pushes always ride FCM high priority: that's what wakes
+        // a dozing device and shows heads-up + sound like a messaging app.
+        priority: TRANSACTIONAL.has(d.category) ? 'high' : d.priority,
         channelId: d.category === 'order' ? 'orders' : 'default',
       }),
     )

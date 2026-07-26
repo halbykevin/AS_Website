@@ -261,14 +261,19 @@ export async function sendTemplate(customerId, templateKey, vars = {}, opts = {}
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
+// "Khoder Al Jaber" -> "Khoder"; empty -> "there", so templates can always
+// greet with {{name}} and never render an awkward blank.
+const firstName = (full) => String(full || '').trim().split(/\s+/)[0] || 'there'
+
 export const eventHandlers = {
   async order_created({ orderId, customerId, name, itemCount, total }) {
     if (!customerId) return
     await sendTemplate(
       customerId,
       'order_received',
-      { orderId, name: name || 'there', itemCount, total: money(total) },
-      { dedupeKey: `order:${orderId}:received`, data: { orderId } },
+      { orderId, name: firstName(name), itemCount, total: money(total) },
+      // Transactional: high priority so the push wakes a sleeping device.
+      { dedupeKey: `order:${orderId}:received`, data: { orderId }, priority: 'high' },
     )
   },
 
@@ -282,10 +287,16 @@ export const eventHandlers = {
     }
     const key = tplByStatus[status]
     if (!key) return
+    // Pull the order's name/total so the copy can be personal ("Good news,
+    // Khoder…") instead of a bare order number.
+    const { rows: ord } = await query(
+      `SELECT full_name, subtotal FROM orders WHERE id = $1`,
+      [orderId],
+    )
     await sendTemplate(
       customerId,
       key,
-      { orderId },
+      { orderId, name: firstName(ord[0]?.full_name), total: money(ord[0]?.subtotal) },
       { dedupeKey: `order:${orderId}:status:${status}`, data: { orderId }, priority: 'high' },
     )
     // A delivered order schedules a feedback survey (delayed a bit so the push
