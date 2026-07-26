@@ -2,14 +2,14 @@
 // prompt second), per-category opt-in/out, and quiet hours. Order & account
 // notifications are transactional and always on.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Switch, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useAccount } from '@/src/lib/account';
 import { notificationsApi, useNotifications } from '@/src/lib/notifications';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Card, Button, Icon, Divider, Skeleton, Field, Input } from '@/src/ui';
+import { Screen, Text, Header, Card, Button, Icon, Divider, Skeleton, EmptyState, Field, Input } from '@/src/ui';
 
 const OPTIONAL_CATEGORIES = [
   { key: 'promo', label: 'Offers & promotions', hint: 'Sales, new arrivals, vouchers' },
@@ -27,18 +27,23 @@ export default function NotificationSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const loadPrefs = useCallback(() => {
+    setError('');
+    return notificationsApi
+      .getPrefs()
+      .then(setPrefs)
+      .catch(e => setError(e.message));
+  }, []);
+
   useEffect(() => {
     if (account?.loading) return;
     if (!account?.customer) {
       router.replace('/auth/login?next=/account/notifications');
       return;
     }
-    notificationsApi
-      .getPrefs()
-      .then(setPrefs)
-      .catch(e => setError(e.message));
+    loadPrefs();
     Notifications.getPermissionsAsync().then(p => setOsGranted(p.status === 'granted'));
-  }, [account?.loading, account?.customer]);
+  }, [account?.loading, account?.customer, loadPrefs]);
 
   const save = async patch => {
     const next = { ...prefs, ...patch, categories: { ...prefs.categories, ...(patch.categories || {}) } };
@@ -68,7 +73,9 @@ export default function NotificationSettingsScreen() {
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
       <Header title="Notification settings" />
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
-        {!prefs ? (
+        {!prefs && error ? (
+          <EmptyState icon="info" title="Couldn't load your settings" message={error} actionLabel="Try again" onAction={loadPrefs} />
+        ) : !prefs ? (
           [0, 1, 2].map(i => <Skeleton key={i} height={90} radius="2xl" />)
         ) : (
           <>

@@ -385,7 +385,10 @@ function prune() {
 }
 
 export const scraperRouter = express.Router()
-scraperRouter.use(requireAuth)
+// Scoped to /api/scrape on purpose: this router is mounted at the root, so an
+// unscoped `use` would put admin auth in front of every route mounted after it
+// (it shadowed the whole customer notifications API) and turn 404s into 401s.
+scraperRouter.use('/api/scrape', requireAuth)
 
 scraperRouter.post('/api/scrape', (req, res) => {
   const opts = req.body || {}
