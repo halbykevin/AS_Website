@@ -7,7 +7,6 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Card, Icon, Skeleton } from '@/src/ui';
 import AppHeader from '@/src/components/AppHeader';
 import ComingSoon from '@/src/components/ComingSoon';
-import SearchPill from '@/src/components/SearchPill';
 import CategoryWall from '@/src/components/store/CategoryWall';
 
 export default function ShopScreen() {
@@ -33,7 +32,8 @@ export default function ShopScreen() {
   return (
     <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={cats.isLoading} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" title="Shop" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing['2xl'], paddingTop: theme.spacing.lg }}>
-        <SearchPill />
+        {/* No search field here on purpose — AppHeader already carries the
+            search action, and two entry points to the same screen is noise. */}
 
         {/* All products shortcut */}
         <Card onPress={() => router.push('/category/all')} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>

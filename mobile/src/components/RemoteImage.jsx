@@ -8,15 +8,18 @@ import { Image } from 'expo-image';
 import { useTheme } from '@/src/theme';
 import Icon from '@/src/ui/Icon';
 
-export default function RemoteImage({ uri, style, contentFit = 'cover', radius = 0, fallbackIcon = 'box', transition = 200, ...rest }) {
+// `fallback` / `fallbackBackground` let a caller on a dark surface opt out of
+// the light default, which otherwise reads as a broken image rather than an
+// absent one.
+export default function RemoteImage({ uri, style, contentFit = 'cover', radius = 0, fallbackIcon = 'box', fallback, fallbackBackground, transition = 200, ...rest }) {
   const theme = useTheme();
   const [failed, setFailed] = useState(false);
   const hasImage = Boolean(uri) && !failed;
 
   if (!hasImage) {
     return (
-      <View style={[{ alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surfaceAlt, borderRadius: radius }, style]}>
-        <Icon name={fallbackIcon} size={28} color={theme.colors.textFaint} />
+      <View style={[{ alignItems: 'center', justifyContent: 'center', backgroundColor: fallbackBackground ?? theme.colors.surfaceAlt, borderRadius: radius }, style]}>
+        {fallback ?? <Icon name={fallbackIcon} size={28} color={theme.colors.textFaint} />}
       </View>
     );
   }

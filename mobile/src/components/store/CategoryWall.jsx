@@ -56,7 +56,19 @@ function Tile({ category }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={() => router.push(`/category/${category.slug}`)} style={({ pressed }) => [styles.tile, pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] }]} accessibilityRole="button" accessibilityLabel={category.name}>
-      <RemoteImage uri={category.image} style={styles.img} contentFit="cover" fallbackIcon="grid" />
+      {/* A category with no image in the CMS still has to look deliberate on
+          the dark wall — the light default fallback reads as a broken tile. */}
+      <RemoteImage
+        uri={category.image}
+        style={styles.img}
+        contentFit="cover"
+        fallbackBackground={theme.colors.inverseSoft}
+        fallback={
+          <Text style={styles.fallbackInitial} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {String(category.name || '?').trim().charAt(0).toUpperCase()}
+          </Text>
+        }
+      />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.82)']} locations={[0, 0.45, 1]} style={styles.gradient} />
 
       <View style={styles.arrow}>
@@ -110,6 +122,17 @@ const makeStyles = t => ({
   },
   img: { ...absoluteFill() },
   gradient: { ...absoluteFill() },
+  // Ghosted monogram, so a tile with no image still has a face. Nudged up out
+  // of the label's gradient at the bottom of the tile.
+  fallbackInitial: {
+    position: 'absolute',
+    color: 'rgba(255,255,255,0.10)',
+    fontSize: 128,
+    lineHeight: 140,
+    fontWeight: '900',
+    letterSpacing: -6,
+    transform: [{ translateY: -18 }]
+  },
   arrow: {
     position: 'absolute',
     right: 10,
