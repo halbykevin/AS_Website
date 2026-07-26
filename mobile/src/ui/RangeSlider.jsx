@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -6,6 +6,11 @@ import { useThemedStyles } from '@/src/theme';
 import Text from './Text';
 
 const THUMB = 26;
+const RAIL = 5;
+// A real 44dp touch strip. The thumb still *looks* like 26dp, but a gesture's
+// hitSlop is clipped to its parent's bounds on Android, so the parent has to be
+// as tall as the target we want.
+const TRACK_H = 44;
 // A thumb is CENTRED on its end of the rail, so half of it hangs past the rail's
 // extremes. Reserving that overhang as padding keeps the thumbs — and their
 // touch targets — inside the control instead of spilling toward the screen
@@ -13,11 +18,22 @@ const THUMB = 26;
 // It also lines the thumb's outer edge up with the labels above it.
 const EDGE = THUMB / 2;
 // Tall but narrow: easy to grab vertically without widening the target back into
-// the edge-gesture zone we just moved it out of.
-const THUMB_HIT_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };
+// the edge-gesture zone we just moved it out of. Goes on the GESTURE, not the
+// view — a hitSlop prop on a GestureDetector's child does not widen the handler.
+const THUMB_HIT_SLOP = { top: (TRACK_H - THUMB) / 2, bottom: (TRACK_H - THUMB) / 2, left: 6, right: 6 };
 
 const money = n => `$${Number(n || 0).toLocaleString()}`;
-const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+// MUST be a worklet. It's called from the pan handler, which runs on the UI
+// thread; without the directive Reanimated captures it into the worklet closure
+// as a plain function and calling it there throws "Tried to synchronously call
+// a non-worklet function on the UI thread" — crashing the app on the first
+// pixel of a drag. Marking it a worklet leaves it perfectly callable from JS
+// too, which the render path below relies on.
+function clamp(v, lo, hi) {
+  'worklet';
+  return Math.min(Math.max(v, lo), hi);
+}
 
 export default function RangeSlider({ bounds, low, high, step = 1, onChange, onCommit }) {
   const styles = useThemedStyles(makeStyles);
@@ -31,24 +47,36 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
   const hiStart = useSharedValue(0);
   const w = useSharedValue(0);
 
-  const fracToValue = useCallback(
-    frac => {
-      const raw = min + frac * span;
-      return clamp(Math.round(raw / step) * step, min, max);
-    },
-    [min, max, span, step]
-  );
+  // The gestures have to be built exactly once. GestureDetector reconfigures the
+  // native handler whenever the gesture object changes, and this component
+  // re-renders on every drag frame (the $ labels are state) — so building them
+  // inline meant reattaching mid-drag, ~60 times a second. Everything volatile
+  // is read through this ref instead, which keeps the callbacks below (and
+  // therefore the gestures) referentially stable for the component's lifetime.
+  const latest = useRef(null);
+  latest.current = { min, max, span, step, onChange, onCommit };
+
+  const fracToValue = useCallback(frac => {
+    const c = latest.current;
+    return clamp(Math.round((c.min + frac * c.span) / c.step) * c.step, c.min, c.max);
+  }, []);
 
   const report = useCallback(
     (loF, hiF) => {
       const lo = fracToValue(loF);
       const hi = fracToValue(hiF);
       setLabels({ lo, hi });
-      onChange?.(lo, hi);
+      latest.current.onChange?.(lo, hi);
     },
-    [fracToValue, onChange]
+    [fracToValue]
   );
-  const commit = useCallback((loF, hiF) => onCommit?.(fracToValue(loF), fracToValue(hiF)), [fracToValue, onCommit]);
+
+  const commit = useCallback(
+    (loF, hiF) => {
+      latest.current.onCommit?.(fracToValue(loF), fracToValue(hiF));
+    },
+    [fracToValue]
+  );
 
   const onLayout = e => {
     const width = e.nativeEvent.layout.width;
@@ -56,30 +84,34 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
     setTrackW(width);
   };
 
-  const makePan = (frac, start, isLow) =>
-    Gesture.Pan()
-      .activeOffsetX([-6, 6])
-      .failOffsetY([-12, 12])
-      .onBegin(() => {
-        'worklet';
-        start.value = frac.value;
-      })
-      .onUpdate(e => {
-        'worklet';
-        const delta = w.value > 0 ? e.translationX / w.value : 0;
-        let next = clamp(start.value + delta, 0, 1);
-        if (isLow) next = Math.min(next, hiFrac.value);
-        else next = Math.max(next, loFrac.value);
-        frac.value = next;
-        runOnJS(report)(loFrac.value, hiFrac.value);
-      })
-      .onFinalize(() => {
-        'worklet';
-        runOnJS(commit)(loFrac.value, hiFrac.value);
-      });
+  const makePan = useCallback(
+    (frac, start, isLow) =>
+      Gesture.Pan()
+        .activeOffsetX([-6, 6])
+        .failOffsetY([-12, 12])
+        .hitSlop(THUMB_HIT_SLOP)
+        .onBegin(() => {
+          'worklet';
+          start.value = frac.value;
+        })
+        .onUpdate(e => {
+          'worklet';
+          const delta = w.value > 0 ? e.translationX / w.value : 0;
+          let next = clamp(start.value + delta, 0, 1);
+          if (isLow) next = Math.min(next, hiFrac.value);
+          else next = Math.max(next, loFrac.value);
+          frac.value = next;
+          runOnJS(report)(loFrac.value, hiFrac.value);
+        })
+        .onFinalize(() => {
+          'worklet';
+          runOnJS(commit)(loFrac.value, hiFrac.value);
+        }),
+    [report, commit, loFrac, hiFrac, w]
+  );
 
-  const loPan = makePan(loFrac, loStart, true);
-  const hiPan = makePan(hiFrac, hiStart, false);
+  const loPan = useMemo(() => makePan(loFrac, loStart, true), [makePan, loFrac, loStart]);
+  const hiPan = useMemo(() => makePan(hiFrac, hiStart, false), [makePan, hiFrac, hiStart]);
 
   const loStyle = useAnimatedStyle(() => ({ transform: [{ translateX: loFrac.value * w.value - THUMB / 2 }] }));
   const hiStyle = useAnimatedStyle(() => ({ transform: [{ translateX: hiFrac.value * w.value - THUMB / 2 }] }));
@@ -103,10 +135,10 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
           {trackW > 0 ? (
             <>
               <GestureDetector gesture={loPan}>
-                <Animated.View style={[styles.thumb, loStyle]} hitSlop={THUMB_HIT_SLOP} accessibilityRole="adjustable" accessibilityLabel="Minimum price" />
+                <Animated.View style={[styles.thumb, loStyle]} accessibilityRole="adjustable" accessibilityLabel="Minimum price" />
               </GestureDetector>
               <GestureDetector gesture={hiPan}>
-                <Animated.View style={[styles.thumb, hiStyle]} hitSlop={THUMB_HIT_SLOP} accessibilityRole="adjustable" accessibilityLabel="Maximum price" />
+                <Animated.View style={[styles.thumb, hiStyle]} accessibilityRole="adjustable" accessibilityLabel="Maximum price" />
               </GestureDetector>
             </>
           ) : null}
@@ -117,13 +149,16 @@ export default function RangeSlider({ bounds, low, high, step = 1, onChange, onC
 }
 
 const makeStyles = t => ({
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: t.spacing.sm },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: t.spacing.xs },
   trackWrap: { paddingHorizontal: EDGE },
-  track: { height: THUMB, justifyContent: 'center' },
-  rail: { position: 'absolute', left: 0, right: 0, height: 5, borderRadius: 3, backgroundColor: t.alpha(t.colors.text, 0.12) },
-  fill: { position: 'absolute', height: 5, borderRadius: 3, backgroundColor: t.colors.primary },
+  track: { height: TRACK_H, justifyContent: 'center' },
+  // Absolute children get explicit tops rather than relying on the parent's
+  // justifyContent, which Yoga applies inconsistently to absolute layout.
+  rail: { position: 'absolute', top: (TRACK_H - RAIL) / 2, left: 0, right: 0, height: RAIL, borderRadius: 3, backgroundColor: t.alpha(t.colors.text, 0.12) },
+  fill: { position: 'absolute', top: (TRACK_H - RAIL) / 2, height: RAIL, borderRadius: 3, backgroundColor: t.colors.primary },
   thumb: {
     position: 'absolute',
+    top: (TRACK_H - THUMB) / 2,
     left: 0,
     width: THUMB,
     height: THUMB,
