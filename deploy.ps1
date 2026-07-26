@@ -5,13 +5,20 @@
 .DESCRIPTION
   Checks the SSH toolchain, creates and installs an SSH key the first time,
   makes sure your branch is pushed, then runs deploy.sh ON THE VPS - which
-  pulls, installs, migrates only when the schema changed, restarts PM2 and
-  health-checks the API.
+  pulls once and deploys BOTH APIs from that single clone:
+
+    site   AS Company website API   server/            pm2 as-api        :8080
+    store  AS Store API             as_store/server/   pm2 as-store-api  :8081
+
+  Each app installs, migrates and restarts independently; an app whose files
+  did not change is left running untouched.
 
   Settings are remembered in deploy.env at the repo root (git-ignored).
 
 .EXAMPLE
-  npm run deploy                     # from server/ - deploys the current branch
+  npm run deploy                     # both APIs, current branch
+.EXAMPLE
+  npm run deploy -- -App store       # just the AS Store API
 .EXAMPLE
   npm run deploy -- -Branch main -ForceMigrate
 .EXAMPLE
@@ -24,9 +31,12 @@ param(
   [int]$Port = 0,
   [string]$RemotePath,
   [string]$Branch,
+  [ValidateSet('all', 'site', 'store')]
+  [string]$App = 'all',
   [string]$IdentityFile,
   [switch]$ForceMigrate,
   [switch]$SkipMigrate,
+  [switch]$ForceRestart,
   [switch]$DryRun,
   [switch]$NoPush,
   [switch]$Setup,
@@ -279,12 +289,13 @@ if (-not $hasUpstream) {
 # --------------------------------------------------------------------------
 # 6. Run the deploy on the VPS
 # --------------------------------------------------------------------------
-$flags = "--branch '$Branch'"
+$flags = "--branch '$Branch' --app '$App'"
 if ($ForceMigrate) { $flags += " --force-migrate" }
 if ($SkipMigrate)  { $flags += " --skip-migrate" }
+if ($ForceRestart) { $flags += " --force-restart" }
 if ($DryRun)       { $flags += " --dry-run" }
 
-Write-Step "Running deploy.sh on $Server"
+Write-Step "Running deploy.sh on $Server ($App)"
 Write-Dim  "bash $RemotePath/deploy.sh $flags"
 Write-Host ""
 
@@ -293,8 +304,8 @@ $code = $LASTEXITCODE
 
 Write-Host ""
 if ($code -eq 0) {
-  Write-Host "Deployed $Branch to $Server." -ForegroundColor Green
-  Write-Dim "The website itself is rebuilt by Vercel on push - nothing else to do."
+  Write-Host "Deployed $Branch ($App) to $Server." -ForegroundColor Green
+  Write-Dim "Both frontends are rebuilt by Vercel on push - nothing else to do."
 } else {
   Write-Host "Deploy FAILED (exit $code). The VPS output above says why." -ForegroundColor Red
 }

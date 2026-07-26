@@ -27,15 +27,25 @@ Browser ──► Vercel (React static site, this repo root)
 Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
-**Deploy the API:** `npm run deploy` (from either folder, on any OS).
+**Deploy the APIs:** `npm run deploy` (from any of the three package folders, on any OS).
+The repo holds **two** Node APIs, both served from one clone at `/opt/as-company` on the VPS:
+`site` = [server/](server/) → pm2 `as-api` :8080, and `store` = [as_store/server/](as_store/server/)
+→ pm2 `as-store-api` :8081. Target one with `npm run deploy:site` / `deploy:store`.
+
 [scripts/deploy.mjs](scripts/deploy.mjs) routes to [deploy.ps1](deploy.ps1) on Windows/macOS —
 which checks/creates the SSH key, installs it on the VPS on first run, remembers the target in
 `deploy.env` (git-ignored), pushes the branch, then runs [deploy.sh](deploy.sh) over SSH — or
-straight to `deploy.sh` when already on the VPS. `deploy.sh` fast-forwards the branch, installs
-deps only when the manifests changed, **fingerprints every schema-bearing file under `server/`**
-to decide whether `npm run migrate` is needed (taking a `pg_dump` first), restarts PM2, health-checks
-`/api/health`, and rolls the code back if the API doesn't come up. Flags: `--branch`, `--dry-run`,
-`--force-migrate`, `--skip-migrate`. Details in [server/README.md](server/README.md).
+straight to `deploy.sh` when already on the VPS. `deploy.sh` preflights each app's `.env`,
+fast-forwards the branch **once**, then per app: installs deps only when its manifests changed,
+**fingerprints every schema-bearing file it owns** (the store's includes `as_store/db/*.sql`,
+since its `migrate.js` reads `../../db`) to decide whether `npm run migrate` is needed (taking a
+`pg_dump` first), restarts its PM2 process, and health-checks `/api/health`. An app with no
+changes is left running untouched; a failed health check rolls the code back. Flags: `--app`,
+`--branch`, `--dry-run`, `--force-migrate`, `--skip-migrate`, `--force-restart`.
+Details in [server/README.md](server/README.md).
+
+> The store API **must** live inside the clone (`/opt/as-company/as_store/server`) — a standalone
+> copy of `as_store/server/` breaks `migrate.js`'s `../../db` lookup. See [as_store/DEPLOY.md](as_store/DEPLOY.md).
 
 ## Backend
 

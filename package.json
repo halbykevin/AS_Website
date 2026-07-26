@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "node scripts/deploy.mjs",
+    "deploy:site": "node scripts/deploy.mjs --app site",
+    "deploy:store": "node scripts/deploy.mjs --app store",
     "deploy:setup": "node scripts/deploy.mjs --remote --setup"
   },
   "dependencies": {

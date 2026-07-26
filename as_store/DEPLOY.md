@@ -11,6 +11,41 @@ Shopper ──► https://store.as.com.lb        (Vercel — this Next.js app, r
                                 └── /opt/as-store-scraper       (Python import tool, optional)
 ```
 
+## Shipping changes: `npm run deploy`
+
+Day to day you do **not** follow the steps below — they are first-time setup. Once the
+API is running, ship changes with:
+
+```bash
+npm run deploy            # from as_store/server — deploys the store API
+npm run deploy:all        # both APIs (website + store)
+npm run deploy -- --dry-run
+```
+
+This runs [`deploy.sh`](../deploy.sh) on the VPS, which pulls the branch once and deploys
+both APIs from the **single repo clone at `/opt/as-company`**, each with its own dependency
+install, schema check, PM2 process and health check. See
+[server/README.md](../server/README.md#shipping-a-change-npm-run-deploy) for the full behaviour.
+
+> **The store API must live inside the repo clone**, at `/opt/as-company/as_store/server`.
+> It cannot run as a standalone copy of `as_store/server/`: `src/migrate.js` resolves its SQL
+> to `../../db`, i.e. **`as_store/db/`, a sibling of `server/`**. A folder containing only
+> `server/` makes that path resolve to `/opt/db/schema.sql` and `npm run migrate` fails.
+>
+> Moving an existing hand-copied `/opt/as-store-api` into the clone — once, on the VPS:
+>
+> ```bash
+> cp /opt/as-store-api/.env /opt/as-company/as_store/server/.env
+> # keep UPLOAD_DIR=/opt/as-store-api/uploads in that .env so the images stay where they are
+> pm2 delete as-store-api
+> cd /opt/as-company/as_store/server && npm install
+> pm2 start src/index.js --name as-store-api && pm2 save
+> curl http://127.0.0.1:8081/api/health
+> ```
+>
+> `deploy.sh` refuses to deploy the store until that `.env` is in place, and prints these
+> same steps if it is missing.
+
 The store ships **unpublished**: visitors see the branded "Coming soon" page until you flip
 **Admin → Settings → Site visibility → Published** (preview the hidden site any time with
 `https://store.as.com.lb/?preview=1`). `/admin` is never gated.
@@ -24,15 +59,15 @@ In **ISPmanager → Databases** create database `as_store` with a user + passwor
 GRANT ALL PRIVILEGES ON DATABASE as_store TO as_store_user;` and on Postgres 15+:
 `\c as_store` then `GRANT ALL ON SCHEMA public TO as_store_user;`).
 
-## 2. VPS — upload the API
+## 2. VPS — configure the API
 
-Copy `as_store/server/` to the VPS (e.g. `/opt/as-store-api`) — **without** `node_modules`,
-`.env`, `scrapes/`. If you want the admin **Import** (scraper) tool in production, also copy
-`as_store/scraper/` to `/opt/as-store-scraper` and install its Python deps
-(`pip3 install requests beautifulsoup4 lxml PyYAML tqdm`).
+The code arrives with the repo clone (`/opt/as-company`) — do **not** copy `as_store/server/`
+on its own; see the note above about `../../db`. If you want the admin **Import** (scraper)
+tool in production, also copy `as_store/scraper/` to `/opt/as-store-scraper` and install its
+Python deps (`pip3 install requests beautifulsoup4 lxml PyYAML tqdm`).
 
 ```bash
-cd /opt/as-store-api
+cd /opt/as-company/as_store/server
 cp .env.example .env && nano .env
 ```
 
@@ -101,13 +136,15 @@ TRUNCATE customers, otp_codes RESTART IDENTITY CASCADE;
 ## 4. VPS — run it with PM2
 
 ```bash
-cd /opt/as-store-api
+cd /opt/as-company/as_store/server
 npm install
 npm run migrate         # idempotent, confirms the schema is current
 pm2 start src/index.js --name as-store-api
 pm2 save                # (pm2 startup was already configured for as-api)
 curl http://127.0.0.1:8081/api/health   # -> {"ok":true}
 ```
+
+After this, never run these by hand again — use `npm run deploy`.
 
 ## 5. DNS + SSL for the API subdomain
 

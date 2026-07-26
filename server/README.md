@@ -48,12 +48,22 @@ Quick check: open http://localhost:8080/api/health → `{"ok":true}`.
 
 ## Shipping a change: `npm run deploy`
 
+This repo holds **two** Node APIs, both deployed from a single git clone at
+`/opt/as-company` on the VPS:
+
+| App | Folder | PM2 | Port | Database |
+| --- | --- | --- | --- | --- |
+| `site` | `server/` | `as-api` | 8080 | `as_company` |
+| `store` | `as_store/server/` | `as-store-api` | 8081 | `as_store` |
+
 From **anywhere** (Windows, macOS, or the VPS itself):
 
 ```bash
 cd server
-npm run deploy                       # deploys the branch you are on
-npm run deploy -- --branch main      # deploy a specific branch
+npm run deploy                       # both APIs, current branch
+npm run deploy:site                  # just this one
+npm run deploy:store                 # just the store
+npm run deploy -- --branch main      # a specific branch
 npm run deploy -- --dry-run          # show what would happen, change nothing
 npm run deploy -- --force-migrate    # migrate even if the schema looks unchanged
 ```
@@ -71,14 +81,25 @@ see `deploy.env.example`); the script asks for them once and writes them there.
 
 **What `deploy.sh` does on the VPS**
 
-1. `git fetch` + **fast-forward only** to `origin/<branch>` (refuses to merge or run on a dirty tree).
-2. Installs dependencies **only if** `server/package.json` / `package-lock.json` changed (`npm ci`, falling back to `npm install`).
-3. **Detects schema changes.** There is no migration-file runner — `src/migrate.js` is one idempotent DDL blob — so the script fingerprints *every* schema-bearing file under `server/` (anything containing `CREATE/ALTER/DROP TABLE|INDEX|SEQUENCE…`, plus any `*.sql`) and compares it with the previous deploy, stored in `.deploy-state/schema.manifest`. Changed → **`pg_dump` backup first** (last 5 kept in `.deploy-state/backups/`), then `npm run migrate`. Unchanged → skipped. It reports which files changed.
-4. Restarts PM2 — or `pm2 start` + `pm2 save` if the process does not exist yet.
-5. Health-checks `http://127.0.0.1:$PORT/api/health`. If the API does not come up, it prints the PM2 log and **rolls the code back** to the previous commit (the database is *not* rolled back — restore the dump if needed).
+**Preflight**, before touching anything: every selected app must have its folder and
+its `.env`, so a half-configured store can't take the website down with it.
 
-`bash deploy.sh --help` lists every flag. The frontend is never built here — Vercel
-rebuilds it on push.
+**Once**, for both apps: `git fetch` + **fast-forward only** to `origin/<branch>`
+(refuses to merge, or to run on a dirty tree).
+
+Then, for **each app independently**:
+
+1. Installs dependencies **only if** that app's `package.json` / `package-lock.json` changed (`npm ci`, falling back to `npm install`).
+2. **Detects schema changes.** Neither app has a migration-file runner — the site's `src/migrate.js` is one idempotent DDL blob, the store replays `as_store/db/*.sql` — so the script fingerprints every schema-bearing file the app owns (anything containing `CREATE/ALTER/DROP TABLE|INDEX|SEQUENCE…`, plus any `*.sql` that isn't seed data) and compares it with the previous deploy in `.deploy-state/schema-<app>.manifest`. Changed → **`pg_dump` backup first** (last 5 per app in `.deploy-state/backups/`), then `npm run migrate`. Unchanged → skipped. It reports which files moved.
+3. Restarts its PM2 process — or `pm2 start` + `pm2 save` if it doesn't exist yet. **An app whose files didn't change is left running untouched**, so deploying a store change costs the website no downtime (override with `--force-restart`).
+4. Health-checks `http://127.0.0.1:$PORT/api/health`. On failure it prints that app's PM2 log and **rolls the code back** to the previous commit, reverting every app it restarted this run. Databases are *not* rolled back — restore the dump if needed.
+
+> The store's schema lives in `as_store/db/`, **outside** its server folder, because
+> `migrate.js` reads `../../db`. The fingerprint covers both paths — see
+> [as_store/DEPLOY.md](../as_store/DEPLOY.md) for why the store must live inside the clone.
+
+`bash deploy.sh --help` lists every flag. Neither frontend is built here — Vercel
+rebuilds both on push.
 
 ---
 
