@@ -15,30 +15,47 @@ import SortSheet from './SortSheet';
 import FilterSheet from './FilterSheet';
 import { activeFilterCount } from '@/src/lib/catalogFilters';
 
-export default function CatalogToolbar({ total = 0, sort, filters, facets, bounds, products, showCategory = true, onSortChange, onFiltersChange }) {
+export default function CatalogToolbar({ total = 0, loading = false, sort, filters, facets, bounds, products = [], showCategory = true, onSortChange, onFiltersChange }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const sheet = useSheet();
   const activeCount = activeFilterCount(filters);
+
+  // Every section of the filter panel is derived from the loaded catalog — the
+  // category/brand facets and the price bounds all come out of `products`.
+  // Opened too early it renders with those sections missing and a "No matches"
+  // CTA, so the button stays disabled until there is something to filter.
+  // Gated on the SOURCE list, not the filtered one: a filter that matches
+  // nothing must still leave you a way back in to clear it.
+  const ready = !loading && products.length > 0;
+
+  const hasFacets = (showCategory && facets?.categories?.length > 0) || facets?.brands?.length > 0;
+  const hasPrice = bounds?.max > bounds?.min;
 
   const openSort = () =>
     sheet.open({
       render: ({ close }) => <SortSheet value={sort} onChange={onSortChange} onClose={close} />
     });
 
-  const openFilter = () =>
+  const openFilter = () => {
+    if (!ready) return;
+    // Size the sheet to the groups it will actually render (facets, price, and
+    // the always-present sale/density controls) instead of a fixed height, so a
+    // short panel doesn't open with a third of it blank. The body scrolls, so
+    // shorter phones get a scrollbar rather than a clipped sheet.
+    const groups = 1 + (hasFacets ? 1 : 0) + (hasPrice ? 1 : 0);
     sheet.open({
-      // Sized to the panel's content (~535dp) rather than the screen, so it
-      // doesn't open with a third of it blank. The body scrolls, so shorter
-      // phones just get a scrollbar instead of a clipped sheet.
-      snapPoints: ['68%'],
+      snapPoints: [groups >= 3 ? '68%' : groups === 2 ? '56%' : '44%'],
       render: ({ close }) => <FilterSheet facets={facets} bounds={bounds} products={products} initial={filters} showCategory={showCategory} onApply={onFiltersChange} onClose={close} />
     });
+  };
 
   return (
     <View style={styles.bar}>
       <Text variant="callout" muted>
-        {total} {total === 1 ? 'product' : 'products'}
+        {/* Grouped like the sheet's "Show 1,370" CTA — the two counts sit a
+            thumb apart, so they must not disagree on formatting. */}
+        {loading ? 'Loading…' : `${total.toLocaleString()} ${total === 1 ? 'product' : 'products'}`}
       </Text>
 
       <View style={styles.actions}>
@@ -49,7 +66,15 @@ export default function CatalogToolbar({ total = 0, sort, filters, facets, bound
           </Text>
         </Pressable>
 
-        <Pressable onPress={openFilter} style={({ pressed }) => [styles.pill, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Filter">
+        <Pressable
+          onPress={openFilter}
+          disabled={!ready}
+          style={({ pressed }) => [styles.pill, pressed && styles.pressed, !ready && styles.disabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Filter"
+          accessibilityState={{ disabled: !ready }}
+          accessibilityHint={ready ? 'Narrow down the catalog' : 'Available once the products have loaded'}
+        >
           <Icon name="settings" size={16} color={theme.colors.textMuted} />
           <Text variant="callout" weight="medium">
             Filter
@@ -89,6 +114,7 @@ const makeStyles = t => ({
     backgroundColor: t.colors.surface
   },
   pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.4 },
   badge: {
     marginLeft: 2,
     minWidth: 20,

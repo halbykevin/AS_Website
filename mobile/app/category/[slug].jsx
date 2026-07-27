@@ -82,7 +82,7 @@ export default function CategoryScreen() {
           {category.tagline}
         </Text>
       ) : null}
-      <CatalogToolbar total={visible.length} sort={sort} filters={filters} facets={facets} bounds={bounds} products={products} showCategory={showCategory} onSortChange={setSort} onFiltersChange={setFilters} />
+      <CatalogToolbar total={visible.length} loading={isLoading} sort={sort} filters={filters} facets={facets} bounds={bounds} products={products} showCategory={showCategory} onSortChange={setSort} onFiltersChange={setFilters} />
     </View>
   );
 

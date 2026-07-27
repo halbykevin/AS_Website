@@ -142,19 +142,13 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
       ) : null}
 
       <Group>
-        <View style={styles.row}>
-          <Text variant="title" style={styles.rowLabel}>
-            On sale only
-          </Text>
+        <ControlRow label="On sale only">
           <Switch value={draft.sale} onValueChange={v => patch({ sale: v })} />
-        </View>
+        </ControlRow>
         <RowDivider />
-        <View style={styles.row}>
-          <Text variant="title" style={styles.rowLabel}>
-            Per row
-          </Text>
+        <ControlRow label="Per row">
           <DensityToggle value={draft.cols} onChange={v => patch({ cols: v })} />
-        </View>
+        </ControlRow>
       </Group>
     </SheetScaffold>
   );
@@ -171,6 +165,21 @@ function Group({ children, style }) {
 function RowDivider() {
   const styles = useThemedStyles(makeStyles);
   return <View style={styles.divider} />;
+}
+
+// A row pairing a label with an inline control (switch, segmented toggle). The
+// label takes the free space and truncates, so a wide control keeps its natural
+// size on a narrow phone instead of being squeezed off the end of the row.
+function ControlRow({ label, children }) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.row}>
+      <Text variant="title" numberOfLines={1} style={styles.rowGrow}>
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
 }
 
 function PickerRow({ label, value, active, onPress }) {
@@ -218,7 +227,10 @@ function OptionPicker({ title, options, value, onPick, onClose }) {
 }
 
 const makeStyles = t => ({
-  body: { gap: t.spacing.md, paddingTop: t.spacing.xs, paddingBottom: t.spacing.lg },
+  // Cards are separated by a full step (16) rather than 12: at 12 the gap
+  // between two cards read as barely more than the inset divider inside one,
+  // which blurred where a group ended.
+  body: { gap: t.spacing.lg, paddingTop: t.spacing.sm, paddingBottom: t.spacing.xl },
 
   group: {
     borderRadius: t.radii['2xl'],
@@ -227,11 +239,15 @@ const makeStyles = t => ({
     borderColor: t.colors.border,
     overflow: 'hidden'
   },
-  priceGroup: { padding: t.spacing.lg, gap: t.spacing.md },
+  // Same 16 horizontal inset as the rows above it, so every card's contents sit
+  // on one vertical line. The slider carries its own $ labels, hence the tighter
+  // internal gap and the trimmed bottom — its touch target already adds height.
+  priceGroup: { paddingHorizontal: t.spacing.lg, paddingTop: t.spacing.lg, paddingBottom: t.spacing.md, gap: t.spacing.sm },
 
   // 56 keeps every row comfortably past the 48dp minimum tap target.
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.spacing.md, minHeight: 56, paddingHorizontal: t.spacing.lg },
   rowLabel: { flexShrink: 0 },
+  rowGrow: { flex: 1 },
   rowValue: { flex: 1, textAlign: 'right' },
   divider: { height: 1, marginLeft: t.spacing.lg, backgroundColor: t.colors.border },
 
