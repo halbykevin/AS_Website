@@ -1,20 +1,3 @@
-// ---------------------------------------------------------------------------
-// AppHeader — the single fixed, responsive, dynamic top bar for both faces of
-// the app: the AS Store (dark "ink" chrome) and the AS Company website (light).
-//
-//  • Fixed     — rendered ABOVE the scroller (never scrolls away). Pair it with
-//                Screen's `header` slot, or place it above a FlatList.
-//  • Responsive— logo width, gutters and gaps scale to the viewport, and the
-//                content is capped so it never over-stretches on tablets/web.
-//  • Dynamic   — pass `scrolled` (from useScrolled): the bar smoothly reveals a
-//                divider + shadow once content slides underneath, and a compact
-//                centered title fades in for context.
-//
-//   <AppHeader brand="store" search bag scrolled={scrolled} />           // tab
-//   <AppHeader brand="store" title="All products" showBack search bag /> // stack
-//   <AppHeader brand="company" title="Events" bell scrolled={scrolled} />
-// ---------------------------------------------------------------------------
-
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -30,9 +13,11 @@ import AnnouncementBar from './AnnouncementBar';
 import { useGlobalPromoVisible } from './GlobalPromoBanner';
 
 const LOGOS = {
-  company: require('../../assets/as-logo-clear.png'),
+  company: require('../../assets/as-logo.jpg'),
   store: require('../../assets/as-store-logo-clear.png')
 };
+
+const LOGO_ASPECT = { company: 1, store: 1.5 };
 
 export default function AppHeader({
   brand = 'store',
@@ -44,7 +29,7 @@ export default function AppHeader({
   bell = true,
   scrolled = false,
   announcement,
-  right // extra custom actions, rendered before the standard ones
+  right
 }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -54,12 +39,11 @@ export default function AppHeader({
 
   const dark = brand === 'store';
   const fg = dark ? theme.colors.textOnInverse : theme.colors.text;
-  // Responsive sizing: tighten on small phones, breathe on wide screens.
   const compact = width < 360;
-  const logoW = brand === 'company' ? (compact ? 104 : 128) : compact ? 96 : 116;
+  const logoH = compact ? 36 : 42;
+  const logoW = logoH * LOGO_ASPECT[brand];
   const gutter = width >= 620 ? theme.spacing['2xl'] : theme.layout.screenPadding;
 
-  // Dynamic divider/shadow — animate on the `scrolled` cross so it feels alive.
   const elev = useRef(new Animated.Value(scrolled ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(elev, { toValue: scrolled ? 1 : 0, duration: theme.timing.fast, useNativeDriver: false }).start();
@@ -82,23 +66,18 @@ export default function AppHeader({
           }
         ]}
       >
-        {/* Left: back button OR brand logo */}
         {showBack ? (
           <Pressable onPress={back} hitSlop={theme.layout.hitSlop} style={styles.side} accessibilityRole="button" accessibilityLabel="Go back">
             <Icon name="chevronLeft" size={26} color={fg} />
           </Pressable>
         ) : (
           <Pressable onPress={() => router.push(brand === 'company' ? '/company' : '/')} style={styles.brand} accessibilityRole="imagebutton" accessibilityLabel={brand === 'company' ? 'AS Company home' : 'AS Store home'}>
-            <Image source={LOGOS[brand]} style={{ width: logoW, height: 34 }} contentFit="contain" />
+            <Image source={LOGOS[brand]} style={{ width: logoW, height: logoH }} contentFit="contain" />
           </Pressable>
         )}
 
-        {/* Spacer keeps the actions pinned right regardless of the left zone. */}
         <View style={{ flex: 1 }} />
 
-        {/* Center: title, as a centered overlay so it stays optically centered
-            no matter the left/right widths. On stack screens it's the primary
-            label; on tab screens it fades in only once scrolled (extra context). */}
         {title ? (
           <Animated.View style={[styles.titleWrap, !showBack && { opacity: elev }]} pointerEvents="none">
             <Text variant="title" numberOfLines={1} style={{ color: fg, textAlign: 'center', maxWidth: '62%' }}>
@@ -164,7 +143,6 @@ const makeStyles = t => ({
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    // shadow (iOS) — opacity animated; Android uses `elevation`.
     shadowColor: '#0F1111',
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 }
