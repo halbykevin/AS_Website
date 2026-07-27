@@ -11,6 +11,7 @@ import ProductTile from '@/src/components/ProductTile';
 import ProductGrid from '@/src/components/ProductGrid';
 import HRail from '@/src/components/HRail';
 import CategoryWall from '@/src/components/store/CategoryWall';
+import useConfirmExit from '@/src/lib/useConfirmExit';
 
 const FEED_LIMIT = 48; // one bounded request feeds every section below
 const PREVIEW_COUNT = 8; // grid preview size — the rest lives in /category/all
@@ -38,6 +39,11 @@ export default function HomeScreen() {
   const newIn = useMemo(() => products.slice(0, 8), [products]);
   const deals = useMemo(() => products.filter(p => p.salePercent || (p.oldPrice && Number(p.oldPrice) > Number(p.price))).slice(0, 10), [products]);
   const preview = useMemo(() => products.slice(0, PREVIEW_COUNT), [products]);
+
+  // Home is the only screen where Android's back means "leave the app" — every
+  // other tab unwinds to here first, and pushed screens just pop. Must sit above
+  // the early return below so the hook order stays stable.
+  useConfirmExit();
 
   if (storeSettings && storeSettings.published === false) {
     return (

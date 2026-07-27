@@ -5,7 +5,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { useProducts, useCategories } from '@/src/lib/queries';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Skeleton, EmptyState, useScrolled } from '@/src/ui';
-import ProductTile from '@/src/components/ProductTile';
+import ProductTile, { productTileHeight } from '@/src/components/ProductTile';
 import AppHeader from '@/src/components/AppHeader';
 import CatalogToolbar from '@/src/components/store/CatalogToolbar';
 import { buildCatalogIndex, queryCatalog, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
@@ -15,7 +15,7 @@ const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, c
 
 export default function CategoryScreen() {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const params = useLocalSearchParams();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const { storeSettings } = useContent();
@@ -67,7 +67,24 @@ export default function CategoryScreen() {
   // One style object for every cell, rebuilt only when the density changes —
   // an inline literal here allocates a fresh object per tile per render, which
   // also defeats RN's style diffing on a list this long.
-  const cellStyle = useMemo(() => ({ flex: 1 / columns, maxWidth: `${100 / columns}%` }), [columns]);
+  //
+  // The row gap lives here as a margin rather than as `gap` on the content
+  // container: VirtualizedList puts spacer views around the rendered window, and
+  // a container `gap` spaces those too, which would drift the real offsets away
+  // from what getItemLayout promises.
+  const rowGap = theme.spacing.md;
+  const cellStyle = useMemo(() => ({ flex: 1 / columns, maxWidth: `${100 / columns}%`, marginBottom: rowGap }), [columns, rowGap]);
+
+  // Every tile is the same height by construction (see productTileHeight), so
+  // the grid can tell FlatList each row's size up front instead of measuring
+  // ~1370 cells while you scroll.
+  //
+  // NOTE: with numColumns > 1, FlatList reports Math.ceil(items / numColumns) to
+  // VirtualizedList and passes getItemLayout straight through — so `i` here is
+  // the ROW index, not the item index. Treating it as an item index silently
+  // corrupts every scroll offset.
+  const rowHeight = useMemo(() => productTileHeight(fontScale) + rowGap, [fontScale, rowGap]);
+  const getItemLayout = useCallback((_, i) => ({ length: rowHeight, offset: rowHeight * i, index: i }), [rowHeight]);
 
   const renderItem = useCallback(
     ({ item }) => (
@@ -117,11 +134,11 @@ export default function CategoryScreen() {
         columnWrapperStyle={columns > 1 ? { gap: theme.spacing.md } : undefined}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        getItemLayout={getItemLayout}
         contentContainerStyle={{
           paddingHorizontal: theme.layout.screenPadding,
           paddingTop: theme.spacing.md,
-          paddingBottom: theme.spacing['4xl'],
-          gap: theme.spacing.md
+          paddingBottom: theme.spacing['4xl']
         }}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}

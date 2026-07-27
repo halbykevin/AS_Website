@@ -4,7 +4,7 @@
 // fills its grid column; otherwise it's a fixed-width rail card.
 
 import { memo, useMemo } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
@@ -15,10 +15,48 @@ import Button from '@/src/ui/Button';
 import Badge from '@/src/ui/Badge';
 import RemoteImage from './RemoteImage';
 
+// --- Fixed geometry ----------------------------------------------------------
+// The tile is a FIXED height so the catalog grid can hand FlatList a
+// getItemLayout and stop measuring every one of ~1370 cells as it scrolls.
+// That only holds if nothing inside can change height, so the two things that
+// could are pinned: the text block always reserves its maximum (brand line +
+// 2-line name + 2-line teaser), and the colour dots — the one conditional row —
+// moved to an overlay on the image.
+//
+// Heights that come from text are multiplied by the OS font scale rather than
+// capped with maxFontSizeMultiplier: someone who has turned their system text
+// up still gets it, and the grid reads the same fontScale from
+// useWindowDimensions(), so the tile and getItemLayout can never disagree.
+const IMAGE_H = 130;
+const BUTTON_MIN_H = 36;
+
+// Line heights from the type scale (tokens.js): overline 14, title 23,
+// caption 16, callout 20 (the button's label).
+const textBlockHeight = f => Math.ceil(14 * f) + 2 + Math.ceil(23 * f) * 2 + 2 + Math.ceil(16 * f) * 2;
+
+export function productTileHeight(fontScale = 1) {
+  const f = Math.max(1, fontScale || 1);
+  const price = Math.ceil(23 * f); // one line, sale row or "From $x"
+  const button = Math.max(BUTTON_MIN_H, Math.ceil(20 * f) + 16); // label + 8pt padding
+  return (
+    2 + // top + bottom hairline border
+    12 + // card padding top
+    textBlockHeight(f) +
+    8 +
+    IMAGE_H + // imageWrap marginTop + height
+    12 +
+    price +
+    8 +
+    button + // footer marginTop + price + button marginTop + button
+    12 // card padding bottom
+  );
+}
+
 function ProductTile({ product, fluid = false, width }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const dispatch = useDispatch();
+  const { fontScale } = useWindowDimensions();
   const { id, name, tagline, price, image, colors = [], brand, slug } = product;
 
   const priceNum = Number(price) || 0;
@@ -43,10 +81,10 @@ function ProductTile({ product, fluid = false, width }) {
   const add = () => dispatch(addItem({ id, title: name, image, price: priceNum, slug }));
 
   return (
-    <View style={[styles.card, fluid ? { width: '100%' } : { width: width || 260 }]}>
+    <View style={[styles.card, { height: productTileHeight(fontScale) }, fluid ? { width: '100%' } : { width: width || 260 }]}>
       {onSale ? <Badge label={`−${pct}%`} tone="primary" style={styles.saleBadge} /> : null}
 
-      <Pressable onPress={open} style={styles.textBlock}>
+      <Pressable onPress={open} style={[styles.textBlock, { height: textBlockHeight(Math.max(1, fontScale || 1)) }]}>
         <Text variant="overline" color="primary" numberOfLines={1}>
           {(brand || 'New').toUpperCase()}
         </Text>
@@ -62,17 +100,19 @@ function ProductTile({ product, fluid = false, width }) {
 
       <Pressable onPress={open} style={styles.imageWrap}>
         <RemoteImage uri={image} style={styles.image} contentFit="contain" fallbackIcon="box" />
-      </Pressable>
-
-      <View style={styles.footer}>
+        {/* Overlaid rather than stacked in the footer: as a flow row it was the
+            only part of the tile that appeared conditionally, which made the
+            height vary and getItemLayout impossible. */}
         {colors.length > 0 ? (
-          <View style={styles.dots}>
+          <View style={styles.dots} pointerEvents="none">
             {colors.slice(0, 5).map((c, i) => (
               <View key={i} style={[styles.dot, { backgroundColor: c }]} />
             ))}
           </View>
         ) : null}
+      </Pressable>
 
+      <View style={styles.footer}>
         {onSale ? (
           <View style={styles.priceRow}>
             <Text variant="title" color="primary">
@@ -102,17 +142,18 @@ const makeStyles = t => ({
     ...t.shadows.card
   },
   saleBadge: { position: 'absolute', right: t.spacing.md, top: t.spacing.md, zIndex: 2 },
-  textBlock: { minHeight: 72 },
+  // Height is set inline from the font scale — see productTileHeight.
+  textBlock: { overflow: 'hidden' },
   imageWrap: {
     marginTop: t.spacing.sm,
-    height: 130,
+    height: IMAGE_H,
     borderRadius: t.radii.xl,
     overflow: 'hidden',
     backgroundColor: t.colors.surfaceAlt
   },
   image: { width: '100%', height: '100%' },
   footer: { marginTop: t.spacing.md },
-  dots: { flexDirection: 'row', gap: 6, marginBottom: t.spacing.sm },
+  dots: { position: 'absolute', left: t.spacing.sm, bottom: t.spacing.sm, flexDirection: 'row', gap: 6 },
   dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.spacing.sm },
   strike: { textDecorationLine: 'line-through' }
