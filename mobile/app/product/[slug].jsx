@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { useProduct } from '@/src/lib/queries';
@@ -8,14 +8,20 @@ import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion } from '@/src/ui';
+import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion, Markdown } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+// Below this the spec table's two columns get too narrow to read and it stacks
+// each row instead. Measured against the tightest phone we support (320pt),
+// which leaves ~248pt inside the screen gutters and the card's own padding.
+const SPEC_STACK_BELOW = 360;
 
 export default function ProductDetailScreen() {
   const theme = useTheme();
+  // Read live rather than captured at import: the gallery pages are sized from
+  // it, so a rotation or a foldable unfolding has to re-page them.
+  const { width: screenWidth } = useWindowDimensions();
   const { slug } = useLocalSearchParams();
   const { data: product, isLoading } = useProduct(slug);
   const { storeSettings } = useContent();
@@ -48,7 +54,7 @@ export default function ProductDetailScreen() {
       <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
         <Header title="Product" />
         <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.lg }}>
-          <Skeleton height={SCREEN_W * 0.9} radius="2xl" />
+          <Skeleton height={screenWidth * 0.9} radius="2xl" />
           <Skeleton height={24} width="70%" />
           <Skeleton height={18} width="40%" />
         </View>
@@ -77,7 +83,7 @@ export default function ProductDetailScreen() {
     dispatch(addItem({ id: product.id, title: product.name, image: product.image || images[0], price: priceNum, slug: product.slug }));
   };
 
-  const galleryWidth = Math.min(SCREEN_W, theme.layout.maxContentWidth);
+  const galleryWidth = Math.min(screenWidth, theme.layout.maxContentWidth);
 
   return (
     <Screen
@@ -192,28 +198,21 @@ export default function ProductDetailScreen() {
             rather than a wall of rows; both are one prop to flip. */}
         {description ? (
           <Accordion title="Description" defaultExpanded>
-            <Text variant="body" muted>
-              {description}
-            </Text>
+            {/* Catalog copy is light markdown — headings and bullet lists — so
+                it goes through the renderer rather than into one flat string. */}
+            <Markdown text={description} />
           </Accordion>
         ) : null}
 
         {/* Specs */}
         {specs.length ? (
           <Accordion title="Specifications" count={specs.length}>
-            <View style={{ gap: theme.spacing.sm }}>
+            <View>
               {specs.map((s, i) => (
                 <View key={`${s.label}-${i}`}>
-                  {i > 0 ? <Divider style={{ marginBottom: theme.spacing.sm }} /> : null}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.lg }}>
-                    {s.label ? (
-                      <Text variant="callout" muted style={{ flex: 1 }}>
-                        {s.label}
-                      </Text>
-                    ) : null}
-                    <Text variant="callout" style={{ flex: 1, textAlign: s.label ? 'right' : 'left' }}>
-                      {s.value}
-                    </Text>
+                  {i > 0 ? <Divider /> : null}
+                  <View style={{ paddingVertical: theme.spacing.sm }}>
+                    <SpecRow label={s.label} value={s.value} stacked={screenWidth < SPEC_STACK_BELOW} />
                   </View>
                 </View>
               ))}
@@ -227,6 +226,41 @@ export default function ProductDetailScreen() {
 
       <ImageViewer images={images} index={viewerAt ?? 0} visible={viewerAt !== null} onClose={closeViewer} />
     </Screen>
+  );
+}
+
+// One row of the spec table. Side by side the label takes a fixed share and the
+// value claims the rest, right-aligned — an even 50/50 split left short labels
+// like "Color" swimming in space while values like "Apple M5 Pro – 18‑Core CPU"
+// wrapped to three ragged right-aligned lines. On a narrow screen there isn't
+// room for two columns at all, so the label sits above the value instead.
+function SpecRow({ label, value, stacked }) {
+  const theme = useTheme();
+
+  if (!label) {
+    return <Text variant="callout">{value}</Text>;
+  }
+
+  if (stacked) {
+    return (
+      <View style={{ gap: 2 }}>
+        <Text variant="caption" muted>
+          {label}
+        </Text>
+        <Text variant="callout">{value}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.lg }}>
+      <Text variant="callout" muted style={{ flexGrow: 0, flexShrink: 1, flexBasis: '38%' }}>
+        {label}
+      </Text>
+      <Text variant="callout" style={{ flex: 1, textAlign: 'right' }}>
+        {value}
+      </Text>
+    </View>
   );
 }
 

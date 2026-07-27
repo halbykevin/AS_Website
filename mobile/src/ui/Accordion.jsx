@@ -1,36 +1,39 @@
-// A collapsible section that animates its own height. Wrap anything in it:
+// A collapsible section. Wrap anything in it:
 //
 //   <Accordion title="Specifications" count={7}>…</Accordion>
 //   <Accordion title="Description" defaultExpanded>…</Accordion>
 //   <Accordion title="Filters" expanded={open} onChange={setOpen} />   // controlled
 //
-// How the height animation works, since it is the part that usually goes wrong.
-// You cannot animate to 'auto', so the content's natural height has to be
-// measured — but a collapsed section is clipped to 0, and content inside a
-// zero-height box measures 0. Ask it how tall it is and it says 0, the height
-// stays 0, and the section never opens.
+// The body is shown and hidden with `display: 'none'`, NOT by animating its
+// height, and that choice is the whole point of this file.
 //
-// So there are two phases. Until the height is known the body is taken OUT of
-// flow and made invisible: it lays out at full size (so onLayout reports a real
-// number) while occupying no space and being unseen — no flash, no layout
-// shift. Once measured, the body returns to normal flow and its height is
-// driven 0 -> measured on the UI thread. Because measurement is continuous,
-// the section also resizes itself when its content reflows (a font-scale
-// change, a late-loading value): onLayout simply fires again with a new number.
+// Animating height means knowing the height, and you cannot animate to 'auto' —
+// so the natural size has to be measured with onLayout and fed back in. That
+// measurement is a trap: whatever number the first layout pass happens to
+// report becomes the height, and once a definite height is applied the content
+// sits inside a box that no longer changes size, so onLayout never fires again
+// and there is no second chance. A first pass that lands before the children
+// contribute anything locks the section at its padding — a header, a sliver of
+// empty card, and content you can never reach. That is exactly what this
+// component used to do.
+//
+// `display: 'none'` has no such failure mode. Yoga drops the subtree from
+// layout entirely when closed and gives it its full natural height when open,
+// every time, with nothing measured in JS and nothing to get stuck at. The
+// height change is then animated natively by `LinearTransition`, which measures
+// on the UI thread — and if that ever no-ops, the section still opens correctly
+// and simply snaps. Correctness does not depend on the animation.
 //
 // Details that matter and are easy to miss:
 //  • Collapsed content is hidden from screen readers and made untappable.
-//    Clipping is only visual — without this, VoiceOver/TalkBack happily read a
-//    "hidden" section and its buttons stay reachable.
-//  • `useReducedMotion` snaps instead of animating for anyone who asked the OS
-//    for less motion.
-//  • The first measurement of an initially-expanded section is applied without
-//    animating, so the screen doesn't open with a section sliding down.
-//  • `lazy` leaves heavy content unmounted until the first expand.
+//  • `useReducedMotion` drops the animations for anyone who asked the OS for
+//    less motion.
+//  • `lazy` leaves heavy content unmounted until the first expand. Without it
+//    the children stay mounted while closed, so they keep their own state.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from './Text';
 import Icon from './Icon';
@@ -66,35 +69,18 @@ export default function Accordion({
 
   // Mount gate for `lazy`: once opened, stay mounted so reopening is instant.
   // Flipped during render rather than in an effect so the children mount in the
-  // SAME commit that opens the section — an effect would run a frame later, and
-  // the height animation would start against a measurement taken while the
-  // content was still empty, producing a visible pop.
+  // SAME commit that opens the section, not a frame later.
   const [everOpened, setEverOpened] = useState(!lazy || defaultExpanded);
   if (open && !everOpened) setEverOpened(true);
 
+  // Drives the chevron and the body's fade — opacity and transform only. Both
+  // are cheap, non-layout props, so nothing here can affect whether the content
+  // is laid out at the right size.
   const progress = useSharedValue(open ? 1 : 0);
-  const contentHeight = useSharedValue(0);
-  // Also in React state, because it decides which style the body renders with —
-  // that is a render-time choice and a shared value can't drive it.
-  const [measuredHeight, setMeasuredHeight] = useState(0);
-  const measuring = measuredHeight === 0;
 
   useEffect(() => {
     progress.value = reduceMotion ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: DURATION, easing: EASING });
   }, [open, reduceMotion, progress]);
-
-  const onContentLayout = useCallback(
-    e => {
-      const h = e.nativeEvent.layout.height;
-      if (h <= 0 || Math.abs(h - contentHeight.value) < 0.5) return;
-      // Written straight to the shared value as well as to state: the effect
-      // that would otherwise sync it runs a frame later, and the body would
-      // render its first animated frame against a height of 0.
-      contentHeight.value = h;
-      setMeasuredHeight(h);
-    },
-    [contentHeight]
-  );
 
   const toggle = useCallback(() => {
     if (disabled) return;
@@ -103,17 +89,18 @@ export default function Accordion({
     onChange?.(next);
   }, [disabled, open, isControlled, onChange]);
 
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: progress.value * contentHeight.value,
-    // Fades slightly ahead of the height so the text doesn't appear to be
-    // squeezed out of existence.
-    opacity: progress.value
-  }));
-
+  const bodyStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
   const chevronStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${progress.value * 180}deg` }] }));
 
   return (
-    <View style={[variant === 'card' ? styles.card : styles.plain, style]} testID={testID}>
+    <Animated.View
+      style={[variant === 'card' ? styles.card : styles.plain, style]}
+      // Eases the card between its closed and open size. Reanimated measures
+      // both natively, so unlike an onLayout round-trip there is no number for
+      // this component to hold on to and get wrong.
+      layout={reduceMotion ? undefined : LinearTransition.duration(DURATION)}
+      testID={testID}
+    >
       <Pressable
         onPress={toggle}
         disabled={disabled}
@@ -127,7 +114,7 @@ export default function Accordion({
 
         <View style={styles.titleWrap}>
           <View style={styles.titleRow}>
-            <Text variant="title" numberOfLines={1} style={styles.title}>
+            <Text variant="title" numberOfLines={2} style={styles.title}>
               {title}
             </Text>
             {count != null ? (
@@ -139,7 +126,7 @@ export default function Accordion({
             ) : null}
           </View>
           {subtitle ? (
-            <Text variant="caption" muted numberOfLines={1} style={{ marginTop: 2 }}>
+            <Text variant="caption" muted numberOfLines={2} style={styles.subtitle}>
               {subtitle}
             </Text>
           ) : null}
@@ -151,32 +138,21 @@ export default function Accordion({
         </Animated.View>
       </Pressable>
 
-      {/* Two phases, because a collapsed section cannot measure itself.
-
-          Until the content's natural height is known the body is taken OUT of
-          flow and made invisible: it still lays out at full size, so onLayout
-          reports a real number, but it occupies no space and cannot be seen —
-          no flash, no layout shift. Once the height is in, the body returns to
-          normal flow and is driven by the animation.
-
-          The first version of this clipped the content to height 0 and then
-          asked it how tall it was. It answered 0, so the height stayed 0 and
-          nothing ever appeared. */}
+      {/* `hidden` sets display:none, which takes the subtree out of layout
+          without constraining it. Open, it is an ordinary in-flow view at its
+          own full height — the content is never clipped to a remembered
+          number. The animated style only touches opacity. */}
       <Animated.View
-        style={[styles.body, measuring ? styles.measuring : bodyStyle]}
-        pointerEvents={open && !measuring ? 'auto' : 'none'}
+        style={[bodyStyle, open ? null : styles.hidden]}
+        pointerEvents={open ? 'auto' : 'none'}
+        // display:none already removes it, but a closed section must not be
+        // reachable by VoiceOver/TalkBack on any platform.
+        accessibilityElementsHidden={!open}
+        importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
       >
-        <View
-          onLayout={onContentLayout}
-          // Clipping is visual only — assistive tech would still reach in.
-          accessibilityElementsHidden={!open}
-          importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
-          style={[styles.content, contentStyle]}
-        >
-          {everOpened ? children : null}
-        </View>
+        <View style={[styles.content, contentStyle]}>{everOpened ? children : null}</View>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -204,18 +180,21 @@ const makeStyles = t => ({
 
   titleWrap: { flex: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm },
+  // Shrinks so a long title wraps instead of shoving the count pill and the
+  // chevron off the edge of a narrow screen.
   title: { flexShrink: 1 },
+  subtitle: { marginTop: 2 },
   count: {
     minWidth: 22,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: t.radii.pill,
     backgroundColor: t.colors.surfaceAlt,
-    alignItems: 'center'
+    alignItems: 'center',
+    // Never squeezed by a long title — it is two or three characters wide.
+    flexShrink: 0
   },
 
-  body: { overflow: 'hidden' },
-  // Measuring pass: laid out at natural size, out of flow, invisible.
-  measuring: { position: 'absolute', left: 0, right: 0, opacity: 0 },
-  content: { paddingHorizontal: t.spacing.lg, paddingBottom: t.spacing.lg }
+  hidden: { display: 'none' },
+  content: { paddingHorizontal: t.spacing.lg, paddingTop: t.spacing.xs, paddingBottom: t.spacing.lg }
 });

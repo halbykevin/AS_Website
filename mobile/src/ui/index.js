@@ -7,6 +7,7 @@ export { default as Chip } from './Chip';
 export { default as Divider } from './Divider';
 export { default as Header } from './Header';
 export { default as Icon } from './Icon';
+export { default as Markdown } from './Markdown';
 export { default as SectionHeader } from './SectionHeader';
 export { default as Skeleton } from './Skeleton';
 export { default as EmptyState } from './EmptyState';
