@@ -7,7 +7,18 @@
 // Kept out of catalogFilters.js on purpose: applyFilters stays pure and
 // allocation-free, and all the tracing lives here.
 
-export const FILTER_DEBUG = true;
+// OFF by default — flip to true only while chasing a filter bug, and put it
+// back before committing.
+//
+// This is not free tracing. A single filter toggle fires logApply + logDraft +
+// logFilterResult, and logFilterResult rebuilds its report with `filterStats`,
+// which walks the whole catalog five more times (including re-slugifying every
+// brand) purely to say what got rejected. On /category/all that is ~0.8ms of
+// extra compute — but the real cost is three console.log calls of nested
+// objects crossing the RN bridge on every single interaction, which is what
+// made applying a filter feel like the app had hung. It was shipping `true`, so
+// preview and production builds paid for it too.
+export const FILTER_DEBUG = false;
 
 const slugify = s =>
   String(s || '')

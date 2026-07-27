@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -10,6 +10,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
+import ImageViewer from '@/src/components/ImageViewer';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -21,6 +22,12 @@ export default function ProductDetailScreen() {
   const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
   const [active, setActive] = useState(0);
+  // Index of the photo the lightbox is showing; null when it's closed. The
+  // close handler is memoised because the viewer feeds it into its gesture
+  // definitions — a fresh identity each render would reattach the native
+  // handlers underneath a live pinch.
+  const [viewerAt, setViewerAt] = useState(null);
+  const closeViewer = useCallback(() => setViewerAt(null), []);
 
   const inCart = items.find(i => i.id === product?.id)?.qty || 0;
   const atCap = inCart >= MAX_QTY;
@@ -91,11 +98,26 @@ export default function ProductDetailScreen() {
       <View>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e => setActive(Math.round(e.nativeEvent.contentOffset.x / galleryWidth))}>
           {(images.length ? images : ['']).map((img, i) => (
-            <View key={i} style={{ width: galleryWidth, aspectRatio: 1, backgroundColor: theme.colors.surfaceAlt }}>
+            <Pressable
+              key={i}
+              onPress={() => img && setViewerAt(i)}
+              disabled={!img}
+              style={{ width: galleryWidth, aspectRatio: 1, backgroundColor: theme.colors.surfaceAlt }}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={`${product.name}, photo ${i + 1} of ${images.length || 1}`}
+              accessibilityHint="Opens full screen, where you can zoom"
+            >
               <RemoteImage uri={img} style={{ width: '100%', height: '100%' }} contentFit="contain" fallbackIcon="box" />
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
+
+        {/* Tapping a photo isn't discoverable on its own, so say so quietly. */}
+        {images.length ? (
+          <View style={{ position: 'absolute', right: theme.spacing.md, top: theme.spacing.md, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.alpha(theme.colors.text, 0.08) }} pointerEvents="none">
+            <Icon name="expand" size={17} color={theme.colors.textMuted} />
+          </View>
+        ) : null}
         {images.length > 1 ? (
           <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: theme.spacing.md }}>
             {images.map((_, i) => (
@@ -198,6 +220,8 @@ export default function ProductDetailScreen() {
         {/* Larger quantities via WhatsApp (mirrors the store's max-qty note) */}
         {atCap && storeSettings?.contact?.whatsapp ? <Button variant="ghost" icon="whatsapp" label="Need more? Order on WhatsApp" onPress={() => openUrl(whatsappChatUrl(storeSettings.contact.whatsapp, `Hi, I'd like to order more of: ${product.name}`))} fullWidth /> : null}
       </View>
+
+      <ImageViewer images={images} index={viewerAt ?? 0} visible={viewerAt !== null} onClose={closeViewer} />
     </Screen>
   );
 }

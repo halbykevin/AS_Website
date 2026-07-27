@@ -15,19 +15,19 @@ import SortSheet from './SortSheet';
 import FilterSheet from './FilterSheet';
 import { activeFilterCount } from '@/src/lib/catalogFilters';
 
-export default function CatalogToolbar({ total = 0, loading = false, sort, filters, facets, bounds, products = [], showCategory = true, onSortChange, onFiltersChange }) {
+export default function CatalogToolbar({ total = 0, loading = false, sort, filters, facets, bounds, index = [], showCategory = true, onSortChange, onFiltersChange }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const sheet = useSheet();
   const activeCount = activeFilterCount(filters);
 
   // Every section of the filter panel is derived from the loaded catalog — the
-  // category/brand facets and the price bounds all come out of `products`.
-  // Opened too early it renders with those sections missing and a "No matches"
-  // CTA, so the button stays disabled until there is something to filter.
-  // Gated on the SOURCE list, not the filtered one: a filter that matches
-  // nothing must still leave you a way back in to clear it.
-  const ready = !loading && products.length > 0;
+  // category/brand facets and the price bounds all come out of it. Opened too
+  // early it renders with those sections missing and a "No matches" CTA, so the
+  // button stays disabled until there is something to filter. Gated on the
+  // SOURCE list, not the filtered one: a filter that matches nothing must still
+  // leave you a way back in to clear it.
+  const ready = !loading && index.length > 0;
 
   const hasFacets = (showCategory && facets?.categories?.length > 0) || facets?.brands?.length > 0;
   const hasPrice = bounds?.max > bounds?.min;
@@ -46,7 +46,7 @@ export default function CatalogToolbar({ total = 0, loading = false, sort, filte
     const groups = 1 + (hasFacets ? 1 : 0) + (hasPrice ? 1 : 0);
     sheet.open({
       snapPoints: [groups >= 3 ? '68%' : groups === 2 ? '56%' : '44%'],
-      render: ({ close }) => <FilterSheet facets={facets} bounds={bounds} products={products} initial={filters} showCategory={showCategory} onApply={onFiltersChange} onClose={close} />
+      render: ({ close }) => <FilterSheet facets={facets} bounds={bounds} index={index} initial={filters} showCategory={showCategory} onApply={onFiltersChange} onClose={close} />
     });
   };
 

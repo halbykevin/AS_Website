@@ -8,7 +8,7 @@ import { Screen, Text, Skeleton, EmptyState, useScrolled } from '@/src/ui';
 import ProductTile from '@/src/components/ProductTile';
 import AppHeader from '@/src/components/AppHeader';
 import CatalogToolbar from '@/src/components/store/CatalogToolbar';
-import { applyFilters, sortProducts, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
+import { buildCatalogIndex, queryCatalog, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
 import { logCatalogLoad, logFacets, logFilterResult } from '@/src/lib/filterDebug';
 
 const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
@@ -45,7 +45,9 @@ export default function CategoryScreen() {
   // On a single category page the category facet is redundant, so hide it there.
   const showCategory = isAll && facets.categories.length > 1;
 
-  const visible = useMemo(() => sortProducts(applyFilters(products, filters), sort), [products, filters, sort]);
+  // Derived once per loaded catalog; every subsequent filter/sort reads it.
+  const index = useMemo(() => buildCatalogIndex(products), [products]);
+  const visible = useMemo(() => queryCatalog(index, filters, sort), [index, filters, sort]);
 
   const columns = resolveColumns(filters.cols, width);
 
@@ -62,13 +64,18 @@ export default function CategoryScreen() {
     logFilterResult(`category/${slug}`, products, filters, visible.length);
   }, [products, filters, visible.length, slug]);
 
+  // One style object for every cell, rebuilt only when the density changes —
+  // an inline literal here allocates a fresh object per tile per render, which
+  // also defeats RN's style diffing on a list this long.
+  const cellStyle = useMemo(() => ({ flex: 1 / columns, maxWidth: `${100 / columns}%` }), [columns]);
+
   const renderItem = useCallback(
     ({ item }) => (
-      <View style={{ flex: 1 / columns, maxWidth: `${100 / columns}%` }}>
+      <View style={cellStyle}>
         <ProductTile product={item} fluid />
       </View>
     ),
-    [columns]
+    [cellStyle]
   );
   const keyExtractor = useCallback(item => String(item.id), []);
 
@@ -82,7 +89,7 @@ export default function CategoryScreen() {
           {category.tagline}
         </Text>
       ) : null}
-      <CatalogToolbar total={visible.length} loading={isLoading} sort={sort} filters={filters} facets={facets} bounds={bounds} products={products} showCategory={showCategory} onSortChange={setSort} onFiltersChange={setFilters} />
+      <CatalogToolbar total={visible.length} loading={isLoading} sort={sort} filters={filters} facets={facets} bounds={bounds} index={index} showCategory={showCategory} onSortChange={setSort} onFiltersChange={setFilters} />
     </View>
   );
 

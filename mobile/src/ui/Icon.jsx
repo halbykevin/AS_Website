@@ -24,6 +24,7 @@ const MAP = {
   // nav / chrome
   menu: 'menu',
   close: 'close',
+  expand: 'expand-outline',
   chevronRight: 'chevron-forward',
   chevronLeft: 'chevron-back',
   chevronDown: 'chevron-down',

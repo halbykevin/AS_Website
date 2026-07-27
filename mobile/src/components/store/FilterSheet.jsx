@@ -20,12 +20,12 @@ import Text from '@/src/ui/Text';
 import Icon from '@/src/ui/Icon';
 import Button from '@/src/ui/Button';
 import DensityToggle from './DensityToggle';
-import { applyFilters, activeFilterCount } from '@/src/lib/catalogFilters';
+import { countCatalog, activeFilterCount } from '@/src/lib/catalogFilters';
 import { logSheet, logPick, logDraft, logApply } from '@/src/lib/filterDebug';
 
 const EMPTY = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
 
-export default function FilterSheet({ facets, bounds, products = [], initial, showCategory = true, onApply, onClose }) {
+export default function FilterSheet({ facets, bounds, index = [], initial, showCategory = true, onApply, onClose }) {
   const styles = useThemedStyles(makeStyles);
   const sheet = useSheet();
   const [draft, setDraft] = useState(() => ({ ...EMPTY, ...initial }));
@@ -60,14 +60,16 @@ export default function FilterSheet({ facets, bounds, products = [], initial, sh
   const hasCategory = showCategory && facets.categories.length > 0;
   const hasBrand = facets.brands.length > 0;
 
-  const count = useMemo(() => applyFilters(products, draft).length, [products, draft]);
+  // Counts off the index without materialising the filtered array — this reruns
+  // on every draft change and only ever needed the number.
+  const count = useMemo(() => countCatalog(index, draft), [index, draft]);
   const activeCount = activeFilterCount(draft);
 
   // Mount/unmount tracing: if this sheet unmounts while the nested Category or
   // Brand picker is open, the pick lands on a dead component and silently does
   // nothing — which looks exactly like "the filter doesn't work".
   useEffect(() => {
-    logSheet('FilterSheet mounted', { initial, products: products.length, showCategory });
+    logSheet('FilterSheet mounted', { initial, products: index.length, showCategory });
     return () => logSheet('FilterSheet UNMOUNTED');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
