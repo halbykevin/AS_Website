@@ -8,7 +8,7 @@ import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
-import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState } from '@/src/ui';
+import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
 
@@ -187,23 +187,20 @@ export default function ProductDetailScreen() {
         <Divider />
 
         {/* Description */}
+        {/* Description opens by default — it's what the shopper came to read.
+            Specifications stay closed so the page below the fold is scannable
+            rather than a wall of rows; both are one prop to flip. */}
         {description ? (
-          <View>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
-              Description
-            </Text>
+          <Accordion title="Description" defaultExpanded>
             <Text variant="body" muted>
               {description}
             </Text>
-          </View>
+          </Accordion>
         ) : null}
 
         {/* Specs */}
         {specs.length ? (
-          <View>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
-              Specifications
-            </Text>
+          <Accordion title="Specifications" count={specs.length}>
             <View style={{ gap: theme.spacing.sm }}>
               {specs.map((s, i) => (
                 <View key={`${s.label}-${i}`}>
@@ -221,7 +218,7 @@ export default function ProductDetailScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </Accordion>
         ) : null}
 
         {/* Larger quantities via WhatsApp (mirrors the store's max-qty note) */}

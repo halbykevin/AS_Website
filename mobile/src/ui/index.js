@@ -13,5 +13,6 @@ export { default as EmptyState } from './EmptyState';
 export { Input, Field } from './Input';
 export { default as Switch } from './Switch';
 export { default as RangeSlider } from './RangeSlider';
+export { default as Accordion } from './Accordion';
 export { default as useScrolled } from './useScrolled';
 export { SheetProvider, SheetHost, useSheet, SheetScaffold, SheetPressable } from './sheet';
