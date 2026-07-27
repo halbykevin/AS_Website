@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import { addItem } from '@/src/store/cartSlice';
-import { money } from '@/src/lib/format';
+import { money, cleanDescription } from '@/src/lib/format';
 import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
 import Badge from '@/src/ui/Badge';
@@ -64,10 +64,12 @@ function ProductTile({ product, fluid = false, width }) {
   const onSale = Boolean(oldPrice) && oldPrice > priceNum;
   const pct = onSale ? product.salePercent || Math.round((1 - priceNum / oldPrice) * 100) : 0;
 
-  // Teaser: first real paragraph of the description, else the tagline.
+  // Teaser: first real paragraph of the description, else the tagline. Cleaned
+  // first — the raw copy can carry citation markers and URLs, and a two-line
+  // clamp full of "[2](https://…" is worse than no teaser at all.
   const teaser = useMemo(() => {
     return (
-      String(product.description || '')
+      cleanDescription(product.description)
         .split(/\n{2,}/)
         .map(b => b.trim())
         .find(b => b && !b.startsWith('#') && !b.startsWith('-') && !b.startsWith('*'))

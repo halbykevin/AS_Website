@@ -4,7 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { useProduct } from '@/src/lib/queries';
 import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice';
-import { money } from '@/src/lib/format';
+import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
@@ -37,6 +37,11 @@ export default function ProductDetailScreen() {
     const list = Array.isArray(product.images) && product.images.length ? product.images : [product.image].filter(Boolean);
     return list;
   }, [product]);
+
+  // The API sends specs as [label, value] pairs and descriptions that can carry
+  // citation markers and raw URLs — normalise both before they reach the render.
+  const specs = useMemo(() => normalizeSpecs(product?.specs), [product?.specs]);
+  const description = useMemo(() => cleanDescription(product?.description), [product?.description]);
 
   if (isLoading) {
     return (
@@ -182,33 +187,35 @@ export default function ProductDetailScreen() {
         <Divider />
 
         {/* Description */}
-        {product.description ? (
+        {description ? (
           <View>
             <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
               Description
             </Text>
             <Text variant="body" muted>
-              {product.description}
+              {description}
             </Text>
           </View>
         ) : null}
 
         {/* Specs */}
-        {Array.isArray(product.specs) && product.specs.length ? (
+        {specs.length ? (
           <View>
             <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
               Specifications
             </Text>
             <View style={{ gap: theme.spacing.sm }}>
-              {product.specs.map((s, i) => (
-                <View key={i}>
+              {specs.map((s, i) => (
+                <View key={`${s.label}-${i}`}>
                   {i > 0 ? <Divider style={{ marginBottom: theme.spacing.sm }} /> : null}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.lg }}>
-                    <Text variant="callout" muted style={{ flex: 1 }}>
-                      {s.label || s.name || s.key}
-                    </Text>
-                    <Text variant="callout" style={{ flex: 1, textAlign: 'right' }}>
-                      {s.value ?? (typeof s === 'string' ? s : '')}
+                    {s.label ? (
+                      <Text variant="callout" muted style={{ flex: 1 }}>
+                        {s.label}
+                      </Text>
+                    ) : null}
+                    <Text variant="callout" style={{ flex: 1, textAlign: s.label ? 'right' : 'left' }}>
+                      {s.value}
                     </Text>
                   </View>
                 </View>
