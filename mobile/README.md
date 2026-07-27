@@ -243,16 +243,33 @@ npm run web        # run in the browser
   maps the app's semantic icon names.
 - **Images:** `expo-image` via `src/components/RemoteImage.jsx` (caching +
   branded fallback).
-- **Splash:** `assets/as-logo-full-clear.png` — the full brand lockup with the
-  flat `#F7F7F7` studio backdrop keyed out, so it sits on the white splash
-  without a grey card behind it. Source of truth is `as-logo-full.png`; the
-  `-clear` suffix means "background removed", same as `as-logo-clear.png`.
-  `imageWidth` is **per platform on purpose**: expo centres the logo on a 288dp
-  canvas and hands it to Android 12's `windowSplashScreenAnimatedIcon`, which
-  only shows the inner **192dp circle** — the lockup's widest ink sits at
-  `0.527 x imageWidth` from centre, so anything over **182dp clips "COMPPANY"**
-  on Android. iOS draws the same image into a plain centred aspect-fit frame
-  with no mask, so it gets the roomier 260dp. Re-measure that ratio if the
-  artwork changes.
+- **App icon / splash / favicon:** all four are generated from one master,
+  `assets/as-logo.jpg` (512x512, circular badge on pure `#FFFFFF`, ink spanning
+  **91%** of the canvas). Keep that file as the source of truth and regenerate
+  rather than hand-editing the PNGs:
+  - `icon.png` (1024) and `favicon.png` (512) — full-bleed. The badge's widest
+    ink sits at the edge *midpoints*, which clear iOS's squircle mask, so no
+    padding is needed.
+  - `adaptive-icon.png` (1024) — Android masks an adaptive foreground down to a
+    centred circle of roughly **61%** of the canvas, so here the logo is scaled
+    to **60%**; at full bleed the "ABSOLUTE SOLUTIONS SAL" line is cut off.
+  - `splash-icon.png` (1024) — full-bleed, on the white `backgroundColor`.
+    `imageWidth` is now a **single value for both platforms**: expo centres the
+    logo on a 288dp canvas and hands it to Android 12's
+    `windowSplashScreenAnimatedIcon`, which only shows the inner **192dp
+    circle**. The old artwork was a wide lockup whose ink reached
+    `0.527 x imageWidth` from centre, so it needed a smaller Android override;
+    this badge is square and circular, reaching only `0.455 x imageWidth`, which
+    puts the Android ceiling at **~211dp**. At 190dp the ink is 173dp — a
+    comfortable margin inside the mask — so the per-platform split is gone.
+    Re-measure that ratio if the artwork changes.
+  - **Not** regenerated from it: `notification-icon.png`. Android renders that
+    one as a flat white silhouette, so it has to stay a transparent mono glyph —
+    the colour badge would come out as a white blob.
+- **In-app logos** are separate from the launcher icon and unchanged:
+  `as-logo-clear.png` and `as-store-logo-clear.png`, used by `AppHeader`,
+  `BrandBar` and `ComingSoon`. The `-clear` suffix means "background removed";
+  each has an unkeyed source of truth alongside it (`as-logo.png`,
+  `as-store-logo.png`).
 - Building a native binary (EAS): `npx eas build` after configuring an Expo
   account.

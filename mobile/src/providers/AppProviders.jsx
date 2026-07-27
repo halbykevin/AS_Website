@@ -1,10 +1,3 @@
-// The single provider stack the whole app is wrapped in (from the root layout):
-//   Theme → Redux (cart) → React Query (server cache, persisted) → Account → Content
-//
-// React Query is persisted to AsyncStorage: on relaunch the catalog paints
-// instantly from the last snapshot while a background refetch brings it fresh.
-// Cart persistence: hydrate from AsyncStorage on mount, then mirror changes back.
-
 import { useEffect, useRef, useState } from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { QueryClient } from '@tanstack/react-query';
