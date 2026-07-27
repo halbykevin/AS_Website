@@ -7,6 +7,8 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
+    "kill": "node scripts/kill-dev.mjs",
+    "kill:dry": "node scripts/kill-dev.mjs --dry",
     "deploy": "node scripts/deploy.mjs",
     "deploy:site": "node scripts/deploy.mjs --app site",
     "deploy:store": "node scripts/deploy.mjs --app store",
