@@ -4,7 +4,7 @@ import CartDrawer from '@/components/CartDrawer.jsx'
 import StorePopup from '@/components/StorePopup.jsx'
 import PublishGate from '@/components/PublishGate.jsx'
 import ComingSoon from '@/components/ComingSoon.jsx'
-import { loadSettings, loadPopup } from '@/lib/site'
+import { loadSettings } from '@/lib/site'
 import { loadCategories } from '@/lib/catalog'
 
 // Storefront chrome — loads CMS settings (announcement, footer, contact,
@@ -15,12 +15,20 @@ import { loadCategories } from '@/lib/catalog'
 // via CSS scroll-behavior instead).
 // The whole public storefront sits behind the publish gate (settings.published,
 // toggled in /admin/settings) — /admin has its own layout and is never gated.
+// The promotions popup loads its own data client-side (see StorePopup): these
+// pages are prerendered and CDN-held, so anything baked in here can be hours
+// stale, which is not acceptable for an on/off switch.
+
+// Safety-net TTL for the whole storefront segment. The `next: { revalidate }`
+// on the loaders' fetches only bounds the *data* cache — it does not give the
+// route one, so pages with no dynamic input (the homepage) were prerendered
+// once with `revalidate: false` and served by the CDN forever. Declaring it
+// here makes those pages ISR: /api/revalidate purges them the moment an admin
+// saves, and this hour is the backstop if that purge is ever missed.
+export const revalidate = 3600
+
 export default async function StoreLayout({ children }) {
-  const [settings, categories, popup] = await Promise.all([
-    loadSettings(),
-    loadCategories(),
-    loadPopup(),
-  ])
+  const [settings, categories] = await Promise.all([loadSettings(), loadCategories()])
   return (
     <PublishGate published={Boolean(settings.published)} fallback={<ComingSoon settings={settings} />}>
       {/* overflow-x-clip (not hidden — sticky still works) so no wide
@@ -30,7 +38,7 @@ export default async function StoreLayout({ children }) {
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />
         <CartDrawer whatsapp={settings?.contact?.whatsapp} />
-        <StorePopup popup={popup} />
+        <StorePopup />
       </div>
     </PublishGate>
   )

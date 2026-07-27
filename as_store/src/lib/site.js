@@ -53,18 +53,11 @@ export async function loadSettings() {
   }
 }
 
-// The promotions/announcements popup. Null when disabled or outside its
-// schedule window (the API gates that server-side); cached under the shared
-// 'store' tag so an admin save shows up immediately.
-export async function loadPopup() {
-  try {
-    const res = await fetch(`${API}/api/popup`, STORE_CACHE)
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
-  }
-}
+// NOTE: there is deliberately no loadPopup() here. The promotions popup is
+// fetched client-side by components/StorePopup.jsx with `cache: 'no-store'`,
+// because anything loaded through STORE_CACHE can be served from a prerendered
+// page for hours — which silently kept a switched-off popup alive on the
+// homepage. Keep it out of the cached SSR payload.
 
 export async function loadPage(slug) {
   try {

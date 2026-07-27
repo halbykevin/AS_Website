@@ -14,7 +14,9 @@ export const isAuthed = () => Boolean(getToken())
 
 // Content endpoints whose writes change what the public storefront renders — a
 // successful write to any of these purges the SSR cache so the edit shows at once.
-const STOREFRONT_CONTENT = /\/api\/(products|categories|brands|sales|homepage-sections|pages|settings|uploads|admin\/popup)/
+// The popup is intentionally absent: StorePopup fetches it live on the client,
+// so its saves need no purge (and a purge is a whole-site one — not worth it).
+const STOREFRONT_CONTENT = /\/api\/(products|categories|brands|sales|homepage-sections|pages|settings|uploads)/
 
 // Fire-and-forget the storefront cache purge (same-origin Next route). Best-effort:
 // a failure just means the 1-hour TTL eventually refreshes the data instead.

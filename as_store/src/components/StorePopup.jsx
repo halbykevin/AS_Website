@@ -1,18 +1,27 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PopupCard from './PopupCard.jsx'
 
 // Promotions / announcements popup for the storefront. All decisions about
 // WHAT it looks like live in PopupCard (shared with the admin preview); this
 // component owns WHEN it appears:
 //
+//   • data       — fetched client-side and uncached, so admin toggles are instant
 //   • frequency  — 'once' per saved version, 'daily' (24h re-show), 'always'
 //   • trigger    — timer after load, or scrolling past a % of the page
 //   • a11y       — focus trap, ESC, focus restore, aria-modal, scroll lock
 //   • motion     — spring-in card, honoring prefers-reduced-motion
 //
 // Mobile web gets a bottom-sheet presentation; desktop a centered dialog.
+//
+// The popup is deliberately NOT server-rendered. Storefront pages are
+// statically prerendered and held by the CDN, so a popup baked into that HTML
+// kept showing long after it had been switched off in the admin — the cached
+// copy still carried the old showOnWeb flag. Loading it here instead means
+// turning it on or off takes effect on the next page view, on every route,
+// regardless of what the page cache is holding.
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 const SEEN_KEY = 'as_store_popup_seen'
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -36,7 +45,42 @@ function markSeen(version) {
   }
 }
 
-export default function StorePopup({ popup }) {
+// Fetches the live popup once per page load. `cache: 'no-store'` keeps it out
+// of every cache layer — the admin's save is the only source of truth. It's
+// non-critical chrome, so it waits for an idle moment rather than competing
+// with the page's own requests; the API returns null when the popup is
+// disabled or outside its schedule window.
+function useLivePopup() {
+  const [popup, setPopup] = useState(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const load = async () => {
+      try {
+        const res = await fetch(`${API}/api/popup`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (res.ok) setPopup(await res.json())
+      } catch {
+        /* offline or aborted — no popup, never break the page */
+      }
+    }
+
+    const idle = typeof window.requestIdleCallback === 'function'
+    const handle = idle ? window.requestIdleCallback(load, { timeout: 2000 }) : setTimeout(load, 300)
+    return () => {
+      controller.abort()
+      if (idle) window.cancelIdleCallback?.(handle)
+      else clearTimeout(handle)
+    }
+  }, [])
+
+  return popup
+}
+
+export default function StorePopup() {
+  const popup = useLivePopup()
   const [open, setOpen] = useState(false)
   const [enter, setEnter] = useState(false)
   const firedRef = useRef(false)
@@ -46,6 +90,15 @@ export default function StorePopup({ popup }) {
   const eligible = Boolean(
     popup && popup.enabled && popup.showOnWeb && (popup.title || popup.body || popup.image),
   )
+
+  const close = useCallback(() => {
+    markSeen(popup?.version)
+    setEnter(false)
+    setTimeout(() => {
+      setOpen(false)
+      restoreRef.current?.focus?.({ preventScroll: true })
+    }, 200)
+  }, [popup?.version])
 
   // Reveal on the configured trigger.
   useEffect(() => {
@@ -115,19 +168,9 @@ export default function StorePopup({ popup }) {
       document.body.style.overflow = prevOverflow
       document.removeEventListener('keydown', onKey)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, close])
 
   if (!open || !popup) return null
-
-  const close = () => {
-    markSeen(popup.version)
-    setEnter(false)
-    setTimeout(() => {
-      setOpen(false)
-      restoreRef.current?.focus?.({ preventScroll: true })
-    }, 200)
-  }
 
   return (
     <div
