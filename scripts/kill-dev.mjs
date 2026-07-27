@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { createServer } from 'node:net'
 
 const isWin = process.platform === 'win32'
 
@@ -36,10 +37,11 @@ const names = processNames([...new Set([...listening.values()].flat())])
 console.log(`\nAS Website — ${dry ? 'dev servers currently running' : 'stopping dev servers'}\n`)
 
 let hits = 0
+const reserved = []
 for (const [port, what] of targets) {
   const pids = (listening.get(port) ?? []).filter((pid) => !OFF_LIMITS.has(pid))
   if (!pids.length) {
-    console.log(`  ${String(port).padEnd(6)}${what.padEnd(42)}not running`)
+    console.log(`  ${String(port).padEnd(6)}${what.padEnd(42)}${await why(port)}`)
     continue
   }
   for (const pid of pids) {
@@ -56,11 +58,64 @@ for (const [port, what] of targets) {
 
 console.log(
   hits === 0
-    ? '\nNothing was running — all dev ports are already free.\n'
+    ? '\nNo dev servers were running.'
     : dry
-      ? `\n${hits} process(es) would be killed. Re-run without --dry.\n`
-      : `\n${hits} process(es) stopped.\n`,
+      ? `\n${hits} process(es) would be killed. Re-run without --dry.`
+      : `\n${hits} process(es) stopped.`,
 )
+
+if (reserved.length) {
+  // Group into contiguous runs so each netsh line reserves exactly one block.
+  const runs = []
+  for (const port of [...reserved].sort((a, b) => a - b)) {
+    const last = runs[runs.length - 1]
+    if (last && port === last.start + last.count) last.count++
+    else runs.push({ start: port, count: 1 })
+  }
+  const many = reserved.length > 1
+
+  console.log(
+    `\nHeads up: ${reserved.join(', ')} ${many ? 'are' : 'is'} reserved by Windows, not held by a\n` +
+      `process — killing things will never free ${many ? 'them' : 'it'}. Hyper-V/WSL/Docker grab\n` +
+      `dynamic port ranges on boot. Claim them back from an ADMIN shell:\n\n` +
+      `  netsh int ipv4 show excludedportrange protocol=tcp\n` +
+      `  net stop winnat\n` +
+      runs
+        .map(
+          (r) =>
+            `  netsh int ipv4 add excludedportrange protocol=tcp startport=${r.start} numberofports=${r.count} store=persistent\n`,
+        )
+        .join('') +
+      `  net start winnat\n\n` +
+      `That reservation is persistent and survives reboots, so the range stays\n` +
+      `yours instead of going back to Hyper-V. (net stop winnat briefly drops\n` +
+      `Docker/WSL networking.)`,
+  )
+}
+console.log('')
+
+/**
+ * Explains a port that has no listener. "Free" is the normal answer, but on
+ * Windows a port can be unusable with nothing holding it: Hyper-V/WSL/Docker
+ * reserve dynamic ranges (`netsh int ipv4 show excludedportrange protocol=tcp`)
+ * and binding inside one fails with EACCES. Dev servers report that as "port is
+ * being used by another process", which sends you hunting for a process to kill
+ * that does not exist — so name it here instead.
+ */
+async function why(port) {
+  const code = await new Promise((resolve) => {
+    const probe = createServer()
+    probe.once('error', (err) => resolve(err.code))
+    probe.once('listening', () => probe.close(() => resolve(null)))
+    probe.listen(port, '0.0.0.0')
+  })
+  if (code === 'EACCES') {
+    reserved.push(port)
+    return 'RESERVED by Windows — nothing to kill (see below)'
+  }
+  if (code === 'EADDRINUSE') return 'in use, owner hidden — retry in an elevated shell'
+  return 'not running'
+}
 
 /** Map of port -> [pid] for every LISTENING socket on the machine. */
 function snapshot() {

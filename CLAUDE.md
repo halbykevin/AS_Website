@@ -27,6 +27,11 @@ Browser ──► Vercel (React static site, this repo root)
 Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
+`npm run kill` (repo root) stops every dev server across all the sub-projects at once —
+it clears whatever is listening on the project's ports (vite 5173-5175, next 5180, site API
+8080, store API 8081, expo 8082-8083) and their child processes. `npm run kill:dry` lists them
+without killing. See [scripts/kill-dev.mjs](scripts/kill-dev.mjs).
+
 **Deploy the APIs:** `npm run deploy` (from any of the three package folders, on any OS).
 The repo holds **two** Node APIs, both served from one clone at `/opt/as-company` on the VPS:
 `site` = [server/](server/) → pm2 `as-api` :8080, and `store` = [as_store/server/](as_store/server/)
