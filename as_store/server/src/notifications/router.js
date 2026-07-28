@@ -1,10 +1,7 @@
-// HTTP surface of the notification domain. Customer endpoints only ever touch
-// the caller's own rows; everything under /api/admin requires the admin JWT.
-
 import express from 'express'
 import { query } from '../db.js'
 import { requireAuth } from '../auth.js'
-import { requireCustomer, optionalCustomer } from '../customerAuth.js'
+import { requireCustomer, optionalCustomer, normalizeMobile } from '../customerAuth.js'
 import {
   CATEGORIES,
   TRANSACTIONAL,
@@ -598,9 +595,18 @@ r.post(
     if (!c) return res.status(404).json({ error: 'Not found' })
     let customerId = Number(req.body?.customerId) || null
     if (!customerId && req.body?.mobile) {
+      // customers.mobile is stored normalized (country code included), so a locally
+      // typed "81977112" only matches once normalizeMobile prefixes 961. Keep the raw
+      // digits as a fallback for any row saved before normalization.
       const digits = String(req.body.mobile).replace(/\D/g, '')
-      const { rows } = await query(`SELECT id FROM customers WHERE mobile = $1`, [digits])
-      customerId = rows[0]?.id || null
+      const candidates = [...new Set([normalizeMobile(digits), digits])].filter(Boolean)
+      if (candidates.length) {
+        const { rows } = await query(
+          `SELECT id FROM customers WHERE mobile = ANY($1::text[]) ORDER BY id ASC LIMIT 1`,
+          [candidates],
+        )
+        customerId = rows[0]?.id || null
+      }
     }
     if (!customerId)
       return res.status(400).json({ error: 'Provide a customerId or a known mobile number' })
