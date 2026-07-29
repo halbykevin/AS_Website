@@ -28,6 +28,10 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | POST | `/api/reservations` | — | Visitor submits a reservation |
 | GET | `/api/reservations` | admin | List reservations |
 | PATCH/DELETE | `/api/reservations/:id` | admin | Update status / delete |
+| POST | `/api/contact` | — | Visitor submits the `/contact` form (stored + emailed; 5 per IP / 10 min) |
+| GET | `/api/contact-messages` | admin | List contact messages (newest first) |
+| PUT | `/api/contact-messages/:id/read` | admin | Mark read / unread (`{ read }`) |
+| DELETE | `/api/contact-messages/:id` | admin | Delete a message |
 | POST | `/api/uploads` | admin | Upload an image → returns its URL |
 | GET | `/uploads/:file` | — | Serve an uploaded image. Add `?w=<px>&format=webp&q=<1-100>` to get an on-the-fly resized/re-encoded variant (originals are never modified; variants cached under `uploads/.cache`). Widths bucket to 320–2000; unknown params serve the original. |
 

@@ -2,10 +2,12 @@
 // (orders@as.com.lb, SMTP SSL :465 by default). Inert unless SMTP_HOST/SMTP_USER/
 // SMTP_PASS are set, so nothing sends until the mailbox is configured.
 //
-// Currently sends one email: a "new Guess the Score entry" notification to the
-// staff inbox after every public prediction submission. The email includes a
-// one-tap WhatsApp button that opens a chat with the player, pre-filled with a
-// confirmation of their predicted score.
+// Sends two emails, both to the staff inbox:
+//  • "new Guess the Score entry" after every public prediction submission, with a
+//    one-tap WhatsApp button that opens a chat with the player, pre-filled with a
+//    confirmation of their predicted score.
+//  • "new contact message" after every /contact form submission, with reply-by-
+//    email and reply-on-WhatsApp buttons (the email's Reply-To is the sender).
 import nodemailer from 'nodemailer'
 import { toWhatsAppNumber } from './whatsapp.js'
 
@@ -16,6 +18,9 @@ const PASS = process.env.SMTP_PASS || ''
 const FROM = process.env.MAIL_FROM || (USER ? `AS Company <${USER}>` : '')
 // Where the entry notifications land. Defaults to the staff address on file.
 const NOTIFY_TO = process.env.PREDICTOR_NOTIFY_TO || 'kevinhalby70199@gmail.com'
+// Where contact-form messages land: the company mailbox staff answer from
+// (same address the site sends as), overridable per environment.
+const CONTACT_TO = process.env.CONTACT_NOTIFY_TO || 'orders@as.com.lb'
 
 export const mailEnabled = () => Boolean(HOST && USER && PASS)
 
@@ -43,15 +48,16 @@ const esc = (s) =>
 const formatDraw = (n) => (n == null || n === '' ? '' : `#${String(n).padStart(4, '0')}`)
 
 // Branded email shell — a light-gray page with a white card, a text logo header,
-// and a small footer. All-inline styles for email-client compatibility.
-function emailShell(innerHtml) {
+// and a small footer. All-inline styles for email-client compatibility. The
+// `kicker` under the logo names which part of the site the email came from.
+function emailShell(innerHtml, kicker = 'Guess the Score') {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;margin:0;padding:24px">
     <div style="max-width:600px;margin:0 auto">
       <div style="background:#ffffff;border-radius:16px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <div style="text-align:center;padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid #eee">
           <span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:${RED}">AS COMPANY</span>
-          <div style="margin-top:4px;font-size:12px;color:${MUTED}">Guess the Score</div>
+          <div style="margin-top:4px;font-size:12px;color:${MUTED}">${esc(kicker)}</div>
         </div>
         ${innerHtml}
       </div>
@@ -133,5 +139,72 @@ export async function sendPredictionEmail(entry) {
     replyTo: FROM,
     subject: `New Guess the Score entry — ${playerName || 'Anonymous'}`,
     html: emailShell(inner),
+  })
+}
+
+// Send the staff notification for one contact-form message. Reply-To is the
+// visitor's address, so hitting Reply in the inbox answers them directly.
+// Fire-and-forget: callers should .catch() it — the message is already stored.
+export async function sendContactEmail(msg) {
+  if (!mailEnabled()) return { skipped: true }
+  const { name, email, phone = '', subject = '', message = '', createdAt } = msg
+
+  const when = createdAt
+    ? new Date(createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+    : ''
+  const waNumber = phone ? toWhatsAppNumber(phone) : ''
+  const waHref = waNumber
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(
+        `Hi ${name || 'there'}! 👋 Thanks for reaching out to AS Company — we received your message and we're happy to help.`
+      )}`
+    : ''
+
+  const messageBlock = `
+    <div style="margin:22px 0;padding:18px;border:1px solid #eee;border-radius:12px;background:#fafafa">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:${MUTED}">Message</div>
+      <div style="margin-top:8px;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap">${esc(message)}</div>
+    </div>`
+
+  const buttons = `
+    <div style="text-align:center;margin:26px 0 6px">
+      <a href="mailto:${esc(email)}" style="display:inline-block;background:${RED};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:999px">
+        ✉️ Reply to ${esc(name || email)}
+      </a>
+    </div>
+    ${
+      waHref
+        ? `<div style="text-align:center;margin:12px 0 6px">
+             <a href="${waHref}" style="display:inline-block;background:#25D366;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:999px">
+               💬 Reply on WhatsApp
+             </a>
+           </div>`
+        : ''
+    }
+    <p style="margin:12px 0 0;font-size:12px;color:${MUTED};text-align:center">
+      Replying to this email also reaches ${esc(email)}.
+    </p>`
+
+  const inner = `
+    <h2 style="margin:0 0 4px;font-size:20px;color:${INK}">New contact message ✉️</h2>
+    <p style="margin:0 0 20px;font-size:14px;color:${MUTED}">Someone just wrote to you from the website.</p>
+
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px">
+      <tr><td style="padding:6px 0;color:${MUTED};width:120px">Name</td><td style="padding:6px 0;color:${INK};font-weight:700">${esc(name)}</td></tr>
+      <tr><td style="padding:6px 0;color:${MUTED}">Email</td><td style="padding:6px 0;color:${INK}">${esc(email)}</td></tr>
+      ${phone ? `<tr><td style="padding:6px 0;color:${MUTED}">Phone</td><td style="padding:6px 0;color:${INK}">${esc(phone)}</td></tr>` : ''}
+      ${subject ? `<tr><td style="padding:6px 0;color:${MUTED}">Subject</td><td style="padding:6px 0;color:${INK}">${esc(subject)}</td></tr>` : ''}
+      ${when ? `<tr><td style="padding:6px 0;color:${MUTED}">Received</td><td style="padding:6px 0;color:${INK}">${esc(when)}</td></tr>` : ''}
+    </table>
+
+    ${messageBlock}
+
+    ${buttons}`
+
+  return getTransport().sendMail({
+    from: FROM,
+    to: CONTACT_TO,
+    replyTo: email ? `${name || 'Website visitor'} <${email}>` : FROM,
+    subject: `Website contact — ${subject || name || 'New message'}`,
+    html: emailShell(inner, 'Contact form'),
   })
 }

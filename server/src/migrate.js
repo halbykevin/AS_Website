@@ -344,6 +344,20 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS events_source_ext ON events(source, external_id) WHERE source <> '';
 
+-- Contact form submissions from the public /contact page. Emailed to the staff
+-- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT DEFAULT '',
+  subject TEXT DEFAULT '',
+  message TEXT NOT NULL,
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS contact_messages_created ON contact_messages(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS reservations (
   id SERIAL PRIMARY KEY,
   event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,

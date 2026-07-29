@@ -26,6 +26,7 @@ export default function Footer() {
               <li><Link to="/events" className="transition hover:text-as-red">Events</Link></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">What We Do</Link></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">About</Link></li>
+              <li><Link to="/contact" className="transition hover:text-as-red">Contact</Link></li>
             </ul>
           </div>
 
@@ -35,6 +36,13 @@ export default function Footer() {
             {contact.subheading && (
               <p className="mt-2 text-xs text-as-charcoal/50">{contact.subheading}</p>
             )}
+            <Link
+              to="/contact"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-as-red px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-as-red-light"
+            >
+              Send us a message
+              <span aria-hidden>→</span>
+            </Link>
             <ul className="mt-4 space-y-2.5 text-sm text-as-charcoal/65">
               <li>
                 <a href={`mailto:${contact.email}`} className="transition hover:text-as-red">
