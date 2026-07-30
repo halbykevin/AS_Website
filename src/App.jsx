@@ -14,6 +14,7 @@ const EventDetail = lazy(() => import('./pages/EventDetail.jsx'))
 const StoreComingSoon = lazy(() => import('./pages/StoreComingSoon.jsx'))
 const WhatWeDo = lazy(() => import('./pages/WhatWeDo.jsx'))
 const SolutionDetail = lazy(() => import('./pages/SolutionDetail.jsx'))
+const Contact = lazy(() => import('./pages/Contact.jsx'))
 
 // Admin area — split so public visitors never download the dashboard bundle.
 const AdminLogin = lazy(() => import('./admin/Login.jsx'))
@@ -28,6 +29,7 @@ const StoryAdmin = lazy(() => import('./admin/pages/StoryAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 const PredictorAdmin = lazy(() => import('./admin/pages/PredictorAdmin.jsx'))
+const MessagesAdmin = lazy(() => import('./admin/pages/MessagesAdmin.jsx'))
 
 // The public website, gated behind the publish flag.
 function PublicSite() {
@@ -46,6 +48,7 @@ function PublicSite() {
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/store" element={<StoreComingSoon />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -78,6 +81,7 @@ export default function App() {
               <Route path="story" element={<StoryAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="predictor" element={<PredictorAdmin />} />
+              <Route path="messages" element={<MessagesAdmin />} />
               <Route path="scraper" element={<ScraperAdmin />} />
             </Route>
 

@@ -467,6 +467,21 @@ function mapPredictor(meta, matches) {
 export const submitPrediction = (data) =>
   request('/api/predictions', { method: 'POST', body: data })
 
+// Submit the public contact form (/contact). The API stores the message and
+// emails it to the staff inbox. body = { name, email, phone, subject, message }
+export const sendContactMessage = (data) =>
+  request('/api/contact', { method: 'POST', body: data })
+
+// Build a WhatsApp "click to chat" link for a general enquiry: prefers the
+// admin-configured number (pre-filled message), falling back to the plain
+// WhatsApp link from the contact settings. Returns '' when neither is set.
+export function whatsappContactUrl(number, fallbackLink, message) {
+  const digits = String(number || '').replace(/\D/g, '')
+  if (!digits) return fallbackLink || ''
+  const text = message || "Hello 👋 I'd like to know more about AS Company."
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
+
 export async function loadSite() {
   try {
     const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
@@ -598,6 +613,12 @@ export const adminApi = {
   archivePrediction: (id, archived = true) =>
     request(`/api/predictions/${id}/archive`, { method: 'PUT', body: { archived }, authed: true }),
   archiveAllPredictions: () => request('/api/predictions/archive-all', { method: 'POST', authed: true }),
+
+  listContactMessages: () => request('/api/contact-messages', { authed: true }),
+  markContactMessageRead: (id, read = true) =>
+    request(`/api/contact-messages/${id}/read`, { method: 'PUT', body: { read }, authed: true }),
+  deleteContactMessage: (id) =>
+    request(`/api/contact-messages/${id}`, { method: 'DELETE', authed: true }),
 
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),

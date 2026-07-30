@@ -8,7 +8,7 @@ import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
-import { mailEnabled, sendPredictionEmail } from './mailer.js'
+import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
 import { imageResizer } from './images.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -17,6 +17,10 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || 'http://localhost:8080').replace(/
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 export const app = express()
+
+// Behind nginx on the VPS — trust the first hop so req.ip is the real visitor
+// address (used to throttle the public contact form) instead of 127.0.0.1.
+app.set('trust proxy', 1)
 
 // CORS — lock to the website origin(s) in production.
 const origins = (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim())
@@ -137,6 +141,10 @@ const predictorMatchJson = (r) => ({
   teamA: r.team_a, teamACode: r.team_a_code, teamAFlag: r.team_a_flag,
   teamB: r.team_b, teamBCode: r.team_b_code, teamBFlag: r.team_b_flag,
   kickoff: r.kickoff, sort: r.sort, visible: r.visible,
+})
+const contactMessageJson = (r) => ({
+  id: r.id, name: r.name, email: r.email, phone: r.phone || '',
+  subject: r.subject || '', message: r.message, read: r.read === true, createdAt: r.created_at,
 })
 const predictionJson = (r) => ({
   id: r.id, fullName: r.full_name, mobile: r.mobile,
@@ -812,6 +820,83 @@ app.post('/api/predictions/bulk-delete', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/predictions/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM predictions WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Contact messages =========================
+// Public "Get in touch" form on /contact. Every message is stored (so nothing is
+// lost if mail is down) and emailed to the staff inbox.
+
+// Light in-memory throttle: max 5 submissions per IP per 10 minutes, so a bot
+// can't flood the inbox. Resets on restart — that's fine for this scale.
+const contactHits = new Map()
+const CONTACT_WINDOW_MS = 10 * 60 * 1000
+const CONTACT_MAX = 5
+function contactThrottled(ip) {
+  const now = Date.now()
+  const hits = (contactHits.get(ip) || []).filter((t) => now - t < CONTACT_WINDOW_MS)
+  if (hits.length >= CONTACT_MAX) {
+    contactHits.set(ip, hits)
+    return true
+  }
+  hits.push(now)
+  contactHits.set(ip, hits)
+  // Drop stale IPs so the map can't grow without bound.
+  if (contactHits.size > 500) {
+    for (const [key, times] of contactHits)
+      if (!times.some((t) => now - t < CONTACT_WINDOW_MS)) contactHits.delete(key)
+  }
+  return false
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i
+
+app.post('/api/contact', ah(async (req, res) => {
+  const b = req.body || {}
+  // Honeypot — a hidden field real visitors never fill in. Accept and drop.
+  if (String(b.website || '').trim()) return res.status(201).json({ ok: true })
+
+  const name = String(b.name || '').trim().slice(0, 120)
+  const email = String(b.email || '').trim().slice(0, 200)
+  const phone = String(b.phone || '').trim().slice(0, 40)
+  const subject = String(b.subject || '').trim().slice(0, 160)
+  const message = String(b.message || '').trim().slice(0, 4000)
+
+  if (!name || !email || !message)
+    return res.status(400).json({ error: 'Name, email and message are required' })
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Please enter a valid email address' })
+  if (message.length < 5) return res.status(400).json({ error: 'Please write a little more in your message' })
+  if (contactThrottled(req.ip))
+    return res.status(429).json({ error: 'Too many messages just now — please try again in a few minutes.' })
+
+  const { rows } = await query(
+    'INSERT INTO contact_messages (name, email, phone, subject, message) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+    [name, email, phone, subject, message]
+  )
+  res.status(201).json({ ok: true, id: rows[0].id })
+
+  // Fire-and-forget staff notification. No-op unless SMTP is configured; the
+  // message is already saved, so a mail failure never loses it.
+  if (mailEnabled()) {
+    sendContactEmail({ name, email, phone, subject, message, createdAt: rows[0].created_at })
+      .catch((err) => console.error('[mail] contact notification failed:', err.message))
+  }
+}))
+
+app.get('/api/contact-messages', requireAuth, ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM contact_messages ORDER BY created_at DESC, id DESC')
+  res.json(rows.map(contactMessageJson))
+}))
+
+app.put('/api/contact-messages/:id/read', requireAuth, ah(async (req, res) => {
+  const read = req.body?.read !== false
+  const { rows } = await query('UPDATE contact_messages SET read=$1 WHERE id=$2 RETURNING *', [read, req.params.id])
+  if (!rows[0]) return res.status(404).json({ error: 'Message not found' })
+  res.json(contactMessageJson(rows[0]))
+}))
+
+app.delete('/api/contact-messages/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM contact_messages WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

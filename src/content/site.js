@@ -19,7 +19,7 @@ export const nav = [
   { label: 'What We Do', href: '/what-we-do' },
   { label: 'Events', href: '/events' },
   { label: 'About', href: '/what-we-do' },
-  { label: 'Contact', href: '/#contact' },
+  { label: 'Contact', href: '/contact' },
 ]
 
 export const hero = {
@@ -272,4 +272,15 @@ export const contact = {
   whatsapp: 'https://wa.me/message/EHISICDXT6DJC1',
   instagram: 'https://www.instagram.com/ascompany.lb/',
   instagramHandle: '@ascompany.lb',
+  // Copy for the /contact page. The channels above are admin-editable (Site
+  // Settings → Contact); these labels are static site copy.
+  page: {
+    eyebrow: 'Contact',
+    title: 'Let’s talk',
+    intro:
+      'Message us on WhatsApp, send us an email, or say hi on Instagram — whichever suits you. We usually reply the same day.',
+    formHeading: 'Send us a message',
+    formNote: 'We’ll reply to the email address you leave here.',
+    success: 'Thanks for reaching out! Your message is on its way — we’ll get back to you shortly.',
+  },
 }

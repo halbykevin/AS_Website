@@ -82,6 +82,8 @@ two teams each with a name + a club logo in `team_a_flag`/`team_b_flag` — uplo
 older `team_a_code`/`team_b_code` still resolving a flagcdn.com flag for national teams — plus
 stage/kickoff/sort/visible) and `predictions` (public entries: full_name/mobile + a `picks` JSONB array
 of `{matchId, teamA, teamB, scoreA, scoreB}` + `share_platform`/`share_item`),
+`contact_messages` (the public `/contact` form: name/email/phone/subject/message + a `read` flag —
+stored **and** emailed to staff, listed at `/admin/messages`),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -97,6 +99,17 @@ checks and one active entry per mobile; the admin reads/archives/deletes entries
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
 Public can read content; everything else needs a Bearer token.
+
+**Contact** (`/contact` → [pages/Contact.jsx](src/pages/Contact.jsx), reached from the nav "Contact" item
+and the footer): one-tap WhatsApp / email / Instagram cards next to a message form. `POST /api/contact`
+is public — it validates, throttles (5 per IP / 10 min, plus a honeypot field), inserts into
+`contact_messages`, then fire-and-forget emails the message to staff via
+[server/src/mailer.js](server/src/mailer.js) (`sendContactEmail`, Reply-To = the visitor, so hitting
+Reply answers them; needs `SMTP_*`, and lands in **orders@as.com.lb** unless `CONTACT_NOTIFY_TO`
+overrides it). Storing first means a mail outage
+never loses a lead — staff read them at `/admin/messages`. The channels themselves come from
+`settings.contact_*` (Site Settings → Contact); the page copy defaults live in `content/site.js`
+(`contact.page`).
 
 ## Web scraper
 
@@ -173,10 +186,10 @@ src/
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
   components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
-  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail
+  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, MessagesAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -188,8 +201,8 @@ tailwind.config.js          # brand colors, Inter font, animations
 
 ## Routes
 
-Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/scraper`
+Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
 at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles
