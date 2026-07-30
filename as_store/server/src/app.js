@@ -434,6 +434,65 @@ const DETAIL_SELECT = `
   LEFT JOIN brands b ON b.id = p.brand_id
   ${SALE_JOIN}`;
 
+/* ---- Search ------------------------------------------------------------ */
+
+// The catalogue is small enough that ILIKE beats bringing in tsvector/pg_trgm,
+// but a single `%phrase%` only ever matched a contiguous phrase — "gaming
+// wheel" missed "Mars Gaming Racing Force Feedback Racing Wheel". So the query
+// is tokenised (every token must appear somewhere in the product's searchable
+// text) and the rows are ranked, instead of coming back in whatever order
+// `sort` happened to be.
+const SEARCH_HAYSTACK = `concat_ws(' ', p.name, b.name, c.name, p.tagline)`;
+
+// A `%` or `_` typed by a shopper is a literal, not a wildcard.
+const likeEscape = (s) => String(s).replace(/[\\%_]/g, "\\$&");
+
+const searchTokens = (raw) =>
+  String(raw || "")
+    .split(/\s+/)
+    .map((t) => t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    .filter(Boolean)
+    .slice(0, 6);
+
+// Pushes one `haystack ILIKE $n` clause per token onto `where`/`params`, and
+// returns the tokens so the caller can build a matching rank expression.
+function pushSearchWhere(raw, where, params) {
+  const tokens = searchTokens(raw);
+  // Punctuation-only query ("???"): match nothing rather than everything.
+  if (!tokens.length) {
+    if (String(raw || "").trim()) where.push("false");
+    return tokens;
+  }
+  for (const token of tokens) {
+    params.push(`%${likeEscape(token)}%`);
+    where.push(`${SEARCH_HAYSTACK} ILIKE $${params.length}`);
+  }
+  return tokens;
+}
+
+// Relevance buckets: an exact product name first, then a name that starts with
+// the query, then a name/brand/category that merely contains it.
+function pushSearchRank(tokens, params) {
+  const phrase = tokens.join(" ");
+  params.push(phrase);
+  const exact = params.length;
+  params.push(`${likeEscape(phrase)}%`);
+  const prefix = params.length;
+  params.push(`%${likeEscape(phrase)}%`);
+  const anywhere = params.length;
+  return `CASE
+      WHEN lower(p.name) = lower($${exact}) THEN 0
+      WHEN p.name ILIKE $${prefix} THEN 1
+      WHEN p.name ILIKE $${anywhere} THEN 2
+      WHEN b.name ILIKE $${anywhere} THEN 3
+      WHEN c.name ILIKE $${anywhere} THEN 4
+      ELSE 5
+    END`;
+}
+
+// Ties broken by in-stock, then the admin's manual order.
+const SEARCH_TIEBREAK = `(COALESCE(p.stock, 0) > 0) DESC, p.sort, p.id`;
+
 // Columns that admin create/update accept, mapped from camelCase body keys.
 const PRODUCT_COLS = {
   name: "name",
@@ -1462,20 +1521,91 @@ app.get(
     if (req.query.featured === "1" || req.query.featured === "true") {
       where.push("p.featured = true");
     }
-    if (req.query.search) {
-      params.push(`%${req.query.search}%`);
-      const n = params.length;
-      where.push(
-        `(p.name ILIKE $${n} OR b.name ILIKE $${n} OR c.name ILIKE $${n} OR p.tagline ILIKE $${n})`,
-      );
-    }
-    let sql = `${LIST_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY p.sort, p.id`;
+    const tokens = req.query.search
+      ? pushSearchWhere(req.query.search, where, params)
+      : [];
+    const orderBy = tokens.length
+      ? `${pushSearchRank(tokens, params)}, ${SEARCH_TIEBREAK}`
+      : "p.sort, p.id";
+    let sql = `${LIST_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${orderBy}`;
     if (req.query.limit) {
       params.push(Number(req.query.limit) || 24);
       sql += ` LIMIT $${params.length}`;
     }
     const { rows } = await query(sql, params);
     res.json(rows.map(productJson));
+  }),
+);
+
+// Autocomplete for the storefront search dialog: the top-ranked products plus
+// the categories and brands whose names match, in one round-trip so the
+// dropdown never has to fan out three requests per keystroke.
+app.get(
+  "/api/search/suggest",
+  ah(async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 12);
+    const tokens = searchTokens(q);
+    if (!tokens.length) {
+      return res.json({
+        query: q,
+        products: [],
+        categories: [],
+        brands: [],
+        total: 0,
+      });
+    }
+
+    const patterns = tokens.map((t) => `%${likeEscape(t)}%`);
+    const where = [
+      "p.visible = true",
+      ...tokens.map((_, i) => `${SEARCH_HAYSTACK} ILIKE $${i + 1}`),
+    ].join(" AND ");
+
+    const listParams = [...patterns];
+    const rank = pushSearchRank(tokens, listParams);
+    listParams.push(limit);
+
+    // Facets match on ANY token so "burago f1" still surfaces the Burago brand.
+    const facetSql = (table) => `
+      SELECT t.*, (SELECT COUNT(*)::int FROM products p
+                   WHERE p.${table === "categories" ? "category_id" : "brand_id"} = t.id
+                     AND p.visible = true) AS product_count
+      FROM ${table} t
+      WHERE t.visible = true AND t.name ILIKE ANY($1::text[])
+      ORDER BY t.sort, t.id LIMIT 4`;
+
+    const [list, count, cats, brands] = await Promise.all([
+      query(
+        `${LIST_SELECT} WHERE ${where}
+         ORDER BY ${rank}, ${SEARCH_TIEBREAK}
+         LIMIT $${listParams.length}`,
+        listParams,
+      ),
+      query(
+        `SELECT COUNT(*)::int AS n FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         LEFT JOIN brands b ON b.id = p.brand_id
+         WHERE ${where}`,
+        patterns,
+      ),
+      query(facetSql("categories"), [patterns]),
+      query(facetSql("brands"), [patterns]),
+    ]);
+
+    res.json({
+      query: q,
+      total: count.rows[0]?.n || 0,
+      products: list.rows.map(productJson),
+      categories: cats.rows.map((r) => ({
+        ...categoryJson(r),
+        productCount: r.product_count,
+      })),
+      brands: brands.rows.map((r) => ({
+        ...brandJson(r),
+        productCount: r.product_count,
+      })),
+    });
   }),
 );
 

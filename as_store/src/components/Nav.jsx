@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSelector, useDispatch } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
-import SearchBox from './SearchBox.jsx'
+import SearchDialog from './search/SearchDialog.jsx'
 import { selectCartCount } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 import { useAccount, accountApi } from '@/lib/account'
@@ -111,6 +111,31 @@ export default function Nav({ settings, categories = [] }) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [openMenu, setOpenMenu] = useState(null) // which mobile department is expanded
 
+  const openSearch = () => {
+    setOpen(false)
+    setSearchOpen(true)
+  }
+
+  // ⌘K / Ctrl-K anywhere, and "/" when the shopper isn't already typing — the
+  // shortcut shoppers now expect from Algolia-style search.
+  useEffect(() => {
+    const typing = (el) =>
+      el instanceof HTMLElement &&
+      (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+    const onKey = (e) => {
+      const key = e.key?.toLowerCase()
+      if (key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      } else if (key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e.target)) {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       {announcement?.enabled && announcement.text && (
@@ -164,7 +189,13 @@ export default function Nav({ settings, categories = [] }) {
           </ul>
 
           <div className="flex items-center gap-5 text-white/80">
-            <button onClick={() => setSearchOpen(true)} className="transition-colors hover:text-white" aria-label="Search">
+            <button
+              onClick={openSearch}
+              className="transition-colors hover:text-white"
+              aria-label="Search"
+              aria-keyshortcuts="Control+K Meta+K"
+              title="Search (⌘K)"
+            >
               <Icon name="search" className="h-[18px] w-[18px]" />
             </button>
             {customer && <NotificationsBell />}
@@ -211,8 +242,20 @@ export default function Nav({ settings, categories = [] }) {
                 <Icon name="close" className="h-5 w-5" />
               </button>
             </div>
+            {/* The nav's search icon is behind this panel, so the menu carries
+                its own way into the search dialog. */}
+            <div className="shell-wide mt-6">
+              <button
+                onClick={openSearch}
+                className="flex w-full items-center gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-left text-[15px] text-white/50 transition-colors hover:bg-white/10"
+              >
+                <Icon name="search" className="h-5 w-5" />
+                Search products…
+              </button>
+            </div>
+
             <motion.ul
-              className="shell-wide mt-8 space-y-1"
+              className="shell-wide mt-4 space-y-1"
               initial="hidden"
               animate="show"
               variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } } }}
@@ -306,37 +349,11 @@ export default function Nav({ settings, categories = [] }) {
         )}
       </AnimatePresence>
 
-      {/* Search overlay */}
-      <AnimatePresence>
-        {searchOpen && (
-          <motion.div
-            className="fixed inset-0 z-[60]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="absolute inset-0 bg-black/40" onClick={() => setSearchOpen(false)} />
-            <motion.div
-              className="absolute inset-x-0 top-0 bg-white p-4 shadow-lg"
-              initial={{ y: -24, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -24, opacity: 0 }}
-              transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
-            >
-              <div className="shell-wide flex items-center gap-3">
-                <SearchBox big autoFocus suggest className="flex-1" onSubmit={() => setSearchOpen(false)} />
-                <button
-                  onClick={() => setSearchOpen(false)}
-                  className="rounded-lg p-2 text-as-ink/50 hover:bg-as-fog hover:text-as-ink"
-                  aria-label="Close search"
-                >
-                  <Icon name="close" className="h-5 w-5" />
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SearchDialog
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        categories={categories}
+      />
     </header>
   )
 }

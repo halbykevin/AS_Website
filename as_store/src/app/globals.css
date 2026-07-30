@@ -33,6 +33,11 @@ body {
   .pill-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-as-ink/15 px-6 py-2.5 text-sm font-medium text-as-ink transition hover:bg-as-ink/[0.04];
   }
+
+  /* Keycap — the search dialog's shortcut legend (↵ / ↑↓ / esc). */
+  .kbd {
+    @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-as-ink/15 bg-white px-1.5 font-sans text-[11px] font-medium leading-none text-as-ink/55 shadow-[0_1px_0_rgba(21,24,26,0.06)];
+  }
 }
 
 @layer utilities {
