@@ -6,7 +6,7 @@
 // AsyncStorage (see AppProviders) so a relaunch paints immediately.
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { loadProducts, loadProduct, loadCategories, loadBrands } from './storeApi';
+import { loadProducts, loadProduct, loadCategories, loadBrands, loadStoreSettings } from './storeApi';
 import { accountApi } from './account';
 
 export function useProducts(filters = {}) {
@@ -33,6 +33,16 @@ export function useProduct(slug) {
 // What checkout may offer. Cash on delivery is always available; online payment
 // only when the server has Whish configured. An unreachable (or older) API means
 // COD-only rather than a broken checkout.
+// Delivery pricing for the checkout summary. The server still decides what is
+// actually charged; this only lets the app show it before the order exists.
+export function useStoreSettings() {
+  return useQuery({
+    queryKey: ['store-settings'],
+    queryFn: loadStoreSettings,
+    staleTime: 10 * 60 * 1000
+  });
+}
+
 export function usePaymentMethods() {
   return useQuery({
     queryKey: ['payment-methods'],

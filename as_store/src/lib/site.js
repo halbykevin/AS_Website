@@ -22,6 +22,8 @@ export const defaultSettings = {
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
   // Sign-in page: your branding on the email-code button.
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
+  // Delivery charge. Mirrors the server default; the real values come from settings.
+  delivery: { fee: 0, freeOver: 100 },
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
@@ -44,6 +46,7 @@ export async function loadSettings() {
       contact: { ...defaultSettings.contact, ...(s.contact || {}) },
       homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
       loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
+      delivery: { ...defaultSettings.delivery, ...(s.delivery || {}) },
       socials: s.socials || {},
       navLinks: s.navLinks?.length ? s.navLinks : defaultSettings.navLinks,
       footerGroups: s.footerGroups?.length ? s.footerGroups : defaultSettings.footerGroups,

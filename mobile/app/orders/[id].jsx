@@ -6,7 +6,7 @@ import { useDispatch } from 'react-redux';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { clearCart } from '@/src/store/cartSlice';
 import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH } from '@/src/lib/payments';
-import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
+import { money, orderTotal, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Badge, Icon, Divider, Skeleton, EmptyState } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
@@ -213,9 +213,21 @@ export default function OrderDetailScreen() {
               </View>
             ))}
             <Divider inset={theme.spacing.lg} />
+            {Number(order.deliveryFee) > 0 && (
+              <View style={{ gap: 4, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text variant="callout" muted>Subtotal</Text>
+                  <Text variant="callout" muted>{money(order.subtotal)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text variant="callout" muted>Delivery</Text>
+                  <Text variant="callout" muted>{money(order.deliveryFee)}</Text>
+                </View>
+              </View>
+            )}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: theme.spacing.lg }}>
               <Text variant="title">Total</Text>
-              <Text variant="title">{money(order.subtotal)}</Text>
+              <Text variant="title">{money(orderTotal(order))}</Text>
             </View>
           </Card>
         </View>

@@ -5,9 +5,10 @@ import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice';
 import { useAccount, accountApi } from '@/src/lib/account';
-import { usePaymentMethods } from '@/src/lib/queries';
+import { usePaymentMethods, useStoreSettings } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
 import { money } from '@/src/lib/format';
+import { deliveryFeeFor } from '@/src/lib/delivery';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
@@ -21,6 +22,9 @@ export default function CheckoutScreen() {
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
   const dispatch = useDispatch();
+  const { data: settings } = useStoreSettings();
+  const deliveryFee = deliveryFeeFor(total, settings?.delivery);
+  const grandTotal = total + deliveryFee;
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true });
   const [addrId, setAddrId] = useState(null);
@@ -121,15 +125,25 @@ export default function CheckoutScreen() {
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background, gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text variant="caption" muted>Subtotal</Text>
+            <Text variant="caption" muted>{money(total)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text variant="caption" muted>Delivery</Text>
+            <Text variant="caption" muted>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</Text>
+          </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Text variant="body" muted>
               Total
             </Text>
-            <Text variant="h2">{money(total)}</Text>
+            <Text variant="h2">{money(grandTotal)}</Text>
           </View>
           <Button label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'} loading={busy} onPress={placeOrder} size="lg" fullWidth />
           <Text variant="caption" faint center>
-            Free delivery on orders over $100 · 12 months warranty
+            {Number(settings?.delivery?.fee) > 0 && Number(settings?.delivery?.freeOver) > 0
+              ? `Free delivery on orders over ${money(settings.delivery.freeOver)} · 12 months warranty`
+              : '12 months warranty'}
           </Text>
         </View>
       }

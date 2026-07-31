@@ -7,7 +7,7 @@ import { Button, Card, Badge, Spinner, Select, Modal, Checkbox } from '@/compone
 import { useToast } from '@/components/admin/toast.jsx'
 import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
-import { ORDER_STATUSES, statusMeta, money, orderDate } from '@/lib/orders'
+import { ORDER_STATUSES, statusMeta, money, orderDate, orderTotal } from '@/lib/orders'
 
 export default function OrdersAdmin() {
   const qc = useQueryClient()
@@ -138,7 +138,7 @@ export default function OrdersAdmin() {
                   ) : (
                     <span className="rounded-full bg-as-ink/8 px-2 py-0.5 text-[11px] font-medium text-as-ink/55">COD</span>
                   )}
-                  <span className="ml-auto font-medium text-as-ink">{money(o.subtotal)}</span>
+                  <span className="ml-auto font-medium text-as-ink">{money(orderTotal(o))}</span>
                   {/* Select is w-full by design, so its width is set by this wrapper. */}
                   <span className="w-36 shrink-0">
                     <Select
@@ -205,14 +205,28 @@ function OrderModal({ id, onClose }) {
                 </li>
               ))}
             </ul>
-            <div className="mt-3 flex items-center justify-between border-t border-as-ink/10 pt-3">
-              <span className="text-sm text-as-ink/60">
-                Total ·{' '}
-                {order.paymentMethod === 'whish'
-                  ? `Whish — ${order.paymentStatus === 'paid' ? 'paid' : 'unpaid'}`
-                  : 'Cash on delivery'}
-              </span>
-              <span className="text-lg font-semibold text-as-ink">{money(order.subtotal)}</span>
+            <div className="mt-3 space-y-1.5 border-t border-as-ink/10 pt-3">
+              {Number(order.deliveryFee) > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-sm text-as-ink/55">
+                    <span>Subtotal</span>
+                    <span>{money(order.subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-as-ink/55">
+                    <span>Delivery</span>
+                    <span>{money(order.deliveryFee)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-as-ink/60">
+                  Total ·{' '}
+                  {order.paymentMethod === 'whish'
+                    ? `Whish — ${order.paymentStatus === 'paid' ? 'paid' : 'unpaid'}`
+                    : 'Cash on delivery'}
+                </span>
+                <span className="text-lg font-semibold text-as-ink">{money(orderTotal(order))}</span>
+              </div>
             </div>
           </div>
 

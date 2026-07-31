@@ -7,7 +7,7 @@ import { useDispatch } from 'react-redux'
 import Icon from '@/components/Icon.jsx'
 import { clearCart } from '@/store/cartSlice'
 import { useAccount, accountApi } from '@/lib/account'
-import { statusMeta, statusClasses, money, orderDate } from '@/lib/orders'
+import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
 
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
 
@@ -220,16 +220,30 @@ export default function OrderPage({ params }) {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex items-center justify-between border-t border-as-ink/10 pt-4">
-              <span className="text-as-ink/60">
-                Total ·{' '}
-                {order.paymentMethod === 'whish'
-                  ? order.paymentStatus === 'paid'
-                    ? 'Paid online'
-                    : 'Online payment'
-                  : 'Cash on delivery'}
-              </span>
-              <span className="text-xl font-semibold text-as-ink">{money(order.subtotal)}</span>
+            <div className="mt-4 space-y-2 border-t border-as-ink/10 pt-4 text-sm">
+              {Number(order.deliveryFee) > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-as-ink/60">
+                    <span>Subtotal</span>
+                    <span>{money(order.subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-as-ink/60">
+                    <span>Delivery</span>
+                    <span>{money(order.deliveryFee)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-as-ink/60">
+                  Total ·{' '}
+                  {order.paymentMethod === 'whish'
+                    ? order.paymentStatus === 'paid'
+                      ? 'Paid online'
+                      : 'Online payment'
+                    : 'Cash on delivery'}
+                </span>
+                <span className="text-xl font-semibold text-as-ink">{money(orderTotal(order))}</span>
+              </div>
             </div>
           </div>
 

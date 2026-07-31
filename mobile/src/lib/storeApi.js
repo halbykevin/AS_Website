@@ -76,6 +76,8 @@ export const defaultStoreSettings = {
     count: 8
   },
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
+  // Delivery charge; real values come from the API's settings row.
+  delivery: { fee: 0, freeOver: 100 },
   navLinks: [],
   footerGroups: []
 };
@@ -91,7 +93,8 @@ export async function loadStoreSettings() {
         ...(s.announcement || {})
       },
       contact: { ...defaultStoreSettings.contact, ...(s.contact || {}) },
-      homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) }
+      homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) },
+      delivery: { ...defaultStoreSettings.delivery, ...(s.delivery || {}) }
     };
   } catch {
     return defaultStoreSettings;

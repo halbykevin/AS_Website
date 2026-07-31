@@ -7,7 +7,9 @@ import { useSelector, useDispatch } from 'react-redux'
 import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
 import { useAccount } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
-import { money } from '@/lib/orders'
+import { money, deliveryFeeFor } from '@/lib/orders'
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
 export default function CheckoutPage() {
   const { customer, setCustomer } = useAccount()
@@ -23,6 +25,24 @@ export default function CheckoutPage() {
   const [addrId, setAddrId] = useState(null) // selected saved-address id | 'new' | null
   const seeded = useRef(false)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Delivery pricing, fetched live so the summary matches what the API will
+  // charge. Until it arrives the fee shows as free rather than guessing a
+  // number the server might not agree with.
+  const [delivery, setDelivery] = useState(null)
+  useEffect(() => {
+    let alive = true
+    fetch(`${API}/api/settings`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => alive && s?.delivery && setDelivery(s.delivery))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const deliveryFee = deliveryFeeFor(total, delivery)
+  const grandTotal = total + deliveryFee
 
   const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : []
 
@@ -253,14 +273,28 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex items-center justify-between border-t border-as-ink/10 pt-4">
-              <span className="text-as-ink/60">Total</span>
-              <span className="text-xl font-semibold text-as-ink">{money(total)}</span>
+            <div className="mt-4 space-y-2 border-t border-as-ink/10 pt-4 text-sm">
+              <div className="flex items-center justify-between text-as-ink/60">
+                <span>Subtotal</span>
+                <span>{money(total)}</span>
+              </div>
+              <div className="flex items-center justify-between text-as-ink/60">
+                <span>Delivery</span>
+                <span>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-as-ink/60">Total</span>
+                <span className="text-xl font-semibold text-as-ink">{money(grandTotal)}</span>
+              </div>
             </div>
             <button type="submit" disabled={busy} className="pill mt-5 w-full justify-center">
               {busy ? 'Please wait…' : pay === 'whish' ? 'Continue to payment' : 'Place order'}
             </button>
-            <p className="mt-3 text-center text-xs text-as-ink/45">Free delivery on orders over $100 · 12 months warranty</p>
+            <p className="mt-3 text-center text-xs text-as-ink/45">
+              {Number(delivery?.fee) > 0 && Number(delivery?.freeOver) > 0
+                ? `Free delivery on orders over ${money(delivery.freeOver)} · 12 months warranty`
+                : '12 months warranty'}
+            </p>
           </div>
         </form>
       </div>

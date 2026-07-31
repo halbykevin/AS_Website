@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
-import { money, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
+import { money, orderTotal, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
 import { PAYMENT_WHISH } from '@/src/lib/payments';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui';
@@ -64,7 +64,7 @@ export default function OrdersScreen() {
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text variant="title">{money(o.subtotal)}</Text>
+                  <Text variant="title">{money(orderTotal(o))}</Text>
                   <Icon name="chevronRight" size={18} color={theme.colors.textFaint} />
                 </View>
               </View>

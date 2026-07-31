@@ -3,6 +3,11 @@
 
 export const money = n => `$${Number(n || 0).toLocaleString()}`;
 
+// What an order costs, delivery included. Older orders have no deliveryFee, so
+// this falls back to the items subtotal rather than rendering a blank.
+export const orderTotal = o =>
+  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0);
+
 // Format an event date (YYYY-MM-DD) as "Thursday 18 Jun 2026".
 export function formatEventDate(date) {
   if (!date) return '';

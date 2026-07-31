@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
-import { statusMeta, statusClasses, money, orderDate } from '@/lib/orders'
+import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
 
 export default function AccountPage() {
   const { customer, loading, logout, setCustomer } = useAccount()
@@ -98,7 +98,7 @@ function OrdersList() {
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClasses(o.status)}`}>
                   {statusMeta(o.status).label}
                 </span>
-                <span className="w-20 text-right font-medium text-as-ink">{money(o.subtotal)}</span>
+                <span className="w-20 text-right font-medium text-as-ink">{money(orderTotal(o))}</span>
                 <Icon name="chevronRight" className="h-4 w-4 text-as-ink/30" />
               </Link>
             </li>

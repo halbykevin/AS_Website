@@ -263,9 +263,33 @@ const settingsJson = (r) => ({
     logo: r.login_button_logo || "",
     weight: r.login_button_weight || "medium",
   },
+  delivery: {
+    fee: Number(r.delivery_fee ?? 0),
+    freeOver: Number(r.free_delivery_over ?? 0),
+  },
   published: r.published ?? false,
   updatedAt: r.updated_at,
 });
+
+// Settings money input: undefined/blank leaves the column alone (COALESCE), a
+// number is clamped to >= 0 and 2dp.
+const nonNegativeMoney = (v) => {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(n * 100) / 100;
+};
+
+// The one place the delivery charge is decided. A zero fee means delivery is
+// always free; a zero threshold means the fee always applies. Rounded to cents
+// so it can never introduce a fractional amount Whish would reject.
+export function deliveryFeeFor(subtotal, settings) {
+  const fee = Number(settings?.delivery_fee ?? 0);
+  const freeOver = Number(settings?.free_delivery_over ?? 0);
+  if (!Number.isFinite(fee) || fee <= 0) return 0;
+  if (freeOver > 0 && Number(subtotal) >= freeOver) return 0;
+  return Math.round(fee * 100) / 100;
+}
 
 const pageJson = (r) => ({
   id: r.id,
@@ -350,6 +374,9 @@ const orderJson = (r) => ({
   city: r.city || "",
   notes: r.notes || "",
   subtotal: r.subtotal,
+  deliveryFee: Number(r.delivery_fee ?? 0),
+  // What the customer actually pays / paid.
+  total: Number(r.subtotal ?? 0) + Number(r.delivery_fee ?? 0),
   paymentMethod: r.payment_method || "cod",
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
@@ -1157,9 +1184,17 @@ app.post(
         .json({ error: "Online payment is unavailable right now" });
     }
 
+    // Delivery is priced from the live settings row, never from the client, and
+    // snapshotted onto the order so changing the fee later cannot rewrite it.
+    const { rows: setRows } = await query(
+      `SELECT delivery_fee, free_delivery_over FROM settings WHERE id = 1`,
+    );
+    const deliveryFee = deliveryFeeFor(subtotal, setRows[0]);
+    const total = subtotal + deliveryFee;
+
     const { rows } = await query(
-      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, payment_method, payment_status, currency)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,'unpaid','USD') RETURNING id`,
+      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, payment_method, payment_status, currency)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,'unpaid','USD') RETURNING id`,
       [
         customerId,
         fullName,
@@ -1169,6 +1204,7 @@ app.post(
         b.city || "",
         b.notes || "",
         subtotal,
+        deliveryFee,
         paymentMethod,
       ],
     );
@@ -1197,7 +1233,7 @@ app.post(
         customerId,
         name: fullName,
         itemCount: items.reduce((n, it) => n + it.qty, 0),
-        total: subtotal,
+        total,
       },
       `order:${orderId}:created`,
     ).catch((e) => console.error("[notify] emit order_created:", e?.message || e));
@@ -1205,7 +1241,8 @@ app.post(
     const trackToken = signOrderToken(orderId);
     if (paymentMethod === "whish") {
       console.log(
-        `[whish] order #${orderId} created (unpaid), starting payment: subtotal=${subtotal} USD`,
+        `[whish] order #${orderId} created (unpaid), starting payment: ` +
+          `subtotal=${subtotal} + delivery=${deliveryFee} = ${total} USD`,
       );
       const appReturn = appReturnUrl(b.returnUrl);
       const bridge = (result) =>
@@ -1217,7 +1254,7 @@ app.post(
         );
       try {
         const { collectUrl } = await whishCreatePayment({
-          amount: subtotal,
+          amount: total,
           currency: "USD",
           externalId: orderId,
           invoice: `AS Store order #${orderId}`,
@@ -1280,7 +1317,7 @@ async function markWhishPaid(orderId) {
   );
   await emitEvent(
     "payment_paid",
-    { orderId: detail.id, customerId: detail.customerId, total: detail.subtotal },
+    { orderId: detail.id, customerId: detail.customerId, total: detail.total },
     `order:${detail.id}:paid`,
   ).catch((e) => console.error("[notify] emit payment_paid:", e?.message || e));
   return true;
@@ -1540,7 +1577,7 @@ const CUSTOMER_SELECT = `
     (SELECT count(*) FROM customer_logins l WHERE l.customer_id = c.id)::int AS login_count,
     (SELECT array_agg(DISTINCT l.method) FROM customer_logins l WHERE l.customer_id = c.id) AS methods_used,
     (SELECT count(*) FROM orders o WHERE o.customer_id = c.id)::int AS order_count,
-    (SELECT COALESCE(sum(o.subtotal), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
+    (SELECT COALESCE(sum(o.subtotal + o.delivery_fee), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
     (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at
   FROM customers c`;
 
@@ -1664,7 +1701,7 @@ app.get(
       [req.params.id],
     );
     const { rows: orders } = await query(
-      `SELECT id, status, payment_method, payment_status, subtotal, created_at
+      `SELECT id, status, payment_method, payment_status, subtotal, delivery_fee, created_at
        FROM orders WHERE customer_id = $1 ORDER BY id DESC LIMIT 50`,
       [req.params.id],
     );
@@ -1679,6 +1716,8 @@ app.get(
         paymentMethod: o.payment_method || "cod",
         paymentStatus: o.payment_status || "unpaid",
         subtotal: Number(o.subtotal || 0),
+        deliveryFee: Number(o.delivery_fee || 0),
+        total: Number(o.subtotal || 0) + Number(o.delivery_fee || 0),
         createdAt: o.created_at,
       })),
     });
@@ -2281,7 +2320,9 @@ app.put(
          home_new_count       = COALESCE($21, home_new_count),
          login_button_label   = COALESCE($22, login_button_label),
          login_button_logo    = COALESCE($23, login_button_logo),
-         login_button_weight  = COALESCE($24, login_button_weight)
+         login_button_weight  = COALESCE($24, login_button_weight),
+         delivery_fee         = COALESCE($25, delivery_fee),
+         free_delivery_over   = COALESCE($26, free_delivery_over)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -2313,6 +2354,9 @@ app.put(
         LOGIN_BUTTON_WEIGHTS.includes(b.loginButton?.weight)
           ? b.loginButton.weight
           : null,
+        // Money: clamp to non-negative so a typo can never credit an order.
+        nonNegativeMoney(b.delivery?.fee),
+        nonNegativeMoney(b.delivery?.freeOver),
       ],
     );
     res.json(settingsJson(rows[0]));

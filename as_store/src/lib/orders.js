@@ -25,6 +25,22 @@ export const statusClasses = (v) =>
 
 export const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
+// Mirror of deliveryFeeFor() in the API. The server is always the authority —
+// this exists so the cart and checkout can *show* the charge before the order
+// is created, never to decide what gets charged.
+export function deliveryFeeFor(subtotal, delivery) {
+  const fee = Number(delivery?.fee ?? 0)
+  const freeOver = Number(delivery?.freeOver ?? 0)
+  if (!Number.isFinite(fee) || fee <= 0) return 0
+  if (freeOver > 0 && Number(subtotal) >= freeOver) return 0
+  return Math.round(fee * 100) / 100
+}
+
+// What an order actually costs. Handles both a placed order (deliveryFee on the
+// record) and pre-checkout figures.
+export const orderTotal = (o) =>
+  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0)
+
 export const orderDate = (iso) => {
   try {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })

@@ -20,6 +20,7 @@ const EMPTY = {
   navLogoSizeMobile: 18,
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
+  delivery: { fee: 0, freeOver: 100 },
 }
 
 // Must match LOGIN_BUTTON_WEIGHTS server-side — the value becomes a class name.
@@ -48,6 +49,7 @@ export default function SettingsPage() {
         contact: { ...EMPTY.contact, ...(data.contact || {}) },
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
+        delivery: { ...EMPTY.delivery, ...(data.delivery || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
         navLinks: data.navLinks || [],
         footerGroups: data.footerGroups || [],
@@ -166,6 +168,53 @@ export default function SettingsPage() {
             placeholder="Free delivery on orders over $100 · 12 months warranty"
           />
         </Field>
+      </Card>
+
+      {/* Delivery charge */}
+      <Card className="space-y-4 p-5">
+        <h3 className="font-bold text-as-ink">Delivery</h3>
+        <p className="text-sm text-as-ink/50">
+          Charged on top of the items total at checkout. The fee is saved onto each order as it is
+          placed, so changing these values never alters an order a customer already paid.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Delivery fee ($)" hint="0 = delivery is always free.">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.delivery.fee}
+              onChange={(e) => setNested('delivery', 'fee', e.target.value)}
+            />
+          </Field>
+          <Field label="Free delivery over ($)" hint="0 = the fee applies to every order.">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.delivery.freeOver}
+              onChange={(e) => setNested('delivery', 'freeOver', e.target.value)}
+            />
+          </Field>
+        </div>
+        <p className="rounded-lg bg-as-fog px-3 py-2 text-sm text-as-ink/70">
+          {Number(form.delivery.fee) > 0 ? (
+            Number(form.delivery.freeOver) > 0 ? (
+              <>
+                Orders under <b>${Number(form.delivery.freeOver).toLocaleString()}</b> pay{' '}
+                <b>${Number(form.delivery.fee).toLocaleString()}</b> delivery. Orders of $
+                {Number(form.delivery.freeOver).toLocaleString()} or more ship free.
+              </>
+            ) : (
+              <>
+                Every order pays <b>${Number(form.delivery.fee).toLocaleString()}</b> delivery,
+                whatever the value.
+              </>
+            )
+          ) : (
+            <>Delivery is free on every order — no fee is added at checkout.</>
+          )}
+        </p>
       </Card>
 
       {/* Sign-in button branding */}

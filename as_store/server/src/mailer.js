@@ -27,6 +27,11 @@ function getTransport() {
 }
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
+
+// What the customer pays. Falls back to subtotal for order shapes that predate
+// the delivery fee, so an old order never renders a blank total.
+const orderTotal = (o) =>
+  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0)
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
@@ -96,9 +101,23 @@ function orderBody(order, { intro, trackUrl }) {
     <p style="margin:20px 0 4px;font-size:13px;color:${MUTED}">Order #${order.id} · ${new Date(order.createdAt).toLocaleString('en-GB')}</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
       ${rows}
+      ${
+        // Only break the sum out when delivery was actually charged — a free
+        // delivery adds two rows of noise to every other order.
+        Number(order.deliveryFee) > 0
+          ? `<tr>
+        <td colspan="2" style="padding:10px 0 2px;color:${MUTED}">Subtotal</td>
+        <td align="right" style="padding:10px 0 2px;color:${MUTED}">${money(order.subtotal)}</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:2px 0;color:${MUTED}">Delivery</td>
+        <td align="right" style="padding:2px 0;color:${MUTED}">${money(order.deliveryFee)}</td>
+      </tr>`
+          : ''
+      }
       <tr>
         <td colspan="2" style="padding:12px 0;font-weight:bold;color:${INK}">${esc(paymentWording(order).totalLabel)}</td>
-        <td align="right" style="padding:12px 0;font-weight:bold;color:${INK}">${money(order.subtotal)}</td>
+        <td align="right" style="padding:12px 0;font-weight:bold;color:${INK}">${money(orderTotal(order))}</td>
       </tr>
     </table>
 
@@ -207,7 +226,7 @@ export async function sendOrderEmails(order, trackToken) {
         from: FROM,
         // The payment method is in the subject so staff can triage the inbox
         // without opening the mail — an unpaid order needs different handling.
-        subject: `New order #${order.id} — ${order.fullName} (${money(order.subtotal)}) · ${pay.tag}`,
+        subject: `New order #${order.id} — ${order.fullName} (${money(orderTotal(order))}) · ${pay.tag}`,
         to: NOTIFY,
         html: emailShell(
           orderBody(order, {

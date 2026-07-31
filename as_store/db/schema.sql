@@ -114,6 +114,11 @@ CREATE TABLE IF NOT EXISTS settings (
   CONSTRAINT settings_singleton CHECK (id = 1)
 );
 
+-- Delivery charge. A fee of 0 means delivery is always free; a threshold of 0
+-- means the fee applies to every order regardless of value.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS delivery_fee       NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS free_delivery_over NUMERIC(10,2) DEFAULT 100;
+
 -- Backfill the showcase background colour on databases created before it existed.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS showcase_bg TEXT DEFAULT '#000000';
 -- Backfill the nav logo size on databases created before it existed.
@@ -350,6 +355,13 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
+
+-- Delivery charged on this order, snapshotted at checkout so a later change to
+-- the fee or the free-delivery threshold never rewrites what a customer paid.
+-- `subtotal` keeps its meaning (items only); the amount charged is
+-- subtotal + delivery_fee. Existing orders default to 0, so their total is
+-- unchanged.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) NOT NULL DEFAULT 0;
 
 -- Online payment (Whish Pay). payment_method is 'cod' or 'whish'; payment_status
 -- tracks the money axis independently of the fulfilment `status`, so a COD order

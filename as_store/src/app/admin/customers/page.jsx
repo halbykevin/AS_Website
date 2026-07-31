@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
 import { Badge, Card, Input, Modal, Select, Spinner } from '@/components/admin/ui.jsx'
 import { adminApi } from '@/lib/adminApi'
-import { money, statusClasses, statusMeta } from '@/lib/orders'
+import { money, statusClasses, statusMeta, orderTotal } from '@/lib/orders'
 import {
   CUSTOMER_SORTS,
   SIGNUP_METHODS,
@@ -410,7 +410,7 @@ function CustomerModal({ id, onClose }) {
                       {o.paymentMethod === 'whish' ? 'Whish' : 'COD'} · {o.paymentStatus}
                     </span>
                     <span className="ml-auto font-semibold tabular-nums text-as-ink">
-                      {money(o.subtotal)}
+                      {money(orderTotal(o))}
                     </span>
                   </li>
                 ))}
