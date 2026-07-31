@@ -34,6 +34,30 @@ const RED = '#A41E22'
 const INK = '#1d1d1f'
 const MUTED = '#6e6e73'
 
+// How an order paid, in the three places an email has to say it. A Whish order
+// only reaches the customer/staff mails once markWhishPaid has settled it, so
+// 'paid' is the normal case there — but the wording still follows the actual
+// payment_status rather than assuming it.
+function paymentWording(order) {
+  const paid = order?.paymentStatus === 'paid'
+  if (order?.paymentMethod === 'whish') {
+    return {
+      tag: 'Whish Pay',
+      totalLabel: paid ? 'Total — paid with Whish Pay' : 'Total — awaiting Whish Pay payment',
+      customerLine: paid
+        ? "We've received your payment in full."
+        : 'Your Whish Pay payment is still pending.',
+      staffLine: paid ? 'paid online with Whish Pay' : 'started but not yet paid via Whish Pay',
+    }
+  }
+  return {
+    tag: 'Cash on delivery',
+    totalLabel: 'Total — cash on delivery',
+    customerLine: 'You pay in cash when it arrives.',
+    staffLine: 'to be paid cash on delivery',
+  }
+}
+
 function emailShell(innerHtml) {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f5f7;margin:0;padding:24px">
@@ -73,7 +97,7 @@ function orderBody(order, { intro, trackUrl }) {
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
       ${rows}
       <tr>
-        <td colspan="2" style="padding:12px 0;font-weight:bold;color:${INK}">Total — cash on delivery</td>
+        <td colspan="2" style="padding:12px 0;font-weight:bold;color:${INK}">${esc(paymentWording(order).totalLabel)}</td>
         <td align="right" style="padding:12px 0;font-weight:bold;color:${INK}">${money(order.subtotal)}</td>
       </tr>
     </table>
@@ -103,6 +127,7 @@ export async function sendOrderEmails(order, trackToken) {
     ? `${STORE_URL}/account/orders/${order.id}?t=${encodeURIComponent(trackToken)}`
     : ''
   const jobs = []
+  const pay = paymentWording(order)
 
   if (order.email) {
     jobs.push(
@@ -112,7 +137,7 @@ export async function sendOrderEmails(order, trackToken) {
         subject: `Your AS Store order #${order.id} — received`,
         html: emailShell(
           orderBody(order, {
-            intro: `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. You pay in cash when it arrives.`,
+            intro: `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. ${esc(pay.customerLine)}`,
             trackUrl,
           }),
         ),
@@ -124,11 +149,13 @@ export async function sendOrderEmails(order, trackToken) {
     jobs.push(
       t.sendMail({
         from: FROM,
+        // The payment method is in the subject so staff can triage the inbox
+        // without opening the mail — an unpaid order needs different handling.
+        subject: `New order #${order.id} — ${order.fullName} (${money(order.subtotal)}) · ${pay.tag}`,
         to: NOTIFY,
-        subject: `New order #${order.id} — ${order.fullName} (${money(order.subtotal)})`,
         html: emailShell(
           orderBody(order, {
-            intro: `New cash-on-delivery order from <strong>${esc(order.fullName)}</strong> (${esc(order.phone)}).`,
+            intro: `New order from <strong>${esc(order.fullName)}</strong> (${esc(order.phone)}), ${esc(pay.staffLine)}.`,
             trackUrl: '',
           }),
         ),
