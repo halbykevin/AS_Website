@@ -74,7 +74,7 @@ export default function HomepageAdmin() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-as-ink/50">Drag to reorder. Toggle to show/hide. Click a block to edit its content & background.</p>
+        <p className="text-sm text-admin-text/50">Drag to reorder. Toggle to show/hide. Click a block to edit its content & background.</p>
         <div className="flex items-center gap-2">
           {orderDirty && (
             <Button onClick={() => saveOrder.mutate()} disabled={saveOrder.isPending}>
@@ -88,7 +88,7 @@ export default function HomepageAdmin() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : items.length === 0 ? (
-        <Card className="py-16 text-center text-sm text-as-ink/50">No sections yet. Add your first block.</Card>
+        <Card className="py-16 text-center text-sm text-admin-text/50">No sections yet. Add your first block.</Card>
       ) : (
         <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-2">
           {items.map((s) => (
@@ -125,12 +125,12 @@ function AddMenu({ onPick }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-as-ink/10 bg-white shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-admin-line/10 bg-admin-surface shadow-lg">
             {Object.entries(TYPE_LABELS).map(([type, label]) => (
               <button
                 key={type}
                 onClick={() => { setOpen(false); onPick(type) }}
-                className="block w-full px-4 py-2.5 text-left text-sm text-as-ink hover:bg-as-fog"
+                className="block w-full px-4 py-2.5 text-left text-sm text-admin-text hover:bg-admin-bg"
               >
                 {label}
               </button>
@@ -149,11 +149,11 @@ function SectionRow({ section, onEdit, onToggle, onDelete }) {
       value={section}
       dragListener={false}
       dragControls={controls}
-      className={`flex items-center gap-3 rounded-xl border border-as-ink/10 bg-white px-3 py-3 ${section.visible ? '' : 'opacity-60'}`}
+      className={`flex items-center gap-3 rounded-xl border border-admin-line/10 bg-admin-surface px-3 py-3 ${section.visible ? '' : 'opacity-60'}`}
     >
       <button
         onPointerDown={(e) => controls.start(e)}
-        className="cursor-grab touch-none rounded-lg p-1.5 text-as-ink/40 hover:bg-as-fog active:cursor-grabbing"
+        className="cursor-grab touch-none rounded-lg p-1.5 text-admin-text/40 hover:bg-admin-bg active:cursor-grabbing"
         aria-label="Drag to reorder"
         title="Drag to reorder"
       >
@@ -161,14 +161,14 @@ function SectionRow({ section, onEdit, onToggle, onDelete }) {
       </button>
       <Badge tone="brand">{TYPE_LABELS[section.type] || section.type}</Badge>
       <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <p className="truncate font-medium text-as-ink">{section.heading || section.eyebrow || '(no heading)'}</p>
-        {section.subheading && <p className="truncate text-xs text-as-ink/45">{section.subheading}</p>}
+        <p className="truncate font-medium text-admin-text">{section.heading || section.eyebrow || '(no heading)'}</p>
+        {section.subheading && <p className="truncate text-xs text-admin-text/45">{section.subheading}</p>}
       </button>
       <Toggle checked={section.visible} onChange={onToggle} />
-      <button onClick={onEdit} className="rounded-lg p-2 text-as-ink/60 hover:bg-as-fog hover:text-as-red" title="Edit">
+      <button onClick={onEdit} className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-bg hover:text-as-red" title="Edit">
         <Icon name="pencil" className="h-4 w-4" />
       </button>
-      <button onClick={onDelete} className="rounded-lg p-2 text-as-ink/60 hover:bg-red-50 hover:text-red-600" title="Delete">
+      <button onClick={onDelete} className="rounded-lg p-2 text-admin-text/60 hover:bg-red-50 hover:text-red-600" title="Delete">
         <Icon name="trash" className="h-4 w-4" />
       </button>
     </Reorder.Item>
@@ -328,7 +328,7 @@ function ImageField({ label, value, onChange }) {
   return (
     <Field label={label}>
       <div className="flex items-center gap-3">
-        <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-as-fog ring-1 ring-as-ink/10">
+        <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-admin-bg ring-1 ring-admin-line/10">
           {value && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />
@@ -355,12 +355,12 @@ function ColorField({ label, value, onChange }) {
           type="color"
           value={valid ? value : '#ffffff'}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-as-ink/15 bg-transparent p-1"
+          className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-admin-line/15 bg-transparent p-1"
           aria-label="Pick background colour"
         />
         <Input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="#ffffff" className="font-mono" />
         {value && (
-          <button onClick={() => onChange('')} className="shrink-0 rounded-lg p-2 text-as-ink/50 hover:bg-as-fog" title="Clear">
+          <button onClick={() => onChange('')} className="shrink-0 rounded-lg p-2 text-admin-text/50 hover:bg-admin-bg" title="Clear">
             <Icon name="close" className="h-4 w-4" />
           </button>
         )}
@@ -383,14 +383,14 @@ function HeroProductPicker({ value, onChange, products }) {
       hint="The product shown floating in the hero — its image, name, price and Shop link all follow it. Leave empty to auto-pick."
     >
       {selected ? (
-        <div className="flex items-center gap-3 rounded-lg border border-as-ink/10 bg-as-fog/40 p-2">
+        <div className="flex items-center gap-3 rounded-lg border border-admin-line/10 bg-admin-bg/40 p-2">
           {selected.image && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={selected.image} alt="" className="h-10 w-10 shrink-0 rounded bg-white object-contain" />
+            <img src={selected.image} alt="" className="h-10 w-10 shrink-0 rounded bg-admin-surface object-contain" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-as-ink">{selected.name}</p>
-            <p className="text-xs text-as-ink/50">${Number(selected.price || 0).toLocaleString()}</p>
+            <p className="truncate text-sm font-medium text-admin-text">{selected.name}</p>
+            <p className="text-xs text-admin-text/50">${Number(selected.price || 0).toLocaleString()}</p>
           </div>
           <Button variant="secondary" onClick={() => onChange(null)}>Change</Button>
         </div>
@@ -398,20 +398,20 @@ function HeroProductPicker({ value, onChange, products }) {
         <>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products by name…" />
           {matches.length > 0 && (
-            <ul className="mt-1 max-h-56 divide-y divide-as-ink/5 overflow-auto rounded-lg border border-as-ink/10">
+            <ul className="mt-1 max-h-56 divide-y divide-admin-line/5 overflow-auto rounded-lg border border-admin-line/10">
               {matches.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     onClick={() => { onChange(p.id); setQ('') }}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-as-fog"
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-admin-bg"
                   >
                     {p.image && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.image} alt="" className="h-8 w-8 shrink-0 rounded bg-white object-contain" />
+                      <img src={p.image} alt="" className="h-8 w-8 shrink-0 rounded bg-admin-surface object-contain" />
                     )}
-                    <span className="min-w-0 flex-1 truncate text-sm text-as-ink">{p.name}</span>
-                    <span className="shrink-0 text-xs text-as-ink/50">${Number(p.price || 0).toLocaleString()}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-admin-text">{p.name}</span>
+                    <span className="shrink-0 text-xs text-admin-text/50">${Number(p.price || 0).toLocaleString()}</span>
                   </button>
                 </li>
               ))}
@@ -431,12 +431,12 @@ function ButtonsEditor({ value, onChange }) {
   }
   return (
     <div className="space-y-2">
-      <span className="block text-sm font-semibold text-as-ink">Buttons</span>
+      <span className="block text-sm font-semibold text-admin-text">Buttons</span>
       {value.map((b, i) => (
         <div key={i} className="flex items-center gap-2">
           <Input value={b.label || ''} onChange={(e) => update(i, 'label', e.target.value)} placeholder="Label" className="flex-1" />
           <Input value={b.href || ''} onChange={(e) => update(i, 'href', e.target.value)} placeholder="#latest or /category/audio" className="flex-1" />
-          <button onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="shrink-0 rounded-lg p-2 text-as-ink/50 hover:bg-red-50 hover:text-red-600" title="Remove">
+          <button onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="shrink-0 rounded-lg p-2 text-admin-text/50 hover:bg-red-50 hover:text-red-600" title="Remove">
             <Icon name="trash" className="h-4 w-4" />
           </button>
         </div>
@@ -456,12 +456,12 @@ function TilesEditor({ value, onChange }) {
   }
   return (
     <div className="space-y-3">
-      <span className="block text-sm font-semibold text-as-ink">Tiles</span>
+      <span className="block text-sm font-semibold text-admin-text">Tiles</span>
       {value.map((t, i) => (
-        <div key={i} className="space-y-2 rounded-xl border border-as-ink/10 p-3">
+        <div key={i} className="space-y-2 rounded-xl border border-admin-line/10 p-3">
           <div className="flex items-center gap-2">
             <Input value={t.title || ''} onChange={(e) => update(i, { title: e.target.value })} placeholder="Title" className="flex-1 font-medium" />
-            <button onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="shrink-0 rounded-lg p-2 text-as-ink/50 hover:bg-red-50 hover:text-red-600" title="Remove tile">
+            <button onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="shrink-0 rounded-lg p-2 text-admin-text/50 hover:bg-red-50 hover:text-red-600" title="Remove tile">
               <Icon name="trash" className="h-4 w-4" />
             </button>
           </div>

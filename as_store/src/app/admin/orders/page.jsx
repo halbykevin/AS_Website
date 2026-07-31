@@ -78,7 +78,7 @@ export default function OrdersAdmin() {
             key={t.value || 'all'}
             onClick={() => setStatus(t.value)}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              status === t.value ? 'bg-as-ink text-white' : 'bg-white text-as-ink/60 hover:bg-as-fog'
+              status === t.value ? 'bg-admin-invert text-white' : 'bg-admin-surface text-admin-text/60 hover:bg-admin-bg'
             }`}
           >
             {t.label}
@@ -95,12 +95,12 @@ export default function OrdersAdmin() {
             <a href="/admin/login" className="mt-2 inline-block text-as-red underline">Sign in again</a>
           </div>
         ) : list.length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">No orders here yet.</p>
+          <p className="py-16 text-center text-sm text-admin-text/50">No orders here yet.</p>
         ) : (
           <>
             {/* Bulk-select bar */}
-            <div className="flex items-center justify-between gap-3 border-b border-as-ink/5 bg-as-fog/40 px-5 py-2.5">
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-as-ink/60">
+            <div className="flex items-center justify-between gap-3 border-b border-admin-line/5 bg-admin-bg/40 px-5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-admin-text/60">
                 <Checkbox checked={sel.all} indeterminate={sel.indeterminate} onChange={sel.toggleAll} />
                 {sel.count > 0 ? `${sel.count} selected` : 'Select all'}
               </label>
@@ -111,20 +111,20 @@ export default function OrdersAdmin() {
                 </Button>
               )}
             </div>
-            <ul className="divide-y divide-as-ink/5">
+            <ul className="divide-y divide-admin-line/5">
               {list.map((o) => (
                 <li
                   key={o.id}
-                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-as-fog/60 ${
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-admin-bg/60 ${
                     sel.has(o.id) ? 'bg-as-red/5' : ''
                   }`}
                 >
                   <Checkbox checked={sel.has(o.id)} onChange={() => sel.toggle(o.id)} />
                   <button onClick={() => setViewId(o.id)} className="min-w-0 text-left">
-                    <p className="font-semibold text-as-ink">Order #{o.id}</p>
-                    <p className="truncate text-xs text-as-ink/45">{o.customerEmail || 'guest'} · {o.fullName}</p>
+                    <p className="font-semibold text-admin-text">Order #{o.id}</p>
+                    <p className="truncate text-xs text-admin-text/45">{o.customerEmail || 'guest'} · {o.fullName}</p>
                   </button>
-                  <span className="text-xs text-as-ink/50">
+                  <span className="text-xs text-admin-text/50">
                     {orderDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
                   </span>
                   {o.paymentMethod === 'whish' ? (
@@ -136,9 +136,9 @@ export default function OrdersAdmin() {
                       Whish · {o.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-as-ink/8 px-2 py-0.5 text-[11px] font-medium text-as-ink/55">COD</span>
+                    <span className="rounded-full bg-admin-text/8 px-2 py-0.5 text-[11px] font-medium text-admin-text/55">COD</span>
                   )}
-                  <span className="ml-auto font-medium text-as-ink">{money(orderTotal(o))}</span>
+                  <span className="ml-auto font-medium text-admin-text">{money(orderTotal(o))}</span>
                   {/* Select is w-full by design, so its width is set by this wrapper. */}
                   <span className="w-36 shrink-0">
                     <Select
@@ -155,7 +155,7 @@ export default function OrdersAdmin() {
                     disabled={remove.isPending}
                     title={`Delete order #${o.id}`}
                     aria-label={`Delete order #${o.id}`}
-                    className="rounded-lg p-2 text-as-ink/35 transition hover:bg-red-50 hover:text-as-red disabled:opacity-40"
+                    className="rounded-lg p-2 text-admin-text/35 transition hover:bg-red-50 hover:text-as-red disabled:opacity-40"
                   >
                     <Icon name="trash" className="h-4 w-4" />
                   </button>
@@ -185,60 +185,60 @@ function OrderModal({ id, onClose }) {
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <Badge tone="brand">{statusMeta(order.status).label}</Badge>
-            <span className="text-sm text-as-ink/50">{orderDate(order.createdAt)}</span>
+            <span className="text-sm text-admin-text/50">{orderDate(order.createdAt)}</span>
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/45">Items</h4>
-            <ul className="divide-y divide-as-ink/8">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-admin-text/45">Items</h4>
+            <ul className="divide-y divide-admin-line/8">
               {(order.items || []).map((it) => (
                 <li key={it.id} className="flex items-center gap-3 py-2">
-                  <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-as-fog">
+                  <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-admin-bg">
                     {it.image && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={it.image} alt="" className="h-full w-full object-cover" />
                     )}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-as-ink">{it.name}</span>
-                  <span className="text-sm text-as-ink/60">×{it.qty}</span>
-                  <span className="text-sm font-medium text-as-ink">{money(Number(it.price) * it.qty)}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-admin-text">{it.name}</span>
+                  <span className="text-sm text-admin-text/60">×{it.qty}</span>
+                  <span className="text-sm font-medium text-admin-text">{money(Number(it.price) * it.qty)}</span>
                 </li>
               ))}
             </ul>
-            <div className="mt-3 space-y-1.5 border-t border-as-ink/10 pt-3">
+            <div className="mt-3 space-y-1.5 border-t border-admin-line/10 pt-3">
               {Number(order.deliveryFee) > 0 && (
                 <>
-                  <div className="flex items-center justify-between text-sm text-as-ink/55">
+                  <div className="flex items-center justify-between text-sm text-admin-text/55">
                     <span>Subtotal</span>
                     <span>{money(order.subtotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-as-ink/55">
+                  <div className="flex items-center justify-between text-sm text-admin-text/55">
                     <span>Delivery</span>
                     <span>{money(order.deliveryFee)}</span>
                   </div>
                 </>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-sm text-as-ink/60">
+                <span className="text-sm text-admin-text/60">
                   Total ·{' '}
                   {order.paymentMethod === 'whish'
                     ? `Whish — ${order.paymentStatus === 'paid' ? 'paid' : 'unpaid'}`
                     : 'Cash on delivery'}
                 </span>
-                <span className="text-lg font-semibold text-as-ink">{money(orderTotal(order))}</span>
+                <span className="text-lg font-semibold text-admin-text">{money(orderTotal(order))}</span>
               </div>
             </div>
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/45">Deliver to</h4>
-            <div className="space-y-0.5 text-sm text-as-ink/75">
-              <p className="font-medium text-as-ink">{order.fullName}</p>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-admin-text/45">Deliver to</h4>
+            <div className="space-y-0.5 text-sm text-admin-text/75">
+              <p className="font-medium text-admin-text">{order.fullName}</p>
               {order.phone && <p>{order.phone}</p>}
               {order.customerEmail && <p>{order.customerEmail}</p>}
               {order.address && <p>{order.address}</p>}
               {order.city && <p>{order.city}</p>}
-              {order.notes && <p className="mt-1 text-as-ink/50">“{order.notes}”</p>}
+              {order.notes && <p className="mt-1 text-admin-text/50">“{order.notes}”</p>}
             </div>
           </div>
         </div>

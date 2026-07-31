@@ -80,7 +80,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-as-ink/50">Site-wide content shown across the storefront.</p>
+        <p className="text-sm text-admin-text/50">Site-wide content shown across the storefront.</p>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save changes'}
         </Button>
@@ -90,7 +90,7 @@ export default function SettingsPage() {
       <Card className="space-y-3 p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <h3 className="font-bold text-as-ink">Site visibility</h3>
+            <h3 className="font-bold text-admin-text">Site visibility</h3>
             {form.published ? <Badge tone="green">Live</Badge> : <Badge tone="amber">Coming soon</Badge>}
           </div>
           <Toggle
@@ -99,17 +99,17 @@ export default function SettingsPage() {
             label={form.published ? 'Published' : 'Hidden'}
           />
         </div>
-        <p className="text-sm text-as-ink/50">
+        <p className="text-sm text-admin-text/50">
           Off = visitors see a branded “Coming soon” page instead of the store. This admin is never
           hidden, and you can preview the real site while it&apos;s off by opening{' '}
-          <code className="rounded bg-as-fog px-1.5 py-0.5 text-xs">/?preview=1</code>. Remember to
+          <code className="rounded bg-admin-bg px-1.5 py-0.5 text-xs">/?preview=1</code>. Remember to
           press <b>Save changes</b> after flipping the switch.
         </p>
       </Card>
 
       {/* General */}
       <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-as-ink">General</h3>
+        <h3 className="font-bold text-admin-text">General</h3>
         <Field label="Store name">
           <Input value={form.storeName} onChange={(e) => set('storeName', e.target.value)} />
         </Field>
@@ -154,7 +154,7 @@ export default function SettingsPage() {
       {/* Announcement */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-as-ink">Announcement bar</h3>
+          <h3 className="font-bold text-admin-text">Announcement bar</h3>
           <Toggle
             checked={form.announcement.enabled}
             onChange={(v) => setNested('announcement', 'enabled', v)}
@@ -172,8 +172,8 @@ export default function SettingsPage() {
 
       {/* Delivery charge */}
       <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-as-ink">Delivery</h3>
-        <p className="text-sm text-as-ink/50">
+        <h3 className="font-bold text-admin-text">Delivery</h3>
+        <p className="text-sm text-admin-text/50">
           Charged on top of the items total at checkout. The fee is saved onto each order as it is
           placed, so changing these values never alters an order a customer already paid.
         </p>
@@ -197,7 +197,7 @@ export default function SettingsPage() {
             />
           </Field>
         </div>
-        <p className="rounded-lg bg-as-fog px-3 py-2 text-sm text-as-ink/70">
+        <p className="rounded-lg bg-admin-bg px-3 py-2 text-sm text-admin-text/70">
           {Number(form.delivery.fee) > 0 ? (
             Number(form.delivery.freeOver) > 0 ? (
               <>
@@ -219,8 +219,8 @@ export default function SettingsPage() {
 
       {/* Sign-in button branding */}
       <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-as-ink">Sign-in button</h3>
-        <p className="text-sm text-as-ink/50">
+        <h3 className="font-bold text-admin-text">Sign-in button</h3>
+        <p className="text-sm text-admin-text/50">
           The email-code button on the sign-in page. Use your own logo and wording — it’s your
           service, so it shouldn’t carry another company’s mark.
         </p>
@@ -248,9 +248,9 @@ export default function SettingsPage() {
           onChange={(v) => setNested('loginButton', 'logo', v)}
         />
         <Field label="Preview" hint="Exactly how it renders on the sign-in page.">
-          <div className="rounded-xl bg-as-fog p-5">
+          <div className="rounded-xl bg-admin-bg p-5">
             <span
-              className={`mx-auto flex h-12 w-full max-w-sm items-center justify-center gap-3 rounded-full border border-as-ink/15 bg-white text-[15px] text-as-ink ${
+              className={`mx-auto flex h-12 w-full max-w-sm items-center justify-center gap-3 rounded-full border border-admin-line/15 bg-admin-surface text-[15px] text-admin-text ${
                 LOGIN_WEIGHT_CLS[form.loginButton.weight] || LOGIN_WEIGHT_CLS.medium
               }`}
             >
@@ -258,7 +258,7 @@ export default function SettingsPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={form.loginButton.logo} alt="" className="h-5 w-auto max-w-[96px] shrink-0 object-contain" />
               ) : (
-                <Icon name="mail" className="h-5 w-5 text-as-ink/55" />
+                <Icon name="mail" className="h-5 w-5 text-admin-text/55" />
               )}
               {form.loginButton.label || 'Continue with email'}
             </span>
@@ -269,14 +269,14 @@ export default function SettingsPage() {
       {/* Homepage — New arrivals (the first block on the homepage) */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-as-ink">Homepage — New arrivals</h3>
+          <h3 className="font-bold text-admin-text">Homepage — New arrivals</h3>
           <Toggle
             checked={form.homeNew.enabled}
             onChange={(v) => setNested('homeNew', 'enabled', v)}
             label="Shown"
           />
         </div>
-        <p className="text-sm text-as-ink/50">
+        <p className="text-sm text-admin-text/50">
           The first section on the homepage — a strip of products under the nav.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -290,7 +290,7 @@ export default function SettingsPage() {
             <select
               value={form.homeNew.source}
               onChange={(e) => setNested('homeNew', 'source', e.target.value)}
-              className="w-full rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm text-as-ink focus:border-as-red focus:outline-none"
+              className="w-full rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm text-admin-text focus:border-as-red focus:outline-none"
             >
               <option value="newest">Newest arrivals</option>
               <option value="featured">Featured products</option>
@@ -302,7 +302,7 @@ export default function SettingsPage() {
               <select
                 value={form.homeNew.categoryId ?? ''}
                 onChange={(e) => setNested('homeNew', 'categoryId', e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm text-as-ink focus:border-as-red focus:outline-none"
+                className="w-full rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm text-admin-text focus:border-as-red focus:outline-none"
               >
                 <option value="">Select a category…</option>
                 {categories.map((c) => (
@@ -327,7 +327,7 @@ export default function SettingsPage() {
 
       {/* Contact */}
       <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-        <h3 className="font-bold text-as-ink sm:col-span-2">Contact</h3>
+        <h3 className="font-bold text-admin-text sm:col-span-2">Contact</h3>
         <Field label="Email">
           <Input value={form.contact.email} onChange={(e) => setNested('contact', 'email', e.target.value)} />
         </Field>
@@ -344,7 +344,7 @@ export default function SettingsPage() {
 
       {/* Socials */}
       <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-        <h3 className="font-bold text-as-ink sm:col-span-2">Social links</h3>
+        <h3 className="font-bold text-admin-text sm:col-span-2">Social links</h3>
         {['instagram', 'facebook', 'tiktok', 'x', 'youtube'].map((key) => (
           <Field key={key} label={key[0].toUpperCase() + key.slice(1)}>
             <Input
@@ -358,14 +358,14 @@ export default function SettingsPage() {
 
       {/* Nav links */}
       <Card className="space-y-3 p-5">
-        <h3 className="font-bold text-as-ink">Navigation links</h3>
+        <h3 className="font-bold text-admin-text">Navigation links</h3>
         <LinkList value={form.navLinks} onChange={(v) => set('navLinks', v)} />
       </Card>
 
       {/* Footer groups */}
       <Card className="space-y-4 p-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-as-ink">Footer columns</h3>
+          <h3 className="font-bold text-admin-text">Footer columns</h3>
           <Button
             variant="secondary"
             onClick={() => set('footerGroups', [...form.footerGroups, { title: 'New column', links: [] }])}
@@ -375,7 +375,7 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-4">
           {form.footerGroups.map((g, gi) => (
-            <div key={gi} className="rounded-xl border border-as-ink/10 p-4">
+            <div key={gi} className="rounded-xl border border-admin-line/10 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Input
                   value={g.title}
@@ -388,7 +388,7 @@ export default function SettingsPage() {
                 />
                 <button
                   onClick={() => set('footerGroups', form.footerGroups.filter((_, i) => i !== gi))}
-                  className="shrink-0 rounded-lg p-2 text-as-ink/50 hover:bg-red-50 hover:text-red-600"
+                  className="shrink-0 rounded-lg p-2 text-admin-text/50 hover:bg-red-50 hover:text-red-600"
                   title="Remove column"
                 >
                   <Icon name="trash" className="h-4 w-4" />
@@ -405,7 +405,7 @@ export default function SettingsPage() {
             </div>
           ))}
           {form.footerGroups.length === 0 && (
-            <p className="text-sm text-as-ink/40">No footer columns yet.</p>
+            <p className="text-sm text-admin-text/40">No footer columns yet.</p>
           )}
         </div>
       </Card>
@@ -444,7 +444,7 @@ function LinkList({ value, onChange }) {
           />
           <button
             onClick={() => onChange(value.filter((_, idx) => idx !== i))}
-            className="shrink-0 rounded-lg p-2 text-as-ink/50 hover:bg-red-50 hover:text-red-600"
+            className="shrink-0 rounded-lg p-2 text-admin-text/50 hover:bg-red-50 hover:text-red-600"
             title="Remove"
           >
             <Icon name="trash" className="h-4 w-4" />
@@ -484,12 +484,12 @@ function LoginLogoField({ value, onChange }) {
   return (
     <Field label="Logo" hint="Shown 20px tall next to the text; a square mark or a short wordmark both work. Leave empty for the default mail icon.">
       <div className="flex items-center gap-3">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-as-fog ring-1 ring-as-ink/10">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-admin-bg ring-1 ring-admin-line/10">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-contain p-2" />
           ) : (
-            <Icon name="mail" className="h-5 w-5 text-as-ink/30" />
+            <Icon name="mail" className="h-5 w-5 text-admin-text/30" />
           )}
         </span>
         <div className="flex-1 space-y-2">

@@ -49,7 +49,7 @@ export default function BrandsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-as-ink/50">Brands are auto-created when you import products, and editable here.</p>
+        <p className="text-sm text-admin-text/50">Brands are auto-created when you import products, and editable here.</p>
         <Button onClick={() => setEditing(BLANK)}>
           <Icon name="plus" className="h-4 w-4" /> New brand
         </Button>
@@ -61,12 +61,12 @@ export default function BrandsPage() {
             <Spinner />
           </div>
         ) : list.length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">No brands yet. Import products to populate them.</p>
+          <p className="py-16 text-center text-sm text-admin-text/50">No brands yet. Import products to populate them.</p>
         ) : (
           <>
             {/* Bulk-select bar */}
-            <div className="flex items-center justify-between gap-3 border-b border-as-ink/5 bg-as-fog/40 px-5 py-2.5">
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-as-ink/60">
+            <div className="flex items-center justify-between gap-3 border-b border-admin-line/5 bg-admin-bg/40 px-5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-admin-text/60">
                 <Checkbox checked={sel.all} indeterminate={sel.indeterminate} onChange={sel.toggleAll} />
                 {sel.count > 0 ? `${sel.count} selected` : 'Select all'}
               </label>
@@ -77,14 +77,14 @@ export default function BrandsPage() {
                 </Button>
               )}
             </div>
-            <ul className="divide-y divide-as-ink/5">
+            <ul className="divide-y divide-admin-line/5">
               {list.map((b) => (
                 <li
                   key={b.id}
-                  className={`flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60 ${sel.has(b.id) ? 'bg-as-red/5' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-3 hover:bg-admin-bg/60 ${sel.has(b.id) ? 'bg-as-red/5' : ''}`}
                 >
                   <Checkbox checked={sel.has(b.id)} onChange={() => sel.toggle(b.id)} />
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-as-fog text-as-ink/40">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-admin-bg text-admin-text/40">
                   {b.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={b.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -93,14 +93,14 @@ export default function BrandsPage() {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-as-ink">{b.name}</p>
-                  <p className="truncate text-xs text-as-ink/40">/{b.slug}</p>
+                  <p className="truncate font-medium text-admin-text">{b.name}</p>
+                  <p className="truncate text-xs text-admin-text/40">/{b.slug}</p>
                 </div>
                 {b.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setEditing(b)}
-                    className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-as-red"
+                    className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-as-red"
                     title="Edit"
                   >
                     <Icon name="pencil" className="h-4 w-4" />
@@ -110,7 +110,7 @@ export default function BrandsPage() {
                       if (confirm(`Delete "${b.name}"? Products keep existing but lose this brand.`))
                         remove.mutate(b.id)
                     }}
-                    className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-red-600"
+                    className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-red-600"
                     title="Delete"
                   >
                     <Icon name="trash" className="h-4 w-4" />
@@ -218,7 +218,7 @@ function BrandModal({ brand, onClose, onSaved }) {
         </Field>
         <Field label="Logo / image">
           <div className="flex items-center gap-3">
-            <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-as-fog ring-1 ring-as-ink/10">
+            <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-admin-bg ring-1 ring-admin-line/10">
               {form.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={form.imageUrl} alt="" className="h-full w-full object-cover" />

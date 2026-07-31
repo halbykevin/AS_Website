@@ -103,7 +103,7 @@ export default function SalesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-as-ink/50">
+        <p className="text-sm text-admin-text/50">
           Run a discount on the whole store, a category, a brand or hand-picked products. Shoppers
           see the old price crossed out next to the sale price.
         </p>
@@ -118,21 +118,21 @@ export default function SalesPage() {
             <Spinner />
           </div>
         ) : list.length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">
+          <p className="py-16 text-center text-sm text-admin-text/50">
             No sales yet. Create one to discount part (or all) of the store.
           </p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
+          <ul className="divide-y divide-admin-line/5">
             {list.map((s) => {
               const status = saleStatus(s)
               return (
-                <li key={s.id} className="flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60">
+                <li key={s.id} className="flex items-center gap-4 px-5 py-3 hover:bg-admin-bg/60">
                   <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-as-red/10 text-sm font-bold text-as-red">
                     −{s.percent}%
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-as-ink">{s.name}</p>
-                    <p className="truncate text-xs text-as-ink/45">
+                    <p className="truncate font-medium text-admin-text">{s.name}</p>
+                    <p className="truncate text-xs text-admin-text/45">
                       {scopeLabel(s)}
                       {s.startsAt && ` · from ${fmtDate(s.startsAt)}`}
                       {s.endsAt && ` · until ${fmtDate(s.endsAt)}`}
@@ -146,7 +146,7 @@ export default function SalesPage() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setEditing(s)}
-                      className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-as-red"
+                      className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-as-red"
                       title="Edit"
                     >
                       <Icon name="pencil" className="h-4 w-4" />
@@ -156,7 +156,7 @@ export default function SalesPage() {
                         if (confirm(`Delete "${s.name}"? Prices go back to normal immediately.`))
                           remove.mutate(s.id)
                       }}
-                      className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-red-600"
+                      className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-red-600"
                       title="Delete"
                     >
                       <Icon name="trash" className="h-4 w-4" />
@@ -324,14 +324,14 @@ function SaleModal({ sale, categories, brands, products, onClose, onSaved }) {
                 onChange={(e) => setProductSearch(e.target.value)}
                 placeholder="Search products…"
               />
-              <div className="max-h-56 overflow-y-auto rounded-lg border border-as-ink/10">
+              <div className="max-h-56 overflow-y-auto rounded-lg border border-admin-line/10">
                 {shownProducts.length === 0 ? (
-                  <p className="p-4 text-center text-xs text-as-ink/40">No products match.</p>
+                  <p className="p-4 text-center text-xs text-admin-text/40">No products match.</p>
                 ) : (
                   shownProducts.map((p) => (
                     <label
                       key={p.id}
-                      className="flex cursor-pointer items-center gap-3 border-b border-as-ink/5 px-3 py-2 last:border-0 hover:bg-as-fog/60"
+                      className="flex cursor-pointer items-center gap-3 border-b border-admin-line/5 px-3 py-2 last:border-0 hover:bg-admin-bg/60"
                     >
                       <Checkbox
                         checked={form.productIds.includes(p.id)}
@@ -341,10 +341,10 @@ function SaleModal({ sale, categories, brands, products, onClose, onSaved }) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.image} alt="" className="h-8 w-8 shrink-0 rounded object-contain" />
                       ) : (
-                        <span className="h-8 w-8 shrink-0 rounded bg-as-fog" />
+                        <span className="h-8 w-8 shrink-0 rounded bg-admin-bg" />
                       )}
-                      <span className="min-w-0 flex-1 truncate text-sm text-as-ink">{p.name}</span>
-                      <span className="text-xs text-as-ink/45">${Number(p.oldPrice ?? p.price).toLocaleString()}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-admin-text">{p.name}</span>
+                      <span className="text-xs text-admin-text/45">${Number(p.oldPrice ?? p.price).toLocaleString()}</span>
                     </label>
                   ))
                 )}

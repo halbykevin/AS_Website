@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Icon from '@/components/Icon.jsx'
 import { ToastProvider } from '@/components/admin/toast.jsx'
 import { isAuthed, clearToken } from '@/lib/adminApi'
+import { ADMIN_THEMES, useAdminTheme } from '@/lib/adminTheme'
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: 'grid', exact: true },
@@ -29,6 +30,9 @@ export default function AdminLayout({ children }) {
   const isLogin = pathname === '/admin/login'
   const [ready, setReady] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  // Hooks must run on every render, including the login screen and the
+  // pre-auth loading state, so this sits above the early returns below.
+  const { theme, setTheme } = useAdminTheme()
 
   // Client-side auth guard (the API is the real gate; this is UX).
   useEffect(() => {
@@ -49,7 +53,7 @@ export default function AdminLayout({ children }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-as-fog text-as-ink/50">
+      <div className="flex min-h-screen items-center justify-center bg-admin-bg text-admin-text/50">
         Loading…
       </div>
     )
@@ -64,34 +68,35 @@ export default function AdminLayout({ children }) {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-as-fog lg:flex">
+      <div className="min-h-screen bg-admin-bg lg:flex">
         {/* Sidebar */}
         <Sidebar pathname={pathname} onLogout={logout} drawer={drawer} setDrawer={setDrawer} />
 
         {/* Main column */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Topbar */}
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-as-ink/10 bg-white/80 px-4 backdrop-blur">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-admin-line/10 bg-admin-surface/80 px-4 backdrop-blur">
             <button
               onClick={() => setDrawer(true)}
-              className="rounded-lg p-2 text-as-ink/70 hover:bg-as-fog lg:hidden"
+              className="rounded-lg p-2 text-admin-text/70 hover:bg-admin-bg lg:hidden"
               aria-label="Menu"
             >
               <Icon name="menu" className="h-5 w-5" />
             </button>
-            <h1 className="text-lg font-bold text-as-ink">{title}</h1>
+            <h1 className="text-lg font-bold text-admin-text">{title}</h1>
             <div className="ml-auto flex items-center gap-2">
+              <ThemePicker theme={theme} setTheme={setTheme} />
               <a
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-as-ink/70 hover:bg-as-fog sm:inline-flex"
+                className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-admin-text/70 hover:bg-admin-bg sm:inline-flex"
               >
                 View store ↗
               </a>
               <button
                 onClick={logout}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-as-ink/70 hover:bg-as-fog"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-admin-text/70 hover:bg-admin-bg"
               >
                 <Icon name="logout" className="h-4 w-4" /> Sign out
               </button>
@@ -107,7 +112,7 @@ export default function AdminLayout({ children }) {
 
 function Sidebar({ pathname, onLogout, drawer, setDrawer }) {
   const inner = (
-    <div className="flex h-full flex-col bg-as-ink text-white">
+    <div className="flex h-full flex-col bg-admin-invert text-white">
       <div className="flex h-14 items-center gap-2 border-b border-white/10 px-5">
         <span className="rounded bg-white/95 px-1.5 py-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -154,5 +159,38 @@ function Sidebar({ pathname, onLogout, drawer, setDrawer }) {
         </div>
       )}
     </>
+  )
+}
+
+// Segmented control in the topbar. Labels collapse to icons on small screens so
+// the control never crowds the page title.
+function ThemePicker({ theme, setTheme }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Admin theme"
+      className="flex items-center gap-0.5 rounded-lg border border-admin-line/10 p-0.5"
+    >
+      {ADMIN_THEMES.map((t) => {
+        const active = theme === t.value
+        return (
+          <button
+            key={t.value}
+            role="radio"
+            aria-checked={active}
+            onClick={() => setTheme(t.value)}
+            title={t.hint}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold transition sm:px-2.5 ${
+              active
+                ? 'bg-admin-invert text-white'
+                : 'text-admin-text/55 hover:bg-admin-bg hover:text-admin-text'
+            }`}
+          >
+            <Icon name={t.icon} className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{t.label}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }

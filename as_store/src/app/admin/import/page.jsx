@@ -79,8 +79,8 @@ export default function ImportPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-as-ink">Import products</h2>
-        <p className="mt-1 text-sm text-as-ink/50">
+        <h2 className="text-xl font-bold text-admin-text">Import products</h2>
+        <p className="mt-1 text-sm text-admin-text/50">
           Scrape an e-commerce page and pull its products, categories, brands and images straight
           into your catalog. Re-running on the same URLs updates rather than duplicates.
         </p>
@@ -115,19 +115,19 @@ export default function ImportPage() {
             </Field>
           </div>
 
-          <div className="space-y-3 rounded-xl bg-as-fog/60 p-4">
+          <div className="space-y-3 rounded-xl bg-admin-bg/60 p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">Follow pagination (all pages)</span>
+              <span className="text-sm text-admin-text/70">Follow pagination (all pages)</span>
               <Toggle checked={opts.allPages} onChange={(v) => set('allPages', v)} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">Ignore robots.txt</span>
+              <span className="text-sm text-admin-text/70">Ignore robots.txt</span>
               <Toggle checked={opts.ignoreRobots} onChange={(v) => set('ignoreRobots', v)} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">
+              <span className="text-sm text-admin-text/70">
                 JavaScript site (render)
-                <span className="ml-1 text-xs text-as-ink/40">needs Playwright</span>
+                <span className="ml-1 text-xs text-admin-text/40">needs Playwright</span>
               </span>
               <Toggle checked={opts.render} onChange={(v) => set('render', v)} />
             </div>
@@ -141,8 +141,8 @@ export default function ImportPage() {
 
         {/* Status + log */}
         <Card className="flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-as-ink/10 px-5 py-3">
-            <h3 className="font-bold text-as-ink">Run log</h3>
+          <div className="flex items-center justify-between border-b border-admin-line/10 px-5 py-3">
+            <h3 className="font-bold text-admin-text">Run log</h3>
             {job && (
               <Badge tone={job.status === 'done' ? 'green' : job.status === 'error' ? 'red' : 'amber'}>
                 {job.status}
@@ -151,7 +151,7 @@ export default function ImportPage() {
           </div>
 
           {s && (
-            <div className="grid grid-cols-3 gap-px border-b border-as-ink/10 bg-as-ink/5 text-center">
+            <div className="grid grid-cols-3 gap-px border-b border-admin-line/10 bg-admin-text/5 text-center">
               {[
                 ['New', s.created],
                 ['Updated', s.updated],
@@ -160,9 +160,9 @@ export default function ImportPage() {
                 ['Categories', s.categories],
                 ['Scraped', s.products],
               ].map(([label, val]) => (
-                <div key={label} className="bg-white py-3">
-                  <p className="text-xl font-bold text-as-ink">{val}</p>
-                  <p className="text-xs text-as-ink/45">{label}</p>
+                <div key={label} className="bg-admin-surface py-3">
+                  <p className="text-xl font-bold text-admin-text">{val}</p>
+                  <p className="text-xs text-admin-text/45">{label}</p>
                 </div>
               ))}
             </div>
@@ -170,14 +170,14 @@ export default function ImportPage() {
 
           <pre
             ref={logRef}
-            className="m-0 h-72 flex-1 overflow-auto bg-as-ink p-4 font-mono text-xs leading-relaxed text-white/80"
+            className="m-0 h-72 flex-1 overflow-auto bg-admin-invert p-4 font-mono text-xs leading-relaxed text-white/80"
           >
             {job?.log || 'The scraper output will stream here…'}
             {job?.error ? `\n\nError: ${job.error}` : ''}
           </pre>
 
           {job?.status === 'done' && (
-            <div className="border-t border-as-ink/10 p-3">
+            <div className="border-t border-admin-line/10 p-3">
               <Link href="/admin/products" className="text-sm font-medium text-as-red hover:underline">
                 View imported products →
               </Link>

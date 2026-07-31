@@ -31,7 +31,7 @@ export default function PagesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-as-ink/50">Content pages like About, Contact, Shipping — linkable from the nav &amp; footer.</p>
+        <p className="text-sm text-admin-text/50">Content pages like About, Contact, Shipping — linkable from the nav &amp; footer.</p>
         <Button onClick={() => setEditing(BLANK)}>
           <Icon name="plus" className="h-4 w-4" /> New page
         </Button>
@@ -43,17 +43,17 @@ export default function PagesPage() {
             <Spinner />
           </div>
         ) : (data ?? []).length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">No pages yet.</p>
+          <p className="py-16 text-center text-sm text-admin-text/50">No pages yet.</p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
+          <ul className="divide-y divide-admin-line/5">
             {data.map((p) => (
-              <li key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-as-fog/60">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-as-fog text-as-ink/40">
+              <li key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-admin-bg/60">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-admin-bg text-admin-text/40">
                   <Icon name="file" className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-as-ink">{p.title}</p>
-                  <p className="truncate text-xs text-as-ink/40">/pages/{p.slug}</p>
+                  <p className="truncate font-medium text-admin-text">{p.title}</p>
+                  <p className="truncate text-xs text-admin-text/40">/pages/{p.slug}</p>
                 </div>
                 {p.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
@@ -61,14 +61,14 @@ export default function PagesPage() {
                     href={`/pages/${p.slug}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-as-red"
+                    className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-as-red"
                     title="View"
                   >
                     <Icon name="eye" className="h-4 w-4" />
                   </a>
                   <button
                     onClick={() => setEditing(p)}
-                    className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-as-red"
+                    className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-as-red"
                     title="Edit"
                   >
                     <Icon name="pencil" className="h-4 w-4" />
@@ -77,7 +77,7 @@ export default function PagesPage() {
                     onClick={() => {
                       if (confirm(`Delete "${p.title}"?`)) remove.mutate(p.id)
                     }}
-                    className="rounded-lg p-2 text-as-ink/60 hover:bg-white hover:text-red-600"
+                    className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface hover:text-red-600"
                     title="Delete"
                   >
                     <Icon name="trash" className="h-4 w-4" />

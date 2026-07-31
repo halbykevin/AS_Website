@@ -198,10 +198,10 @@ export default function ProductEditor({ id }) {
       {/* Header */}
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/admin/products" className="rounded-lg p-2 text-as-ink/60 hover:bg-white" aria-label="Back">
+          <Link href="/admin/products" className="rounded-lg p-2 text-admin-text/60 hover:bg-admin-surface" aria-label="Back">
             <Icon name="chevronLeft" className="h-5 w-5" />
           </Link>
-          <h2 className="text-xl font-bold text-as-ink">{editing ? 'Edit product' : 'New product'}</h2>
+          <h2 className="text-xl font-bold text-admin-text">{editing ? 'Edit product' : 'New product'}</h2>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="secondary" as={Link} href="/admin/products">
@@ -273,7 +273,7 @@ export default function ProductEditor({ id }) {
 
           {/* Colors */}
           <Card className="space-y-3 p-5">
-            <p className="text-sm font-semibold text-as-ink">Colors</p>
+            <p className="text-sm font-semibold text-admin-text">Colors</p>
             <div className="flex flex-wrap items-center gap-2">
               {form.colors.map((c) => (
                 <span key={c} className="group relative">
@@ -281,21 +281,21 @@ export default function ProductEditor({ id }) {
                   <button
                     type="button"
                     onClick={() => removeColor(c)}
-                    className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-as-ink text-[10px] text-white group-hover:flex"
+                    className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-admin-invert text-[10px] text-white group-hover:flex"
                     aria-label={`Remove ${c}`}
                   >
                     ✕
                   </button>
                 </span>
               ))}
-              {form.colors.length === 0 && <span className="text-sm text-as-ink/40">No colors yet.</span>}
+              {form.colors.length === 0 && <span className="text-sm text-admin-text/40">No colors yet.</span>}
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={newColor}
                 onChange={(e) => setNewColor(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded border border-as-ink/15 bg-white"
+                className="h-9 w-12 cursor-pointer rounded border border-admin-line/15 bg-admin-surface"
               />
               <Input value={newColor} onChange={(e) => setNewColor(e.target.value)} className="w-32" />
               <Button type="button" variant="secondary" onClick={addColor}>
@@ -307,11 +307,11 @@ export default function ProductEditor({ id }) {
           {/* Specifications table */}
           <Card className="space-y-3 p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-as-ink">Specifications</p>
-              <span className="text-xs text-as-ink/40">Shown in the product&apos;s Specifications tab</span>
+              <p className="text-sm font-semibold text-admin-text">Specifications</p>
+              <span className="text-xs text-admin-text/40">Shown in the product&apos;s Specifications tab</span>
             </div>
             {form.specs.length === 0 && (
-              <p className="text-sm text-as-ink/40">No specifications yet.</p>
+              <p className="text-sm text-admin-text/40">No specifications yet.</p>
             )}
             <div className="space-y-2">
               {form.specs.map((row, i) => (
@@ -330,7 +330,7 @@ export default function ProductEditor({ id }) {
                   <button
                     type="button"
                     onClick={() => removeSpec(i)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-as-ink/40 transition hover:bg-red-50 hover:text-red-600"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-admin-text/40 transition hover:bg-red-50 hover:text-red-600"
                     aria-label="Remove specification"
                   >
                     <Icon name="trash" className="h-4 w-4" />
@@ -345,14 +345,14 @@ export default function ProductEditor({ id }) {
 
           {/* Images */}
           <Card className="space-y-3 p-5">
-            <p className="text-sm font-semibold text-as-ink">Images</p>
+            <p className="text-sm font-semibold text-admin-text">Images</p>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {images.map((img, i) => (
-                <div key={img.id ?? i} className="group relative aspect-square overflow-hidden rounded-xl bg-as-fog ring-1 ring-as-ink/10">
+                <div key={img.id ?? i} className="group relative aspect-square overflow-hidden rounded-xl bg-admin-bg ring-1 ring-admin-line/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="h-full w-full object-cover" />
                   {i === 0 && (
-                    <span className="absolute left-1 top-1 rounded bg-as-ink/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="absolute left-1 top-1 rounded bg-admin-invert/85 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                       Primary
                     </span>
                   )}
@@ -369,7 +369,7 @@ export default function ProductEditor({ id }) {
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-as-ink/15 text-as-ink/40 transition hover:border-as-red hover:text-as-red"
+                className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-admin-line/15 text-admin-text/40 transition hover:border-as-red hover:text-as-red"
               >
                 {uploading ? <Spinner /> : <Icon name="upload" className="h-6 w-6" />}
                 <span className="text-xs font-medium">{uploading ? 'Uploading…' : 'Upload'}</span>
@@ -398,24 +398,24 @@ export default function ProductEditor({ id }) {
         {/* Sidebar: flags + live preview */}
         <div className="space-y-6">
           <Card className="space-y-4 p-5">
-            <p className="text-sm font-semibold text-as-ink">Visibility</p>
+            <p className="text-sm font-semibold text-admin-text">Visibility</p>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">Visible on store</span>
+              <span className="text-sm text-admin-text/70">Visible on store</span>
               <Toggle checked={form.visible} onChange={(v) => set('visible', v)} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">Featured</span>
+              <span className="text-sm text-admin-text/70">Featured</span>
               <Toggle checked={form.featured} onChange={(v) => set('featured', v)} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-as-ink/70">Mark as new</span>
+              <span className="text-sm text-admin-text/70">Mark as new</span>
               <Toggle checked={form.isNew} onChange={(v) => set('isNew', v)} />
             </div>
           </Card>
 
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/40">Live preview</p>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-as-ink/10">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-admin-text/40">Live preview</p>
+            <div className="rounded-2xl bg-admin-surface p-4 ring-1 ring-admin-line/10">
               <ProductTile product={preview} />
             </div>
           </div>

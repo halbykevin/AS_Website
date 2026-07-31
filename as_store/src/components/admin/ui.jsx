@@ -27,8 +27,8 @@ export function Button({ variant = 'primary', className = '', as = 'button', ...
     'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50'
   const variants = {
     primary: 'bg-as-red text-white hover:bg-as-red-dark',
-    secondary: 'border border-as-ink/15 bg-white text-as-ink hover:bg-as-fog',
-    ghost: 'text-as-ink/70 hover:bg-as-ink/5',
+    secondary: 'border border-admin-line/15 bg-admin-surface text-admin-text hover:bg-admin-bg',
+    ghost: 'text-admin-text/70 hover:bg-admin-text/5',
     danger: 'bg-red-600 text-white hover:bg-red-700',
     dangerGhost: 'text-red-600 hover:bg-red-50',
   }
@@ -37,27 +37,27 @@ export function Button({ variant = 'primary', className = '', as = 'button', ...
 }
 
 export function Card({ className = '', ...props }) {
-  return <div className={cn('rounded-2xl border border-as-ink/10 bg-white', className)} {...props} />
+  return <div className={cn('rounded-2xl border border-admin-line/10 bg-admin-surface', className)} {...props} />
 }
 
 export function Field({ label, hint, error, children }) {
   return (
     <label className="block">
       {label && (
-        <span className="mb-1.5 block text-sm font-semibold text-as-ink">{label}</span>
+        <span className="mb-1.5 block text-sm font-semibold text-admin-text">{label}</span>
       )}
       {children}
       {error ? (
         <span className="mt-1 block text-xs text-red-600">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-xs text-as-ink/45">{hint}</span>
+        <span className="mt-1 block text-xs text-admin-text/45">{hint}</span>
       ) : null}
     </label>
   )
 }
 
 const inputCls =
-  'w-full rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm text-as-ink outline-none transition placeholder:text-as-ink/35 focus:border-as-red focus:ring-2 focus:ring-as-red/20'
+  'w-full rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm text-admin-text outline-none transition placeholder:text-admin-text/35 focus:border-as-red focus:ring-2 focus:ring-as-red/20'
 
 export function Input({ className = '', ...props }) {
   return <input className={cn(inputCls, className)} {...props} />
@@ -84,24 +84,24 @@ export function Toggle({ checked, onChange, label }) {
       <span
         className={cn(
           'relative h-6 w-11 rounded-full transition',
-          checked ? 'bg-as-red' : 'bg-as-ink/20',
+          checked ? 'bg-as-red' : 'bg-admin-text/20',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
+            'absolute top-0.5 h-5 w-5 rounded-full bg-admin-surface shadow transition-all',
             checked ? 'left-[22px]' : 'left-0.5',
           )}
         />
       </span>
-      {label && <span className="text-sm text-as-ink">{label}</span>}
+      {label && <span className="text-sm text-admin-text">{label}</span>}
     </button>
   )
 }
 
 export function Badge({ tone = 'gray', children }) {
   const tones = {
-    gray: 'bg-as-ink/8 text-as-ink/70',
+    gray: 'bg-admin-text/8 text-admin-text/70',
     green: 'bg-emerald-100 text-emerald-700',
     red: 'bg-red-100 text-red-700',
     amber: 'bg-amber-100 text-amber-700',
@@ -127,16 +127,16 @@ export function Modal({ open, onClose, title, children, footer }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal>
-      <div className="absolute inset-0 bg-as-ink/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-as-ink/10 px-5 py-4">
-          <h3 className="text-base font-bold text-as-ink">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-as-ink/50 hover:bg-as-fog" aria-label="Close">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-admin-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-admin-line/10 px-5 py-4">
+          <h3 className="text-base font-bold text-admin-text">{title}</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-admin-text/50 hover:bg-admin-bg" aria-label="Close">
             ✕
           </button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-as-ink/10 px-5 py-4">{footer}</div>}
+        {footer && <div className="flex justify-end gap-2 border-t border-admin-line/10 px-5 py-4">{footer}</div>}
       </div>
     </div>
   )

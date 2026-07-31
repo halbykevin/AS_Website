@@ -33,7 +33,7 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             className={`pointer-events-auto rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              t.tone === 'error' ? 'bg-red-600' : 'bg-as-ink'
+              t.tone === 'error' ? 'bg-red-600' : 'bg-admin-invert'
             }`}
           >
             {t.message}

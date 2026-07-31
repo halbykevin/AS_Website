@@ -22,8 +22,8 @@ export default function Dashboard() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-as-ink">Welcome back 👋</h2>
-          <p className="text-sm text-as-ink/50">Here's what's in your store right now.</p>
+          <h2 className="text-2xl font-bold text-admin-text">Welcome back 👋</h2>
+          <p className="text-sm text-admin-text/50">Here's what's in your store right now.</p>
         </div>
         <Button as={Link} href="/admin/products/new">
           <Icon name="plus" className="h-4 w-4" /> New product
@@ -44,18 +44,18 @@ export default function Dashboard() {
                 </Link>
               )}
             </div>
-            <p className="mt-4 text-3xl font-bold text-as-ink">
+            <p className="mt-4 text-3xl font-bold text-admin-text">
               {products.isLoading ? '—' : s.value}
             </p>
-            <p className="text-sm text-as-ink/50">{s.label}</p>
+            <p className="text-sm text-admin-text/50">{s.label}</p>
           </Card>
         ))}
       </div>
 
       {/* Recent products */}
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-as-ink/10 px-5 py-4">
-          <h3 className="font-bold text-as-ink">Recent products</h3>
+        <div className="flex items-center justify-between border-b border-admin-line/10 px-5 py-4">
+          <h3 className="font-bold text-admin-text">Recent products</h3>
           <Link href="/admin/products" className="text-sm font-medium text-as-red hover:underline">
             See all
           </Link>
@@ -65,23 +65,23 @@ export default function Dashboard() {
             <Spinner />
           </div>
         ) : list.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-as-ink/50">No products yet.</p>
+          <p className="px-5 py-10 text-center text-sm text-admin-text/50">No products yet.</p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
+          <ul className="divide-y divide-admin-line/5">
             {list.slice(0, 6).map((p) => (
               <li key={p.id}>
-                <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-as-fog">
-                  <span className="h-11 w-11 overflow-hidden rounded-lg bg-as-fog">
+                <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-admin-bg">
+                  <span className="h-11 w-11 overflow-hidden rounded-lg bg-admin-bg">
                     {p.image && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.image} alt="" className="h-full w-full object-cover" />
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-as-ink">{p.name}</span>
-                    <span className="block text-xs text-as-ink/45">{p.category || 'Uncategorized'}</span>
+                    <span className="block truncate font-medium text-admin-text">{p.name}</span>
+                    <span className="block text-xs text-admin-text/45">{p.category || 'Uncategorized'}</span>
                   </span>
-                  <span className="text-sm font-semibold text-as-ink">${Number(p.price).toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-admin-text">${Number(p.price).toLocaleString()}</span>
                 </Link>
               </li>
             ))}

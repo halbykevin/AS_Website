@@ -48,7 +48,7 @@ export default function NotificationsAdmin() {
             key={t.value}
             onClick={() => setTab(t.value)}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              tab === t.value ? 'bg-as-ink text-white' : 'bg-white text-as-ink/60 hover:bg-as-fog'
+              tab === t.value ? 'bg-admin-invert text-white' : 'bg-admin-surface text-admin-text/60 hover:bg-admin-bg'
             }`}
           >
             {t.label}
@@ -77,8 +77,8 @@ function Overview() {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {stats.map((s) => (
         <Card key={s.label} className="p-4">
-          <p className="text-xs text-as-ink/50">{s.label}</p>
-          <p className={`mt-1 text-xl font-semibold ${s.alert ? 'text-as-red' : 'text-as-ink'}`}>{s.value}</p>
+          <p className="text-xs text-admin-text/50">{s.label}</p>
+          <p className={`mt-1 text-xl font-semibold ${s.alert ? 'text-as-red' : 'text-admin-text'}`}>{s.value}</p>
         </Card>
       ))}
     </div>
@@ -141,21 +141,21 @@ function Campaigns() {
         ) : error ? (
           <p className="py-16 text-center text-sm font-medium text-red-600">Couldn’t load — {error.message}</p>
         ) : list.length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">
+          <p className="py-16 text-center text-sm text-admin-text/50">
             No campaigns yet. Create one to notify your customers about offers, news, or surveys.
           </p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
+          <ul className="divide-y divide-admin-line/5">
             {list.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-as-fog/60">
+              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-admin-bg/60">
                 <button onClick={() => setViewId(c.id)} className="min-w-0 flex-1 text-left">
-                  <p className="font-semibold text-as-ink">{c.name}</p>
-                  <p className="truncate text-xs text-as-ink/45">
+                  <p className="font-semibold text-admin-text">{c.name}</p>
+                  <p className="truncate text-xs text-admin-text/45">
                     {CATEGORIES.find((x) => x.value === c.category)?.label || c.category} · {c.audienceLabel} ·{' '}
                     {(c.channels || []).join(' + ')}
                   </p>
                 </button>
-                <span className="text-xs text-as-ink/50">
+                <span className="text-xs text-admin-text/50">
                   {c.status === 'scheduled' && c.scheduledAt ? `for ${fmtDate(c.scheduledAt)}` : fmtDate(c.sentAt || c.createdAt)}
                 </span>
                 <Badge tone={STATUS_TONE[c.status] || 'gray'}>{c.status}</Badge>
@@ -201,7 +201,7 @@ function IconBtn({ title, icon, onClick, danger }) {
       title={title}
       aria-label={title}
       className={`rounded-lg p-2 transition ${
-        danger ? 'text-as-ink/35 hover:bg-red-50 hover:text-as-red' : 'text-as-ink/45 hover:bg-as-fog hover:text-as-ink'
+        danger ? 'text-admin-text/35 hover:bg-red-50 hover:text-as-red' : 'text-admin-text/45 hover:bg-admin-bg hover:text-admin-text'
       }`}
     >
       <Icon name={icon} className="h-4 w-4" />
@@ -356,7 +356,7 @@ function CampaignEditor({ campaign, onClose, onSaved }) {
         <Field label="Channels">
           <div className="space-y-2 pt-1">
             {CHANNELS.map((ch) => (
-              <label key={ch.value} className="flex items-center gap-2 text-sm text-as-ink/80">
+              <label key={ch.value} className="flex items-center gap-2 text-sm text-admin-text/80">
                 <input
                   type="checkbox"
                   checked={f.channels.includes(ch.value)}
@@ -383,7 +383,7 @@ function CampaignEditor({ campaign, onClose, onSaved }) {
             label="Audience"
             hint={reach ? `Reaches ~${reach.customers} customer(s) · ${reach.liveDevices} live device(s) registered overall` : ''}
           >
-            <div className="space-y-3 rounded-xl border border-as-ink/10 p-3">
+            <div className="space-y-3 rounded-xl border border-admin-line/10 p-3">
               <Select value={aud.type || 'all'} onChange={(e) => set('audience', { type: e.target.value })}>
                 <option value="all">All customers (broadcast — also reaches signed-out devices)</option>
                 <option value="filter">Filtered audience</option>
@@ -447,16 +447,16 @@ function CampaignEditor({ campaign, onClose, onSaved }) {
 
 function PhonePreview({ title, body, imageUrl }) {
   return (
-    <div className="rounded-xl bg-as-fog p-4">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-as-ink/45">Preview</p>
-      <div className="mx-auto max-w-sm rounded-2xl bg-white p-3 shadow-sm">
+    <div className="rounded-xl bg-admin-bg p-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-admin-text/45">Preview</p>
+      <div className="mx-auto max-w-sm rounded-2xl bg-admin-surface p-3 shadow-sm">
         <div className="flex gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-as-red/10">
             <Icon name="bell" className="h-4 w-4 text-as-red" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-as-ink">{title || 'Notification title'}</p>
-            <p className="line-clamp-3 text-sm text-as-ink/70">{body || 'Message body appears here.'}</p>
+            <p className="truncate text-sm font-semibold text-admin-text">{title || 'Notification title'}</p>
+            <p className="line-clamp-3 text-sm text-admin-text/70">{body || 'Message body appears here.'}</p>
             {imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt="" className="mt-2 max-h-32 w-full rounded-lg object-cover" />
@@ -482,7 +482,7 @@ function CampaignStats({ id, onClose }) {
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <Badge tone={STATUS_TONE[c.status] || 'gray'}>{c.status}</Badge>
-            <span className="text-sm text-as-ink/50">
+            <span className="text-sm text-admin-text/50">
               {c.sentAt ? `Sent ${fmtDate(c.sentAt)}` : c.scheduledAt ? `Scheduled ${fmtDate(c.scheduledAt)}` : fmtDate(c.createdAt)}
             </span>
           </div>
@@ -497,14 +497,14 @@ function CampaignStats({ id, onClose }) {
                 ['Failures', c.stats.failures],
                 ...(c.surveyId ? [['Survey responses', c.stats.surveyResponses]] : []),
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-as-fog p-3">
-                  <p className="text-xs text-as-ink/50">{label}</p>
-                  <p className="text-lg font-semibold text-as-ink">{value}</p>
+                <div key={label} className="rounded-xl bg-admin-bg p-3">
+                  <p className="text-xs text-admin-text/50">{label}</p>
+                  <p className="text-lg font-semibold text-admin-text">{value}</p>
                 </div>
               ))}
             </div>
           )}
-          <p className="text-xs text-as-ink/45">
+          <p className="text-xs text-admin-text/45">
             Audience: {c.audienceLabel} · Channels: {(c.channels || []).join(', ')} · By {c.createdBy || '—'}
           </p>
         </div>
@@ -540,18 +540,18 @@ function Templates() {
   return (
     <>
       <Card className="overflow-hidden">
-        <p className="border-b border-as-ink/5 px-5 py-3 text-sm text-as-ink/55">
+        <p className="border-b border-admin-line/5 px-5 py-3 text-sm text-admin-text/55">
           Automatic messages sent by order and account events. Placeholders like{' '}
-          <code className="rounded bg-as-fog px-1">{'{{orderId}}'}</code> are filled in at send time.
+          <code className="rounded bg-admin-bg px-1">{'{{orderId}}'}</code> are filled in at send time.
         </p>
-        <ul className="divide-y divide-as-ink/5">
+        <ul className="divide-y divide-admin-line/5">
           {(data || []).map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-as-fog/60">
+            <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-admin-bg/60">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-as-ink">
-                  {t.name} <span className="text-xs font-normal text-as-ink/40">({t.key} · v{t.version})</span>
+                <p className="font-semibold text-admin-text">
+                  {t.name} <span className="text-xs font-normal text-admin-text/40">({t.key} · v{t.version})</span>
                 </p>
-                <p className="truncate text-xs text-as-ink/45">{t.titleEn} — {t.bodyEn}</p>
+                <p className="truncate text-xs text-admin-text/45">{t.titleEn} — {t.bodyEn}</p>
               </div>
               <Badge tone={t.active ? 'green' : 'gray'}>{t.active ? 'active' : 'off'}</Badge>
               <IconBtn title="Edit" icon="pencil" onClick={() => setEditing(t)} />
@@ -636,16 +636,16 @@ function Surveys() {
       </div>
       <Card className="overflow-hidden">
         {(data || []).length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">
+          <p className="py-16 text-center text-sm text-admin-text/50">
             No surveys yet. The newest active survey is also offered automatically after each delivered order.
           </p>
         ) : (
-          <ul className="divide-y divide-as-ink/5">
+          <ul className="divide-y divide-admin-line/5">
             {data.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-as-fog/60">
+              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-admin-bg/60">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-as-ink">{s.title}</p>
-                  <p className="text-xs text-as-ink/45">{(s.questions || []).length} question(s)</p>
+                  <p className="font-semibold text-admin-text">{s.title}</p>
+                  <p className="text-xs text-admin-text/45">{(s.questions || []).length} question(s)</p>
                 </div>
                 <button onClick={() => setResponsesFor(s)} className="text-sm font-medium text-as-red hover:underline">
                   {s.responseCount ?? 0} response(s)
@@ -706,7 +706,7 @@ function SurveyEditor({ survey, onClose, onSaved }) {
         <Field label="Questions">
           <div className="space-y-3">
             {f.questions.map((q, i) => (
-              <div key={q.id} className="flex flex-wrap items-start gap-2 rounded-xl border border-as-ink/10 p-3">
+              <div key={q.id} className="flex flex-wrap items-start gap-2 rounded-xl border border-admin-line/10 p-3">
                 <Select value={q.type} onChange={(e) => setQ(i, { type: e.target.value })} className="w-32">
                   <option value="rating">1–5 rating</option>
                   <option value="text">Free text</option>
@@ -751,21 +751,21 @@ function SurveyResponses({ survey, onClose }) {
       {isLoading ? (
         <div className="flex justify-center py-10"><Spinner /></div>
       ) : (data || []).length === 0 ? (
-        <p className="py-10 text-center text-sm text-as-ink/50">No responses yet.</p>
+        <p className="py-10 text-center text-sm text-admin-text/50">No responses yet.</p>
       ) : (
         <ul className="max-h-[60vh] space-y-3 overflow-y-auto">
           {data.map((r) => (
-            <li key={r.id} className="rounded-xl bg-as-fog p-3 text-sm">
-              <p className="font-medium text-as-ink">
+            <li key={r.id} className="rounded-xl bg-admin-bg p-3 text-sm">
+              <p className="font-medium text-admin-text">
                 {r.customerName || `Customer #${r.customerId}`}
-                {r.orderId ? <span className="text-as-ink/45"> · order #{r.orderId}</span> : null}
-                <span className="float-right text-xs font-normal text-as-ink/40">{fmtDate(r.createdAt)}</span>
+                {r.orderId ? <span className="text-admin-text/45"> · order #{r.orderId}</span> : null}
+                <span className="float-right text-xs font-normal text-admin-text/40">{fmtDate(r.createdAt)}</span>
               </p>
               <dl className="mt-1 space-y-1">
                 {Object.entries(r.answers || {}).map(([k, v]) => (
                   <div key={k}>
-                    <dt className="text-xs text-as-ink/50">{label(k)}</dt>
-                    <dd className="text-as-ink/85">{String(v)}</dd>
+                    <dt className="text-xs text-admin-text/50">{label(k)}</dt>
+                    <dd className="text-admin-text/85">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
@@ -791,7 +791,7 @@ function Activity() {
   const chip = (d, i) => {
     const tone = d.status === 'sent' ? 'bg-emerald-100 text-emerald-700'
       : d.status === 'dead' || d.status === 'failed' ? 'bg-red-100 text-red-700'
-      : 'bg-as-ink/8 text-as-ink/55'
+      : 'bg-admin-text/8 text-admin-text/55'
     return (
       <span key={i} title={d.error || ''} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
         {d.channel}: {d.status}
@@ -801,33 +801,33 @@ function Activity() {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card className="overflow-hidden">
-        <h3 className="border-b border-as-ink/5 px-5 py-3 text-sm font-semibold text-as-ink">Recent notifications</h3>
-        <ul className="max-h-[32rem] divide-y divide-as-ink/5 overflow-y-auto">
+        <h3 className="border-b border-admin-line/5 px-5 py-3 text-sm font-semibold text-admin-text">Recent notifications</h3>
+        <ul className="max-h-[32rem] divide-y divide-admin-line/5 overflow-y-auto">
           {(recent || []).map((n) => (
             <li key={n.id} className="px-5 py-3">
-              <p className="text-sm font-medium text-as-ink">{n.title}</p>
-              <p className="text-xs text-as-ink/45">
+              <p className="text-sm font-medium text-admin-text">{n.title}</p>
+              <p className="text-xs text-admin-text/45">
                 {n.customerName || `#${n.customerId ?? '—'}`} · {n.category}
                 {n.templateKey ? ` · ${n.templateKey}` : ''} · {fmtDate(n.createdAt)}
               </p>
               <p className="mt-1 flex flex-wrap gap-1">{(n.deliveries || []).map(chip)}</p>
             </li>
           ))}
-          {(recent || []).length === 0 && <li className="px-5 py-10 text-center text-sm text-as-ink/50">Nothing sent yet.</li>}
+          {(recent || []).length === 0 && <li className="px-5 py-10 text-center text-sm text-admin-text/50">Nothing sent yet.</li>}
         </ul>
       </Card>
       <Card className="overflow-hidden">
-        <h3 className="border-b border-as-ink/5 px-5 py-3 text-sm font-semibold text-as-ink">Audit log</h3>
-        <ul className="max-h-[32rem] divide-y divide-as-ink/5 overflow-y-auto">
+        <h3 className="border-b border-admin-line/5 px-5 py-3 text-sm font-semibold text-admin-text">Audit log</h3>
+        <ul className="max-h-[32rem] divide-y divide-admin-line/5 overflow-y-auto">
           {(audit || []).map((a) => (
             <li key={a.id} className="px-5 py-2.5 text-sm">
-              <span className="font-medium text-as-ink">{a.actor}</span>{' '}
-              <span className="text-as-ink/70">{a.action.replace(/_/g, ' ')}</span>{' '}
-              <span className="text-as-ink/45">{a.entity} #{a.entityId ?? ''}</span>
-              <span className="float-right text-xs text-as-ink/40">{fmtDate(a.createdAt)}</span>
+              <span className="font-medium text-admin-text">{a.actor}</span>{' '}
+              <span className="text-admin-text/70">{a.action.replace(/_/g, ' ')}</span>{' '}
+              <span className="text-admin-text/45">{a.entity} #{a.entityId ?? ''}</span>
+              <span className="float-right text-xs text-admin-text/40">{fmtDate(a.createdAt)}</span>
             </li>
           ))}
-          {(audit || []).length === 0 && <li className="px-5 py-10 text-center text-sm text-as-ink/50">No activity yet.</li>}
+          {(audit || []).length === 0 && <li className="px-5 py-10 text-center text-sm text-admin-text/50">No activity yet.</li>}
         </ul>
       </Card>
     </div>

@@ -18,6 +18,16 @@ module.exports = {
           soft: '#222A2D', // sub-nav
           line: '#2C3236',
         },
+        // Admin CMS surfaces. These resolve through CSS variables so the admin
+        // can switch theme (light / dark / eco) at runtime. The storefront never
+        // sets data-admin-theme, so it always gets the :root light values and is
+        // completely unaffected. The rgb(... / <alpha-value>) form is required —
+        // the admin leans on opacity modifiers like text-admin-text/45.
+        'admin-bg': 'rgb(var(--admin-bg) / <alpha-value>)',
+        'admin-surface': 'rgb(var(--admin-surface) / <alpha-value>)',
+        'admin-text': 'rgb(var(--admin-text) / <alpha-value>)',
+        'admin-line': 'rgb(var(--admin-line) / <alpha-value>)',
+        'admin-invert': 'rgb(var(--admin-invert) / <alpha-value>)',
         // Rating stars / deal accents.
         'as-amber': '#F2A93B',
         // Light section backgrounds.

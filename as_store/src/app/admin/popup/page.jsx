@@ -120,8 +120,8 @@ export default function PopupAdminPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-extrabold text-as-ink">Promotions popup</h1>
-          <p className="mt-0.5 text-sm text-as-ink/55">
+          <h1 className="text-xl font-extrabold text-admin-text">Promotions popup</h1>
+          <p className="mt-0.5 text-sm text-admin-text/55">
             One announcement, shown on the website and in the mobile app.
           </p>
         </div>
@@ -139,19 +139,19 @@ export default function PopupAdminPage() {
           <Card className="space-y-4 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-as-ink">Show the popup</p>
-                <p className="text-xs text-as-ink/50">Master switch for both surfaces.</p>
+                <p className="text-sm font-semibold text-admin-text">Show the popup</p>
+                <p className="text-xs text-admin-text/50">Master switch for both surfaces.</p>
               </div>
               <Toggle checked={form.enabled} onChange={(v) => set('enabled', v)} />
             </div>
-            <div className="grid gap-3 border-t border-as-ink/10 pt-4 sm:grid-cols-2">
+            <div className="grid gap-3 border-t border-admin-line/10 pt-4 sm:grid-cols-2">
               <Toggle checked={form.showOnWeb} onChange={(v) => set('showOnWeb', v)} label="Website storefront" />
               <Toggle checked={form.showOnApp} onChange={(v) => set('showOnApp', v)} label="Mobile app" />
             </div>
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-as-ink/50">Content</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-admin-text/50">Content</h2>
             <Field label="Eyebrow" hint="Small badge above the title — e.g. “Limited offer”.">
               <Input
                 value={form.eyebrow}
@@ -193,7 +193,7 @@ export default function PopupAdminPage() {
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-as-ink/50">Style</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-admin-text/50">Style</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Layout">
                 <Select value={form.layout} onChange={(e) => set('layout', e.target.value)}>
@@ -220,7 +220,7 @@ export default function PopupAdminPage() {
                   type="color"
                   value={form.accentColor}
                   onChange={(e) => set('accentColor', e.target.value)}
-                  className="h-9 w-12 cursor-pointer rounded-lg border border-as-ink/15 bg-white p-1"
+                  className="h-9 w-12 cursor-pointer rounded-lg border border-admin-line/15 bg-admin-surface p-1"
                   aria-label="Accent colour"
                 />
                 <Input
@@ -235,7 +235,7 @@ export default function PopupAdminPage() {
                     onClick={() => set('accentColor', c)}
                     aria-label={`Use ${c}`}
                     className={`h-7 w-7 rounded-full ring-2 ring-offset-2 transition ${
-                      form.accentColor.toLowerCase() === c.toLowerCase() ? 'ring-as-ink' : 'ring-transparent'
+                      form.accentColor.toLowerCase() === c.toLowerCase() ? 'ring-admin-line' : 'ring-transparent'
                     }`}
                     style={{ backgroundColor: c }}
                   />
@@ -245,7 +245,7 @@ export default function PopupAdminPage() {
           </Card>
 
           <Card className="space-y-4 p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-as-ink/50">When it appears</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-admin-text/50">When it appears</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Trigger" hint="The app always uses the delay.">
                 <Select value={form.trigger} onChange={(e) => set('trigger', e.target.value)}>
@@ -301,7 +301,7 @@ export default function PopupAdminPage() {
               </Field>
             </div>
             {(scheduled || expired) && (
-              <p className="flex items-start gap-2 rounded-lg bg-as-fog px-3 py-2 text-xs text-as-ink/70">
+              <p className="flex items-start gap-2 rounded-lg bg-admin-bg px-3 py-2 text-xs text-admin-text/70">
                 <Icon name="bell" className="mt-0.5 h-4 w-4 shrink-0" />
                 {scheduled
                   ? 'Enabled but not started yet — the API hides it until the start time.'
@@ -314,8 +314,8 @@ export default function PopupAdminPage() {
         {/* ---------------- Live preview ---------------- */}
         <div className="lg:sticky lg:top-6 lg:self-start">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-as-ink/50">Preview</h2>
-            <span className="text-xs text-as-ink/45">{liveNow ? 'Visible to visitors' : 'Not showing'}</span>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-admin-text/50">Preview</h2>
+            <span className="text-xs text-admin-text/45">{liveNow ? 'Visible to visitors' : 'Not showing'}</span>
           </div>
           <div className="rounded-3xl bg-gradient-to-br from-as-ink to-as-ink-soft p-5">
             {hasContent ? (
@@ -326,7 +326,7 @@ export default function PopupAdminPage() {
               </div>
             )}
           </div>
-          <p className="mt-3 text-xs text-as-ink/45">
+          <p className="mt-3 text-xs text-admin-text/45">
             This is the same component the storefront renders. The mobile app uses the same content and
             colours in a native sheet.
           </p>
@@ -358,7 +358,7 @@ function ImagePicker({ label, value, onChange }) {
   return (
     <Field label={label} hint="Recommended 1200×750 for the card layout, taller for banner.">
       <div className="flex items-start gap-3">
-        <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-as-fog ring-1 ring-as-ink/10">
+        <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-admin-bg ring-1 ring-admin-line/10">
           {value && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />

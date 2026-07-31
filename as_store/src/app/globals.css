@@ -6,6 +6,56 @@ html {
   scroll-behavior: smooth;
 }
 
+/* --- Admin CMS theming -----------------------------------------------------
+   Only the admin sets data-admin-theme (AdminLayout, cleared on unmount), so
+   the storefront always renders with the :root values below and is untouched
+   by any of this. Values are space-separated RGB channels because the Tailwind
+   tokens wrap them in rgb(... / <alpha-value>). */
+:root {
+  --admin-bg: 245 245 247; /* page background — matches as-fog */
+  --admin-surface: 255 255 255; /* cards, inputs, table rows */
+  --admin-text: 21 24 26; /* primary text — matches as-ink */
+  --admin-line: 21 24 26; /* borders/dividers, always used at low alpha */
+  --admin-invert: 21 24 26; /* sidebar + active chips, always with white text */
+}
+
+[data-admin-theme='dark'] {
+  --admin-bg: 14 17 19;
+  --admin-surface: 26 30 33;
+  --admin-text: 232 236 238;
+  --admin-line: 232 236 238; /* light line at low alpha reads as a subtle rule */
+  --admin-invert: 45 52 57;
+}
+
+/* Eco: true black so OLED panels can switch pixels off, lower-contrast text,
+   and no motion — the animation savings are real CPU/GPU, not just cosmetics. */
+[data-admin-theme='eco'] {
+  --admin-bg: 0 0 0;
+  --admin-surface: 12 13 14;
+  --admin-text: 198 203 205;
+  --admin-line: 198 203 205;
+  --admin-invert: 32 34 36;
+}
+
+[data-admin-theme='eco'] *,
+[data-admin-theme='eco'] *::before,
+[data-admin-theme='eco'] *::after {
+  animation-duration: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Product thumbnails are the brightest thing on an admin page; dimming them
+   saves panel power and keeps the eco theme visually calm. Hover restores
+   full brightness so the admin can still inspect an image properly. */
+[data-admin-theme='eco'] img {
+  filter: brightness(0.82);
+}
+[data-admin-theme='eco'] img:hover {
+  filter: none;
+}
+
 body {
   @apply bg-white font-sans text-as-ink antialiased;
   -webkit-font-smoothing: antialiased;

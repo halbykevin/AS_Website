@@ -70,7 +70,7 @@ export default function CustomersAdmin() {
             key={t.value}
             onClick={() => setTab(t.value)}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              tab === t.value ? 'bg-as-ink text-white' : 'bg-white text-as-ink/60 hover:bg-as-fog'
+              tab === t.value ? 'bg-admin-invert text-white' : 'bg-admin-surface text-admin-text/60 hover:bg-admin-bg'
             }`}
           >
             {t.label}
@@ -118,7 +118,7 @@ function CustomersTab() {
       {/* Filters, one row above the table */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
-          <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-as-ink/40" />
+          <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-text/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -147,13 +147,13 @@ function CustomersTab() {
         <button
           onClick={() => setOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
           title={order === 'desc' ? 'Descending' : 'Ascending'}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm font-medium text-as-ink/70 hover:bg-as-fog"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm font-medium text-admin-text/70 hover:bg-admin-bg"
         >
           <Icon name="sort" className="h-4 w-4" />
           {order === 'desc' ? 'Desc' : 'Asc'}
         </button>
 
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-as-ink/15 bg-white px-3 py-2 text-sm font-medium text-as-ink/70">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm font-medium text-admin-text/70">
           <input
             type="checkbox"
             checked={hasOrders}
@@ -163,7 +163,7 @@ function CustomersTab() {
           Has orders
         </label>
 
-        <span className="ml-auto text-sm text-as-ink/45">
+        <span className="ml-auto text-sm text-admin-text/45">
           {list.length} customer{list.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -176,12 +176,12 @@ function CustomersTab() {
         ) : error ? (
           <p className="py-16 text-center text-sm text-red-600">{error.message}</p>
         ) : list.length === 0 ? (
-          <p className="py-16 text-center text-sm text-as-ink/50">No customers found.</p>
+          <p className="py-16 text-center text-sm text-admin-text/50">No customers found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-sm">
               <thead>
-                <tr className="border-b border-as-ink/10 bg-as-fog/40 text-left text-xs uppercase tracking-wide text-as-ink/50">
+                <tr className="border-b border-admin-line/10 bg-admin-bg/40 text-left text-xs uppercase tracking-wide text-admin-text/50">
                   <th className="px-4 py-2.5 font-semibold">Customer</th>
                   <th className="px-4 py-2.5 font-semibold">Signed up with</th>
                   <th className="px-4 py-2.5 font-semibold">Last sign-in</th>
@@ -192,16 +192,16 @@ function CustomersTab() {
                   <th className="px-4 py-2.5 font-semibold"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-as-ink/5">
+              <tbody className="divide-y divide-admin-line/5">
                 {list.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => setViewId(c.id)}
-                    className="cursor-pointer hover:bg-as-fog/50"
+                    className="cursor-pointer hover:bg-admin-bg/50"
                   >
                     <td className="px-4 py-3">
-                      <span className="block font-medium text-as-ink">{c.name || 'Unnamed'}</span>
-                      <span className="mt-0.5 block truncate text-xs text-as-ink/45">
+                      <span className="block font-medium text-admin-text">{c.name || 'Unnamed'}</span>
+                      <span className="mt-0.5 block truncate text-xs text-admin-text/45">
                         {[c.mobile, c.email].filter(Boolean).join(' · ') || 'No contact details'}
                       </span>
                     </td>
@@ -211,23 +211,23 @@ function CustomersTab() {
                     <td className="px-4 py-3">
                       {c.lastLoginAt ? (
                         <>
-                          <span className="block text-as-ink/80">{timeAgo(c.lastLoginAt)}</span>
+                          <span className="block text-admin-text/80">{timeAgo(c.lastLoginAt)}</span>
                           {c.lastLoginMethod && (
-                            <span className="mt-0.5 block text-xs text-as-ink/45">
+                            <span className="mt-0.5 block text-xs text-admin-text/45">
                               via {methodMeta(c.lastLoginMethod).short}
                             </span>
                           )}
                         </>
                       ) : (
-                        <span className="text-as-ink/35">Never</span>
+                        <span className="text-admin-text/35">Never</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-as-ink/70">{c.loginCount}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-as-ink/70">{c.orderCount}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-as-ink">
+                    <td className="px-4 py-3 text-right tabular-nums text-admin-text/70">{c.loginCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-admin-text/70">{c.orderCount}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-admin-text">
                       {money(c.totalSpent)}
                     </td>
-                    <td className="px-4 py-3 text-as-ink/55">{timeAgo(c.createdAt)}</td>
+                    <td className="px-4 py-3 text-admin-text/55">{timeAgo(c.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         // The row opens the detail dialog; keep that from firing.
@@ -238,7 +238,7 @@ function CustomersTab() {
                         disabled={del.pending}
                         title={`Delete ${c.name || 'customer'}`}
                         aria-label={`Delete ${c.name || 'customer'}`}
-                        className="rounded-lg p-1.5 text-as-ink/35 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                        className="rounded-lg p-1.5 text-admin-text/35 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                       >
                         <Icon name="trash" className="h-4 w-4" />
                       </button>
@@ -275,8 +275,8 @@ function StatsRow() {
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {tiles.map((t) => (
         <Card key={t.label} className="px-4 py-3.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-as-ink/45">{t.label}</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-as-ink">
+          <p className="text-xs font-medium uppercase tracking-wide text-admin-text/45">{t.label}</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-admin-text">
             {t.value == null ? '—' : t.value.toLocaleString()}
           </p>
         </Card>
@@ -313,7 +313,7 @@ function LoginsTab() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
-          <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-as-ink/40" />
+          <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-text/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -329,7 +329,7 @@ function LoginsTab() {
             </option>
           ))}
         </Select>
-        <span className="ml-auto text-sm text-as-ink/45">
+        <span className="ml-auto text-sm text-admin-text/45">
           {list.length} sign-in{list.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -342,7 +342,7 @@ function LoginsTab() {
         ) : error ? (
           <p className="py-16 text-center text-sm text-red-600">{error.message}</p>
         ) : list.length === 0 ? (
-          <p className="px-6 py-16 text-center text-sm text-as-ink/50">
+          <p className="px-6 py-16 text-center text-sm text-admin-text/50">
             No sign-ins recorded yet. Sign-in tracking starts from the moment this feature went
             live — earlier logins were never stored.
           </p>
@@ -350,7 +350,7 @@ function LoginsTab() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-as-ink/10 bg-as-fog/40 text-left text-xs uppercase tracking-wide text-as-ink/50">
+                <tr className="border-b border-admin-line/10 bg-admin-bg/40 text-left text-xs uppercase tracking-wide text-admin-text/50">
                   <th className="px-4 py-2.5 font-semibold">Customer</th>
                   <th className="px-4 py-2.5 font-semibold">Method</th>
                   <th className="px-4 py-2.5 font-semibold">When</th>
@@ -358,12 +358,12 @@ function LoginsTab() {
                   <th className="px-4 py-2.5 font-semibold">IP</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-as-ink/5">
+              <tbody className="divide-y divide-admin-line/5">
                 {list.map((l) => (
-                  <tr key={l.id} className="hover:bg-as-fog/50">
+                  <tr key={l.id} className="hover:bg-admin-bg/50">
                     <td className="px-4 py-3">
-                      <span className="block font-medium text-as-ink">{l.name || 'Unnamed'}</span>
-                      <span className="mt-0.5 block truncate text-xs text-as-ink/45">
+                      <span className="block font-medium text-admin-text">{l.name || 'Unnamed'}</span>
+                      <span className="mt-0.5 block truncate text-xs text-admin-text/45">
                         {[l.mobile, l.email].filter(Boolean).join(' · ')}
                       </span>
                     </td>
@@ -373,13 +373,13 @@ function LoginsTab() {
                         {l.isSignup && <Badge tone="gray">New account</Badge>}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-as-ink/70" title={dateTime(l.createdAt)}>
+                    <td className="px-4 py-3 text-admin-text/70" title={dateTime(l.createdAt)}>
                       {timeAgo(l.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-as-ink/55" title={l.userAgent}>
+                    <td className="px-4 py-3 text-admin-text/55" title={l.userAgent}>
                       {deviceLabel(l.userAgent) || '—'}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-as-ink/45">{l.ip || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-admin-text/45">{l.ip || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -434,12 +434,12 @@ function CustomerModal({ id, onClose }) {
           </div>
 
           <div>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-as-ink/45">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-admin-text/45">
               Sign-in methods
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
               <MethodBadge value={data.signupMethod} />
-              <span className="text-xs text-as-ink/45">signed up</span>
+              <span className="text-xs text-admin-text/45">signed up</span>
               {(data.methodsUsed || [])
                 .filter((m) => m !== data.signupMethod)
                 .map((m) => (
@@ -450,10 +450,10 @@ function CustomerModal({ id, onClose }) {
 
           {data.address || (data.addresses || []).length > 0 ? (
             <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-as-ink/45">
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-admin-text/45">
                 Addresses
               </p>
-              <ul className="space-y-1.5 text-sm text-as-ink/70">
+              <ul className="space-y-1.5 text-sm text-admin-text/70">
                 {(data.addresses || []).length > 0
                   ? data.addresses.map((a, i) => (
                       <li key={a.id || i}>
@@ -467,25 +467,25 @@ function CustomerModal({ id, onClose }) {
           ) : null}
 
           <div>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-as-ink/45">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-admin-text/45">
               Orders ({data.orderCount}) · {money(data.totalSpent)} total
             </p>
             {data.orders.length === 0 ? (
-              <p className="text-sm text-as-ink/45">No orders yet.</p>
+              <p className="text-sm text-admin-text/45">No orders yet.</p>
             ) : (
-              <ul className="divide-y divide-as-ink/5 rounded-lg border border-as-ink/10">
+              <ul className="divide-y divide-admin-line/5 rounded-lg border border-admin-line/10">
                 {data.orders.map((o) => (
                   <li key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-                    <span className="font-medium text-as-ink">#{o.id}</span>
+                    <span className="font-medium text-admin-text">#{o.id}</span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClasses(o.status)}`}
                     >
                       {statusMeta(o.status).label}
                     </span>
-                    <span className="text-xs text-as-ink/45">
+                    <span className="text-xs text-admin-text/45">
                       {o.paymentMethod === 'whish' ? 'Whish' : 'COD'} · {o.paymentStatus}
                     </span>
-                    <span className="ml-auto font-semibold tabular-nums text-as-ink">
+                    <span className="ml-auto font-semibold tabular-nums text-admin-text">
                       {money(orderTotal(o))}
                     </span>
                   </li>
@@ -495,20 +495,20 @@ function CustomerModal({ id, onClose }) {
           </div>
 
           <div>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-as-ink/45">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-admin-text/45">
               Recent sign-ins ({data.loginCount})
             </p>
             {data.logins.length === 0 ? (
-              <p className="text-sm text-as-ink/45">
+              <p className="text-sm text-admin-text/45">
                 Nothing recorded yet — this account predates sign-in tracking.
               </p>
             ) : (
-              <ul className="divide-y divide-as-ink/5 rounded-lg border border-as-ink/10">
+              <ul className="divide-y divide-admin-line/5 rounded-lg border border-admin-line/10">
                 {data.logins.map((l) => (
                   <li key={l.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                     <MethodBadge value={l.method} />
-                    <span className="text-as-ink/70">{dateTime(l.createdAt)}</span>
-                    <span className="ml-auto text-xs text-as-ink/45">
+                    <span className="text-admin-text/70">{dateTime(l.createdAt)}</span>
+                    <span className="ml-auto text-xs text-admin-text/45">
                       {[deviceLabel(l.userAgent), l.ip].filter(Boolean).join(' · ')}
                     </span>
                   </li>
@@ -525,8 +525,8 @@ function CustomerModal({ id, onClose }) {
 function Detail({ label, value }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-as-ink/45">{label}</p>
-      <p className="mt-0.5 break-words text-as-ink">{value || '—'}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-admin-text/45">{label}</p>
+      <p className="mt-0.5 break-words text-admin-text">{value || '—'}</p>
     </div>
   )
 }
