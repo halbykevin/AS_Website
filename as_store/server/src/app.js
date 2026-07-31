@@ -632,35 +632,73 @@ async function consumeOtp(target, code) {
 const missingChannel = (c) =>
   !c.email ? "email" : !c.mobile ? "whatsapp" : null;
 
-async function findOrCreateCustomerByMobile(mobile, seed = {}) {
+// How a customer reached us. 'unknown' is reserved for accounts that predate
+// this tracking — it is never assigned to a new row.
+const SIGNUP_METHODS = ["google", "whatsapp", "email", "checkout", "unknown"];
+const signupMethodOf = (v) =>
+  SIGNUP_METHODS.includes(v) ? v : /* unrecognized */ "unknown";
+
+// Record one sign-in. Analytics must never break a login, so failures are
+// logged and swallowed; callers do not await the result.
+async function recordLogin(customerId, method, req, { isSignup = false } = {}) {
+  try {
+    const ip = String(
+      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+        req?.ip ||
+        "",
+    ).slice(0, 60);
+    const agent = String(req?.headers?.["user-agent"] || "").slice(0, 300);
+    await query(
+      `INSERT INTO customer_logins (customer_id, method, is_signup, ip, user_agent)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [customerId, signupMethodOf(method), isSignup, ip, agent],
+    );
+    await query(
+      `UPDATE customers SET last_login_at = now(), last_login_method = $2
+       WHERE id = $1`,
+      [customerId, signupMethodOf(method)],
+    );
+  } catch (e) {
+    console.error("[account] recordLogin failed:", e?.message || e);
+  }
+}
+
+async function findOrCreateCustomerByMobile(mobile, seed = {}, method) {
   const { rows } = await query(`SELECT * FROM customers WHERE mobile = $1`, [
     mobile,
   ]);
   if (rows[0]) return { customer: rows[0], created: false };
   const { rows: made } = await query(
-    `INSERT INTO customers (name, mobile, email, phone, address)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    `INSERT INTO customers (name, mobile, email, phone, address, signup_method)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
     [
       (seed.name || "").trim(),
       mobile,
       seed.email || null,
       seed.phone || mobile,
       seed.address || "",
+      signupMethodOf(method),
     ],
   );
   return { customer: made[0], created: true };
 }
 
-async function findOrCreateCustomerByEmail(email, seed = {}) {
+async function findOrCreateCustomerByEmail(email, seed = {}, method) {
   const { rows } = await query(
     `SELECT * FROM customers WHERE lower(email) = $1 ORDER BY id DESC LIMIT 1`,
     [email],
   );
   if (rows[0]) return { customer: rows[0], created: false };
   const { rows: made } = await query(
-    `INSERT INTO customers (name, email, phone, address)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [(seed.name || "").trim(), email, seed.phone || "", seed.address || ""],
+    `INSERT INTO customers (name, email, phone, address, signup_method)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [
+      (seed.name || "").trim(),
+      email,
+      seed.phone || "",
+      seed.address || "",
+      signupMethodOf(method),
+    ],
   );
   return { customer: made[0], created: true };
 }
@@ -733,8 +771,13 @@ app.get(
       return res.redirect(`${STORE_URL}/login?error=google`);
     }
 
-    const { customer } = await findOrCreateCustomerByEmail(profile.email);
+    const { customer, created } = await findOrCreateCustomerByEmail(
+      profile.email,
+      {},
+      "google",
+    );
     const row = await fillProfile(customer, { name: profile.name });
+    recordLogin(row.id, "google", req, { isSignup: created });
     const to = appReturnUrl(profile.appReturn);
     if (to) {
       const code = await issueMobileAuthCode(row.id, profile.next);
@@ -872,13 +915,22 @@ app.post(
     const error = await consumeOtp(target, code);
     if (error) return res.status(400).json({ error });
 
-    const { customer } =
+    const { customer, created } =
       target.channel === "whatsapp"
-        ? await findOrCreateCustomerByMobile(target.identifier)
-        : await findOrCreateCustomerByEmail(target.identifier);
+        ? await findOrCreateCustomerByMobile(
+            target.identifier,
+            {},
+            target.channel,
+          )
+        : await findOrCreateCustomerByEmail(
+            target.identifier,
+            {},
+            target.channel,
+          );
     const row = req.body?.profile
       ? await fillProfile(customer, req.body.profile)
       : customer;
+    recordLogin(row.id, target.channel, req, { isSignup: created });
 
     res.json({
       token: signCustomerToken(row),
@@ -1053,13 +1105,15 @@ app.post(
       const mobile = normalizeMobile(phone);
       if (!mobile)
         return res.status(400).json({ error: "Enter a valid mobile number" });
-      const { customer } = await findOrCreateCustomerByMobile(mobile, {
-        name: fullName,
-        email,
-        phone,
-        address,
-      });
+      const { customer, created } = await findOrCreateCustomerByMobile(
+        mobile,
+        { name: fullName, email, phone, address },
+        "checkout",
+      );
       customerId = customer.id;
+      // Only a brand-new account is an entry point worth recording. A returning
+      // guest did not authenticate, so it would not be a sign-in.
+      if (created) recordLogin(customerId, "checkout", req, { isSignup: true });
     }
 
     const ids = cleaned.map((i) => i.productId);
@@ -1413,6 +1467,201 @@ app.delete(
     );
     if (!rows[0]) return res.status(404).json({ error: "Not found" });
     res.status(204).end();
+  }),
+);
+
+// ---- Admin customer directory ----
+// Sorting and filtering run in SQL rather than the browser: the customer list
+// only grows, and a client-side sort would silently order just the page it has.
+const CUSTOMER_SORTS = {
+  created: "c.created_at",
+  name: "lower(NULLIF(c.name, ''))",
+  lastLogin: "c.last_login_at",
+  logins: "login_count",
+  orders: "order_count",
+  spent: "total_spent",
+};
+
+const customerRowJson = (r) => ({
+  id: r.id,
+  name: r.name || "",
+  mobile: r.mobile || "",
+  email: r.email || "",
+  phone: r.phone || "",
+  address: r.address || "",
+  createdAt: r.created_at,
+  signupMethod: r.signup_method || "unknown",
+  lastLoginAt: r.last_login_at,
+  lastLoginMethod: r.last_login_method || "",
+  loginCount: Number(r.login_count || 0),
+  methodsUsed: r.methods_used || [],
+  orderCount: Number(r.order_count || 0),
+  totalSpent: Number(r.total_spent || 0),
+  lastOrderAt: r.last_order_at,
+});
+
+const loginRowJson = (r) => ({
+  id: Number(r.id),
+  customerId: r.customer_id,
+  method: r.method,
+  isSignup: r.is_signup === true,
+  ip: r.ip || "",
+  userAgent: r.user_agent || "",
+  createdAt: r.created_at,
+  name: r.name || "",
+  email: r.email || "",
+  mobile: r.mobile || "",
+});
+
+// Aggregates live in subqueries so a customer with no orders and no logins is
+// still returned (a plain JOIN + GROUP BY would multiply rows across the two).
+const CUSTOMER_SELECT = `
+  SELECT c.*,
+    (SELECT count(*) FROM customer_logins l WHERE l.customer_id = c.id)::int AS login_count,
+    (SELECT array_agg(DISTINCT l.method) FROM customer_logins l WHERE l.customer_id = c.id) AS methods_used,
+    (SELECT count(*) FROM orders o WHERE o.customer_id = c.id)::int AS order_count,
+    (SELECT COALESCE(sum(o.subtotal), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
+    (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at
+  FROM customers c`;
+
+app.get(
+  "/api/admin/customers",
+  requireAuth,
+  ah(async (req, res) => {
+    const where = [];
+    const params = [];
+
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      params.push(`%${search}%`);
+      const p = `$${params.length}`;
+      where.push(
+        `(c.name ILIKE ${p} OR c.email ILIKE ${p} OR c.mobile ILIKE ${p} OR c.phone ILIKE ${p})`,
+      );
+    }
+
+    const method = String(req.query.method || "");
+    if (SIGNUP_METHODS.includes(method)) {
+      params.push(method);
+      where.push(`c.signup_method = $${params.length}`);
+    }
+
+    if (req.query.hasOrders === "1")
+      where.push(`EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)`);
+
+    const sort = CUSTOMER_SORTS[req.query.sort] || CUSTOMER_SORTS.created;
+    const dir = String(req.query.order).toLowerCase() === "asc" ? "ASC" : "DESC";
+    const limit = Math.min(Number(req.query.limit) || 500, 2000);
+
+    const { rows } = await query(
+      `${CUSTOMER_SELECT}
+       ${where.length ? "WHERE " + where.join(" AND ") : ""}
+       ORDER BY ${sort} ${dir} NULLS LAST, c.id DESC
+       LIMIT ${limit}`,
+      params,
+    );
+    res.json(rows.map(customerRowJson));
+  }),
+);
+
+// Headline counts for the directory, computed over every customer rather than
+// the filtered page so the tiles stay stable while the admin searches.
+app.get(
+  "/api/admin/customers/stats",
+  requireAuth,
+  ah(async (_req, res) => {
+    const { rows } = await query(
+      `SELECT
+         (SELECT count(*) FROM customers)::int AS total,
+         (SELECT count(*) FROM customers WHERE created_at > now() - interval '30 days')::int AS new30,
+         (SELECT count(*) FROM customers WHERE last_login_at > now() - interval '30 days')::int AS active30,
+         (SELECT count(*) FROM customer_logins)::int AS logins,
+         (SELECT count(DISTINCT customer_id) FROM orders WHERE customer_id IS NOT NULL)::int AS with_orders`,
+    );
+    const { rows: byMethod } = await query(
+      `SELECT signup_method, count(*)::int AS n FROM customers GROUP BY 1`,
+    );
+    res.json({
+      total: rows[0].total,
+      new30: rows[0].new30,
+      active30: rows[0].active30,
+      logins: rows[0].logins,
+      withOrders: rows[0].with_orders,
+      byMethod: Object.fromEntries(
+        byMethod.map((r) => [r.signup_method || "unknown", r.n]),
+      ),
+    });
+  }),
+);
+
+// Recent sign-ins across every customer — the "logins" feed.
+app.get(
+  "/api/admin/customers/logins",
+  requireAuth,
+  ah(async (req, res) => {
+    const where = [];
+    const params = [];
+
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      params.push(`%${search}%`);
+      const p = `$${params.length}`;
+      where.push(
+        `(c.name ILIKE ${p} OR c.email ILIKE ${p} OR c.mobile ILIKE ${p})`,
+      );
+    }
+    const method = String(req.query.method || "");
+    if (SIGNUP_METHODS.includes(method)) {
+      params.push(method);
+      where.push(`l.method = $${params.length}`);
+    }
+    const limit = Math.min(Number(req.query.limit) || 200, 1000);
+
+    const { rows } = await query(
+      `SELECT l.*, c.name, c.email, c.mobile
+       FROM customer_logins l JOIN customers c ON c.id = l.customer_id
+       ${where.length ? "WHERE " + where.join(" AND ") : ""}
+       ORDER BY l.created_at DESC LIMIT ${limit}`,
+      params,
+    );
+    res.json(rows.map(loginRowJson));
+  }),
+);
+
+app.get(
+  "/api/admin/customers/:id",
+  requireAuth,
+  ah(async (req, res) => {
+    const { rows } = await query(`${CUSTOMER_SELECT} WHERE c.id = $1`, [
+      req.params.id,
+    ]);
+    if (!rows[0]) return res.status(404).json({ error: "Not found" });
+
+    const { rows: logins } = await query(
+      `SELECT l.*, c.name, c.email, c.mobile
+       FROM customer_logins l JOIN customers c ON c.id = l.customer_id
+       WHERE l.customer_id = $1 ORDER BY l.created_at DESC LIMIT 50`,
+      [req.params.id],
+    );
+    const { rows: orders } = await query(
+      `SELECT id, status, payment_method, payment_status, subtotal, created_at
+       FROM orders WHERE customer_id = $1 ORDER BY id DESC LIMIT 50`,
+      [req.params.id],
+    );
+
+    res.json({
+      ...customerRowJson(rows[0]),
+      addresses: Array.isArray(rows[0].addresses) ? rows[0].addresses : [],
+      logins: logins.map(loginRowJson),
+      orders: orders.map((o) => ({
+        id: o.id,
+        status: o.status,
+        paymentMethod: o.payment_method || "cod",
+        paymentStatus: o.payment_status || "unpaid",
+        subtotal: Number(o.subtotal || 0),
+        createdAt: o.created_at,
+      })),
+    });
   }),
 );
 

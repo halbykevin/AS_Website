@@ -160,6 +160,22 @@ export const adminApi = {
   deleteSurvey: (id) => req(`/api/admin/surveys/${id}`, { method: 'DELETE', auth: true }),
   surveyResponses: (id) => req(`/api/admin/surveys/${id}/responses`, { auth: true }),
 
+  // customers — directory + sign-in history
+  listCustomers: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null),
+    ).toString()
+    return req(`/api/admin/customers${qs ? `?${qs}` : ''}`, { auth: true })
+  },
+  customerStats: () => req('/api/admin/customers/stats', { auth: true }),
+  listCustomerLogins: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null),
+    ).toString()
+    return req(`/api/admin/customers/logins${qs ? `?${qs}` : ''}`, { auth: true })
+  },
+  getCustomer: (id) => req(`/api/admin/customers/${id}`, { auth: true }),
+
   // orders
   listOrders: (status) =>
     req(`/api/admin/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`, { auth: true }),

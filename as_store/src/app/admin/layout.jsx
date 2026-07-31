@@ -10,6 +10,7 @@ import { isAuthed, clearToken } from '@/lib/adminApi'
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: 'grid', exact: true },
   { href: '/admin/orders', label: 'Orders', icon: 'bag' },
+  { href: '/admin/customers', label: 'Customers', icon: 'user' },
   { href: '/admin/notifications', label: 'Notifications', icon: 'bell' },
   { href: '/admin/homepage', label: 'Homepage', icon: 'image' },
   { href: '/admin/popup', label: 'Promotions popup', icon: 'star' },

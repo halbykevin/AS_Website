@@ -239,10 +239,37 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_mobile
 -- Saved address book: [{ id, title, fullName, phone, address, city, isDefault }].
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS addresses JSONB DEFAULT '[]'::jsonb;
 
+-- How the account came to exist, and a summary of the latest sign-in. Accounts
+-- created before this tracking existed keep 'unknown' — that history was never
+-- recorded and must not be guessed at in the admin UI.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS signup_method     TEXT DEFAULT 'unknown';
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_login_at     TIMESTAMPTZ;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_login_method TEXT;
+CREATE INDEX IF NOT EXISTS idx_customers_signup_method ON customers(signup_method);
+
 DROP TRIGGER IF EXISTS trg_customers_updated ON customers;
 CREATE TRIGGER trg_customers_updated
   BEFORE UPDATE ON customers
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- --- Sign-in history --------------------------------------------------------
+-- One row per successful authentication, so the admin can see how each customer
+-- actually gets in rather than only the method they first signed up with.
+-- 'checkout' means an account the order form created from a mobile number — not
+-- an authentication, but it is how that customer entered the store.
+CREATE TABLE IF NOT EXISTS customer_logins (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  method      TEXT NOT NULL,             -- google|whatsapp|email|checkout
+  is_signup   BOOLEAN NOT NULL DEFAULT false,
+  ip          TEXT DEFAULT '',
+  user_agent  TEXT DEFAULT '',
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_customer_logins_customer
+  ON customer_logins(customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_customer_logins_created
+  ON customer_logins(created_at DESC);
 
 -- --- Login OTP codes ---------------------------------------------------------
 -- One-time codes for mobile login. Only the hash is stored; codes expire after
