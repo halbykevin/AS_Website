@@ -215,24 +215,25 @@ export default function WhatWeDo() {
         ref={heroRef}
         className="relative flex min-h-[90vh] items-center overflow-hidden bg-[#0b0c0e] text-white"
       >
-        {/* Background banner. The artwork is a complete composition (headline,
-            logo, feature strip), so it is contained rather than cropped — and a
-            blurred, over-scaled copy fills whatever the letterbox leaves, so the
-            edges read as depth instead of flat bars.
-            It is a bright image and the hero copy on top is white, so it carries
-            a scrim: a flat fill for overall readability plus a vertical gradient
-            anchoring the top and bottom, where the heading and scroll cue sit. */}
+        {/* Background banner, fitted differently by viewport shape.
+            Desktop is wide enough to show the whole 16:9 composition, so it is
+            contained and an over-scaled blurred copy fills the letterbox.
+            A phone viewport is far taller than the artwork, where containing it
+            would strand a small banner between huge blurred bands — so below lg
+            it covers instead, cropping to the centre of the scene. The blurred
+            layer is dropped there: it would be completely hidden anyway, and a
+            full-screen blur is expensive to paint on a phone. */}
         <div aria-hidden className="absolute inset-0">
           <img
             src="/whyAS.webp"
             alt=""
-            className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+            className="absolute inset-0 hidden h-full w-full scale-110 object-cover blur-2xl lg:block"
           />
           <img
             src="/whyAS.webp"
             alt=""
             fetchpriority="high"
-            className="relative h-full w-full object-contain object-center"
+            className="relative h-full w-full object-cover object-center lg:object-contain"
           />
           <div className="absolute inset-0 bg-[#0b0c0e]/70" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#0b0c0e]/80 via-transparent to-[#0b0c0e]/90" />
