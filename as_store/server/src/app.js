@@ -24,7 +24,12 @@ import {
   OTP_MAX_ATTEMPTS,
   OTP_REQUEST_CAP,
 } from "./otp.js";
-import { sendOrderEmails, sendContactEmail, sendOtpEmail } from "./mailer.js";
+import {
+  sendOrderEmails,
+  sendOrderStatusEmail,
+  sendContactEmail,
+  sendOtpEmail,
+} from "./mailer.js";
 import {
   sendOtpWhatsApp,
   whatsappOtpEnabled,
@@ -1453,6 +1458,21 @@ app.put(
     }
     const detail = await loadOrderDetail(req.params.id);
     if (!detail) return res.status(404).json({ error: "Not found" });
+
+    // Email the customer about the new status. Guarded by the same real-
+    // transition check as the push, so re-saving the same status never re-sends,
+    // and fire-and-forget so a mail outage can never fail the admin's update.
+    if (rows[0]) {
+      sendOrderStatusEmail(detail, signOrderToken(detail.id))
+        .then((r) =>
+          console.log(
+            r.sent
+              ? `[mail] order #${detail.id} → '${status}' email sent to ${detail.email}`
+              : `[mail] order #${detail.id} → '${status}' email skipped (${r.reason})`,
+          ),
+        )
+        .catch((e) => console.error("[mail] status email:", e?.message || e));
+    }
     res.json(detail);
   }),
 );

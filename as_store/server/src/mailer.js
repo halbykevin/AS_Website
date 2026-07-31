@@ -119,6 +119,62 @@ function orderBody(order, { intro, trackUrl }) {
     }`
 }
 
+// Copy for each fulfilment status the admin can move an order to. 'pending' is
+// absent on purpose: it is the state an order starts in, so moving *back* to it
+// is an internal correction the customer should not be emailed about.
+const STATUS_EMAILS = {
+  confirmed: {
+    subject: (o) => `Your AS Store order #${o.id} is confirmed`,
+    intro: (o) =>
+      `Good news ${esc(firstName(o.fullName))} — your order is confirmed and we're getting it ready.`,
+  },
+  shipped: {
+    subject: (o) => `Your AS Store order #${o.id} is on its way`,
+    intro: (o) =>
+      `Your order is on its way, ${esc(firstName(o.fullName))}. We'll let you know once it's delivered.`,
+  },
+  delivered: {
+    subject: (o) => `Your AS Store order #${o.id} has been delivered`,
+    intro: (o) =>
+      `Your order has been delivered — thanks for shopping with AS Store, ${esc(firstName(o.fullName))}!`,
+  },
+  cancelled: {
+    subject: (o) => `Your AS Store order #${o.id} has been cancelled`,
+    // Only promise a refund conversation when money actually changed hands.
+    intro: (o) =>
+      `Your order has been cancelled, ${esc(firstName(o.fullName))}.` +
+      (o.paymentStatus === 'paid'
+        ? " Since this order was already paid, we'll be in touch about your refund."
+        : '') +
+      " If this was unexpected, just reply to this email and we'll help.",
+  },
+}
+
+const firstName = (full) => String(full || '').trim().split(/\s+/)[0] || 'there'
+
+export const statusEmailExists = (status) => Boolean(STATUS_EMAILS[status])
+
+// Fire-and-forget when the admin moves an order to a new status. Only the
+// customer is mailed — staff made the change, so a copy back to them is noise.
+export async function sendOrderStatusEmail(order, trackToken) {
+  if (!mailEnabled()) return { sent: false, reason: 'mail disabled' }
+  const copy = STATUS_EMAILS[order?.status]
+  if (!copy) return { sent: false, reason: `no email for status ${order?.status}` }
+  if (!order.email) return { sent: false, reason: 'order has no email address' }
+
+  const trackUrl = trackToken
+    ? `${STORE_URL}/account/orders/${order.id}?t=${encodeURIComponent(trackToken)}`
+    : ''
+
+  await getTransport().sendMail({
+    from: FROM,
+    to: order.email,
+    subject: copy.subject(order),
+    html: emailShell(orderBody(order, { intro: copy.intro(order), trackUrl })),
+  })
+  return { sent: true }
+}
+
 // Fire-and-forget from the order endpoint: never blocks or fails the order.
 export async function sendOrderEmails(order, trackToken) {
   if (!mailEnabled()) return
