@@ -215,16 +215,24 @@ export default function WhatWeDo() {
         ref={heroRef}
         className="relative flex min-h-[90vh] items-center overflow-hidden bg-[#0b0c0e] text-white"
       >
-        {/* Background banner. It is a bright image and the hero copy on top is
-            white, so it carries a scrim — flat fill for overall readability,
-            plus a vertical gradient that anchors the top and bottom edges where
-            the heading and the scroll cue sit. */}
+        {/* Background banner. The artwork is a complete composition (headline,
+            logo, feature strip), so it is contained rather than cropped — and a
+            blurred, over-scaled copy fills whatever the letterbox leaves, so the
+            edges read as depth instead of flat bars.
+            It is a bright image and the hero copy on top is white, so it carries
+            a scrim: a flat fill for overall readability plus a vertical gradient
+            anchoring the top and bottom, where the heading and scroll cue sit. */}
         <div aria-hidden className="absolute inset-0">
           <img
             src="/whyAS.webp"
             alt=""
+            className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+          />
+          <img
+            src="/whyAS.webp"
+            alt=""
             fetchpriority="high"
-            className="h-full w-full object-cover object-center"
+            className="relative h-full w-full object-contain object-center"
           />
           <div className="absolute inset-0 bg-[#0b0c0e]/70" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#0b0c0e]/80 via-transparent to-[#0b0c0e]/90" />
