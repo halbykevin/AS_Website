@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
-import { Badge, Card, Input, Modal, Select, Spinner } from '@/components/admin/ui.jsx'
+import { Badge, Button, Card, Input, Modal, Select, Spinner } from '@/components/admin/ui.jsx'
+import { useToast } from '@/components/admin/toast.jsx'
 import { adminApi } from '@/lib/adminApi'
 import { money, statusClasses, statusMeta, orderTotal } from '@/lib/orders'
 import {
@@ -14,6 +15,46 @@ import {
   methodMeta,
   timeAgo,
 } from '@/lib/customers'
+
+// Deleting an account is irreversible, so the confirmation spells out exactly
+// what survives (the orders) and what does not, rather than a generic warning.
+function useDeleteCustomer(onDeleted) {
+  const qc = useQueryClient()
+  const toast = useToast()
+
+  const remove = useMutation({
+    mutationFn: (id) => adminApi.deleteCustomer(id),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'customer-logins'] })
+      toast.success(
+        r.ordersKept > 0
+          ? `Customer deleted — ${r.ordersKept} order${r.ordersKept > 1 ? 's' : ''} kept`
+          : 'Customer deleted',
+      )
+      onDeleted?.()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const confirmDelete = (c) => {
+    const who = c.name || c.mobile || c.email || `customer #${c.id}`
+    const orders = Number(c.orderCount || 0)
+    const kept = orders
+      ? `\n\nTheir ${orders} order${orders > 1 ? 's' : ''} will be KEPT (unlinked from the account), so your sales records stay intact.`
+      : ''
+    if (
+      confirm(
+        `Delete ${who}?${kept}\n\nPermanently removed: sign-in history, saved addresses, ` +
+          `notification settings and any survey answers.\n\nThis can't be undone.`,
+      )
+    ) {
+      remove.mutate(c.id)
+    }
+  }
+
+  return { confirmDelete, pending: remove.isPending }
+}
 
 export default function CustomersAdmin() {
   const [tab, setTab] = useState('customers')
@@ -51,6 +92,7 @@ function CustomersTab() {
   const [order, setOrder] = useState('desc')
   const [hasOrders, setHasOrders] = useState(false)
   const [viewId, setViewId] = useState(null)
+  const del = useDeleteCustomer()
 
   // Search/sort/filter run on the server, so the ordering is over every
   // customer rather than whatever subset the browser happens to hold.
@@ -147,6 +189,7 @@ function CustomersTab() {
                   <th className="px-4 py-2.5 text-right font-semibold">Orders</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Spent</th>
                   <th className="px-4 py-2.5 font-semibold">Joined</th>
+                  <th className="px-4 py-2.5 font-semibold"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-as-ink/5">
@@ -185,6 +228,21 @@ function CustomersTab() {
                       {money(c.totalSpent)}
                     </td>
                     <td className="px-4 py-3 text-as-ink/55">{timeAgo(c.createdAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        // The row opens the detail dialog; keep that from firing.
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          del.confirmDelete(c)
+                        }}
+                        disabled={del.pending}
+                        title={`Delete ${c.name || 'customer'}`}
+                        aria-label={`Delete ${c.name || 'customer'}`}
+                        className="rounded-lg p-1.5 text-as-ink/35 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                      >
+                        <Icon name="trash" className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -341,9 +399,27 @@ function CustomerModal({ id, onClose }) {
     queryFn: () => adminApi.getCustomer(id),
     enabled: Boolean(id),
   })
+  // Close the dialog once the account it is showing no longer exists.
+  const del = useDeleteCustomer(onClose)
 
   return (
-    <Modal open={Boolean(id)} onClose={onClose} title={data?.name || 'Customer'}>
+    <Modal
+      open={Boolean(id)}
+      onClose={onClose}
+      title={data?.name || 'Customer'}
+      footer={
+        data ? (
+          <Button
+            variant="dangerGhost"
+            onClick={() => del.confirmDelete(data)}
+            disabled={del.pending}
+          >
+            <Icon name="trash" className="h-4 w-4" />
+            {del.pending ? 'Deleting…' : 'Delete customer'}
+          </Button>
+        ) : null
+      }
+    >
       {isLoading || !data ? (
         <div className="flex justify-center py-10">
           <Spinner />

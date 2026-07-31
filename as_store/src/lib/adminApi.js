@@ -175,6 +175,7 @@ export const adminApi = {
     return req(`/api/admin/customers/logins${qs ? `?${qs}` : ''}`, { auth: true })
   },
   getCustomer: (id) => req(`/api/admin/customers/${id}`, { auth: true }),
+  deleteCustomer: (id) => req(`/api/admin/customers/${id}`, { method: 'DELETE', auth: true }),
 
   // orders
   listOrders: (status) =>

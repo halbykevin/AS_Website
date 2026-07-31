@@ -1724,6 +1724,39 @@ app.get(
   }),
 );
 
+// Deleting a customer removes the account, not the business record: orders are
+// ON DELETE SET NULL, so the sale, its items and the name/address snapshot taken
+// at checkout all survive, merely unlinked. Sign-in history, saved
+// notifications, device tokens and survey answers cascade away with the row.
+app.delete(
+  "/api/admin/customers/:id",
+  requireAuth,
+  ah(async (req, res) => {
+    const id = req.params.id;
+    // Counted before the delete — afterwards the rows are gone or unlinked.
+    const { rows: counts } = await query(
+      `SELECT
+         (SELECT count(*) FROM orders          WHERE customer_id = $1)::int AS orders,
+         (SELECT count(*) FROM customer_logins WHERE customer_id = $1)::int AS logins`,
+      [id],
+    );
+    const { rows } = await query(
+      `DELETE FROM customers WHERE id = $1 RETURNING id, name, mobile, email`,
+      [id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Not found" });
+    console.log(
+      `[admin] customer #${rows[0].id} (${rows[0].name || "unnamed"}) deleted — ` +
+        `${counts[0].orders} order(s) kept, ${counts[0].logins} sign-in(s) removed`,
+    );
+    res.json({
+      id: rows[0].id,
+      ordersKept: counts[0].orders,
+      loginsRemoved: counts[0].logins,
+    });
+  }),
+);
+
 app.get(
   "/api/categories",
   optionalAuth,
