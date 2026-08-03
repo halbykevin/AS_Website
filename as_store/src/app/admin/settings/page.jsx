@@ -31,6 +31,44 @@ const EMPTY = {
   },
 }
 
+// Every group on this page is collapsed behind its own header button. The page
+// holds a dozen unrelated things — a publish gate, delivery pricing, ad tags —
+// and scrolling past ten of them to reach the eleventh is how the wrong setting
+// gets changed by accident. A collapsed row still says what it is set to, so the
+// whole configuration is readable without opening anything.
+//
+// The inputs unmount when a section closes; that is safe because every value
+// lives in the page's `form` state, not in the fields themselves, so edits
+// survive collapsing and are saved together by the one Save button.
+function Section({ title, summary, badge, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <Card className="overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 p-5 text-left transition hover:bg-admin-bg/60"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2.5">
+            <span className="font-bold text-admin-text">{title}</span>
+            {badge}
+          </span>
+          {summary && (
+            <span className="mt-0.5 block truncate text-sm text-admin-text/45">{summary}</span>
+          )}
+        </span>
+        <Icon
+          name="chevronDown"
+          className={`h-4 w-4 shrink-0 text-admin-text/40 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && <div className="space-y-4 border-t border-admin-line/10 p-5">{children}</div>}
+    </Card>
+  )
+}
+
 // Must match LOGIN_BUTTON_WEIGHTS server-side — the value becomes a class name.
 const LOGIN_WEIGHTS = [
   { value: 'normal', label: 'Regular' },
@@ -87,21 +125,31 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-admin-text/50">Site-wide content shown across the storefront.</p>
+    <div className="mx-auto max-w-3xl space-y-4 pb-4">
+      {/* Sticky under the admin topbar (h-14), so Save is reachable no matter
+          how far down an opened section runs. Kept to the column width rather
+          than bled to the viewport edges: everything on this page is the same
+          width, so this covers all of it, and the bleed would have to match
+          three different `main` paddings to look right. */}
+      <div className="sticky top-14 z-20 flex items-center justify-between gap-3 rounded-xl border border-admin-line/10 bg-admin-bg/90 px-4 py-3 backdrop-blur">
+        <p className="text-sm text-admin-text/50">Open a section to edit it.</p>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
 
       {/* Publish gate */}
-      <Card className="space-y-3 p-5">
+      <Section
+        title="Site visibility"
+        badge={form.published ? <Badge tone="green">Live</Badge> : <Badge tone="amber">Coming soon</Badge>}
+        summary={
+          form.published
+            ? 'The storefront is open to everyone.'
+            : 'Visitors see the “Coming soon” page.'
+        }
+      >
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="font-bold text-admin-text">Site visibility</h3>
-            {form.published ? <Badge tone="green">Live</Badge> : <Badge tone="amber">Coming soon</Badge>}
-          </div>
+          <span className="text-sm font-semibold text-admin-text">Storefront</span>
           <Toggle
             checked={form.published}
             onChange={(v) => set('published', v)}
@@ -114,11 +162,13 @@ export default function SettingsPage() {
           <code className="rounded bg-admin-bg px-1.5 py-0.5 text-xs">/?preview=1</code>. Remember to
           press <b>Save changes</b> after flipping the switch.
         </p>
-      </Card>
+      </Section>
 
       {/* General */}
-      <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-admin-text">General</h3>
+      <Section
+        title="General"
+        summary={`${form.storeName || 'Unnamed store'} · logo ${form.navLogoSize}px desktop, ${form.navLogoSizeMobile}px mobile`}
+      >
         <Field label="Store name">
           <Input value={form.storeName} onChange={(e) => set('storeName', e.target.value)} />
         </Field>
@@ -158,16 +208,20 @@ export default function SettingsPage() {
             </div>
           </div>
         </Field>
-      </Card>
+      </Section>
 
       {/* Announcement */}
-      <Card className="space-y-4 p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-admin-text">Announcement bar</h3>
+      <Section
+        title="Announcement bar"
+        badge={form.announcement.enabled ? <Badge tone="green">On</Badge> : <Badge tone="gray">Off</Badge>}
+        summary={form.announcement.text || 'No message set.'}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-admin-text">Show the bar</span>
           <Toggle
             checked={form.announcement.enabled}
             onChange={(v) => setNested('announcement', 'enabled', v)}
-            label="Enabled"
+            label={form.announcement.enabled ? 'Enabled' : 'Hidden'}
           />
         </div>
         <Field label="Message" hint="Shown as a thin bar above the navigation.">
@@ -177,11 +231,21 @@ export default function SettingsPage() {
             placeholder="Free delivery on orders over $100 · 12 months warranty"
           />
         </Field>
-      </Card>
+      </Section>
 
       {/* Delivery charge */}
-      <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-admin-text">Delivery</h3>
+      <Section
+        title="Delivery"
+        summary={
+          Number(form.delivery.fee) > 0
+            ? `$${Number(form.delivery.fee).toLocaleString()} per order${
+                Number(form.delivery.freeOver) > 0
+                  ? `, free over $${Number(form.delivery.freeOver).toLocaleString()}`
+                  : ''
+              }`
+            : 'Free on every order.'
+        }
+      >
         <p className="text-sm text-admin-text/50">
           Charged on top of the items total at checkout. The fee is saved onto each order as it is
           placed, so changing these values never alters an order a customer already paid.
@@ -224,14 +288,13 @@ export default function SettingsPage() {
             <>Delivery is free on every order — no fee is added at checkout.</>
           )}
         </p>
-      </Card>
+      </Section>
 
       {/* Google Analytics + Google Ads */}
-      <TrackingCard value={form.tracking} onChange={(k, v) => setNested('tracking', k, v)} />
+      <TrackingSection value={form.tracking} onChange={(k, v) => setNested('tracking', k, v)} />
 
       {/* Sign-in button branding */}
-      <Card className="space-y-4 p-5">
-        <h3 className="font-bold text-admin-text">Sign-in button</h3>
+      <Section title="Sign-in button" summary={form.loginButton.label || 'Continue with email'}>
         <p className="text-sm text-admin-text/50">
           The email-code button on the sign-in page. Use your own logo and wording — it’s your
           service, so it shouldn’t carry another company’s mark.
@@ -276,16 +339,24 @@ export default function SettingsPage() {
             </span>
           </div>
         </Field>
-      </Card>
+      </Section>
 
       {/* Homepage — New arrivals (the first block on the homepage) */}
-      <Card className="space-y-4 p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-admin-text">Homepage — New arrivals</h3>
+      <Section
+        title="Homepage — New arrivals"
+        badge={form.homeNew.enabled ? <Badge tone="green">Shown</Badge> : <Badge tone="gray">Hidden</Badge>}
+        summary={`“${form.homeNew.heading || 'New in.'}” · ${
+          { newest: 'newest arrivals', featured: 'featured products', category: 'one category' }[
+            form.homeNew.source
+          ] || form.homeNew.source
+        } · ${form.homeNew.count} products`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-admin-text">Show the section</span>
           <Toggle
             checked={form.homeNew.enabled}
             onChange={(v) => setNested('homeNew', 'enabled', v)}
-            label="Shown"
+            label={form.homeNew.enabled ? 'Shown' : 'Hidden'}
           />
         </div>
         <p className="text-sm text-admin-text/50">
@@ -335,49 +406,74 @@ export default function SettingsPage() {
             />
           </Field>
         </div>
-      </Card>
+      </Section>
 
       {/* Contact */}
-      <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-        <h3 className="font-bold text-admin-text sm:col-span-2">Contact</h3>
-        <Field label="Email">
-          <Input value={form.contact.email} onChange={(e) => setNested('contact', 'email', e.target.value)} />
-        </Field>
-        <Field label="Phone">
-          <Input value={form.contact.phone} onChange={(e) => setNested('contact', 'phone', e.target.value)} />
-        </Field>
-        <Field label="WhatsApp number">
-          <Input value={form.contact.whatsapp} onChange={(e) => setNested('contact', 'whatsapp', e.target.value)} placeholder="+9611000000" />
-        </Field>
-        <Field label="Address">
-          <Input value={form.contact.address} onChange={(e) => setNested('contact', 'address', e.target.value)} />
-        </Field>
-      </Card>
+      <Section
+        title="Contact"
+        summary={
+          [form.contact.email, form.contact.phone].filter(Boolean).join(' · ') || 'No contact details set.'
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Email">
+            <Input value={form.contact.email} onChange={(e) => setNested('contact', 'email', e.target.value)} />
+          </Field>
+          <Field label="Phone">
+            <Input value={form.contact.phone} onChange={(e) => setNested('contact', 'phone', e.target.value)} />
+          </Field>
+          <Field label="WhatsApp number">
+            <Input value={form.contact.whatsapp} onChange={(e) => setNested('contact', 'whatsapp', e.target.value)} placeholder="+9611000000" />
+          </Field>
+          <Field label="Address">
+            <Input value={form.contact.address} onChange={(e) => setNested('contact', 'address', e.target.value)} />
+          </Field>
+        </div>
+      </Section>
 
       {/* Socials */}
-      <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
-        <h3 className="font-bold text-admin-text sm:col-span-2">Social links</h3>
-        {['instagram', 'facebook', 'tiktok', 'x', 'youtube'].map((key) => (
-          <Field key={key} label={key[0].toUpperCase() + key.slice(1)}>
-            <Input
-              value={form.socials[key] || ''}
-              onChange={(e) => setNested('socials', key, e.target.value)}
-              placeholder="https://…"
-            />
-          </Field>
-        ))}
-      </Card>
+      <Section
+        title="Social links"
+        summary={(() => {
+          const linked = Object.entries(form.socials).filter(([, v]) => v).map(([k]) => k)
+          return linked.length ? linked.join(', ') : 'None linked.'
+        })()}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {['instagram', 'facebook', 'tiktok', 'x', 'youtube'].map((key) => (
+            <Field key={key} label={key[0].toUpperCase() + key.slice(1)}>
+              <Input
+                value={form.socials[key] || ''}
+                onChange={(e) => setNested('socials', key, e.target.value)}
+                placeholder="https://…"
+              />
+            </Field>
+          ))}
+        </div>
+      </Section>
 
       {/* Nav links */}
-      <Card className="space-y-3 p-5">
-        <h3 className="font-bold text-admin-text">Navigation links</h3>
+      <Section
+        title="Navigation links"
+        summary={
+          form.navLinks.length
+            ? `${form.navLinks.length} extra link${form.navLinks.length === 1 ? '' : 's'} after the categories`
+            : 'Categories only.'
+        }
+      >
         <LinkList value={form.navLinks} onChange={(v) => set('navLinks', v)} />
-      </Card>
+      </Section>
 
       {/* Footer groups */}
-      <Card className="space-y-4 p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-admin-text">Footer columns</h3>
+      <Section
+        title="Footer columns"
+        summary={
+          form.footerGroups.length
+            ? form.footerGroups.map((g) => g.title || 'Untitled').join(' · ')
+            : 'No footer columns yet.'
+        }
+      >
+        <div className="flex justify-end">
           <Button
             variant="secondary"
             onClick={() => set('footerGroups', [...form.footerGroups, { title: 'New column', links: [] }])}
@@ -420,7 +516,7 @@ export default function SettingsPage() {
             <p className="text-sm text-admin-text/40">No footer columns yet.</p>
           )}
         </div>
-      </Card>
+      </Section>
 
       <div className="flex justify-end">
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
@@ -441,26 +537,37 @@ const TAG_PATTERNS = {
   label: /^[A-Za-z0-9_-]{4,40}$/,
 }
 
-function TrackingCard({ value, onChange }) {
+function TrackingSection({ value, onChange }) {
   const bad = (v, kind) => Boolean(v) && !TAG_PATTERNS[kind].test(String(v).trim())
   const on = value.enabled
   const hasAds = Boolean(value.adsConversionId && value.adsPurchaseLabel)
 
   return (
-    <Card className="space-y-4 p-5">
+    <Section
+      title="Marketing tags"
+      badge={
+        !on ? (
+          <Badge tone="gray">Off</Badge>
+        ) : hasAds ? (
+          <Badge tone="green">Ads tracking live</Badge>
+        ) : value.ga4Id ? (
+          <Badge tone="amber">Analytics only</Badge>
+        ) : (
+          <Badge tone="gray">Not set up</Badge>
+        )
+      }
+      summary={
+        !on
+          ? 'No Google script loads.'
+          : hasAds
+            ? `Analytics ${value.ga4Id || '—'} · Ads ${value.adsConversionId}`
+            : value.ga4Id
+              ? `Analytics ${value.ga4Id} · no ad conversions reported`
+              : 'Add your Google Ads conversion ID to measure campaigns.'
+      }
+    >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <h3 className="font-bold text-admin-text">Marketing tags</h3>
-          {!on ? (
-            <Badge tone="gray">Off</Badge>
-          ) : hasAds ? (
-            <Badge tone="green">Ads tracking live</Badge>
-          ) : value.ga4Id ? (
-            <Badge tone="amber">Analytics only</Badge>
-          ) : (
-            <Badge tone="gray">Not set up</Badge>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-admin-text">Google tracking</span>
         <Toggle checked={on} onChange={(v) => onChange('enabled', v)} label={on ? 'Enabled' : 'Disabled'} />
       </div>
       <p className="text-sm text-admin-text/50">
@@ -550,7 +657,7 @@ function TrackingCard({ value, onChange }) {
           <>Add the conversion ID and purchase label before spending on ads, or the campaign is flying blind.</>
         )}
       </p>
-    </Card>
+    </Section>
   )
 }
 
