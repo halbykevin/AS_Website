@@ -1,19 +1,30 @@
-import Link from 'next/link'
-import Icon from './Icon.jsx'
-import { defaultSettings } from '@/lib/site'
+import Link from "next/link";
+import Icon from "./Icon.jsx";
+import { defaultSettings } from "@/lib/site";
 
-function FooterLink({ href = '#', children }) {
-  const cls = 'text-xs text-as-ink/60 transition-colors hover:text-as-red'
-  if (href.startsWith('/')) return <Link href={href} className={cls}>{children}</Link>
-  return <a href={href} className={cls}>{children}</a>
+function FooterLink({ href = "#", children }) {
+  const cls = "text-xs text-as-ink/60 transition-colors hover:text-as-red";
+  if (href.startsWith("/"))
+    return (
+      <Link href={href} className={cls}>
+        {children}
+      </Link>
+    );
+  return (
+    <a href={href} className={cls}>
+      {children}
+    </a>
+  );
 }
 
 // Apple-style footer, driven by CMS settings (footer columns, contact, socials).
 export default function Footer({ settings }) {
-  const groups = settings?.footerGroups?.length ? settings.footerGroups : defaultSettings.footerGroups
-  const contact = settings?.contact || {}
-  const socials = settings?.socials || {}
-  const socialEntries = Object.entries(socials).filter(([, v]) => v)
+  const groups = settings?.footerGroups?.length
+    ? settings.footerGroups
+    : defaultSettings.footerGroups;
+  const contact = settings?.contact || {};
+  const socials = settings?.socials || {};
+  const socialEntries = Object.entries(socials).filter(([, v]) => v);
 
   return (
     <footer className="bg-as-fog text-as-ink/70">
@@ -24,8 +35,11 @@ export default function Footer({ settings }) {
             {contact.phone && <>Call {contact.phone}. </>}
             {contact.email && (
               <>
-                Or email{' '}
-                <a href={`mailto:${contact.email}`} className="text-as-red underline hover:no-underline">
+                Or email{" "}
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="text-as-red underline hover:no-underline"
+                >
                   {contact.email}
                 </a>
                 .
@@ -38,7 +52,9 @@ export default function Footer({ settings }) {
           {groups.map((g, gi) => (
             <div key={gi}>
               {/* h2 keeps heading order sequential (page h1 → footer h2). */}
-              <h2 className="mb-3 text-xs font-semibold text-as-ink">{g.title}</h2>
+              <h2 className="mb-3 text-xs font-semibold text-as-ink">
+                {g.title}
+              </h2>
               <ul className="space-y-2.5">
                 {(g.links || []).map((l, li) => (
                   <li key={li}>
@@ -54,7 +70,13 @@ export default function Footer({ settings }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-black/10 pt-5 text-xs">
             <span className="font-semibold text-as-ink">Follow us</span>
             {socialEntries.map(([name, url]) => (
-              <a key={name} href={url} target="_blank" rel="noreferrer" className="capitalize text-as-ink/60 hover:text-as-red hover:underline">
+              <a
+                key={name}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="capitalize text-as-ink/60 hover:text-as-red hover:underline"
+              >
                 {name}
               </a>
             ))}
@@ -65,12 +87,22 @@ export default function Footer({ settings }) {
           <div className="flex items-center gap-2">
             <span className="rounded bg-as-ink px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="h-5 w-auto" />
+              <img
+                src="/as-store-logo.webp"
+                alt="AS Store"
+                width={300}
+                height={200}
+                className="h-5 w-auto"
+              />
             </span>
-            <span>© {new Date().getFullYear()} AS Company — Absolute Solutions SAL.</span>
+            <span>
+              © {new Date().getFullYear()} AS Company — Absolute Solutions SAL.
+            </span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            <FooterLink href="/pages/shipping">Shipping &amp; Returns</FooterLink>
+            <FooterLink href="/pages/shipping">
+              Shipping &amp; Returns
+            </FooterLink>
             <FooterLink href="/pages/warranty">Warranty</FooterLink>
             <FooterLink href="/pages/privacy">Privacy Policy</FooterLink>
             <FooterLink href="/pages/contact">Contact</FooterLink>
@@ -78,5 +110,5 @@ export default function Footer({ settings }) {
         </div>
       </div>
     </footer>
-  )
+  );
 }

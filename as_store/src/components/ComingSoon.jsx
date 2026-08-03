@@ -1,14 +1,14 @@
-'use client'
+"use client";
 
-import { motion } from 'framer-motion'
+import { motion } from "framer-motion";
 
-const EASE = [0.22, 0.61, 0.36, 1]
+const EASE = [0.22, 0.61, 0.36, 1];
 
 // Full-screen holding page shown while settings.published is off. Matches the
 // homepage's dark cinema styling. /admin is never gated, and ?preview=1 lets
 // staff browse the real site while it's hidden.
 export default function ComingSoon({ settings }) {
-  const contact = settings?.contact || {}
+  const contact = settings?.contact || {};
   return (
     <main className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden bg-[#0B0D0E] px-6 text-center">
       {/* Breathing red glows — CSS keyframes (compositor), not JS loops. */}
@@ -28,19 +28,35 @@ export default function ComingSoon({ settings }) {
         className="relative"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/as-store-logo.webp" alt="AS Store" width={300} height={200} className="mx-auto h-12 w-auto" />
+        <img
+          src="/as-store-logo.webp"
+          alt="AS Store"
+          width={300}
+          height={200}
+          className="mx-auto h-12 w-auto"
+        />
         <h1 className="mt-8 text-4xl font-bold tracking-apple text-white sm:text-6xl">
           Something big is coming.
         </h1>
         <p className="mx-auto mt-4 max-w-md text-lg text-white/60">
-          The AS Store is getting ready — genuine tech, delivered anywhere in Lebanon.
+          The AS Store is getting ready — genuine tech, delivered anywhere in
+          Lebanon.
         </p>
         {(contact.phone || contact.email) && (
           <p className="mt-8 text-sm text-white/40">
-            Until then, reach us{contact.phone && <> at <span className="text-white/70">{contact.phone}</span></>}
-            {contact.phone && contact.email && ' or '}
+            Until then, reach us
+            {contact.phone && (
+              <>
+                {" "}
+                at <span className="text-white/70">{contact.phone}</span>
+              </>
+            )}
+            {contact.phone && contact.email && " or "}
             {contact.email && (
-              <a href={`mailto:${contact.email}`} className="text-as-red-light hover:underline">
+              <a
+                href={`mailto:${contact.email}`}
+                className="text-as-red-light hover:underline"
+              >
                 {contact.email}
               </a>
             )}
@@ -49,5 +65,5 @@ export default function ComingSoon({ settings }) {
         )}
       </motion.div>
     </main>
-  )
+  );
 }

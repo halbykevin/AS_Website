@@ -1,50 +1,54 @@
-import Link from 'next/link'
-import Reveal from './Reveal.jsx'
-import Icon from './Icon.jsx'
-import BrandWall from './about/BrandWall.jsx'
-import { brandLogoSlug } from '@/lib/brandLogos'
+import Link from "next/link";
+import Reveal from "./Reveal.jsx";
+import Icon from "./Icon.jsx";
+import BrandWall from "./about/BrandWall.jsx";
+import { brandLogoSlug } from "@/lib/brandLogos";
 
 const stats = [
-  { value: '2008', label: 'Serving Lebanon since' },
-  { value: 'brands', label: 'Trusted brands', dynamic: true },
-  { value: '1,000s', label: 'Products in stock' },
-  { value: '12-mo', label: 'Warranty coverage' },
-]
+  { value: "2008", label: "Serving Lebanon since" },
+  { value: "brands", label: "Trusted brands", dynamic: true },
+  { value: "1,000s", label: "Products in stock" },
+  { value: "12-mo", label: "Warranty coverage" },
+];
 
 const values = [
   {
-    icon: 'check',
-    title: '100% genuine',
-    body: 'Every product is authentic and sourced through official channels — no imitations, ever.',
+    icon: "check",
+    title: "100% genuine",
+    body: "Every product is authentic and sourced through official channels — no imitations, ever.",
   },
   {
-    icon: 'box',
-    title: 'Delivered nationwide',
-    body: 'Fast delivery to your door anywhere in Lebanon, carefully packed and tracked.',
+    icon: "box",
+    title: "Delivered nationwide",
+    body: "Fast delivery to your door anywhere in Lebanon, carefully packed and tracked.",
   },
   {
-    icon: 'bag',
-    title: 'Cash on delivery',
-    body: 'Pay in cash when your order arrives. Simple, safe, and no surprises.',
+    icon: "bag",
+    title: "Cash on delivery",
+    body: "Pay in cash when your order arrives. Simple, safe, and no surprises.",
   },
   {
-    icon: 'whatsapp',
-    title: 'Real human support',
+    icon: "whatsapp",
+    title: "Real human support",
     body: "Questions or bulk orders? Chat with our team on WhatsApp and we'll take care of you.",
   },
-]
+];
 
 // The About page: a cinematic dark hero, stats band, brand story, value cards,
 // a scrolling wall of the brands we carry, and a closing shop CTA.
 export default function AboutContent({ settings, brands = [] }) {
-  const total = brands.length
+  const total = brands.length;
   const logoBrands = brands
-    .map((b) => ({ name: b.name, imageUrl: b.imageUrl || '', logo: brandLogoSlug(b.name) }))
-    .filter((b) => b.imageUrl || b.logo)
-  const names = brands.map((b) => b.name).slice(0, 90)
+    .map((b) => ({
+      name: b.name,
+      imageUrl: b.imageUrl || "",
+      logo: brandLogoSlug(b.name),
+    }))
+    .filter((b) => b.imageUrl || b.logo);
+  const names = brands.map((b) => b.name).slice(0, 90);
 
-  const waDigits = String(settings?.contact?.whatsapp || '').replace(/\D/g, '')
-  const waHref = waDigits ? `https://wa.me/${waDigits}` : '/pages/support'
+  const waDigits = String(settings?.contact?.whatsapp || "").replace(/\D/g, "");
+  const waHref = waDigits ? `https://wa.me/${waDigits}` : "/pages/support";
 
   return (
     <div className="bg-white">
@@ -72,9 +76,10 @@ export default function AboutContent({ settings, brands = [] }) {
           </Reveal>
           <Reveal delay={0.16}>
             <p className="mt-6 max-w-2xl text-lg text-white/60 sm:text-xl">
-              We&rsquo;re the online store of AS Company — a market leader in telecommunication and
-              electronics across Lebanon since 2008. Genuine products, honest prices, and the brands
-              you trust, delivered to your door.
+              We&rsquo;re the online store of AS Company — a market leader in
+              telecommunication and electronics across Lebanon since 2008.
+              Genuine products, honest prices, and the brands you trust,
+              delivered to your door.
             </p>
           </Reveal>
           <Reveal delay={0.24}>
@@ -84,7 +89,7 @@ export default function AboutContent({ settings, brands = [] }) {
               </Link>
               <a
                 href={waHref}
-                target={waDigits ? '_blank' : undefined}
+                target={waDigits ? "_blank" : undefined}
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 px-8 py-3 text-base font-medium text-white/90 transition hover:border-white/50 hover:text-white"
               >
@@ -120,18 +125,21 @@ export default function AboutContent({ settings, brands = [] }) {
           <Reveal delay={0.1}>
             <div className="space-y-5 text-lg leading-relaxed text-as-ink/70">
               <p>
-                AS Company (Absolute Solutions SAL) has been at the forefront of telecommunication and
-                electronics in Lebanon since 2008 — supplying businesses and homes with the technology
-                that keeps the country connected.
+                AS Company (Absolute Solutions SAL) has been at the forefront of
+                telecommunication and electronics in Lebanon since 2008 —
+                supplying businesses and homes with the technology that keeps
+                the country connected.
               </p>
               <p>
-                AS Store is our online storefront: the same expertise and authentic products, now a few
-                taps away. From smartphones and laptops to audio, networking, and accessories, we bring
-                the world&rsquo;s leading brands together in one place you can rely on.
+                AS Store is our online storefront: the same expertise and
+                authentic products, now a few taps away. From smartphones and
+                laptops to audio, networking, and accessories, we bring the
+                world&rsquo;s leading brands together in one place you can rely
+                on.
               </p>
               <p>
-                Our promise is simple — real products, fair prices, and a team that actually cares about
-                getting it right for you.
+                Our promise is simple — real products, fair prices, and a team
+                that actually cares about getting it right for you.
               </p>
             </div>
           </Reveal>
@@ -153,8 +161,12 @@ export default function AboutContent({ settings, brands = [] }) {
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-as-red/10 text-as-red">
                     <Icon name={v.icon} className="h-6 w-6" strokeWidth={2} />
                   </span>
-                  <h3 className="mt-5 text-lg font-semibold tracking-apple text-as-ink">{v.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-as-ink/60">{v.body}</p>
+                  <h3 className="mt-5 text-lg font-semibold tracking-apple text-as-ink">
+                    {v.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-as-ink/60">
+                    {v.body}
+                  </p>
                 </div>
               </Reveal>
             ))}
@@ -166,7 +178,9 @@ export default function AboutContent({ settings, brands = [] }) {
       <section className="bg-as-fog pb-24 pt-4">
         <div className="shell-wide">
           <Reveal className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">Our brands</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">
+              Our brands
+            </p>
             <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-apple text-as-ink sm:text-4xl">
               The world&rsquo;s best brands, all in one store
             </h2>
@@ -196,5 +210,5 @@ export default function AboutContent({ settings, brands = [] }) {
         </div>
       </section>
     </div>
-  )
+  );
 }

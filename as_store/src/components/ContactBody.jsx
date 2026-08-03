@@ -1,23 +1,32 @@
-import ContactForm from './ContactForm.jsx'
-import Icon from './Icon.jsx'
+import ContactForm from "./ContactForm.jsx";
+import Icon from "./Icon.jsx";
 
 // Shared contact block: heading + email form + WhatsApp button + contact
 // details. Rendered by both /contact and /pages/support. `settings` supplies
 // the contact info; `eyebrow`/`title`/`subtitle` let each page label it.
-export default function ContactBody({ settings, eyebrow = 'Get in touch', title, subtitle }) {
-  const contact = settings?.contact || {}
-  const waDigits = String(contact.whatsapp || '').replace(/\D/g, '')
+export default function ContactBody({
+  settings,
+  eyebrow = "Get in touch",
+  title,
+  subtitle,
+}) {
+  const contact = settings?.contact || {};
+  const waDigits = String(contact.whatsapp || "").replace(/\D/g, "");
   const waHref = waDigits
     ? `https://wa.me/${waDigits}?text=${encodeURIComponent("Hi AS Store! I'd like to ask about ")}`
-    : ''
+    : "";
 
   return (
     <div className="shell-wide">
       <div className="max-w-2xl">
         {eyebrow && (
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">{eyebrow}</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-as-red">
+            {eyebrow}
+          </p>
         )}
-        <h1 className="mt-3 text-4xl font-semibold tracking-apple text-as-ink sm:text-5xl">{title}</h1>
+        <h1 className="mt-3 text-4xl font-semibold tracking-apple text-as-ink sm:text-5xl">
+          {title}
+        </h1>
         {subtitle && <p className="mt-4 text-lg text-as-ink/60">{subtitle}</p>}
       </div>
 
@@ -28,8 +37,12 @@ export default function ContactBody({ settings, eyebrow = 'Get in touch', title,
         {/* WhatsApp + contact details */}
         <div className="space-y-4">
           <div className="rounded-[28px] border border-as-ink/10 bg-white p-6 sm:p-8">
-            <h2 className="text-lg font-semibold tracking-apple text-as-ink">Chat on WhatsApp</h2>
-            <p className="mt-2 text-sm text-as-ink/60">The fastest way to reach us. Tap below to open a chat.</p>
+            <h2 className="text-lg font-semibold tracking-apple text-as-ink">
+              Chat on WhatsApp
+            </h2>
+            <p className="mt-2 text-sm text-as-ink/60">
+              The fastest way to reach us. Tap below to open a chat.
+            </p>
             {waHref ? (
               <a
                 href={waHref}
@@ -41,7 +54,9 @@ export default function ContactBody({ settings, eyebrow = 'Get in touch', title,
                 Message us on WhatsApp
               </a>
             ) : (
-              <p className="mt-4 text-sm text-as-ink/40">WhatsApp number not set yet.</p>
+              <p className="mt-4 text-sm text-as-ink/40">
+                WhatsApp number not set yet.
+              </p>
             )}
           </div>
 
@@ -49,28 +64,42 @@ export default function ContactBody({ settings, eyebrow = 'Get in touch', title,
             <div className="space-y-4 rounded-[28px] border border-as-ink/10 bg-white p-6 sm:p-8">
               {contact.phone && (
                 <ContactRow label="Phone">
-                  <a href={`tel:${contact.phone}`} className="hover:text-as-red">{contact.phone}</a>
+                  <a
+                    href={`tel:${contact.phone}`}
+                    className="hover:text-as-red"
+                  >
+                    {contact.phone}
+                  </a>
                 </ContactRow>
               )}
               {contact.email && (
                 <ContactRow label="Email">
-                  <a href={`mailto:${contact.email}`} className="hover:text-as-red">{contact.email}</a>
+                  <a
+                    href={`mailto:${contact.email}`}
+                    className="hover:text-as-red"
+                  >
+                    {contact.email}
+                  </a>
                 </ContactRow>
               )}
-              {contact.address && <ContactRow label="Address">{contact.address}</ContactRow>}
+              {contact.address && (
+                <ContactRow label="Address">{contact.address}</ContactRow>
+              )}
             </div>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function ContactRow({ label, children }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-as-red">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-as-red">
+        {label}
+      </p>
       <p className="mt-0.5 break-words text-as-ink/80">{children}</p>
     </div>
-  )
+  );
 }

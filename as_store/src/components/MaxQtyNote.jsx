@@ -1,18 +1,22 @@
-'use client'
+"use client";
 
-import Icon from './Icon.jsx'
-import { MAX_QTY } from '@/store/cartSlice'
+import Icon from "./Icon.jsx";
+import { MAX_QTY } from "@/store/cartSlice";
 
 // Shown when a shopper tries to exceed the per-product quantity cap: a small
 // red note pointing them to WhatsApp for larger orders. `whatsapp` comes from
 // settings.contact.whatsapp; without it the note still shows, just unlinked.
-export default function MaxQtyNote({ whatsapp, product, className = '' }) {
-  const digits = String(whatsapp || '').replace(/\D/g, '')
-  const message = `Hi AS Store! I'd like to order more than ${MAX_QTY} of: ${product || 'a product'}`
-  const href = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}` : ''
+export default function MaxQtyNote({ whatsapp, product, className = "" }) {
+  const digits = String(whatsapp || "").replace(/\D/g, "");
+  const message = `Hi AS Store! I'd like to order more than ${MAX_QTY} of: ${product || "a product"}`;
+  const href = digits
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+    : "";
 
   return (
-    <p className={`flex flex-wrap items-center gap-x-1 text-xs font-medium text-as-red ${className}`}>
+    <p
+      className={`flex flex-wrap items-center gap-x-1 text-xs font-medium text-as-red ${className}`}
+    >
       <span>Max {MAX_QTY} per order — for more quantity,</span>
       {href ? (
         <a
@@ -31,5 +35,5 @@ export default function MaxQtyNote({ whatsapp, product, className = '' }) {
         </span>
       )}
     </p>
-  )
+  );
 }
