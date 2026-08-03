@@ -1,7 +1,7 @@
 import './globals.css'
-import Script from 'next/script'
 import { Inter } from 'next/font/google'
 import Providers from './providers.jsx'
+import Analytics from '@/components/Analytics.jsx'
 import { loadSettings } from '@/lib/site'
 import {
   SITE_URL,
@@ -10,9 +10,6 @@ import {
   organizationJsonLd,
   jsonLdScript,
 } from '@/lib/seo'
-
-// Google Analytics 4 measurement ID (public — safe to ship in the client).
-const GA_ID = 'G-HVDQE4SMTB'
 
 // Self-hosted at build time (no render-blocking Google Fonts request / preconnects).
 // Exposed as a CSS variable wired into tailwind's `sans` stack.
@@ -81,17 +78,10 @@ export default async function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={jsonLdScript(organizationJsonLd(settings))}
         />
-        {/* Google tag (gtag.js) — lazyOnload keeps its ~157KB out of the
-            critical window; analytics still fires, just during idle time. */}
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="lazyOnload" />
-        <Script id="gtag-init" strategy="lazyOnload">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GA_ID}');
-          `}
-        </Script>
+        {/* Google Analytics + Google Ads. IDs come from admin settings, so
+            campaigns can be wired up without a deploy — and the whole tag can
+            be switched off from there too. */}
+        <Analytics tracking={settings.tracking} />
         <Providers>{children}</Providers>
       </body>
     </html>

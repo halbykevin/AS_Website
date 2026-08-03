@@ -272,9 +272,41 @@ const settingsJson = (r) => ({
     fee: Number(r.delivery_fee ?? 0),
     freeOver: Number(r.free_delivery_over ?? 0),
   },
+  // Google tags. Public by nature — they are rendered into every page — so they
+  // ride along on the public settings response the storefront already fetches.
+  tracking: {
+    enabled: r.tracking_enabled ?? true,
+    ga4Id: r.ga4_id || "",
+    adsConversionId: r.ads_conversion_id || "",
+    adsPurchaseLabel: r.ads_purchase_label || "",
+    adsBeginCheckoutLabel: r.ads_begin_checkout_label || "",
+    adsAddToCartLabel: r.ads_add_to_cart_label || "",
+  },
   published: r.published ?? false,
   updatedAt: r.updated_at,
 });
+
+// Google tag identifiers. These are interpolated into a <script> on the
+// storefront, so only the exact shapes Google issues are allowed through —
+// an admin typo should bounce back as an error, never reach the page.
+// undefined/null = "leave the column alone"; "" = clear it.
+const TAG_FORMATS = {
+  ga4Id: { re: /^G-[A-Z0-9]{4,20}$/i, hint: "a GA4 measurement ID, e.g. G-XXXXXXXXXX" },
+  adsConversionId: { re: /^AW-\d{6,15}$/i, hint: "a Google Ads conversion ID, e.g. AW-123456789" },
+  label: { re: /^[A-Za-z0-9_-]{4,40}$/, hint: "a conversion label, e.g. AbC-D_efGhIj" },
+};
+
+const tagValue = (v, kind, field) => {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  if (s === "") return "";
+  if (!TAG_FORMATS[kind].re.test(s)) {
+    const err = new Error(`${field} must be ${TAG_FORMATS[kind].hint}`);
+    err.status = 400;
+    throw err;
+  }
+  return s;
+};
 
 // Settings money input: undefined/blank leaves the column alone (COALESCE), a
 // number is clamped to >= 0 and 2dp.
@@ -2379,7 +2411,13 @@ app.put(
          login_button_logo    = COALESCE($23, login_button_logo),
          login_button_weight  = COALESCE($24, login_button_weight),
          delivery_fee         = COALESCE($25, delivery_fee),
-         free_delivery_over   = COALESCE($26, free_delivery_over)
+         free_delivery_over   = COALESCE($26, free_delivery_over),
+         tracking_enabled          = COALESCE($27, tracking_enabled),
+         ga4_id                    = COALESCE($28, ga4_id),
+         ads_conversion_id         = COALESCE($29, ads_conversion_id),
+         ads_purchase_label        = COALESCE($30, ads_purchase_label),
+         ads_begin_checkout_label  = COALESCE($31, ads_begin_checkout_label),
+         ads_add_to_cart_label     = COALESCE($32, ads_add_to_cart_label)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -2414,6 +2452,13 @@ app.put(
         // Money: clamp to non-negative so a typo can never credit an order.
         nonNegativeMoney(b.delivery?.fee),
         nonNegativeMoney(b.delivery?.freeOver),
+        // Google tags — shape-checked; a bad value throws a 400 (see tagValue).
+        b.tracking?.enabled ?? null,
+        tagValue(b.tracking?.ga4Id, "ga4Id", "Measurement ID"),
+        tagValue(b.tracking?.adsConversionId, "adsConversionId", "Conversion ID"),
+        tagValue(b.tracking?.adsPurchaseLabel, "label", "Purchase label"),
+        tagValue(b.tracking?.adsBeginCheckoutLabel, "label", "Begin-checkout label"),
+        tagValue(b.tracking?.adsAddToCartLabel, "label", "Add-to-cart label"),
       ],
     );
     res.json(settingsJson(rows[0]));
@@ -2759,5 +2804,9 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   if (err.code === "23505")
     return res.status(409).json({ error: "Duplicate (slug already exists)" });
+  // Handlers can opt into a specific reply by setting err.status — and only
+  // then is the message shown, so an unexpected crash still says nothing.
+  if (err.status >= 400 && err.status < 500)
+    return res.status(err.status).json({ error: err.message || "Bad request" });
   res.status(500).json({ error: "Server error" });
 });

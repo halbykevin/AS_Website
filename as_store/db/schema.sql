@@ -138,6 +138,24 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_label   TEXT DEFAULT 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_logo    TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS login_button_weight  TEXT DEFAULT 'medium';
 
+-- Marketing tags (Google Analytics 4 + Google Ads). Editable from the admin so
+-- a campaign can be wired up — or switched off — without a redeploy. Every one
+-- of these is a PUBLIC identifier: they ship in the page HTML by design, and
+-- none of them grants access to an account. The server still validates their
+-- shape before storing, because they end up inside a <script> tag.
+--
+-- ga4_id defaults to the measurement ID the storefront shipped hardcoded, so
+-- this migration changes nothing until someone edits it.
+-- The Ads labels are the second half of a conversion action's snippet: Google
+-- gives you "AW-123456789/AbC-D_efGhIj", the part before the slash is
+-- ads_conversion_id and the part after is the label for that specific action.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS tracking_enabled          BOOLEAN DEFAULT true;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ga4_id                    TEXT DEFAULT 'G-HVDQE4SMTB';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_conversion_id         TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_purchase_label        TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_begin_checkout_label  TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_add_to_cart_label     TEXT DEFAULT '';
+
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (
   id         SERIAL PRIMARY KEY,

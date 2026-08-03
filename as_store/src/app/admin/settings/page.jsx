@@ -21,6 +21,14 @@ const EMPTY = {
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   delivery: { fee: 0, freeOver: 100 },
+  tracking: {
+    enabled: true,
+    ga4Id: '',
+    adsConversionId: '',
+    adsPurchaseLabel: '',
+    adsBeginCheckoutLabel: '',
+    adsAddToCartLabel: '',
+  },
 }
 
 // Must match LOGIN_BUTTON_WEIGHTS server-side — the value becomes a class name.
@@ -50,6 +58,7 @@ export default function SettingsPage() {
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
         delivery: { ...EMPTY.delivery, ...(data.delivery || {}) },
+        tracking: { ...EMPTY.tracking, ...(data.tracking || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
         navLinks: data.navLinks || [],
         footerGroups: data.footerGroups || [],
@@ -216,6 +225,9 @@ export default function SettingsPage() {
           )}
         </p>
       </Card>
+
+      {/* Google Analytics + Google Ads */}
+      <TrackingCard value={form.tracking} onChange={(k, v) => setNested('tracking', k, v)} />
 
       {/* Sign-in button branding */}
       <Card className="space-y-4 p-5">
@@ -416,6 +428,129 @@ export default function SettingsPage() {
         </Button>
       </div>
     </div>
+  )
+}
+
+// --- Marketing tags --------------------------------------------------------
+// Google Analytics + Google Ads identifiers. These must match the patterns the
+// API validates against, so the same shapes are checked here and flagged as you
+// type — a saved typo means a campaign silently reports nothing.
+const TAG_PATTERNS = {
+  ga4Id: /^G-[A-Z0-9]{4,20}$/i,
+  adsConversionId: /^AW-\d{6,15}$/i,
+  label: /^[A-Za-z0-9_-]{4,40}$/,
+}
+
+function TrackingCard({ value, onChange }) {
+  const bad = (v, kind) => Boolean(v) && !TAG_PATTERNS[kind].test(String(v).trim())
+  const on = value.enabled
+  const hasAds = Boolean(value.adsConversionId && value.adsPurchaseLabel)
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <h3 className="font-bold text-admin-text">Marketing tags</h3>
+          {!on ? (
+            <Badge tone="gray">Off</Badge>
+          ) : hasAds ? (
+            <Badge tone="green">Ads tracking live</Badge>
+          ) : value.ga4Id ? (
+            <Badge tone="amber">Analytics only</Badge>
+          ) : (
+            <Badge tone="gray">Not set up</Badge>
+          )}
+        </div>
+        <Toggle checked={on} onChange={(v) => onChange('enabled', v)} label={on ? 'Enabled' : 'Disabled'} />
+      </div>
+      <p className="text-sm text-admin-text/50">
+        Google Analytics measures what visitors do; Google Ads needs the conversion tag to know which
+        ad produced an order — without it, automated bidding has nothing to optimise. Off = no Google
+        script loads at all.
+      </p>
+
+      <Field
+        label="Analytics measurement ID"
+        hint="Google Analytics → Admin → Data streams. Looks like G-XXXXXXXXXX."
+        error={bad(value.ga4Id, 'ga4Id') ? 'Should look like G-XXXXXXXXXX.' : ''}
+      >
+        <Input
+          value={value.ga4Id || ''}
+          onChange={(e) => onChange('ga4Id', e.target.value)}
+          placeholder="G-XXXXXXXXXX"
+          className={bad(value.ga4Id, 'ga4Id') ? 'border-red-400' : ''}
+        />
+      </Field>
+
+      <div className="rounded-xl border border-admin-line/10 p-4">
+        <p className="font-semibold text-admin-text">Google Ads conversions</p>
+        <p className="mt-1 text-sm text-admin-text/50">
+          In Google Ads open <b>Goals → Conversions</b>, pick an action, then <b>Tag setup → Install
+          manually</b>. The snippet contains <code className="rounded bg-admin-bg px-1 py-0.5 text-xs">
+          &apos;send_to&apos;: &apos;AW-123456789/AbC-D_efGhIj&apos;</code> — the part before the slash
+          is the conversion ID, the part after is that action&apos;s label.
+        </p>
+        <div className="mt-4 space-y-4">
+          <Field
+            label="Conversion ID"
+            hint="One per Ads account — shared by every action below."
+            error={bad(value.adsConversionId, 'adsConversionId') ? 'Should look like AW-123456789.' : ''}
+          >
+            <Input
+              value={value.adsConversionId || ''}
+              onChange={(e) => onChange('adsConversionId', e.target.value)}
+              placeholder="AW-123456789"
+              className={bad(value.adsConversionId, 'adsConversionId') ? 'border-red-400' : ''}
+            />
+          </Field>
+          <Field
+            label="Purchase label"
+            hint="The one that matters: fires when an order is placed, with its real value. Set this as your Primary conversion action in Google Ads."
+            error={bad(value.adsPurchaseLabel, 'label') ? 'Just the part after the slash, e.g. AbC-D_efGhIj.' : ''}
+          >
+            <Input
+              value={value.adsPurchaseLabel || ''}
+              onChange={(e) => onChange('adsPurchaseLabel', e.target.value)}
+              placeholder="AbC-D_efGhIj"
+              className={bad(value.adsPurchaseLabel, 'label') ? 'border-red-400' : ''}
+            />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Begin-checkout label" hint="Optional. Secondary action — for insight, not bidding.">
+              <Input
+                value={value.adsBeginCheckoutLabel || ''}
+                onChange={(e) => onChange('adsBeginCheckoutLabel', e.target.value)}
+                placeholder="Leave empty to skip"
+                className={bad(value.adsBeginCheckoutLabel, 'label') ? 'border-red-400' : ''}
+              />
+            </Field>
+            <Field label="Add-to-cart label" hint="Optional. Secondary action.">
+              <Input
+                value={value.adsAddToCartLabel || ''}
+                onChange={(e) => onChange('adsAddToCartLabel', e.target.value)}
+                placeholder="Leave empty to skip"
+                className={bad(value.adsAddToCartLabel, 'label') ? 'border-red-400' : ''}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      <p className="rounded-lg bg-admin-bg px-3 py-2 text-sm text-admin-text/70">
+        {!on ? (
+          <>Tracking is off — no analytics and no ad measurement.</>
+        ) : hasAds ? (
+          <>
+            Orders are reported to Google Ads with their value, so you can see which campaign paid for
+            itself. Check it in Ads under <b>Goals → Conversions</b> a few hours after a real order.
+          </>
+        ) : value.adsConversionId ? (
+          <>Conversion ID set, but the purchase label is missing — orders are not being reported yet.</>
+        ) : (
+          <>Add the conversion ID and purchase label before spending on ads, or the campaign is flying blind.</>
+        )}
+      </p>
+    </Card>
   )
 }
 

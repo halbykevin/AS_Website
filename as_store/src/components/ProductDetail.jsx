@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useDispatch } from 'react-redux'
 import Icon from './Icon.jsx'
@@ -13,6 +13,7 @@ import { addItem, MAX_QTY } from '@/store/cartSlice'
 import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
+import { trackViewItem } from '@/lib/analytics'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
@@ -40,6 +41,19 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   const price = Number(product.price) || 0
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
   const onSale = oldPrice && oldPrice > price
+
+  // Which products get looked at but not bought — the report that tells you
+  // where the ad spend is going. Keyed on the id so it fires again when the
+  // visitor moves between product pages (the component stays mounted).
+  useEffect(() => {
+    trackViewItem({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price) || 0,
+      brand: product.brand,
+      category: product.category,
+    })
+  }, [product.id, product.name, product.price, product.brand, product.category])
 
   const add = () => {
     dispatch(addItem({ id: product.id, title: product.name, image: gallery[0] || '', price, qty, slug: product.slug }))

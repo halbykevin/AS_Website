@@ -8,6 +8,7 @@ import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
 import { useAccount } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { money, deliveryFeeFor } from '@/lib/orders'
+import { trackBeginCheckout } from '@/lib/analytics'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -43,6 +44,16 @@ export default function CheckoutPage() {
 
   const deliveryFee = deliveryFeeFor(total, delivery)
   const grandTotal = total + deliveryFee
+
+  // Reaching this page IS beginning checkout — reported once per visit, and
+  // only once the cart has hydrated from localStorage (the first render can
+  // legitimately be empty). The ref keeps a re-render from repeating it.
+  const checkoutTracked = useRef(false)
+  useEffect(() => {
+    if (checkoutTracked.current || !items.length) return
+    checkoutTracked.current = true
+    trackBeginCheckout(items)
+  }, [items])
 
   const savedAddresses = Array.isArray(customer?.addresses) ? customer.addresses : []
 

@@ -8,6 +8,7 @@ import Icon from '@/components/Icon.jsx'
 import { clearCart } from '@/store/cartSlice'
 import { useAccount, accountApi } from '@/lib/account'
 import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
+import { trackPurchase } from '@/lib/analytics'
 
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
 
@@ -94,6 +95,39 @@ export default function OrderPage({ params }) {
       dispatch(clearCart())
     }
   }, [order, dispatch])
+
+  // The conversion. This is the number Google Ads bids on, so it reports the
+  // sale exactly once and only when there really is one:
+  //   • ?placed=1 — arriving here from the checkout, not from order history.
+  //   • Whish orders wait for the money; cash on delivery counts immediately.
+  //   • A localStorage mark stops a refresh re-sending it. Google also dedupes
+  //     on transaction_id, so a cleared browser can't double-count either.
+  useEffect(() => {
+    if (!placed || state !== 'ready' || !order) return
+    if (order.paymentMethod === 'whish' && order.paymentStatus !== 'paid') return
+    const key = `as_store_purchase_${order.id}`
+    let done = false
+    try {
+      done = localStorage.getItem(key) === '1'
+      if (!done) localStorage.setItem(key, '1')
+    } catch {
+      /* private mode — fall back to Google's own transaction_id dedupe */
+    }
+    if (done) return
+    trackPurchase({
+      id: order.id,
+      total: orderTotal(order),
+      deliveryFee: order.deliveryFee,
+      // productId, not the order-line id — it has to match what add_to_cart and
+      // the product feed call this item.
+      items: (order.items || []).map((it) => ({
+        id: it.productId ?? it.id,
+        name: it.name,
+        price: it.price,
+        qty: it.qty,
+      })),
+    })
+  }, [placed, state, order])
 
   if (state === 'loading' || loading) {
     return (

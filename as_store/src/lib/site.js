@@ -24,6 +24,17 @@ export const defaultSettings = {
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   // Delivery charge. Mirrors the server default; the real values come from settings.
   delivery: { fee: 0, freeOver: 100 },
+  // Google tags. The GA4 ID matches the column default, so analytics keeps
+  // reporting even in the API-unreachable fallback; the Ads IDs are blank until
+  // an admin fills them in (Settings → Marketing tags).
+  tracking: {
+    enabled: true,
+    ga4Id: 'G-HVDQE4SMTB',
+    adsConversionId: '',
+    adsPurchaseLabel: '',
+    adsBeginCheckoutLabel: '',
+    adsAddToCartLabel: '',
+  },
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
@@ -47,6 +58,7 @@ export async function loadSettings() {
       homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
       loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
       delivery: { ...defaultSettings.delivery, ...(s.delivery || {}) },
+      tracking: { ...defaultSettings.tracking, ...(s.tracking || {}) },
       socials: s.socials || {},
       navLinks: s.navLinks?.length ? s.navLinks : defaultSettings.navLinks,
       footerGroups: s.footerGroups?.length ? s.footerGroups : defaultSettings.footerGroups,
