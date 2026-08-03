@@ -2,10 +2,12 @@ import Nav from '@/components/Nav.jsx'
 import Footer from '@/components/Footer.jsx'
 import CartDrawer from '@/components/CartDrawer.jsx'
 import StorePopup from '@/components/StorePopup.jsx'
+import ChatWidget from '@/components/ChatWidget.jsx'
 import PublishGate from '@/components/PublishGate.jsx'
 import ComingSoon from '@/components/ComingSoon.jsx'
 import { loadSettings } from '@/lib/site'
 import { loadCategories } from '@/lib/catalog'
+import { aiConfigured } from '@/lib/ai'
 
 // Storefront chrome — loads CMS settings (announcement, footer, contact,
 // socials) plus the categories that drive the nav menu, and feeds them to the
@@ -39,6 +41,11 @@ export default async function StoreLayout({ children }) {
         <Footer settings={settings} />
         <CartDrawer whatsapp={settings?.contact?.whatsapp} />
         <StorePopup />
+        {/* No API key configured (e.g. the env var is missing on Vercel) means no
+            bubble at all — better than offering an assistant that answers every
+            question with an error. Checked on the server, so the key itself
+            never reaches the browser. Hides itself during checkout too. */}
+        {aiConfigured() && <ChatWidget />}
       </div>
     </PublishGate>
   )

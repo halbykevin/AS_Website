@@ -201,6 +201,11 @@ const brandJson = (r) => ({
 
 const salePrice = (base, pct) => Math.round(Number(base) * (100 - pct)) / 100;
 
+// The same number as salePrice(), in SQL, for WHERE clauses that need to filter
+// on what the shopper pays rather than the pre-discount price. Only valid where
+// SALE_JOIN is in scope.
+const EFFECTIVE_PRICE = `ROUND(p.price * (100 - COALESCE(sale.percent, 0)) / 100.0, 2)`;
+
 const productJson = (r) => {
   const pct = Number(r.sale_percent) || 0;
   return {
@@ -1861,6 +1866,25 @@ app.get(
     }
     if (req.query.featured === "1" || req.query.featured === "true") {
       where.push("p.featured = true");
+    }
+    // Price bounds, for "under $700" style filtering (the shopping assistant
+    // leans on this). Filter on the price the shopper actually pays — the SQL
+    // mirrors salePrice() above, so a discounted item is matched at its sale
+    // price, not its pre-discount one.
+    const priceBound = (v) => {
+      if (v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+    const minPrice = priceBound(req.query.minPrice);
+    const maxPrice = priceBound(req.query.maxPrice);
+    if (minPrice !== null) {
+      params.push(minPrice);
+      where.push(`${EFFECTIVE_PRICE} >= $${params.length}`);
+    }
+    if (maxPrice !== null) {
+      params.push(maxPrice);
+      where.push(`${EFFECTIVE_PRICE} <= $${params.length}`);
     }
     const tokens = req.query.search
       ? pushSearchWhere(req.query.search, where, params)

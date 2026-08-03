@@ -73,6 +73,38 @@ export async function searchProducts(q) {
   }
 }
 
+// Filtered catalog search — what the shopping assistant's search_products tool
+// runs. Every argument is optional; with none it degrades to "everything".
+// Filtering happens in Postgres (including the price bounds, against the real
+// sale-adjusted price), so the model never sees products it shouldn't offer.
+export async function searchCatalog({ query, category, minPrice, maxPrice, limit = 8 } = {}) {
+  const qs = new URLSearchParams()
+  if (query) qs.set('search', query)
+  if (category) qs.set('category', category)
+  if (Number.isFinite(Number(minPrice))) qs.set('minPrice', String(Number(minPrice)))
+  if (Number.isFinite(Number(maxPrice))) qs.set('maxPrice', String(Number(maxPrice)))
+  qs.set('limit', String(Math.min(12, Math.max(1, Number(limit) || 8))))
+  try {
+    const res = await fetch(`${API}/api/products?${qs}`, STORE_CACHE)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+// A CMS page (shipping, warranty, support…) — the assistant quotes these rather
+// than answering policy questions from the model's own guesswork.
+export async function loadPage(slug) {
+  try {
+    const res = await fetch(`${API}/api/pages/${encodeURIComponent(slug)}`, STORE_CACHE)
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 // Single product by slug (full image gallery). Returns null if not found.
 export async function loadProduct(slug) {
   try {

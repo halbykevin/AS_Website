@@ -108,6 +108,22 @@ const paths = {
       <path d="M9.1 8.2c-.5 3 3.7 7.2 6.7 6.7l.7-1.5-2-1.2-.9.9c-1.1-.5-2-1.4-2.5-2.5l.9-.9-1.2-2-1.7.5Z" />
     </>
   ),
+  // A four-point "spark" plus two smaller ones — the shorthand for AI that
+  // people now read instantly. Used by the assistant launcher.
+  sparkles: (
+    <>
+      <path d="M12 3.5c.8 3.4 1.8 4.4 5.2 5.2-3.4.8-4.4 1.8-5.2 5.2-.8-3.4-1.8-4.4-5.2-5.2 3.4-.8 4.4-1.8 5.2-5.2Z" />
+      <path d="M17.8 14.6c.4 1.7.9 2.2 2.6 2.6-1.7.4-2.2.9-2.6 2.6-.4-1.7-.9-2.2-2.6-2.6 1.7-.4 2.2-.9 2.6-2.6Z" />
+      <path d="M6.4 15.4c.3 1.2.6 1.5 1.8 1.8-1.2.3-1.5.6-1.8 1.8-.3-1.2-.6-1.5-1.8-1.8 1.2-.3 1.5-.6 1.8-1.8Z" />
+    </>
+  ),
+  send: <path d="M4.5 12 20 4.5 15.5 20l-3.6-5.9L4.5 12Z" />,
+  refresh: (
+    <>
+      <path d="M20 12a8 8 0 1 1-2.4-5.7" />
+      <path d="M20 4v4h-4" />
+    </>
+  ),
 }
 
 export default function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.7 }) {
