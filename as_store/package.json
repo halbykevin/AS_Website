@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 5180",
     "lint": "next lint",
-    "ship": "node scripts/ship.mjs"
+    "ship": "node scripts/ship.mjs",
+    "sync-catalog": "node scripts/sync-catalog.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.7",

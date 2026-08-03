@@ -13,6 +13,7 @@
     "deploy": "node ../../scripts/deploy.mjs --app store",
     "deploy:all": "node ../../scripts/deploy.mjs",
     "backfill-images": "node src/backfill-images.js",
+    "import-scrape": "node src/import-scrape.js",
     "test": "node --test"
   },
   "dependencies": {

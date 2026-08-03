@@ -32,7 +32,7 @@ fs.mkdirSync(SCRAPE_DIR, { recursive: true })
 /** id -> { id, status, log, summary, error, createdAt } */
 const jobs = new Map()
 
-const slugify = (s) =>
+export const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
 // Normalize a product URL so re-imports can't create duplicates via trivially
@@ -61,6 +61,37 @@ export function normalizeUrl(raw) {
 // won't accept another merchant's images. So at ingest time we download each
 // image onto our own disk (/uploads) and store THAT url instead of the hotlink.
 
+// Shops show their own logo when a product has no photo — pacmax.me serves
+// PACMAC.png that way. Importing it would put another shop's logo on our product
+// pages, so those URLs are dropped at the door and the storefront falls back to
+// the AS placeholder instead. Add more with PLACEHOLDER_IMAGE_PATTERNS
+// (comma-separated regexes) without editing this file.
+const DEFAULT_PLACEHOLDER_PATTERNS = [
+  'pacmac\\.(png|jpe?g|webp)', // pacmax.me's logo, used on their image-less products
+  'woocommerce-placeholder',
+  '(^|/)placeholder[-_.]',
+  'no[-_]?image',
+  'coming[-_]?soon',
+  'default[-_](product|image)',
+]
+
+const placeholderPatterns = [
+  ...DEFAULT_PLACEHOLDER_PATTERNS,
+  ...String(process.env.PLACEHOLDER_IMAGE_PATTERNS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+].map((p) => {
+  try {
+    return new RegExp(p, 'i')
+  } catch {
+    console.warn(`[scraper] ignoring invalid placeholder pattern: ${p}`)
+    return null
+  }
+}).filter(Boolean)
+
+export const isPlaceholderImage = (url) => !!url && placeholderPatterns.some((re) => re.test(String(url)))
+
 const MIME_EXT = {
   'image/jpeg': '.jpg',
   'image/jpg': '.jpg',
@@ -76,15 +107,23 @@ export const isLocalImage = (url) =>
 
 // Filenames are content-addressed by the REMOTE url, so re-runs (and the
 // backfill) resolve the same local file — idempotent, no re-download, no dupes.
+export const imageHash = (url) =>
+  createHash('sha1').update(String(url)).digest('hex').slice(0, 16)
+
 // Cache the uploads listing once per process so the "already downloaded?" check
-// is a Set lookup, not a stat per image.
+// is a Map lookup, not a stat (or a scan of every filename) per image.
 let uploadListing = null
-function existingForHash(hash) {
+export function existingForHash(hash) {
   if (!uploadListing) {
-    try { uploadListing = new Set(fs.readdirSync(UPLOAD_DIR)) } catch { uploadListing = new Set() }
+    uploadListing = new Map()
+    let names = []
+    try { names = fs.readdirSync(UPLOAD_DIR) } catch { /* no uploads dir yet */ }
+    for (const name of names) {
+      const m = /^scrape-([0-9a-f]+)\./.exec(name)
+      if (m && !uploadListing.has(m[1])) uploadListing.set(m[1], name)
+    }
   }
-  for (const name of uploadListing) if (name.startsWith(`scrape-${hash}.`)) return name
-  return null
+  return uploadListing.get(hash) || null
 }
 
 const extFromUrl = (u) => {
@@ -101,7 +140,7 @@ export async function localizeImage(remoteUrl) {
   const url = String(remoteUrl || '').trim()
   if (!url || isLocalImage(url)) return url || null
   try {
-    const hash = createHash('sha1').update(url).digest('hex').slice(0, 16)
+    const hash = imageHash(url)
     const cached = existingForHash(hash)
     if (cached) return `${PUBLIC_URL}/uploads/${cached}`
 
@@ -118,7 +157,7 @@ export async function localizeImage(remoteUrl) {
     const ext = MIME_EXT[type] || extFromUrl(url) || '.jpg'
     const filename = `scrape-${hash}${ext}`
     fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf)
-    if (uploadListing) uploadListing.add(filename)
+    if (uploadListing) uploadListing.set(hash, filename)
     return `${PUBLIC_URL}/uploads/${filename}`
   } catch {
     return null
@@ -230,6 +269,7 @@ export async function ingestProducts(products) {
   let created = 0
   let updated = 0
   let skipped = 0
+  let placeholders = 0
 
   for (const p of Array.isArray(products) ? products : []) {
     const name = stripSiteSuffix(decodeEntities(p?.name || '').trim(), p?.url)
@@ -305,7 +345,9 @@ export async function ingestProducts(products) {
           .filter((r) => r[0] && r[1])
       : []
     const sourceUrl = normalizeUrl(p.url || '')
-    const images = Array.isArray(p.images) ? p.images.filter(Boolean) : []
+    const allImages = Array.isArray(p.images) ? p.images.filter(Boolean) : []
+    const images = allImages.filter((u) => !isPlaceholderImage(u))
+    placeholders += allImages.length - images.length
 
     // Find an existing product by where it was scraped from (idempotent re-runs).
     // Match the normalized URL, but also the raw form so rows saved before this
@@ -360,6 +402,7 @@ export async function ingestProducts(products) {
     created,
     updated,
     skipped,
+    placeholders,
     brands: brandSlugs.size,
     categories: catSlugs.size,
   }

@@ -74,6 +74,15 @@ instead of exposing a customer session in the redirect URL. The app exchanges it
 with `POST /api/account/google/mobile-exchange`. Run `npm run migrate` before
 deploying this flow so the `mobile_auth_codes` table exists.
 
+## Catalog import
+
+The admin **Import products** page spawns `as_store/scraper/scrape.py` and ingests its
+`products.json` (brands, categories, products, images — idempotent on `source_url`).
+When the source shop blocks the VPS's IP, run the same import by hand from a machine
+that isn't blocked: `npm run import-scrape` / `node src/import-scrape.js` — see
+[OFFLINE-IMPORT.md](../OFFLINE-IMPORT.md). `npm run backfill-images` pulls any
+still-hotlinked product photo onto our own `/uploads`.
+
 ## Env (`.env`)
 
 `DATABASE_URL` · `PORT` (8081) · `PUBLIC_URL` (builds uploaded image URLs) · `UPLOAD_DIR` ·

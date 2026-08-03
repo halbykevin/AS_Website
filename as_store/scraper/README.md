@@ -4,6 +4,10 @@ A configurable Python tool that scrapes product data (name, price, SKU, brand,
 description, rating, availability, images...) from e-commerce pages and exports
 to **JSON, CSV and Excel** — with optional **image downloads**.
 
+> Day to day this runs from the admin **Import products** page, on the VPS. If the
+> shop blocks that IP, scrape from your laptop and push the result up instead —
+> see [OFFLINE-IMPORT.md](../OFFLINE-IMPORT.md).
+
 It works on most stores with **zero configuration** by reading the structured
 data they already embed (`schema.org/Product` JSON-LD and Open Graph tags).
 For sites that lack it, you supply **CSS selectors** in a YAML config. For
