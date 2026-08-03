@@ -270,6 +270,7 @@ export async function ingestProducts(products) {
   let updated = 0
   let skipped = 0
   let placeholders = 0
+  let unpriced = 0
 
   for (const p of Array.isArray(products) ? products : []) {
     const name = stripSiteSuffix(decodeEntities(p?.name || '').trim(), p?.url)
@@ -373,10 +374,16 @@ export async function ingestProducts(products) {
       updated++
     } else {
       const slug = await uniqueSlug(title)
+      // Shops hide the price on "call us" items; the scrape brings those in at 0,
+      // and a live product priced $0.00 is worse than no product. Import it
+      // hidden so it lands in the admin to be priced. Only ever decided here, on
+      // INSERT — a re-import never flips the visibility you chose.
+      const priced = price > 0
+      if (!priced) unpriced++
       const { rows } = await query(
         `INSERT INTO products (name, slug, tagline, description, specs, price, category_id, brand_id, source_url, is_new, visible)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,true,true) RETURNING id`,
-        [title, slug, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl],
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,true,$10) RETURNING id`,
+        [title, slug, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl, priced],
       )
       productId = rows[0].id
       created++
@@ -403,6 +410,7 @@ export async function ingestProducts(products) {
     updated,
     skipped,
     placeholders,
+    unpriced,
     brands: brandSlugs.size,
     categories: catSlugs.size,
   }

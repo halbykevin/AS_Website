@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRef } from 'react'
+import { productImage } from '@/lib/productImage'
 import {
   motion,
   useScroll,
@@ -152,7 +153,7 @@ export default function HeroCinema({ cms, product, categories = [] }) {
                   {/* Optimizer-resized LCP image; `priority` emits a preload
                       for the responsive (not full 1000×1000) variant. */}
                   <Image
-                    src={product.image}
+                    src={productImage(product.image)}
                     alt={product.name}
                     width={1000}
                     height={1000}

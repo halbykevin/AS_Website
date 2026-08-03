@@ -322,9 +322,13 @@ if (present !== 'HAVE') {
   // The VPS only ever gets code by pulling the branch, so anything still sitting
   // in the working tree has to be committed and pushed first. Only the paths this
   // tool actually needs — never a blanket `git add -A` over someone's repo.
+  // `as_store/src` is in here because the storefront half of this feature ships
+  // through the same push: Vercel rebuilds on it, and a product whose only photo
+  // was the source shop's logo needs the fallback image or its page won't render.
   const SHIP_PATHS = [
     'as_store/scripts',
     'as_store/server/src',
+    'as_store/src',
     'as_store/server/package.json',
     'as_store/package.json',
     'as_store/OFFLINE-IMPORT.md',
@@ -346,7 +350,16 @@ if (present !== 'HAVE') {
     await run('git', ['push'])
   }
 
-  await run(process.execPath, [path.join(ROOT, 'scripts', 'deploy.mjs'), '--app', 'store'])
+  // Deploying is safe to retry — it fast-forwards the branch and health-checks
+  // itself — so a failure here is a stop, never a half-applied state.
+  await run(process.execPath, [path.join(ROOT, 'scripts', 'deploy.mjs'), '--app', 'store']).catch((e) =>
+    fail(
+      `The deploy did not finish: ${e.message}\n` +
+        `  Your work is committed and pushed, so nothing is lost.\n` +
+        `  Run it on its own to see why:  npm run deploy:store\n` +
+        `  Then re-run this with:  npm run sync-catalog -- --reuse "${runDir}"`,
+    ),
+  )
   const again = await remoteCapture(`test -f '${REMOTE_SERVER}/src/import-scrape.js' && echo HAVE || echo MISSING`)
   if (again !== 'HAVE') fail('The deploy finished but the VPS still has no src/import-scrape.js.')
 }

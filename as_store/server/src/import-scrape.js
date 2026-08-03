@@ -293,6 +293,9 @@ console.log(
     (summary.placeholders ? ` · ${summary.placeholders} placeholder image(s) not imported` : '') +
     '.',
 )
+if (summary.unpriced) {
+  console.log(`${summary.unpriced} new product(s) had no price — imported HIDDEN, price them in /admin/products.`)
+}
 
 // Drop any placeholder an EARLIER import already stored — the logo rows are
 // there under their localized name, which is a hash of the source URL, so the

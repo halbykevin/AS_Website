@@ -7,6 +7,7 @@ import ShareMenu from './ShareMenu.jsx'
 import { addItem } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 import { SITE_URL } from '@/lib/seo'
+import { productImage } from '@/lib/productImage'
 
 // Clean Apple Store product card: name, tagline, centered image, colour dots,
 // "From $X", and an Add to Bag pill (wired to Redux). `fluid` fills its parent
@@ -66,7 +67,7 @@ export default function ProductTile({ product, fluid = false }) {
         {/* next/image resizes the (often 1000×1000) source down to the card's
             real display size and serves WebP/AVIF via the Vercel optimizer. */}
         <Image
-          src={image}
+          src={productImage(image)}
           alt={name}
           fill
           sizes="(max-width: 640px) 45vw, 300px"

@@ -11,6 +11,7 @@ import Breadcrumbs from './Breadcrumbs.jsx'
 import ShareMenu from './ShareMenu.jsx'
 import { addItem, MAX_QTY } from '@/store/cartSlice'
 import { SITE_URL } from '@/lib/seo'
+import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
@@ -62,7 +63,14 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={gallery[active]} alt={product.name} className="h-full w-full object-contain p-6" />
               ) : (
-                <div className="aspect-[4/3] w-full" />
+                // No photo (the source shop only had its own logo, which the
+                // importer strips) — show the AS mark, faded, not an empty box.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={PRODUCT_IMAGE_FALLBACK}
+                  alt={product.name}
+                  className="h-full w-full object-contain p-16 opacity-30"
+                />
               )}
             </button>
             <ImageLightbox
