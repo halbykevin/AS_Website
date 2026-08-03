@@ -6,7 +6,7 @@ import SearchBox from '@/components/SearchBox.jsx'
 import Pagination from '@/components/Pagination.jsx'
 import Icon from '@/components/Icon.jsx'
 import { loadCategories, searchProducts } from '@/lib/catalog'
-import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass } from '@/lib/catalogFilters'
+import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass, tileLayout } from '@/lib/catalogFilters'
 
 export const metadata = { title: 'Search — AS Store' }
 
@@ -93,7 +93,7 @@ export default async function SearchPage({ searchParams }) {
               <>
                 <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
                   {items.map((p) => (
-                    <ProductTile key={p.id} product={p} fluid />
+                    <ProductTile key={p.id} product={p} fluid layout={tileLayout(searchParams.cols)} />
                   ))}
                 </div>
                 <Pagination page={page} totalPages={totalPages} basePath="/search" searchParams={searchParams} />

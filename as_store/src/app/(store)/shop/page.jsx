@@ -11,6 +11,7 @@ import {
   sortProducts,
   paginate,
   gridClass,
+  tileLayout,
 } from '@/lib/catalogFilters'
 
 export const metadata = {
@@ -62,7 +63,7 @@ export default async function ShopPage({ searchParams }) {
           <>
             <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
               {items.map((p) => (
-                <ProductTile key={p.id} product={p} fluid />
+                <ProductTile key={p.id} product={p} fluid layout={tileLayout(searchParams.cols)} />
               ))}
             </div>
             <Pagination page={page} totalPages={totalPages} basePath="/shop" searchParams={searchParams} />

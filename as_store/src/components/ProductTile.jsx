@@ -12,7 +12,18 @@ import { productImage } from '@/lib/productImage'
 // Clean Apple Store product card: name, tagline, centered image, colour dots,
 // "From $X", and an Add to Bag pill (wired to Redux). `fluid` fills its parent
 // (for grids); otherwise it's a fixed-width card for the horizontal rails.
-export default function ProductTile({ product, fluid = false }) {
+//
+// `layout` picks the shape (see tileLayout() in lib/catalogFilters):
+//   'card'  upright card — the original, used by the rails and 2+ column grids
+//   'row'   horizontal — thumbnail left, text right, button full width beneath
+//   'auto'  'row' on phones, 'card' from sm up
+//
+// All three share ONE DOM tree, so the layout is pure CSS and 'auto' can flip at
+// the breakpoint without JavaScript. The children are ordered image → text →
+// footer, which is the horizontal reading order; the upright card reorders them
+// with `order-*`, and in the horizontal one the footer simply wraps onto its own
+// full-width line under both.
+export default function ProductTile({ product, fluid = false, layout = 'card' }) {
   const dispatch = useDispatch()
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
@@ -41,9 +52,36 @@ export default function ProductTile({ product, fluid = false }) {
 
   const sizing = fluid ? 'w-full' : 'w-[280px] shrink-0 snap-start sm:w-[300px]'
 
+  // Per-element classes for each layout. Written out rather than generated: the
+  // upright variants already carry their own `sm:` rules, so they can't just be
+  // machine-prefixed for the 'auto' breakpoint.
+  const S = {
+    row: {
+      box: 'flex-wrap items-start gap-x-3 gap-y-2 rounded-2xl p-3 text-left',
+      img: 'h-24 w-24 shrink-0 rounded-xl',
+      text: 'min-w-0 flex-1',
+      foot: 'w-full',
+      price: 'items-baseline',
+    },
+    card: {
+      box: 'h-[360px] flex-col items-center overflow-hidden rounded-[28px] p-4 text-center sm:h-[450px] sm:p-5',
+      img: 'order-2 mt-2 h-32 w-full rounded-2xl sm:mt-3 sm:h-44',
+      text: 'order-1 flex h-[92px] w-full flex-col overflow-hidden sm:h-[124px]',
+      foot: 'order-3 mt-auto flex w-full flex-col items-center pt-2 sm:pt-3',
+      price: 'items-baseline justify-center',
+    },
+    auto: {
+      box: 'flex-wrap items-start gap-x-3 gap-y-2 rounded-2xl p-3 text-left sm:h-[450px] sm:flex-col sm:flex-nowrap sm:items-center sm:gap-0 sm:overflow-hidden sm:rounded-[28px] sm:p-5 sm:text-center',
+      img: 'h-24 w-24 shrink-0 rounded-xl sm:order-2 sm:mt-3 sm:h-44 sm:w-full sm:rounded-2xl',
+      text: 'min-w-0 flex-1 sm:order-1 sm:flex sm:h-[124px] sm:w-full sm:flex-none sm:flex-col sm:overflow-hidden',
+      foot: 'w-full sm:order-3 sm:mt-auto sm:flex sm:flex-col sm:items-center sm:pt-3',
+      price: 'items-baseline sm:justify-center',
+    },
+  }[layout] || {}
+
   return (
     <div
-      className={`relative flex ${sizing} h-[360px] flex-col items-center overflow-hidden rounded-[28px] border border-as-red bg-white p-4 text-center transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.35)] sm:h-[450px] sm:p-5`}
+      className={`relative flex ${sizing} ${S.box} border border-as-red bg-white transition-shadow duration-300 hover:shadow-[0_22px_50px_-22px_rgba(164,30,34,0.35)]`}
     >
       {onSale && (
         <span className="absolute right-4 top-4 rounded-full bg-as-red px-2 py-0.5 text-xs font-bold text-white">
@@ -55,28 +93,32 @@ export default function ProductTile({ product, fluid = false }) {
           items-center, so without it this block sizes to its content width (the
           whole name on one line) and overflows the card sideways — w-full pins it
           to the card width so break-words + line-clamp actually wrap the text. */}
-      <div className="flex h-[92px] w-full flex-col overflow-hidden sm:h-[124px]">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-as-red sm:text-xs">{brand || 'New'}</p>
-        <Link href={href} className="mt-1">
-          <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug tracking-apple text-as-ink sm:text-lg">{name}</h3>
-        </Link>
-        {teaser && <p className="mt-1 line-clamp-1 break-words text-xs leading-snug text-as-ink/55 sm:line-clamp-2 sm:text-sm">{teaser}</p>}
-      </div>
-
-      <Link href={href} className="relative mt-2 block h-32 w-full overflow-hidden rounded-2xl sm:mt-3 sm:h-44">
+      <Link href={href} className={`relative block overflow-hidden ${S.img}`}>
         {/* next/image resizes the (often 1000×1000) source down to the card's
             real display size and serves WebP/AVIF via the Vercel optimizer. */}
         <Image
           src={productImage(image)}
           alt={name}
           fill
-          sizes="(max-width: 640px) 45vw, 300px"
+          sizes={layout === 'row' ? '96px' : '(max-width: 640px) 45vw, 300px'}
           className="object-contain transition-transform duration-500 ease-out hover:scale-[1.04]"
         />
       </Link>
 
+      {/* Fixed-height text block in the upright card, overflow-hidden so a 2-line
+          name + teaser can never bleed over the image below. w-full is required
+          there: the card is items-center, so without it this block sizes to its
+          content width (the whole name on one line) and overflows sideways. */}
+      <div className={S.text}>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-as-red sm:text-xs">{brand || 'New'}</p>
+        <Link href={href} className="mt-1 block">
+          <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug tracking-apple text-as-ink sm:text-lg">{name}</h3>
+        </Link>
+        {teaser && <p className="mt-1 line-clamp-1 break-words text-xs leading-snug text-as-ink/55 sm:line-clamp-2 sm:text-sm">{teaser}</p>}
+      </div>
+
       {/* Footer pinned to the bottom so prices/buttons align across cards */}
-      <div className="mt-auto flex w-full flex-col items-center pt-2 sm:pt-3">
+      <div className={S.foot}>
         {colors.length > 0 && (
           <div className="mb-2 flex items-center gap-1.5">
             {colors.map((c, i) => (
@@ -85,7 +127,7 @@ export default function ProductTile({ product, fluid = false }) {
           </div>
         )}
         {onSale ? (
-          <p className="flex items-baseline gap-2 text-sm sm:text-base">
+          <p className={`flex gap-2 text-sm sm:text-base ${S.price}`}>
             <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
             <span className="text-xs text-as-ink/40 line-through sm:text-sm">${oldPrice.toLocaleString()}</span>
           </p>

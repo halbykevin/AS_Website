@@ -6,7 +6,7 @@ import ProductFilters from '@/components/ProductFilters.jsx'
 import Breadcrumbs from '@/components/Breadcrumbs.jsx'
 import Pagination from '@/components/Pagination.jsx'
 import { loadCategories, loadCategoryProducts } from '@/lib/catalog'
-import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass } from '@/lib/catalogFilters'
+import { brandFacets, priceBounds, applyFilters, sortProducts, paginate, gridClass, tileLayout } from '@/lib/catalogFilters'
 import { childrenOf, categoryTrail } from '@/lib/categoryTree'
 import { metaDescription, breadcrumbJsonLd, jsonLdScript } from '@/lib/seo'
 
@@ -127,7 +127,7 @@ export default async function CategoryPage({ params, searchParams }) {
           <>
             <div className={`mt-8 grid gap-5 ${gridClass(searchParams.cols)}`}>
               {items.map((p) => (
-                <ProductTile key={p.id} product={p} fluid />
+                <ProductTile key={p.id} product={p} fluid layout={tileLayout(searchParams.cols)} />
               ))}
             </div>
             <Pagination page={page} totalPages={totalPages} basePath={`/category/${slug}`} searchParams={searchParams} />

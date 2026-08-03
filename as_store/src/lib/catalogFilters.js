@@ -17,9 +17,11 @@ export const slugify = (s) =>
 // literally at EVERY breakpoint (so "2" means 2 columns on a phone too); the
 // default (no choice = "Auto") is a responsive layout. Returned strings are
 // literal so Tailwind's JIT compiles them.
-export const COLS = ['2', '3', '4']
+export const COLS = ['1', '2', '3', '4']
 export function gridClass(cols) {
   switch (String(cols)) {
+    case '1':
+      return 'grid-cols-1'
     case '2':
       return 'grid-cols-2'
     case '3':
@@ -27,8 +29,22 @@ export function gridClass(cols) {
     case '4':
       return 'grid-cols-4'
     default:
-      return 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4' // Auto
+      // Auto. One per row on phones: at 2-up a card is ~160px wide, which is
+      // where the name gets clipped and the image turns into a thumbnail. Wider
+      // screens are unchanged.
+      return 'grid-cols-1 sm:grid-cols-3 xl:grid-cols-4'
   }
+}
+
+// Which ProductTile shape suits the chosen density.
+//   'row'  a single column at every width  → always the horizontal card
+//   'auto' one column on phones only       → horizontal below sm, upright above
+//   'card' two or more columns             → the upright card
+export function tileLayout(cols) {
+  const c = String(cols || '')
+  if (c === '1') return 'row'
+  if (c === '') return 'auto'
+  return 'card'
 }
 
 const price = (p) => Number(p.price) || 0
