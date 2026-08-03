@@ -55,11 +55,20 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
   // Per-element classes for each layout. Written out rather than generated: the
   // upright variants already carry their own `sm:` rules, so they can't just be
   // machine-prefixed for the 'auto' breakpoint.
+  // The horizontal card puts the price INSIDE the text column, beside the photo,
+  // rather than in the footer. In the footer it wraps to its own full-width line,
+  // which leaves an empty block next to the thumbnail and makes the card look
+  // broken. Both positions exist in the markup; each layout hides the one it
+  // doesn't use, because CSS can reorder siblings but cannot move an element
+  // between parents.
   const S = {
     row: {
-      box: 'flex-wrap items-start gap-x-3 gap-y-2 rounded-2xl p-3 text-left',
-      img: 'h-24 w-24 shrink-0 rounded-xl',
-      text: 'min-w-0 flex-1',
+      box: 'flex-wrap items-stretch gap-x-3.5 gap-y-2.5 rounded-2xl p-3 text-left',
+      img: 'h-28 w-28 shrink-0 self-start rounded-xl',
+      text: 'flex min-w-0 flex-1 flex-col',
+      teaser: 'line-clamp-2',
+      priceHere: 'mt-auto pt-1.5',
+      priceFoot: 'hidden',
       foot: 'w-full',
       price: 'items-baseline',
     },
@@ -67,17 +76,36 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
       box: 'h-[360px] flex-col items-center overflow-hidden rounded-[28px] p-4 text-center sm:h-[450px] sm:p-5',
       img: 'order-2 mt-2 h-32 w-full rounded-2xl sm:mt-3 sm:h-44',
       text: 'order-1 flex h-[92px] w-full flex-col overflow-hidden sm:h-[124px]',
+      teaser: 'line-clamp-1 sm:line-clamp-2',
+      priceHere: 'hidden',
+      priceFoot: '',
       foot: 'order-3 mt-auto flex w-full flex-col items-center pt-2 sm:pt-3',
       price: 'items-baseline justify-center',
     },
     auto: {
-      box: 'flex-wrap items-start gap-x-3 gap-y-2 rounded-2xl p-3 text-left sm:h-[450px] sm:flex-col sm:flex-nowrap sm:items-center sm:gap-0 sm:overflow-hidden sm:rounded-[28px] sm:p-5 sm:text-center',
-      img: 'h-24 w-24 shrink-0 rounded-xl sm:order-2 sm:mt-3 sm:h-44 sm:w-full sm:rounded-2xl',
-      text: 'min-w-0 flex-1 sm:order-1 sm:flex sm:h-[124px] sm:w-full sm:flex-none sm:flex-col sm:overflow-hidden',
+      box: 'flex-wrap items-stretch gap-x-3.5 gap-y-2.5 rounded-2xl p-3 text-left sm:h-[450px] sm:flex-col sm:flex-nowrap sm:items-center sm:gap-0 sm:overflow-hidden sm:rounded-[28px] sm:p-5 sm:text-center',
+      img: 'h-28 w-28 shrink-0 self-start rounded-xl sm:order-2 sm:mt-3 sm:h-44 sm:w-full sm:self-auto sm:rounded-2xl',
+      text: 'flex min-w-0 flex-1 flex-col sm:order-1 sm:h-[124px] sm:w-full sm:flex-none sm:overflow-hidden',
+      teaser: 'line-clamp-2',
+      priceHere: 'mt-auto pt-1.5 sm:hidden',
+      priceFoot: 'hidden sm:block',
       foot: 'w-full sm:order-3 sm:mt-auto sm:flex sm:flex-col sm:items-center sm:pt-3',
       price: 'items-baseline sm:justify-center',
     },
   }[layout] || {}
+
+  const Price = ({ className = '' }) => (
+    <div className={className}>
+      {onSale ? (
+        <p className={`flex gap-2 text-sm sm:text-base ${S.price}`}>
+          <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
+          <span className="text-xs text-as-ink/40 line-through sm:text-sm">${oldPrice.toLocaleString()}</span>
+        </p>
+      ) : (
+        <p className="text-sm font-medium text-as-ink sm:text-base">From ${priceNum.toLocaleString()}</p>
+      )}
+    </div>
+  )
 
   return (
     <div
@@ -100,7 +128,7 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
           src={productImage(image)}
           alt={name}
           fill
-          sizes={layout === 'row' ? '96px' : '(max-width: 640px) 45vw, 300px'}
+          sizes={layout === 'row' ? '112px' : '(max-width: 640px) 45vw, 300px'}
           className="object-contain transition-transform duration-500 ease-out hover:scale-[1.04]"
         />
       </Link>
@@ -114,7 +142,12 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
         <Link href={href} className="mt-1 block">
           <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug tracking-apple text-as-ink sm:text-lg">{name}</h3>
         </Link>
-        {teaser && <p className="mt-1 line-clamp-1 break-words text-xs leading-snug text-as-ink/55 sm:line-clamp-2 sm:text-sm">{teaser}</p>}
+        {teaser && (
+          <p className={`mt-1 break-words text-xs leading-snug text-as-ink/55 sm:text-sm ${S.teaser}`}>{teaser}</p>
+        )}
+        {/* Horizontal layout only — mt-auto pushes it to the bottom of the column
+            so it lines up with the foot of the photo instead of floating. */}
+        <Price className={S.priceHere} />
       </div>
 
       {/* Footer pinned to the bottom so prices/buttons align across cards */}
@@ -126,14 +159,7 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
             ))}
           </div>
         )}
-        {onSale ? (
-          <p className={`flex gap-2 text-sm sm:text-base ${S.price}`}>
-            <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
-            <span className="text-xs text-as-ink/40 line-through sm:text-sm">${oldPrice.toLocaleString()}</span>
-          </p>
-        ) : (
-          <p className="text-sm font-medium text-as-ink sm:text-base">From ${priceNum.toLocaleString()}</p>
-        )}
+        <Price className={S.priceFoot} />
         {/* Action row: the bag pill takes the space, share sits beside it — kept
             in normal flow so it can never overlap the name/price on narrow cards. */}
         <div className="mt-2 flex w-full items-center gap-2 sm:mt-3">
