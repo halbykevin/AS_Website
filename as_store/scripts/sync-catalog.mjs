@@ -99,13 +99,13 @@ function duration(ms) {
 // `progress` turns a child's own "[483/1330]" chatter into a time estimate: the
 // long steps here are a 20-minute scrape and a few thousand image downloads, and
 // watching them without knowing how much is left is the worst part of the job.
-function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = null } = {}) {
+function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = null, noStdin = false } = {}) {
   return new Promise((resolve, reject) => {
     if (!quiet) dim(`$ ${cmd} ${args.join(' ')}`)
     const t0 = Date.now()
     const child = spawn(cmd, args, {
       cwd,
-      stdio: [stdin === null ? 'inherit' : 'pipe', progress ? 'pipe' : 'inherit', progress ? 'pipe' : 'inherit'],
+      stdio: [noStdin ? 'ignore' : stdin === null ? 'inherit' : 'pipe', progress ? 'pipe' : 'inherit', progress ? 'pipe' : 'inherit'],
       env: { ...process.env, PYTHONUNBUFFERED: '1', AS_SYNC_CATALOG: '1' },
     })
 
@@ -206,6 +206,10 @@ async function confirm(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   const answer = (await rl.question(`\n${C.bold}${question}${C.off} [y/N] `)).trim().toLowerCase()
   rl.close()
+  // Let go of the console: readline leaves stdin flowing and referenced, which
+  // both keeps the process alive at exit and confuses child processes that
+  // inherit the handle.
+  process.stdin.pause()
   return answer === 'y' || answer === 'yes'
 }
 
@@ -352,11 +356,17 @@ if (present !== 'HAVE') {
 
   // Deploying is safe to retry — it fast-forwards the branch and health-checks
   // itself — so a failure here is a stop, never a half-applied state.
-  await run(process.execPath, [path.join(ROOT, 'scripts', 'deploy.mjs'), '--app', 'store']).catch((e) =>
+  //
+  // noStdin is NOT optional: deploy.ps1 shells out to ssh, and an inherited
+  // Windows console that this script has already used for a y/N prompt leaves
+  // ssh blocking forever on its first remote probe. Handing the child no stdin
+  // at all is what makes the integrated deploy work. deploy.env is required
+  // above, so deploy.ps1 has nothing left to ask us.
+  await run(process.execPath, [path.join(ROOT, 'scripts', 'deploy.mjs'), '--app', 'store'], { noStdin: true }).catch((e) =>
     fail(
       `The deploy did not finish: ${e.message}\n` +
         `  Your work is committed and pushed, so nothing is lost.\n` +
-        `  Run it on its own to see why:  npm run deploy:store\n` +
+        `  Run it on its own to see why:  npm run deploy:store   (from as_store/ or the repo root)\n` +
         `  Then re-run this with:  npm run sync-catalog -- --reuse "${runDir}"`,
     ),
   )

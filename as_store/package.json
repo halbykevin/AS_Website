@@ -9,7 +9,8 @@
     "start": "next start -p 5180",
     "lint": "next lint",
     "ship": "node scripts/ship.mjs",
-    "sync-catalog": "node scripts/sync-catalog.mjs"
+    "sync-catalog": "node scripts/sync-catalog.mjs",
+    "deploy:store": "node ../scripts/deploy.mjs --app store"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.7",
