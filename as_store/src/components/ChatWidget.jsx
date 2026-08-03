@@ -19,6 +19,14 @@ const GREETING = {
 
 const SUGGESTIONS = ['A laptop under $700', 'Wireless mouse for work', 'How long is delivery?']
 
+// Answers arrive whole, but they are not shown whole: the sentence types out
+// first and the product tiles only appear once it has finished. Landing both at
+// once meant the auto-scroll jumped straight to the tiles and the answer — the
+// part that says what was found and why — scrolled past unread.
+const REVEAL_TICK = 16 // ms per step
+const REVEAL_STEP = 2 // characters per step (~125 chars/second)
+const REVEAL_MAX_STEPS = 90 // ~1.4s ceiling: a long answer types faster, never slower
+
 // Panel sizing. The user drags the top-left corner to resize (the panel is
 // anchored bottom-right, so it grows up and to the left, into the screen rather
 // than off it) and the size is remembered.
@@ -41,9 +49,16 @@ export default function ChatWidget() {
   const [error, setError] = useState('')
   const [size, setSize] = useState(DEFAULT)
   const [isMobile, setIsMobile] = useState(false)
+  // { index, chars } while the newest answer is typing out, else null.
+  const [reveal, setReveal] = useState(null)
+  const [atBottom, setAtBottom] = useState(true)
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
   const dragRef = useRef(null)
+  // Whether the thread should keep following its own bottom. True while the
+  // customer's question and the typing answer come in; switched off the moment
+  // tiles are added underneath an answer, so the view stays on the words.
+  const stickRef = useRef(true)
 
   // Restore the remembered size, clamped to this viewport — a size saved on a
   // desktop must not open off-screen on a phone. Runs after mount so the server
@@ -142,11 +157,56 @@ export default function ChatWidget() {
     }
   }
 
-  // Keep the newest message in view as the thread grows.
+  // Advance the reveal one step at a time. When it reaches the end of the text
+  // the tiles are about to render underneath, so stop following the bottom
+  // first — otherwise the same commit that adds them scrolls them into view.
+  useEffect(() => {
+    if (!reveal) return
+    const msg = messages[reveal.index]
+    const full = msg?.text || ''
+    if (reveal.chars >= full.length) {
+      if (msg?.products?.length) stickRef.current = false
+      setReveal(null)
+      return
+    }
+    const step = Math.max(REVEAL_STEP, Math.ceil(full.length / REVEAL_MAX_STEPS))
+    const id = setTimeout(() => setReveal((r) => (r ? { ...r, chars: r.chars + step } : r)), REVEAL_TICK)
+    return () => clearTimeout(id)
+  }, [reveal, messages])
+
+  // Nobody wants to watch text type. A tap anywhere in the thread finishes it.
+  function finishReveal() {
+    if (!reveal) return
+    if (messages[reveal.index]?.products?.length) stickRef.current = false
+    setReveal(null)
+  }
+
+  // Keep the newest message in view as the thread grows — while it is still the
+  // thing the customer is waiting for. `reveal` is a dependency so the answer
+  // scrolls with itself as it types.
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [messages, busy])
+    if (!el) return
+    if (stickRef.current) el.scrollTop = el.scrollHeight
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  }, [messages, busy, reveal])
+
+  // Manual scrolling wins: scroll up and we stop chasing the bottom, scroll
+  // back down and we resume.
+  function onScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    stickRef.current = near
+    setAtBottom(near)
+  }
+
+  function scrollToProducts() {
+    const el = scrollRef.current
+    if (!el) return
+    stickRef.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
@@ -167,6 +227,8 @@ export default function ChatWidget() {
     setMessages([GREETING])
     setInput('')
     setError('')
+    setReveal(null)
+    stickRef.current = true
     inputRef.current?.focus()
   }
 
@@ -175,6 +237,8 @@ export default function ChatWidget() {
     if (!question || busy) return
     setInput('')
     setError('')
+    setReveal(null)
+    stickRef.current = true // follow the question and the answer that types after it
     const next = [...messages, { role: 'user', text: question }]
     setMessages(next)
     setBusy(true)
@@ -188,12 +252,20 @@ export default function ChatWidget() {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Something went wrong.')
       setMessages((m) => [...m, { role: 'model', text: data.reply, products: data.products || [] }])
+      // The reply lands directly after the question, so its index is known.
+      // Anyone who asked the OS for less motion gets the whole sentence at once
+      // — but still before the tiles, which is the point of the reveal.
+      const instant = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      setReveal({ index: next.length, chars: instant ? Infinity : 0 })
     } catch (e) {
       setError(e.message)
     } finally {
       setBusy(false)
     }
   }
+
+  // Tiles attached to the newest answer — what the "below" pill counts.
+  const lastProducts = messages[messages.length - 1]?.products?.length || 0
 
   // Not during checkout: once someone is paying, nothing should distract them
   // or tempt them back into browsing.
@@ -240,14 +312,17 @@ export default function ChatWidget() {
         >
           {/* Resize grip, top-left — the corner that grows the panel into the
               screen. Hidden on phones, where the panel already fills the width
-              and a 20px drag target next to the scroll area is a nuisance. */}
+              and a 20px drag target next to the scroll area is a nuisance.
+              Inset by 4px: flush at left-0/top-0 the angle's vertex sits 25px
+              from the centre of the panel's 24px corner arc, so overflow-hidden
+              sliced the corner off and left two floating stubs. */}
           <div
             ref={dragRef}
             onPointerDown={startResize}
             role="separator"
             aria-label="Resize the assistant"
             title="Drag to resize"
-            className="group absolute left-0 top-0 z-10 hidden h-6 w-6 cursor-nwse-resize touch-none sm:block"
+            className="group absolute left-1 top-1 z-10 hidden h-6 w-6 cursor-nwse-resize touch-none sm:block"
           >
             <svg viewBox="0 0 24 24" className="h-full w-full text-as-ink/25 transition group-hover:text-as-ink/60">
               <path d="M6 14V6h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -293,64 +368,113 @@ export default function ChatWidget() {
             </button>
           </header>
 
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {messages.map((m, i) => (
-              <div key={i}>
-                <div
-                  className={
-                    m.role === 'user'
-                      ? 'ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-as-ink px-3.5 py-2 text-sm text-white'
-                      : 'w-fit max-w-[90%] rounded-2xl rounded-bl-sm bg-as-fog px-3.5 py-2 text-sm text-as-ink'
-                  }
-                >
-                  {m.text}
-                </div>
+          {/* Relative so the "products below" pill can sit over the thread
+              without covering the input. */}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div
+              ref={scrollRef}
+              onScroll={onScroll}
+              onClick={finishReveal}
+              className="flex-1 space-y-4 overflow-y-auto px-4 py-4"
+            >
+              {messages.map((m, i) => {
+                const typing = reveal?.index === i
+                return (
+                  <div key={i}>
+                    <div
+                      className={
+                        m.role === 'user'
+                          ? 'ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-sm bg-as-ink px-3.5 py-2 text-sm text-white'
+                          : 'w-fit max-w-[90%] rounded-2xl rounded-bl-sm bg-as-fog px-3.5 py-2 text-sm text-as-ink'
+                      }
+                    >
+                      {typing ? m.text.slice(0, reveal.chars) : m.text}
+                      {typing && (
+                        <span
+                          aria-hidden
+                          className="ml-0.5 inline-block h-3.5 w-0.5 translate-y-0.5 animate-pulse bg-as-ink/50"
+                        />
+                      )}
+                    </div>
 
-                {/* Real tiles, not model-generated markup. */}
-                {m.products?.length > 0 && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {m.products.map((p) => (
-                      <ProductTile key={p.slug} product={p} fluid />
-                    ))}
+                    {/* Real tiles, not model-generated markup. Held back until
+                        the answer above them has finished.
+
+                        One per row, in the horizontal layout: two upright cards
+                        side by side inside a ~350px panel left the name cut off
+                        mid-word and the Add to Bag pill stacked three words
+                        tall. max-w keeps the row sensible when the panel is
+                        dragged out to full screen. */}
+                    {!typing && m.products?.length > 0 && (
+                      <div className="mt-3 max-w-lg space-y-2">
+                        {m.products.map((p) => (
+                          <ProductTile key={p.slug} product={p} fluid layout="row" />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                )
+              })}
 
-            {messages.length === 1 && !busy && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => send(s)}
-                    className="rounded-full bg-white px-3 py-1.5 text-xs text-as-ink/70 ring-1 ring-as-ink/15 transition hover:bg-as-fog"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
+              {messages.length === 1 && !busy && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => send(s)}
+                      className="rounded-full bg-white px-3 py-1.5 text-xs text-as-ink/70 ring-1 ring-as-ink/15 transition hover:bg-as-fog"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-            {busy && (
-              <div className="flex w-fit gap-1 rounded-2xl rounded-bl-sm bg-as-fog px-4 py-3" aria-label="Thinking">
-                {[0, 150, 300].map((d) => (
-                  <span
-                    key={d}
-                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-as-ink/30"
-                    style={{ animationDelay: `${d}ms` }}
-                  />
-                ))}
-              </div>
-            )}
+              {busy && (
+                <div className="flex w-fit gap-1 rounded-2xl rounded-bl-sm bg-as-fog px-4 py-3" aria-label="Thinking">
+                  {[0, 150, 300].map((d) => (
+                    <span
+                      key={d}
+                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-as-ink/30"
+                      style={{ animationDelay: `${d}ms` }}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {error && (
-              <p className="rounded-xl bg-as-red/5 px-3 py-2 text-xs text-as-red">
-                {error}{' '}
-                <Link href="/contact" className="underline" onClick={() => setOpen(false)}>
-                  Send us a message
-                </Link>
-              </p>
+              {error && (
+                <p className="rounded-xl bg-as-red/5 px-3 py-2 text-xs text-as-red">
+                  {error}{' '}
+                  <Link href="/contact" className="underline" onClick={() => setOpen(false)}>
+                    Send us a message
+                  </Link>
+                </p>
+              )}
+            </div>
+
+            {/* The tiles now sit below the fold by design, so say they are
+                there — only when the newest answer has some and they are out
+                of sight. */}
+            {!atBottom && !busy && !reveal && lastProducts > 0 && (
+              <button
+                type="button"
+                onClick={scrollToProducts}
+                className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-as-ink px-3.5 py-1.5 text-xs font-medium text-white shadow-lg transition hover:bg-as-ink-soft"
+              >
+                {lastProducts} {lastProducts === 1 ? 'product' : 'products'} below
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14m0 0l-6-6m6 6l6-6" />
+                </svg>
+              </button>
             )}
           </div>
 
