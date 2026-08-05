@@ -44,7 +44,7 @@ function createTicker() {
 // Radius of the white centre disc — and of the Play button that sits on it, so
 // the two always agree. Kept lean: every pixel here is radial space the labels
 // lose, and a cut-off name is worse than a small button.
-const hubRadius = (size) => Math.max(30, size * 0.1)
+const hubRadius = (size) => Math.max(28, size * 0.085)
 
 // Truncate a label to the space available along the radius.
 function fitText(ctx, text, maxWidth) {
@@ -54,7 +54,30 @@ function fitText(ctx, text, maxWidth) {
   return `${out}…`
 }
 
-function drawWheel(ctx, size, entries, rotation) {
+const font = (weight, px) => `${weight} ${px}px Inter, system-ui, sans-serif`
+
+// Set the largest font at or below `base` that fits `text`, down to `min`.
+// Long names shrink a little instead of being cut off — on a wheel of real
+// names one size can never fit both "Lena Khattar" and "Charbel Estephan", and
+// a whole name at 16px beats half a name at 21px. Returns the size used;
+// callers still run fitText as a backstop for the truly enormous.
+function fitFont(ctx, text, maxWidth, base, min, weight) {
+  ctx.font = font(weight, base)
+  const w = ctx.measureText(text).width
+  if (w <= maxWidth || w === 0) return base
+  // Advance width is near-linear in font size, so one estimate lands close;
+  // measure again and step down if hinting pushed it over.
+  let px = Math.max(min, base * (maxWidth / w))
+  ctx.font = font(weight, px)
+  while (px > min && ctx.measureText(text).width > maxWidth) {
+    px = Math.max(min, px - 0.5)
+    ctx.font = font(weight, px)
+  }
+  return px
+}
+
+// Exported so the label-fitting rules can be exercised against a stub canvas.
+export function drawWheel(ctx, size, entries, rotation) {
   const cx = size / 2
   const cy = size / 2
   const rim = 9
@@ -82,8 +105,8 @@ function drawWheel(ctx, size, entries, rotation) {
   // gets decides both the type size and whether the draw number can sit on its
   // own line above the name — two short lines fit where one long one would be
   // cut off, which is what keeps full names readable on a busy wheel.
-  const labelOuter = r * 0.965
-  const maxLabelW = labelOuter - (hub + 8)
+  const labelOuter = r * 0.975
+  const maxLabelW = labelOuter - (hub + 6)
   // Chord height at the label radius. Clamped at a half-turn: past that the
   // chord shrinks again (a lone entry spanning the full circle would measure 0)
   // even though the space available only ever grows.
@@ -93,6 +116,11 @@ function drawWheel(ctx, size, entries, rotation) {
     ? Math.min(30, Math.max(9, arcH * 0.4))
     : Math.min(24, Math.max(7, arcH * 0.52))
   const numFont = Math.max(8, nameFont * 0.7)
+  // How far a single long name may shrink before it gets an ellipsis instead.
+  // An absolute readability floor, not a fraction of the base: on a small pool
+  // the base is huge, and 60% of huge is still far bigger than a long name
+  // needs — which truncated names that had plenty of room to fit.
+  const minNameFont = Math.min(nameFont, Math.max(10, nameFont * 0.45))
   const showLabels = nameFont >= 8.5
 
   ctx.save()
@@ -130,15 +158,17 @@ function drawWheel(ctx, size, entries, rotation) {
       ctx.shadowBlur = 2
       if (twoLine && num) {
         // Draw number above, slightly dimmed; the name gets the room and weight.
-        ctx.font = `600 ${numFont}px Inter, system-ui, sans-serif`
+        ctx.font = font(600, numFont)
         ctx.globalAlpha = 0.8
         ctx.fillText(fitText(ctx, num, maxLabelW), labelOuter, -nameFont * 0.5)
         ctx.globalAlpha = 1
-        ctx.font = `700 ${nameFont}px Inter, system-ui, sans-serif`
+        // Offsets stay keyed to the base size, so the two lines sit on the same
+        // rails across every segment even when one name shrank to fit.
+        fitFont(ctx, e.fullName, maxLabelW, nameFont, minNameFont, 700)
         ctx.fillText(fitText(ctx, e.fullName, maxLabelW), labelOuter, numFont * 0.58)
       } else {
         const label = [num, e.fullName].filter(Boolean).join(' · ')
-        ctx.font = `600 ${nameFont}px Inter, system-ui, sans-serif`
+        fitFont(ctx, label, maxLabelW, nameFont, minNameFont, 600)
         ctx.fillText(fitText(ctx, label, maxLabelW), labelOuter, 0)
       }
       ctx.restore()
