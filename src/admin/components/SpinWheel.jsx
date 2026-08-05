@@ -136,7 +136,18 @@ function drawWheel(ctx, size, entries, rotation) {
   ctx.fill()
 }
 
-export default function SpinWheel({ entries, onWinner, onSpinningChange, spinToken = 0, disabled = false }) {
+export default function SpinWheel({
+  entries,
+  onWinner,
+  onSpinningChange,
+  spinToken = 0,
+  disabled = false,
+  // How wide the wheel may grow. The card view caps it; the expanded "stage"
+  // view passes a viewport-derived size so it fills the screen.
+  maxSize = 520,
+  // Stage view sits on a dark backdrop, so the readout inverts.
+  theater = false,
+}) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const rotationRef = useRef(0)
@@ -159,17 +170,19 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
     localStorage.setItem('as_wheel_sound', sound ? 'on' : 'off')
   }, [sound])
 
-  // Track the container width so the wheel is crisp at every breakpoint.
+  // Track the container width so the wheel is crisp at every breakpoint. Re-runs
+  // when maxSize changes (expanding to the stage view) — observe() fires once
+  // straight away, so the new cap is applied without waiting for a resize.
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return undefined
     const ro = new ResizeObserver(([entry]) => {
       const w = entry.contentRect.width
-      if (w > 0) setSize(Math.round(Math.min(w, 520)))
+      if (w > 0) setSize(Math.round(Math.min(w, maxSize)))
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [maxSize])
 
   // `list` pins the pool for the duration of a spin, so a wheel that is mid-spin
   // keeps drawing the exact segments the winner was drawn from even if the pool
@@ -260,14 +273,16 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
   }, [spinToken])
 
   const canSpin = count > 0 && !disabled && !spinning
+  const hubSize = Math.max(76, size * 0.26)
+  const pointerW = Math.max(34, size * 0.075)
 
   return (
     <div className="flex flex-col items-center">
-      <div ref={wrapRef} className="relative w-full max-w-[520px]">
+      <div ref={wrapRef} className="relative w-full" style={{ maxWidth: maxSize }}>
         <div className="relative mx-auto" style={{ width: size, height: size }}>
           {/* Pointer — fixed at 12 o'clock, dipping into the rim. */}
           <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1">
-            <svg width="34" height="42" viewBox="0 0 34 42" aria-hidden="true">
+            <svg width={pointerW} height={pointerW * 1.24} viewBox="0 0 34 42" aria-hidden="true">
               <path
                 d="M17 41 L3 12 A15 15 0 1 1 31 12 Z"
                 fill="#A41E22"
@@ -297,12 +312,18 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
                 ? 'bg-as-red hover:scale-105 hover:bg-as-red-light active:scale-95'
                 : 'cursor-not-allowed bg-as-charcoal/40'
             }`}
-            style={{ width: Math.max(76, size * 0.26), height: Math.max(76, size * 0.26) }}
+            style={{ width: hubSize, height: hubSize }}
           >
             {spinning ? (
-              <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-white/40 border-t-white" />
+              <span
+                className="animate-spin rounded-full border-[3px] border-white/40 border-t-white"
+                style={{ width: hubSize * 0.3, height: hubSize * 0.3 }}
+              />
             ) : (
-              <span className="text-center text-sm font-extrabold uppercase leading-tight tracking-wide">
+              <span
+                className="text-center font-extrabold uppercase leading-tight tracking-wide"
+                style={{ fontSize: Math.max(13, size * 0.032) }}
+              >
                 Play
               </span>
             )}
@@ -311,27 +332,45 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
       </div>
 
       {/* Live readout — the name passing under the pointer right now. */}
-      <div className="mt-5 w-full max-w-[520px]">
+      <div className="mt-5 w-full" style={{ maxWidth: maxSize }}>
         <div
-          className={`rounded-2xl border px-4 py-3 text-center transition ${
-            spinning ? 'border-as-red/30 bg-as-red/5' : 'border-black/10 bg-white'
+          className={`rounded-2xl border text-center transition ${theater ? 'px-6 py-4' : 'px-4 py-3'} ${
+            theater
+              ? spinning
+                ? 'border-as-red/50 bg-white/10'
+                : 'border-white/15 bg-white/5'
+              : spinning
+                ? 'border-as-red/30 bg-as-red/5'
+                : 'border-black/10 bg-white'
           }`}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-as-charcoal/45">
+          <p
+            className={`font-semibold uppercase tracking-wider ${
+              theater ? 'text-xs text-white/50' : 'text-[11px] text-as-charcoal/45'
+            }`}
+          >
             {spinning ? 'Spinning…' : count > 0 ? 'Ready to draw' : 'No entries yet'}
           </p>
-          <p className="mt-0.5 truncate text-lg font-extrabold text-as-charcoal">
+          <p
+            className={`mt-0.5 truncate font-extrabold ${
+              theater ? 'text-2xl text-white sm:text-3xl' : 'text-lg text-as-charcoal'
+            }`}
+          >
             {current ? (
               <>
                 {current.drawNumber && (
-                  <span className="mr-2 rounded-md bg-as-red/10 px-1.5 py-0.5 text-sm tabular-nums text-as-red">
+                  <span
+                    className={`mr-2 rounded-md px-1.5 py-0.5 tabular-nums ${
+                      theater ? 'bg-white/15 text-lg text-white sm:text-2xl' : 'bg-as-red/10 text-sm text-as-red'
+                    }`}
+                  >
                     {current.drawNumber}
                   </span>
                 )}
                 {current.fullName}
               </>
             ) : (
-              <span className="text-as-charcoal/35">—</span>
+              <span className={theater ? 'text-white/30' : 'text-as-charcoal/35'}>—</span>
             )}
           </p>
         </div>
@@ -341,7 +380,11 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
             type="button"
             onClick={spin}
             disabled={!canSpin}
-            className="rounded-full bg-as-charcoal px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-as-charcoal/85 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`rounded-full font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              theater
+                ? 'bg-as-red px-8 py-3 text-base text-white hover:bg-as-red-light'
+                : 'bg-as-charcoal px-6 py-2.5 text-sm text-white hover:bg-as-charcoal/85'
+            }`}
           >
             {spinning ? 'Spinning…' : 'Spin the wheel'}
           </button>
@@ -350,7 +393,11 @@ export default function SpinWheel({ entries, onWinner, onSpinningChange, spinTok
             onClick={() => setSound((s) => !s)}
             aria-pressed={sound}
             title={sound ? 'Sound on' : 'Sound off'}
-            className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-white text-as-charcoal/70 transition hover:text-as-red"
+            className={`grid h-10 w-10 place-items-center rounded-full border transition ${
+              theater
+                ? 'border-white/20 bg-white/10 text-white hover:bg-white/20'
+                : 'border-black/10 bg-white text-as-charcoal/70 hover:text-as-red'
+            }`}
           >
             {sound ? '🔊' : '🔇'}
           </button>

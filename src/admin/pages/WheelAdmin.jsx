@@ -64,6 +64,11 @@ export default function WheelAdmin() {
   const [editForm, setEditForm] = useState(blankForm)
   const [winner, setWinner] = useState(null)
   const [spinning, setSpinning] = useState(false)
+  // Stage view: the wheel fills the screen for a live draw. The wheel keeps its
+  // place in the tree and only swaps classes, so expanding never remounts it
+  // (and so can't interrupt a spin in progress).
+  const [expanded, setExpanded] = useState(false)
+  const [stageSize, setStageSize] = useState(640)
   // Bumping this asks the wheel to spin — lets the winner card offer "spin again"
   // without reaching into the wheel with a ref.
   const [spinToken, setSpinToken] = useState(0)
@@ -80,6 +85,42 @@ export default function WheelAdmin() {
   useEffect(() => {
     load()
   }, [])
+
+  // Size the stage wheel to whatever the viewport can spare, leaving room for
+  // the readout and buttons underneath.
+  useEffect(() => {
+    if (!expanded) return undefined
+    const fit = () =>
+      setStageSize(Math.max(260, Math.min(globalThis.innerWidth - 48, globalThis.innerHeight - 250)))
+    fit()
+    globalThis.addEventListener('resize', fit)
+    return () => globalThis.removeEventListener('resize', fit)
+  }, [expanded])
+
+  // Escape leaves the stage, and the page behind it must not scroll under the
+  // overlay. Also try real fullscreen so a projector gets the whole screen —
+  // best-effort only, since browsers can refuse it.
+  useEffect(() => {
+    if (!expanded) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    // The browser's own Escape drops fullscreen without telling React — sync back.
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setExpanded(false)
+    }
+    document.documentElement.requestFullscreen?.().catch(() => {})
+    globalThis.addEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onFsChange)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      globalThis.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onFsChange)
+      document.body.style.overflow = prevOverflow
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    }
+  }, [expanded])
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -276,7 +317,16 @@ export default function WheelAdmin() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         {/* ---------------- The wheel ---------------- */}
-        <Card title="The wheel">
+        <Card
+          title="The wheel"
+          actions={
+            entries.length > 0 && (
+              <Button variant="ghost" type="button" className="px-3 py-1.5" onClick={() => setExpanded(true)}>
+                ⛶ Expand
+              </Button>
+            )
+          }
+        >
           {loading ? (
             <p className="py-16 text-center text-sm text-as-charcoal/50">Loading the wheel…</p>
           ) : entries.length === 0 ? (
@@ -289,17 +339,43 @@ export default function WheelAdmin() {
             </div>
           ) : (
             <>
-              <SpinWheel
-                entries={entries}
-                onWinner={handleWinner}
-                onSpinningChange={setSpinning}
-                spinToken={spinToken}
-                disabled={Boolean(winner)}
-              />
-              <p className="mt-5 text-center text-xs text-as-charcoal/45">
-                Every entry in the pool has an equal chance — the winner is picked at random the moment
-                you press Play. Searching the list never changes who is on the wheel.
-              </p>
+              {/* Same element either way: in the card, or promoted to a full-screen
+                  stage. Only the classes change, so the wheel is never remounted. */}
+              <div
+                className={
+                  expanded
+                    ? 'fixed inset-0 z-40 flex flex-col items-center justify-center overflow-auto bg-as-charcoal p-4'
+                    : ''
+                }
+              >
+                {expanded && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(false)}
+                    className="absolute right-4 top-4 z-10 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                  >
+                    ✕ Close
+                  </button>
+                )}
+                <SpinWheel
+                  entries={entries}
+                  onWinner={handleWinner}
+                  onSpinningChange={setSpinning}
+                  spinToken={spinToken}
+                  disabled={Boolean(winner)}
+                  maxSize={expanded ? stageSize : 520}
+                  theater={expanded}
+                />
+                {expanded && (
+                  <p className="mt-4 text-xs text-white/40">Press Esc to leave the big screen.</p>
+                )}
+              </div>
+              {!expanded && (
+                <p className="mt-5 text-center text-xs text-as-charcoal/45">
+                  Every entry in the pool has an equal chance — the winner is picked at random the moment
+                  you press Play. Searching the list never changes who is on the wheel.
+                </p>
+              )}
             </>
           )}
         </Card>
