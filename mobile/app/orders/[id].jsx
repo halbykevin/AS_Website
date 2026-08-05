@@ -213,16 +213,26 @@ export default function OrderDetailScreen() {
               </View>
             ))}
             <Divider inset={theme.spacing.lg} />
-            {Number(order.deliveryFee) > 0 && (
+            {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
               <View style={{ gap: 4, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="callout" muted>Subtotal</Text>
                   <Text variant="callout" muted>{money(order.subtotal)}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text variant="callout" muted>Delivery</Text>
-                  <Text variant="callout" muted>{money(order.deliveryFee)}</Text>
-                </View>
+                {Number(order.deliveryFee) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="callout" muted>Delivery</Text>
+                    <Text variant="callout" muted>{money(order.deliveryFee)}</Text>
+                  </View>
+                )}
+                {Number(order.vatAmount) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="callout" muted>
+                      VAT{Number(order.vatPercent) > 0 ? ` (${Number(order.vatPercent)}%)` : ''}
+                    </Text>
+                    <Text variant="callout" muted>{money(order.vatAmount)}</Text>
+                  </View>
+                )}
               </View>
             )}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: theme.spacing.lg }}>

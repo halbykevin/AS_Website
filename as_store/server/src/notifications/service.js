@@ -289,14 +289,16 @@ export const eventHandlers = {
     if (!key) return
     // Pull the order's name/total so the copy can be personal ("Good news,
     // Khoder…") instead of a bare order number.
+    // The total quoted here is what the customer owes — items, delivery and
+    // VAT — so it matches the order screen and the confirmation email.
     const { rows: ord } = await query(
-      `SELECT full_name, subtotal FROM orders WHERE id = $1`,
+      `SELECT full_name, subtotal + delivery_fee + vat_amount AS total FROM orders WHERE id = $1`,
       [orderId],
     )
     await sendTemplate(
       customerId,
       key,
-      { orderId, name: firstName(ord[0]?.full_name), total: money(ord[0]?.subtotal) },
+      { orderId, name: firstName(ord[0]?.full_name), total: money(ord[0]?.total) },
       { dedupeKey: `order:${orderId}:status:${status}`, data: { orderId }, priority: 'high' },
     )
     // A delivered order schedules a feedback survey (delayed a bit so the push

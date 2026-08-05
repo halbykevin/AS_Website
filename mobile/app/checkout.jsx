@@ -8,7 +8,7 @@ import { useAccount, accountApi } from '@/src/lib/account';
 import { usePaymentMethods, useStoreSettings } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
 import { money } from '@/src/lib/format';
-import { deliveryFeeFor } from '@/src/lib/delivery';
+import { deliveryFeeFor, vatAmountFor } from '@/src/lib/delivery';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
@@ -24,7 +24,8 @@ export default function CheckoutScreen() {
   const dispatch = useDispatch();
   const { data: settings } = useStoreSettings();
   const deliveryFee = deliveryFeeFor(total, settings?.delivery);
-  const grandTotal = total + deliveryFee;
+  const vatAmount = vatAmountFor(total + deliveryFee, settings?.vat);
+  const grandTotal = total + deliveryFee + vatAmount;
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true });
   const [addrId, setAddrId] = useState(null);
@@ -133,6 +134,12 @@ export default function CheckoutScreen() {
             <Text variant="caption" muted>Delivery</Text>
             <Text variant="caption" muted>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</Text>
           </View>
+          {vatAmount > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" muted>VAT ({Number(settings.vat.percent)}%)</Text>
+              <Text variant="caption" muted>{money(vatAmount)}</Text>
+            </View>
+          )}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Text variant="body" muted>
               Total

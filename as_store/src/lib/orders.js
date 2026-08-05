@@ -23,7 +23,15 @@ export const statusClasses = (v) =>
     gray: 'bg-as-ink/10 text-as-ink/60',
   })[statusMeta(v).tone] || 'bg-as-ink/10 text-as-ink/60'
 
-export const money = (n) => `$${Number(n || 0).toLocaleString()}`
+// Whole amounts stay clean ("$120"); anything with cents shows both digits, so
+// a VAT line reads "$12.10" rather than "$12.1".
+export const money = (n) => {
+  const v = Number(n || 0)
+  return `$${v.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`
+}
 
 // Mirror of deliveryFeeFor() in the API. The server is always the authority —
 // this exists so the cart and checkout can *show* the charge before the order
@@ -36,10 +44,21 @@ export function deliveryFeeFor(subtotal, delivery) {
   return Math.round(fee * 100) / 100
 }
 
-// What an order actually costs. Handles both a placed order (deliveryFee on the
-// record) and pre-checkout figures.
+// Mirror of vatAmountFor() in the API — same caveat as above: for display
+// before the order exists, never the authority. `base` is items + delivery,
+// because the delivery charge is taxable too.
+export function vatAmountFor(base, vat) {
+  const percent = Number(vat?.percent ?? 0)
+  if (!Number.isFinite(percent) || percent <= 0) return 0
+  return Math.round((Number(base) || 0) * (Math.min(percent, 100) / 100) * 100) / 100
+}
+
+// What an order actually costs. Handles both a placed order (deliveryFee /
+// vatAmount on the record) and pre-checkout figures.
 export const orderTotal = (o) =>
-  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0)
+  o?.total != null
+    ? Number(o.total)
+    : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0) + Number(o?.vatAmount || 0)
 
 export const orderDate = (iso) => {
   try {

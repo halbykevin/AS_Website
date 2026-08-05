@@ -139,6 +139,7 @@ export function trackPurchase(order) {
     currency: CURRENCY,
     value,
     ...(order.deliveryFee ? { shipping: Number(order.deliveryFee) } : {}),
+    ...(order.vatAmount ? { tax: Number(order.vatAmount) } : {}),
     items,
   });
   adsConversion(config.adsPurchaseLabel, {

@@ -28,10 +28,12 @@ function getTransport() {
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
-// What the customer pays. Falls back to subtotal for order shapes that predate
-// the delivery fee, so an old order never renders a blank total.
+// What the customer pays. Falls back to the parts for order shapes that predate
+// the delivery fee or VAT, so an old order never renders a blank total.
 const orderTotal = (o) =>
-  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0)
+  o?.total != null
+    ? Number(o.total)
+    : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0) + Number(o?.vatAmount || 0)
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
@@ -102,17 +104,31 @@ function orderBody(order, { intro, trackUrl }) {
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
       ${rows}
       ${
-        // Only break the sum out when delivery was actually charged — a free
-        // delivery adds two rows of noise to every other order.
-        Number(order.deliveryFee) > 0
+        // Only break the sum out when something was actually added on top — on
+        // an order with free delivery and no VAT these rows are pure noise.
+        Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0
           ? `<tr>
         <td colspan="2" style="padding:10px 0 2px;color:${MUTED}">Subtotal</td>
         <td align="right" style="padding:10px 0 2px;color:${MUTED}">${money(order.subtotal)}</td>
       </tr>
-      <tr>
+      ${
+        Number(order.deliveryFee) > 0
+          ? `<tr>
         <td colspan="2" style="padding:2px 0;color:${MUTED}">Delivery</td>
         <td align="right" style="padding:2px 0;color:${MUTED}">${money(order.deliveryFee)}</td>
       </tr>`
+          : ''
+      }
+      ${
+        Number(order.vatAmount) > 0
+          ? `<tr>
+        <td colspan="2" style="padding:2px 0;color:${MUTED}">VAT${
+          Number(order.vatPercent) > 0 ? ` (${Number(order.vatPercent)}%)` : ''
+        }</td>
+        <td align="right" style="padding:2px 0;color:${MUTED}">${money(order.vatAmount)}</td>
+      </tr>`
+          : ''
+      }`
           : ''
       }
       <tr>

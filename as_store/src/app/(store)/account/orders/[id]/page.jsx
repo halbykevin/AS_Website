@@ -118,6 +118,7 @@ export default function OrderPage({ params }) {
       id: order.id,
       total: orderTotal(order),
       deliveryFee: order.deliveryFee,
+      vatAmount: order.vatAmount,
       // productId, not the order-line id — it has to match what add_to_cart and
       // the product feed call this item.
       items: (order.items || []).map((it) => ({
@@ -255,16 +256,24 @@ export default function OrderPage({ params }) {
               ))}
             </ul>
             <div className="mt-4 space-y-2 border-t border-as-ink/10 pt-4 text-sm">
-              {Number(order.deliveryFee) > 0 && (
+              {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
                 <>
                   <div className="flex items-center justify-between text-as-ink/60">
                     <span>Subtotal</span>
                     <span>{money(order.subtotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-as-ink/60">
-                    <span>Delivery</span>
-                    <span>{money(order.deliveryFee)}</span>
-                  </div>
+                  {Number(order.deliveryFee) > 0 && (
+                    <div className="flex items-center justify-between text-as-ink/60">
+                      <span>Delivery</span>
+                      <span>{money(order.deliveryFee)}</span>
+                    </div>
+                  )}
+                  {Number(order.vatAmount) > 0 && (
+                    <div className="flex items-center justify-between text-as-ink/60">
+                      <span>VAT{Number(order.vatPercent) > 0 ? ` (${Number(order.vatPercent)}%)` : ''}</span>
+                      <span>{money(order.vatAmount)}</span>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex items-center justify-between pt-1">

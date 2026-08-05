@@ -78,6 +78,8 @@ export const defaultStoreSettings = {
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   // Delivery charge; real values come from the API's settings row.
   delivery: { fee: 0, freeOver: 100 },
+  // VAT rate in percent; 0 = no VAT line at checkout.
+  vat: { percent: 0 },
   navLinks: [],
   footerGroups: []
 };
@@ -94,7 +96,8 @@ export async function loadStoreSettings() {
       },
       contact: { ...defaultStoreSettings.contact, ...(s.contact || {}) },
       homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) },
-      delivery: { ...defaultStoreSettings.delivery, ...(s.delivery || {}) }
+      delivery: { ...defaultStoreSettings.delivery, ...(s.delivery || {}) },
+      vat: { ...defaultStoreSettings.vat, ...(s.vat || {}) }
     };
   } catch {
     return defaultStoreSettings;

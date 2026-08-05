@@ -28,6 +28,13 @@ module.exports = {
         'admin-text': 'rgb(var(--admin-text) / <alpha-value>)',
         'admin-line': 'rgb(var(--admin-line) / <alpha-value>)',
         'admin-invert': 'rgb(var(--admin-invert) / <alpha-value>)',
+        // The shopping assistant's launcher. Deliberately off-brand: a red
+        // bubble on a red-accented store reads as decoration, this reads as a
+        // button to press.
+        'chat-green': {
+          DEFAULT: '#25D366',
+          dark: '#1DA851',
+        },
         // Rating stars / deal accents.
         'as-amber': '#F2A93B',
         // Light section backgrounds.

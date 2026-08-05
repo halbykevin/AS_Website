@@ -316,7 +316,7 @@ export default function ChatWidget() {
         <div className="fixed bottom-5 right-5 z-40 print:hidden">
           <span
             aria-hidden
-            className="absolute inset-0 rounded-full bg-as-red/30 motion-safe:animate-ping"
+            className="absolute inset-0 rounded-full bg-chat-green/30 motion-safe:animate-ping"
             style={{ animationDuration: "2.6s" }}
           />
           <button
@@ -324,7 +324,7 @@ export default function ChatWidget() {
             onClick={() => setOpen(true)}
             aria-label="Ask the assistant"
             aria-expanded={false}
-            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-as-red-light via-as-red to-as-red-dark text-white shadow-lg shadow-as-red/25 transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-as-red/40 focus:ring-offset-2"
+            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-chat-green text-white shadow-lg shadow-chat-green/40 transition hover:bg-chat-green-dark hover:scale-105 focus:outline-none focus:ring-2 focus:ring-chat-green/50 focus:ring-offset-2"
           >
             <Icon name="sparkles" className="h-6 w-6" />
           </button>
@@ -373,7 +373,7 @@ export default function ChatWidget() {
           </div>
           {/* pt clears the notch when full-screen; sm: resets it for the box. */}
           <header className="flex shrink-0 items-center gap-3 border-b border-as-ink/10 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-as-red-light via-as-red to-as-red-dark text-white">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chat-green text-white">
               <Icon name="sparkles" className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">

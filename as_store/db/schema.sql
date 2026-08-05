@@ -119,6 +119,10 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS delivery_fee       NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS free_delivery_over NUMERIC(10,2) DEFAULT 100;
 
+-- VAT rate added at checkout, in percent (11 = 11%). 0 = no VAT is charged,
+-- which is the default, so this migration changes no existing price.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS vat_percent NUMERIC(5,2) DEFAULT 0;
+
 -- Backfill the showcase background colour on databases created before it existed.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS showcase_bg TEXT DEFAULT '#000000';
 -- Backfill the nav logo size on databases created before it existed.
@@ -380,6 +384,14 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
 -- subtotal + delivery_fee. Existing orders default to 0, so their total is
 -- unchanged.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+-- VAT charged on this order. Like the delivery fee it is snapshotted at
+-- checkout — both the rate (for the "VAT (11%)" line) and the money — so
+-- changing the rate later never rewrites what a customer was charged. The
+-- amount owed is subtotal + delivery_fee + vat_amount; existing orders default
+-- to 0 on both, leaving their totals untouched.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_percent NUMERIC(5,2)  NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_amount  NUMERIC(10,2) NOT NULL DEFAULT 0;
 
 -- Online payment (Whish Pay). payment_method is 'cod' or 'whish'; payment_status
 -- tracks the money axis independently of the fulfilment `status`, so a COD order

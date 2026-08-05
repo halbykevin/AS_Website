@@ -206,16 +206,24 @@ function OrderModal({ id, onClose }) {
               ))}
             </ul>
             <div className="mt-3 space-y-1.5 border-t border-admin-line/10 pt-3">
-              {Number(order.deliveryFee) > 0 && (
+              {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
                 <>
                   <div className="flex items-center justify-between text-sm text-admin-text/55">
                     <span>Subtotal</span>
                     <span>{money(order.subtotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-admin-text/55">
-                    <span>Delivery</span>
-                    <span>{money(order.deliveryFee)}</span>
-                  </div>
+                  {Number(order.deliveryFee) > 0 && (
+                    <div className="flex items-center justify-between text-sm text-admin-text/55">
+                      <span>Delivery</span>
+                      <span>{money(order.deliveryFee)}</span>
+                    </div>
+                  )}
+                  {Number(order.vatAmount) > 0 && (
+                    <div className="flex items-center justify-between text-sm text-admin-text/55">
+                      <span>VAT{Number(order.vatPercent) > 0 ? ` (${Number(order.vatPercent)}%)` : ''}</span>
+                      <span>{money(order.vatAmount)}</span>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex items-center justify-between">

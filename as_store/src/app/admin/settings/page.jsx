@@ -21,6 +21,7 @@ const EMPTY = {
   homeNew: { enabled: true, eyebrow: 'Just landed', heading: 'New in.', source: 'newest', categoryId: null, count: 8 },
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   delivery: { fee: 0, freeOver: 100 },
+  vat: { percent: 0 },
   tracking: {
     enabled: true,
     ga4Id: '',
@@ -96,6 +97,7 @@ export default function SettingsPage() {
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
         delivery: { ...EMPTY.delivery, ...(data.delivery || {}) },
+        vat: { ...EMPTY.vat, ...(data.vat || {}) },
         tracking: { ...EMPTY.tracking, ...(data.tracking || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
         navLinks: data.navLinks || [],
@@ -289,6 +291,9 @@ export default function SettingsPage() {
           )}
         </p>
       </Section>
+
+      {/* VAT */}
+      <VatSection value={form.vat} delivery={form.delivery} onChange={(v) => setNested('vat', 'percent', v)} />
 
       {/* Google Analytics + Google Ads */}
       <TrackingSection value={form.tracking} onChange={(k, v) => setNested('tracking', k, v)} />
@@ -524,6 +529,60 @@ export default function SettingsPage() {
         </Button>
       </div>
     </div>
+  )
+}
+
+// --- VAT -------------------------------------------------------------------
+// One rate, applied at checkout to the items plus the delivery charge. The API
+// is what actually charges it and snapshots the rate onto each order; this only
+// sets the number. The worked example is the point of the section — a rate on
+// its own doesn't tell you what a customer will be asked to pay.
+function VatSection({ value, delivery, onChange }) {
+  const percent = Number(value?.percent) || 0
+  const on = percent > 0
+  const round = (n) => Math.round(n * 100) / 100
+  // Same $100 basket in every example, so changing the rate moves one number.
+  const items = 100
+  const ship = Number(delivery?.fee) > 0 && !(Number(delivery?.freeOver) > 0 && items >= Number(delivery.freeOver))
+    ? Number(delivery.fee)
+    : 0
+  const vat = round((items + ship) * (percent / 100))
+
+  return (
+    <Section
+      title="VAT"
+      badge={on ? <Badge tone="green">{percent}%</Badge> : <Badge tone="gray">Off</Badge>}
+      summary={on ? `${percent}% added at checkout.` : 'No VAT is added at checkout.'}
+    >
+      <p className="text-sm text-admin-text/50">
+        Added on top of the items and the delivery charge at checkout, and shown to the customer as
+        its own line. The rate is saved onto each order as it is placed, so changing it never alters
+        an order a customer already paid. Set it to 0 to switch VAT off entirely.
+      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="VAT rate (%)" hint="0 = no VAT. Lebanon's standard rate is 11.">
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={value?.percent ?? 0}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </Field>
+      </div>
+      <p className="rounded-lg bg-admin-bg px-3 py-2 text-sm text-admin-text/70">
+        {on ? (
+          <>
+            A <b>$100</b> basket{ship > 0 ? <> plus <b>${ship.toLocaleString()}</b> delivery</> : null} is
+            charged <b>${vat.toLocaleString()}</b> VAT — the customer pays{' '}
+            <b>${round(items + ship + vat).toLocaleString()}</b>.
+          </>
+        ) : (
+          <>No VAT line appears at checkout — customers pay the items plus delivery.</>
+        )}
+      </p>
+    </Section>
   )
 }
 

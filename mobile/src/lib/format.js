@@ -1,12 +1,22 @@
 // Small formatting helpers shared across screens. Mirrors the web's `money`
 // helper and the marketing site's event-date formatting.
 
-export const money = n => `$${Number(n || 0).toLocaleString()}`;
+// Whole amounts stay clean ("$120"); anything with cents shows both digits, so
+// a VAT line reads "$12.10" rather than "$12.1".
+export const money = n => {
+  const v = Number(n || 0);
+  return `$${v.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+    maximumFractionDigits: 2
+  })}`;
+};
 
-// What an order costs, delivery included. Older orders have no deliveryFee, so
+// What an order costs, delivery and VAT included. Older orders have neither, so
 // this falls back to the items subtotal rather than rendering a blank.
 export const orderTotal = o =>
-  o?.total != null ? Number(o.total) : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0);
+  o?.total != null
+    ? Number(o.total)
+    : Number(o?.subtotal || 0) + Number(o?.deliveryFee || 0) + Number(o?.vatAmount || 0);
 
 // Format an event date (YYYY-MM-DD) as "Thursday 18 Jun 2026".
 export function formatEventDate(date) {

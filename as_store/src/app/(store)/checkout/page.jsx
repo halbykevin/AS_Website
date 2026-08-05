@@ -7,7 +7,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
 import { useAccount } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
-import { money, deliveryFeeFor } from '@/lib/orders'
+import { money, deliveryFeeFor, vatAmountFor } from '@/lib/orders'
 import { trackBeginCheckout } from '@/lib/analytics'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
@@ -27,15 +27,20 @@ export default function CheckoutPage() {
   const seeded = useRef(false)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  // Delivery pricing, fetched live so the summary matches what the API will
-  // charge. Until it arrives the fee shows as free rather than guessing a
-  // number the server might not agree with.
+  // Delivery and VAT pricing, fetched live so the summary matches what the API
+  // will charge. Until it arrives delivery shows as free and no VAT line
+  // appears, rather than guessing numbers the server might not agree with.
   const [delivery, setDelivery] = useState(null)
+  const [vat, setVat] = useState(null)
   useEffect(() => {
     let alive = true
     fetch(`${API}/api/settings`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => alive && s?.delivery && setDelivery(s.delivery))
+      .then((s) => {
+        if (!alive || !s) return
+        if (s.delivery) setDelivery(s.delivery)
+        if (s.vat) setVat(s.vat)
+      })
       .catch(() => {})
     return () => {
       alive = false
@@ -43,7 +48,9 @@ export default function CheckoutPage() {
   }, [])
 
   const deliveryFee = deliveryFeeFor(total, delivery)
-  const grandTotal = total + deliveryFee
+  // Delivery is part of the taxable amount — same base the API uses.
+  const vatAmount = vatAmountFor(total + deliveryFee, vat)
+  const grandTotal = total + deliveryFee + vatAmount
 
   // Reaching this page IS beginning checkout — reported once per visit, and
   // only once the cart has hydrated from localStorage (the first render can
@@ -293,6 +300,12 @@ export default function CheckoutPage() {
                 <span>Delivery</span>
                 <span>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</span>
               </div>
+              {vatAmount > 0 && (
+                <div className="flex items-center justify-between text-as-ink/60">
+                  <span>VAT ({Number(vat.percent)}%)</span>
+                  <span>{money(vatAmount)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <span className="text-as-ink/60">Total</span>
                 <span className="text-xl font-semibold text-as-ink">{money(grandTotal)}</span>

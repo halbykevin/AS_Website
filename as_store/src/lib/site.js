@@ -24,6 +24,8 @@ export const defaultSettings = {
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   // Delivery charge. Mirrors the server default; the real values come from settings.
   delivery: { fee: 0, freeOver: 100 },
+  // VAT rate in percent. 0 = no VAT, matching the column default.
+  vat: { percent: 0 },
   // Google tags. The GA4 ID matches the column default, so analytics keeps
   // reporting even in the API-unreachable fallback; the Ads IDs are blank until
   // an admin fills them in (Settings → Marketing tags).

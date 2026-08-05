@@ -272,6 +272,9 @@ const settingsJson = (r) => ({
     fee: Number(r.delivery_fee ?? 0),
     freeOver: Number(r.free_delivery_over ?? 0),
   },
+  vat: {
+    percent: Number(r.vat_percent ?? 0),
+  },
   // Google tags. Public by nature — they are rendered into every page — so they
   // ride along on the public settings response the storefront already fetches.
   tracking: {
@@ -317,6 +320,15 @@ const nonNegativeMoney = (v) => {
   return Math.round(n * 100) / 100;
 };
 
+// Settings percentage input: same contract as nonNegativeMoney, clamped to a
+// sane 0–100 so a stray "1100" can never triple an order.
+const percentValue = (v) => {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(Math.min(n, 100) * 100) / 100;
+};
+
 // The one place the delivery charge is decided. A zero fee means delivery is
 // always free; a zero threshold means the fee always applies. Rounded to cents
 // so it can never introduce a fractional amount Whish would reject.
@@ -326,6 +338,17 @@ export function deliveryFeeFor(subtotal, settings) {
   if (!Number.isFinite(fee) || fee <= 0) return 0;
   if (freeOver > 0 && Number(subtotal) >= freeOver) return 0;
   return Math.round(fee * 100) / 100;
+}
+
+// The one place VAT is decided. `base` is the taxable amount — items plus the
+// delivery charge, since the delivery service is taxable too. A rate of 0 (the
+// default) means no VAT line at all. Rounded to cents for the same reason as
+// the delivery fee.
+export function vatAmountFor(base, settings) {
+  const percent = Number(settings?.vat_percent ?? 0);
+  if (!Number.isFinite(percent) || percent <= 0) return 0;
+  const amount = (Number(base) || 0) * (Math.min(percent, 100) / 100);
+  return Math.round(amount * 100) / 100;
 }
 
 const pageJson = (r) => ({
@@ -412,8 +435,13 @@ const orderJson = (r) => ({
   notes: r.notes || "",
   subtotal: r.subtotal,
   deliveryFee: Number(r.delivery_fee ?? 0),
+  vatPercent: Number(r.vat_percent ?? 0), // the rate at the time of the order
+  vatAmount: Number(r.vat_amount ?? 0),
   // What the customer actually pays / paid.
-  total: Number(r.subtotal ?? 0) + Number(r.delivery_fee ?? 0),
+  total:
+    Number(r.subtotal ?? 0) +
+    Number(r.delivery_fee ?? 0) +
+    Number(r.vat_amount ?? 0),
   paymentMethod: r.payment_method || "cod",
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
@@ -1221,17 +1249,20 @@ app.post(
         .json({ error: "Online payment is unavailable right now" });
     }
 
-    // Delivery is priced from the live settings row, never from the client, and
-    // snapshotted onto the order so changing the fee later cannot rewrite it.
+    // Delivery and VAT are priced from the live settings row, never from the
+    // client, and snapshotted onto the order so changing the fee or the rate
+    // later cannot rewrite what this customer was charged.
     const { rows: setRows } = await query(
-      `SELECT delivery_fee, free_delivery_over FROM settings WHERE id = 1`,
+      `SELECT delivery_fee, free_delivery_over, vat_percent FROM settings WHERE id = 1`,
     );
     const deliveryFee = deliveryFeeFor(subtotal, setRows[0]);
-    const total = subtotal + deliveryFee;
+    const vatPercent = Number(setRows[0]?.vat_percent ?? 0);
+    const vatAmount = vatAmountFor(subtotal + deliveryFee, setRows[0]);
+    const total = subtotal + deliveryFee + vatAmount;
 
     const { rows } = await query(
-      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, payment_method, payment_status, currency)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,'unpaid','USD') RETURNING id`,
+      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, payment_method, payment_status, currency)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'unpaid','USD') RETURNING id`,
       [
         customerId,
         fullName,
@@ -1242,6 +1273,8 @@ app.post(
         b.notes || "",
         subtotal,
         deliveryFee,
+        vatPercent,
+        vatAmount,
         paymentMethod,
       ],
     );
@@ -1279,7 +1312,7 @@ app.post(
     if (paymentMethod === "whish") {
       console.log(
         `[whish] order #${orderId} created (unpaid), starting payment: ` +
-          `subtotal=${subtotal} + delivery=${deliveryFee} = ${total} USD`,
+          `subtotal=${subtotal} + delivery=${deliveryFee} + vat=${vatAmount} = ${total} USD`,
       );
       const appReturn = appReturnUrl(b.returnUrl);
       const bridge = (result) =>
@@ -1614,7 +1647,7 @@ const CUSTOMER_SELECT = `
     (SELECT count(*) FROM customer_logins l WHERE l.customer_id = c.id)::int AS login_count,
     (SELECT array_agg(DISTINCT l.method) FROM customer_logins l WHERE l.customer_id = c.id) AS methods_used,
     (SELECT count(*) FROM orders o WHERE o.customer_id = c.id)::int AS order_count,
-    (SELECT COALESCE(sum(o.subtotal + o.delivery_fee), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
+    (SELECT COALESCE(sum(o.subtotal + o.delivery_fee + o.vat_amount), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
     (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at
   FROM customers c`;
 
@@ -1738,7 +1771,7 @@ app.get(
       [req.params.id],
     );
     const { rows: orders } = await query(
-      `SELECT id, status, payment_method, payment_status, subtotal, delivery_fee, created_at
+      `SELECT id, status, payment_method, payment_status, subtotal, delivery_fee, vat_amount, created_at
        FROM orders WHERE customer_id = $1 ORDER BY id DESC LIMIT 50`,
       [req.params.id],
     );
@@ -1754,7 +1787,11 @@ app.get(
         paymentStatus: o.payment_status || "unpaid",
         subtotal: Number(o.subtotal || 0),
         deliveryFee: Number(o.delivery_fee || 0),
-        total: Number(o.subtotal || 0) + Number(o.delivery_fee || 0),
+        vatAmount: Number(o.vat_amount || 0),
+        total:
+          Number(o.subtotal || 0) +
+          Number(o.delivery_fee || 0) +
+          Number(o.vat_amount || 0),
         createdAt: o.created_at,
       })),
     });
@@ -2417,7 +2454,8 @@ app.put(
          ads_conversion_id         = COALESCE($29, ads_conversion_id),
          ads_purchase_label        = COALESCE($30, ads_purchase_label),
          ads_begin_checkout_label  = COALESCE($31, ads_begin_checkout_label),
-         ads_add_to_cart_label     = COALESCE($32, ads_add_to_cart_label)
+         ads_add_to_cart_label     = COALESCE($32, ads_add_to_cart_label),
+         vat_percent               = COALESCE($33, vat_percent)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -2459,6 +2497,9 @@ app.put(
         tagValue(b.tracking?.adsPurchaseLabel, "label", "Purchase label"),
         tagValue(b.tracking?.adsBeginCheckoutLabel, "label", "Begin-checkout label"),
         tagValue(b.tracking?.adsAddToCartLabel, "label", "Add-to-cart label"),
+        // Rate: clamped to 0–100 for the same reason the money fields are
+        // clamped — a typo here multiplies every order.
+        percentValue(b.vat?.percent),
       ],
     );
     res.json(settingsJson(rows[0]));
