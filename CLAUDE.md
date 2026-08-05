@@ -84,6 +84,8 @@ stage/kickoff/sort/visible) and `predictions` (public entries: full_name/mobile 
 of `{matchId, teamA, teamB, scoreA, scoreB}` + `share_platform`/`share_item`),
 `contact_messages` (the public `/contact` form: name/email/phone/subject/message + a `read` flag —
 stored **and** emailed to staff, listed at `/admin/messages`),
+`wheel_entries` (the **Lucky Draw** pool: draw_number/full_name + `source` `manual|predictor`,
+a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording each spin),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -96,6 +98,20 @@ WhatsApp status (the chosen platform + item are stored on the entry), **(3)** fu
 a draw ticket. Open-state is shared via [store/predictor.jsx](src/store/predictor.jsx) (provider in
 `Layout.jsx`). Submissions (`POST /api/predictions`) are public but gated by the enabled/closed/deadline
 checks and one active entry per mobile; the admin reads/archives/deletes entries and exports them to Excel.
+
+The **Lucky Draw** wheel (`/admin/wheel` → [admin/pages/WheelAdmin.jsx](src/admin/pages/WheelAdmin.jsx))
+is an **admin-only** tool — there is no public page and every `/api/wheel-entries*` route is
+Bearer-gated. Staff build the pool (type one entry at a time, paste a list, or **Import Guess the
+Score** — which pulls every *active*, non-archived `predictions` row with its `draw_number`, keyed on
+`prediction_id` so re-running refreshes instead of duplicating), then hit Play:
+[components/SpinWheel.jsx](src/admin/components/SpinWheel.jsx) spins a canvas wheel — a live readout of
+the name under the pointer, synthesised prize-wheel ticks (WebAudio, no assets) — and
+[components/WinnerReveal.jsx](src/admin/components/WinnerReveal.jsx) announces the draw number + full
+name over canvas confetti. The winner is drawn **before** the animation via rejection-sampled
+`crypto.getRandomValues` and the final rotation is derived from it, so the reveal can never disagree
+with the result; that geometry lives in [components/wheelMath.js](src/admin/components/wheelMath.js),
+apart from the component so it stays verifiable. Each spin bumps `wins`/`won_at` on the entry
+("Reset winners" clears them for a fresh round).
 
 API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
 Public can read content; everything else needs a Bearer token.
@@ -189,7 +205,8 @@ src/
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, MessagesAdmin, ScraperAdmin
+    components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, WheelAdmin, MessagesAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -202,7 +219,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/messages`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
 at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles

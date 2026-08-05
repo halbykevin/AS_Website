@@ -29,6 +29,7 @@ const StoryAdmin = lazy(() => import('./admin/pages/StoryAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 const PredictorAdmin = lazy(() => import('./admin/pages/PredictorAdmin.jsx'))
+const WheelAdmin = lazy(() => import('./admin/pages/WheelAdmin.jsx'))
 const MessagesAdmin = lazy(() => import('./admin/pages/MessagesAdmin.jsx'))
 
 // The public website, gated behind the publish flag.
@@ -81,6 +82,7 @@ export default function App() {
               <Route path="story" element={<StoryAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="predictor" element={<PredictorAdmin />} />
+              <Route path="wheel" element={<WheelAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
               <Route path="scraper" element={<ScraperAdmin />} />
             </Route>

@@ -303,6 +303,25 @@ ALTER TABLE predictor ADD COLUMN IF NOT EXISTS terms JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE predictions ADD COLUMN IF NOT EXISTS share_platform TEXT DEFAULT '';
 ALTER TABLE predictions ADD COLUMN IF NOT EXISTS share_item TEXT DEFAULT '';
 
+-- Lucky-draw wheel: the pool of names the admin spins at /admin/wheel. Entries
+-- are typed in by hand (source 'manual') or imported from the ACTIVE "Guess the
+-- Score" entries (source 'predictor'). prediction_id links an imported row back
+-- to its entry, so re-importing refreshes it instead of duplicating it; the
+-- entry survives (unlinked) if that prediction is later deleted.
+CREATE TABLE IF NOT EXISTS wheel_entries (
+  id SERIAL PRIMARY KEY,
+  draw_number TEXT DEFAULT '',
+  full_name TEXT NOT NULL,
+  source TEXT DEFAULT 'manual',
+  prediction_id INTEGER REFERENCES predictions(id) ON DELETE SET NULL,
+  wins INTEGER NOT NULL DEFAULT 0,
+  won_at TIMESTAMPTZ,
+  sort INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS wheel_entries_prediction_unique
+  ON wheel_entries(prediction_id) WHERE prediction_id IS NOT NULL;
+
 -- Upgrades for existing databases (idempotent).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS ticket_url TEXT DEFAULT '';
 ALTER TABLE events DROP COLUMN IF EXISTS price;

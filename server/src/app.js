@@ -142,6 +142,11 @@ const predictorMatchJson = (r) => ({
   teamB: r.team_b, teamBCode: r.team_b_code, teamBFlag: r.team_b_flag,
   kickoff: r.kickoff, sort: r.sort, visible: r.visible,
 })
+const wheelEntryJson = (r) => ({
+  id: r.id, drawNumber: r.draw_number || '', fullName: r.full_name,
+  source: r.source || 'manual', predictionId: r.prediction_id,
+  wins: Number(r.wins) || 0, wonAt: r.won_at, sort: r.sort || 0, createdAt: r.created_at,
+})
 const contactMessageJson = (r) => ({
   id: r.id, name: r.name, email: r.email, phone: r.phone || '',
   subject: r.subject || '', message: r.message, read: r.read === true, createdAt: r.created_at,
@@ -820,6 +825,112 @@ app.post('/api/predictions/bulk-delete', requireAuth, ah(async (req, res) => {
 
 app.delete('/api/predictions/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM predictions WHERE id=$1', [req.params.id])
+  res.status(204).end()
+}))
+
+// ========================= Lucky-draw wheel =========================
+// Admin-only end to end: the wheel is a tool staff run on stage, never a public
+// page. Entries are typed/pasted in or imported from the active predictions.
+const WHEEL_MAX_BULK = 2000
+const drawNo = (v) => String(v ?? '').trim().slice(0, 40)
+const entryName = (v) => String(v ?? '').trim().slice(0, 120)
+
+app.get('/api/wheel-entries', requireAuth, ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM wheel_entries ORDER BY sort ASC, id ASC')
+  res.json(rows.map(wheelEntryJson))
+}))
+
+app.post('/api/wheel-entries', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const fullName = entryName(b.fullName)
+  if (!fullName) return res.status(400).json({ error: 'A full name is required' })
+  const { rows } = await query(
+    `INSERT INTO wheel_entries (draw_number, full_name, source, sort)
+     VALUES ($1,$2,'manual',$3) RETURNING *`,
+    [drawNo(b.drawNumber), fullName, Number(b.sort) || 0]
+  )
+  res.status(201).json(wheelEntryJson(rows[0]))
+}))
+
+// Add a whole pasted list in one round trip (the "paste many names" box).
+app.post('/api/wheel-entries/bulk', requireAuth, ah(async (req, res) => {
+  const entries = (Array.isArray(req.body?.entries) ? req.body.entries : [])
+    .map((e) => ({ drawNumber: drawNo(e?.drawNumber), fullName: entryName(e?.fullName) }))
+    .filter((e) => e.fullName)
+    .slice(0, WHEEL_MAX_BULK)
+  if (entries.length === 0) return res.status(400).json({ error: 'No names found to add' })
+  const { rows } = await query(
+    `INSERT INTO wheel_entries (draw_number, full_name, source)
+     SELECT d, n, 'manual' FROM UNNEST($1::text[], $2::text[]) AS t(d, n) RETURNING *`,
+    [entries.map((e) => e.drawNumber), entries.map((e) => e.fullName)]
+  )
+  res.status(201).json({ added: rows.length, entries: rows.map(wheelEntryJson) })
+}))
+
+// Pull in every ACTIVE (non-archived) "Guess the Score" entry. Keyed on
+// prediction_id so running it again refreshes names/draw numbers rather than
+// duplicating the pool.
+app.post('/api/wheel-entries/import-predictions', requireAuth, ah(async (req, res) => {
+  const before = (await query('SELECT COUNT(*)::int AS n FROM wheel_entries')).rows[0].n
+  const { rows } = await query(
+    `INSERT INTO wheel_entries (draw_number, full_name, source, prediction_id)
+     SELECT s.draw_number, s.full_name, 'predictor', s.id
+       FROM (SELECT COALESCE(p.draw_number::text, '') AS draw_number, p.full_name, p.id
+               FROM predictions p
+              WHERE NOT p.archived
+              ORDER BY p.draw_number ASC, p.id ASC) s
+     ON CONFLICT (prediction_id) WHERE prediction_id IS NOT NULL
+     DO UPDATE SET draw_number = EXCLUDED.draw_number, full_name = EXCLUDED.full_name
+     RETURNING *`
+  )
+  const after = (await query('SELECT COUNT(*)::int AS n FROM wheel_entries')).rows[0].n
+  const created = after - before
+  res.json({ imported: rows.length, created, updated: rows.length - created })
+}))
+
+app.put('/api/wheel-entries/:id', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const fullName = entryName(b.fullName)
+  if (!fullName) return res.status(400).json({ error: 'A full name is required' })
+  const { rows } = await query(
+    'UPDATE wheel_entries SET draw_number=$1, full_name=$2, sort=$3 WHERE id=$4 RETURNING *',
+    [drawNo(b.drawNumber), fullName, Number(b.sort) || 0, req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Entry not found' })
+  res.json(wheelEntryJson(rows[0]))
+}))
+
+// Record the spin result, so the draw stays on the record after the reveal.
+app.post('/api/wheel-entries/:id/win', requireAuth, ah(async (req, res) => {
+  const { rows } = await query(
+    'UPDATE wheel_entries SET wins = wins + 1, won_at = now() WHERE id=$1 RETURNING *',
+    [req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Entry not found' })
+  res.json(wheelEntryJson(rows[0]))
+}))
+
+// Clear every winner mark — start a fresh round without retyping the pool.
+app.post('/api/wheel-entries/reset-wins', requireAuth, ah(async (req, res) => {
+  const { rowCount } = await query('UPDATE wheel_entries SET wins = 0, won_at = NULL WHERE wins > 0')
+  res.json({ reset: rowCount })
+}))
+
+// Delete a ticked selection (POST so the id list travels in the body).
+app.post('/api/wheel-entries/bulk-delete', requireAuth, ah(async (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Number.isInteger)
+  if (ids.length === 0) return res.status(400).json({ error: 'No entries selected.' })
+  const { rowCount } = await query('DELETE FROM wheel_entries WHERE id = ANY($1::int[])', [ids])
+  res.json({ deleted: rowCount })
+}))
+
+app.delete('/api/wheel-entries', requireAuth, ah(async (req, res) => {
+  const { rowCount } = await query('DELETE FROM wheel_entries')
+  res.json({ deleted: rowCount })
+}))
+
+app.delete('/api/wheel-entries/:id', requireAuth, ah(async (req, res) => {
+  await query('DELETE FROM wheel_entries WHERE id=$1', [req.params.id])
   res.status(204).end()
 }))
 

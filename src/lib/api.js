@@ -614,6 +614,21 @@ export const adminApi = {
     request(`/api/predictions/${id}/archive`, { method: 'PUT', body: { archived }, authed: true }),
   archiveAllPredictions: () => request('/api/predictions/archive-all', { method: 'POST', authed: true }),
 
+  // Lucky-draw wheel (admin-only tool — no public reads).
+  listWheelEntries: () => request('/api/wheel-entries', { authed: true }),
+  createWheelEntry: (data) => request('/api/wheel-entries', { method: 'POST', body: data, authed: true }),
+  createWheelEntries: (entries) =>
+    request('/api/wheel-entries/bulk', { method: 'POST', body: { entries }, authed: true }),
+  importWheelEntriesFromPredictions: () =>
+    request('/api/wheel-entries/import-predictions', { method: 'POST', authed: true }),
+  updateWheelEntry: (id, data) => request(`/api/wheel-entries/${id}`, { method: 'PUT', body: data, authed: true }),
+  deleteWheelEntry: (id) => request(`/api/wheel-entries/${id}`, { method: 'DELETE', authed: true }),
+  deleteWheelEntries: (ids) =>
+    request('/api/wheel-entries/bulk-delete', { method: 'POST', body: { ids }, authed: true }),
+  clearWheelEntries: () => request('/api/wheel-entries', { method: 'DELETE', authed: true }),
+  markWheelWinner: (id) => request(`/api/wheel-entries/${id}/win`, { method: 'POST', authed: true }),
+  resetWheelWins: () => request('/api/wheel-entries/reset-wins', { method: 'POST', authed: true }),
+
   listContactMessages: () => request('/api/contact-messages', { authed: true }),
   markContactMessageRead: (id, read = true) =>
     request(`/api/contact-messages/${id}/read`, { method: 'PUT', body: { read }, authed: true }),
