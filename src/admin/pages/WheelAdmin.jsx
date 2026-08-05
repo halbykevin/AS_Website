@@ -68,7 +68,11 @@ export default function WheelAdmin() {
   // place in the tree and only swaps classes, so expanding never remounts it
   // (and so can't interrupt a spin in progress).
   const [expanded, setExpanded] = useState(false)
-  const [stageSize, setStageSize] = useState(640)
+  const [stageFit, setStageFit] = useState(640)
+  // Manual zoom on top of the auto-fit, for when the names still want to be
+  // bigger than the screen strictly allows (the stage scrolls past 100%).
+  const [zoom, setZoom] = useState(1)
+  const stageSize = Math.round(stageFit * zoom)
   // Bumping this asks the wheel to spin — lets the winner card offer "spin again"
   // without reaching into the wheel with a ref.
   const [spinToken, setSpinToken] = useState(0)
@@ -86,12 +90,13 @@ export default function WheelAdmin() {
     load()
   }, [])
 
-  // Size the stage wheel to whatever the viewport can spare, leaving room for
-  // the readout and buttons underneath.
+  // Size the stage wheel to whatever the viewport can spare. The reserve below
+  // covers the readout, the buttons and the overlay padding — the Esc hint is
+  // positioned absolutely so it costs nothing.
   useEffect(() => {
     if (!expanded) return undefined
     const fit = () =>
-      setStageSize(Math.max(260, Math.min(globalThis.innerWidth - 48, globalThis.innerHeight - 250)))
+      setStageFit(Math.max(260, Math.min(globalThis.innerWidth - 32, globalThis.innerHeight - 185)))
     fit()
     globalThis.addEventListener('resize', fit)
     return () => globalThis.removeEventListener('resize', fit)
@@ -342,32 +347,64 @@ export default function WheelAdmin() {
               {/* Same element either way: in the card, or promoted to a full-screen
                   stage. Only the classes change, so the wheel is never remounted. */}
               <div
-                className={
-                  expanded
-                    ? 'fixed inset-0 z-40 flex flex-col items-center justify-center overflow-auto bg-as-charcoal p-4'
-                    : ''
-                }
+                className={expanded ? 'fixed inset-0 z-40 flex overflow-auto bg-as-charcoal p-4' : ''}
               >
                 {expanded && (
-                  <button
-                    type="button"
-                    onClick={() => setExpanded(false)}
-                    className="absolute right-4 top-4 z-10 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-                  >
-                    ✕ Close
-                  </button>
+                  <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+                    <div className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10))}
+                        disabled={zoom <= 0.6}
+                        aria-label="Smaller"
+                        className="grid h-8 w-8 place-items-center rounded-full text-lg font-bold text-white transition hover:bg-white/20 disabled:opacity-30"
+                      >
+                        −
+                      </button>
+                      <span className="w-12 text-center text-xs font-bold tabular-nums text-white/70">
+                        {Math.round(zoom * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))}
+                        disabled={zoom >= 2}
+                        aria-label="Bigger"
+                        className="grid h-8 w-8 place-items-center rounded-full text-lg font-bold text-white transition hover:bg-white/20 disabled:opacity-30"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(false)}
+                      className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
                 )}
-                <SpinWheel
-                  entries={entries}
-                  onWinner={handleWinner}
-                  onSpinningChange={setSpinning}
-                  spinToken={spinToken}
-                  disabled={Boolean(winner)}
-                  maxSize={expanded ? stageSize : 520}
-                  theater={expanded}
-                />
+                {/* `m-auto` rather than justify-center: a zoomed-in wheel taller
+                    than the screen must stay fully scrollable, which centred
+                    flex content is not. Always rendered, so the wheel keeps its
+                    tree position and never remounts. */}
+                <div
+                  className={expanded ? 'm-auto flex flex-col items-center' : ''}
+                  style={expanded ? { width: stageSize } : undefined}
+                >
+                  <SpinWheel
+                    entries={entries}
+                    onWinner={handleWinner}
+                    onSpinningChange={setSpinning}
+                    spinToken={spinToken}
+                    disabled={Boolean(winner)}
+                    maxSize={expanded ? stageSize : 520}
+                    theater={expanded}
+                  />
+                </div>
                 {expanded && (
-                  <p className="mt-4 text-xs text-white/40">Press Esc to leave the big screen.</p>
+                  <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-white/40">
+                    Press Esc to leave the big screen
+                  </p>
                 )}
               </div>
               {!expanded && (

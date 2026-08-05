@@ -41,6 +41,11 @@ function createTicker() {
   }
 }
 
+// Radius of the white centre disc — and of the Play button that sits on it, so
+// the two always agree. Kept lean: every pixel here is radial space the labels
+// lose, and a cut-off name is worse than a small button.
+const hubRadius = (size) => Math.max(30, size * 0.1)
+
 // Truncate a label to the space available along the radius.
 function fitText(ctx, text, maxWidth) {
   if (ctx.measureText(text).width <= maxWidth) return text
@@ -54,7 +59,7 @@ function drawWheel(ctx, size, entries, rotation) {
   const cy = size / 2
   const rim = 9
   const r = size / 2 - rim
-  const hub = Math.max(38, size * 0.13)
+  const hub = hubRadius(size)
   const n = entries.length
 
   ctx.clearRect(0, 0, size, size)
@@ -73,10 +78,22 @@ function drawWheel(ctx, size, entries, rotation) {
   }
 
   const seg = TAU / n
-  // The arc height at the label's radius decides whether text can fit at all.
-  const labelR = r * 0.94
-  const fontSize = Math.min(19, Math.max(7, 2 * Math.sin(seg / 2) * (r * 0.7) * 0.62))
-  const showLabels = fontSize >= 8.5
+  // Labels radiate inward from just inside the rim. The arc height each segment
+  // gets decides both the type size and whether the draw number can sit on its
+  // own line above the name — two short lines fit where one long one would be
+  // cut off, which is what keeps full names readable on a busy wheel.
+  const labelOuter = r * 0.965
+  const maxLabelW = labelOuter - (hub + 8)
+  // Chord height at the label radius. Clamped at a half-turn: past that the
+  // chord shrinks again (a lone entry spanning the full circle would measure 0)
+  // even though the space available only ever grows.
+  const arcH = 2 * Math.sin(Math.min(seg, Math.PI) / 2) * (r * 0.7)
+  const twoLine = arcH >= 30 && n <= 60
+  const nameFont = twoLine
+    ? Math.min(30, Math.max(9, arcH * 0.4))
+    : Math.min(24, Math.max(7, arcH * 0.52))
+  const numFont = Math.max(8, nameFont * 0.7)
+  const showLabels = nameFont >= 8.5
 
   ctx.save()
   ctx.translate(cx, cy)
@@ -103,16 +120,27 @@ function drawWheel(ctx, size, entries, rotation) {
 
     if (showLabels) {
       const e = entries[i]
-      const label = [e.drawNumber, e.fullName].filter(Boolean).join(' · ')
+      const num = e.drawNumber ? String(e.drawNumber) : ''
       ctx.save()
       ctx.rotate(a0 + seg / 2)
       ctx.textAlign = 'right'
       ctx.textBaseline = 'middle'
-      ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`
       ctx.fillStyle = '#fff'
-      ctx.shadowColor = 'rgba(0,0,0,0.35)'
+      ctx.shadowColor = 'rgba(0,0,0,0.4)'
       ctx.shadowBlur = 2
-      ctx.fillText(fitText(ctx, label, labelR - hub - 16), labelR - 10, 0)
+      if (twoLine && num) {
+        // Draw number above, slightly dimmed; the name gets the room and weight.
+        ctx.font = `600 ${numFont}px Inter, system-ui, sans-serif`
+        ctx.globalAlpha = 0.8
+        ctx.fillText(fitText(ctx, num, maxLabelW), labelOuter, -nameFont * 0.5)
+        ctx.globalAlpha = 1
+        ctx.font = `700 ${nameFont}px Inter, system-ui, sans-serif`
+        ctx.fillText(fitText(ctx, e.fullName, maxLabelW), labelOuter, numFont * 0.58)
+      } else {
+        const label = [num, e.fullName].filter(Boolean).join(' · ')
+        ctx.font = `600 ${nameFont}px Inter, system-ui, sans-serif`
+        ctx.fillText(fitText(ctx, label, maxLabelW), labelOuter, 0)
+      }
       ctx.restore()
     }
   }
@@ -273,7 +301,7 @@ export default function SpinWheel({
   }, [spinToken])
 
   const canSpin = count > 0 && !disabled && !spinning
-  const hubSize = Math.max(76, size * 0.26)
+  const hubSize = hubRadius(size) * 2
   const pointerW = Math.max(34, size * 0.075)
 
   return (
