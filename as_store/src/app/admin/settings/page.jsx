@@ -375,22 +375,20 @@ export default function SettingsPage() {
             <Input value={form.homeNew.heading} onChange={(e) => setNested('homeNew', 'heading', e.target.value)} placeholder="New in." />
           </Field>
           <Field label="Show products from" hint="Which products to feature.">
-            <select
+            <Select
               value={form.homeNew.source}
               onChange={(e) => setNested('homeNew', 'source', e.target.value)}
-              className="w-full rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm text-admin-text focus:border-as-red focus:outline-none"
             >
               <option value="newest">Newest arrivals</option>
               <option value="featured">Featured products</option>
               <option value="category">A specific category</option>
-            </select>
+            </Select>
           </Field>
           {form.homeNew.source === 'category' && (
             <Field label="Category">
-              <select
+              <Select
                 value={form.homeNew.categoryId ?? ''}
                 onChange={(e) => setNested('homeNew', 'categoryId', e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg border border-admin-line/15 bg-admin-surface px-3 py-2 text-sm text-admin-text focus:border-as-red focus:outline-none"
               >
                 <option value="">Select a category…</option>
                 {categories.map((c) => (
@@ -398,7 +396,7 @@ export default function SettingsPage() {
                     {c.parentId ? '↳ ' : ''}{c.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           )}
           <Field label="How many to show">
