@@ -13,6 +13,10 @@ import { adminApi } from '@/lib/adminApi'
 // look like this, so it can't collide with a facet value.
 const NONE = '__none__'
 
+// No stock filter on purpose: `products.stock` is not maintained — bulk imports
+// default it to 0, nothing decrements it on an order, and the storefront treats
+// any visible product as sellable. Filtering on it would just return the whole
+// catalogue. Add it back the day the catalogue carries real inventory.
 const STATUSES = [
   { value: '', label: 'Any status' },
   { value: 'visible', label: 'Visible' },
@@ -20,7 +24,6 @@ const STATUSES = [
   { value: 'featured', label: 'Featured' },
   { value: 'sale', label: 'On sale' },
   { value: 'new', label: 'New' },
-  { value: 'out', label: 'Out of stock' },
 ]
 
 const statusMatch = {
@@ -29,7 +32,6 @@ const statusMatch = {
   featured: (p) => p.featured,
   sale: (p) => Boolean(p.salePercent) || Number(p.oldPrice) > Number(p.price),
   new: (p) => p.isNew,
-  out: (p) => Number(p.stock) <= 0,
 }
 
 // `default` keeps whatever order the API returned (p.sort, p.id — the display
@@ -38,7 +40,6 @@ const SORTS = [
   { value: 'default', label: 'Display order' },
   { value: 'name', label: 'Name' },
   { value: 'price', label: 'Price' },
-  { value: 'stock', label: 'Stock' },
   { value: 'brand', label: 'Brand' },
   { value: 'category', label: 'Category' },
   { value: 'added', label: 'Date added' },
@@ -48,7 +49,6 @@ const byName = (a, b) => a.name.localeCompare(b.name)
 const comparators = {
   name: byName,
   price: (a, b) => Number(a.price) - Number(b.price) || byName(a, b),
-  stock: (a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0) || byName(a, b),
   brand: (a, b) => (a.brand || '').localeCompare(b.brand || '') || byName(a, b),
   category: (a, b) => (a.category || '').localeCompare(b.category || '') || byName(a, b),
   added: (a, b) => a.id - b.id, // ids are serial, so id order is creation order
@@ -289,12 +289,6 @@ export default function ProductsPage() {
                     {p.oldPrice ? (
                       <span className="ml-1 line-through">${Number(p.oldPrice).toLocaleString()}</span>
                     ) : null}
-                    {' · '}
-                    {Number(p.stock) > 0 ? (
-                      <span>{Number(p.stock).toLocaleString()} in stock</span>
-                    ) : (
-                      <span className="font-medium text-red-600">Out of stock</span>
-                    )}
                   </p>
                 </div>
 
