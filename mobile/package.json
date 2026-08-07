@@ -16,6 +16,7 @@
     "apk": "node scripts/apk.mjs",
     "apk:prod": "node scripts/apk.mjs --profile production-apk",
     "apk:latest": "node scripts/apk.mjs --latest",
+    "apk:bs": "node scripts/apk.mjs --latest --bluestacks",
     "//eas": "Always go through npx: a bare `eas` picks up whatever is installed globally, and eas.json pins a CLI floor (>= 20.5.1) that the global install falls below.",
     "build:apk": "npx --yes eas-cli@latest build --platform android --profile preview",
     "build:apk:prod": "npx --yes eas-cli@latest build --platform android --profile production-apk",

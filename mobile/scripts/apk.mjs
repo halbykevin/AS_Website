@@ -15,7 +15,7 @@
  * globally installed CLI falls below. See mobile/package.json.
  */
 import { spawnSync } from 'node:child_process'
-import { createReadStream, createWriteStream, mkdirSync, statSync } from 'node:fs'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -47,6 +47,7 @@ if (has('--help') || has('-h')) {
       '  --profile <name>   eas.json build profile (default: preview)',
       '  --latest           use the newest finished APK instead of building',
       '  --force-new        start a build even if one is already running',
+      '  --bluestacks       install into BlueStacks instead of a real phone',
       '  --no-install       skip adb, go straight to the download link',
       '  --no-serve         download only, do not start the local server',
       '  --port <n>         port for the local server (default 8090)',
@@ -62,6 +63,7 @@ const useLatest = has('--latest')
 const forceNew = has('--force-new')
 const skipInstall = has('--no-install')
 const skipServe = has('--no-serve')
+const wantBluestacks = has('--bluestacks') || has('--bs')
 
 // ---------------------------------------------------------------- helpers --
 const say = (s = '') => console.log(s)
@@ -174,15 +176,48 @@ if (!url) die('The build finished but carries no APK artifact. Is this profile b
 mkdirSync(OUT_DIR, { recursive: true })
 const file = join(OUT_DIR, `as-company-${profile}-v${build.appVersion}-${build.appBuildVersion}.apk`)
 
-say('\n  Downloading APK...')
-const res = await fetch(url)
-if (!res.ok) die(`Download failed - ${res.status} ${res.statusText}`)
-await pipeline(Readable.fromWeb(res.body), createWriteStream(file))
+// A finished build's artifact never changes, so a matching local copy is the
+// same bytes — no point pulling 90 MB again on every run.
+const onDisk = existsSync(file) ? statSync(file).size : 0
+const expected = Number(
+  (await fetch(url, { method: 'HEAD' }).catch(() => null))?.headers.get('content-length') || 0,
+)
+
+if (onDisk && onDisk === expected) {
+  say(`\n  ok  Already downloaded: ${file}  (${fmtSize(onDisk)})`)
+} else {
+  say('\n  Downloading APK...')
+  const res = await fetch(url)
+  if (!res.ok) die(`Download failed - ${res.status} ${res.statusText}`)
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(file))
+  say(`  ok  ${file}  (${fmtSize(statSync(file).size)})`)
+}
 const size = statSync(file).size
-say(`  ok  ${file}  (${fmtSize(size)})`)
 
 // -------------------------------------------------------- onto the phone --
-/** adb is rarely on PATH on Windows, but it is wherever Android Studio put it. */
+const BLUESTACKS_DIRS = [
+  `${process.env.ProgramFiles}\\BlueStacks_nxt`,
+  `${process.env['ProgramFiles(x86)']}\\BlueStacks_nxt`,
+]
+const bluestacksDir = isWin ? BLUESTACKS_DIRS.find((d) => existsSync(d)) : ''
+
+/**
+ * BlueStacks listens for adb on a per-instance port recorded in its conf —
+ * 5555 for the first instance, 5565/5575/... for extra ones. Reading the file
+ * beats guessing, but fall back to the usual suspects if it is not there.
+ */
+function bluestacksPorts() {
+  const conf = `${process.env.ProgramData}\\BlueStacks_nxt\\bluestacks.conf`
+  try {
+    const found = [...readFileSync(conf, 'utf8').matchAll(/status\.adb_port="(\d+)"/g)].map((m) => m[1])
+    if (found.length) return [...new Set(found)]
+  } catch {
+    /* not installed, or no conf yet */
+  }
+  return ['5555', '5565', '5575']
+}
+
+/** adb is rarely on PATH on Windows. Prefer a real SDK one; BlueStacks ships its own. */
 function findAdb() {
   const works = (cmd) => sh(cmd, ['version'], { encoding: 'utf8' }).status === 0
   if (works('adb')) return 'adb'
@@ -193,27 +228,84 @@ function findAdb() {
       process.env.LOCALAPPDATA &&
         join(process.env.LOCALAPPDATA, 'Android', 'Sdk', 'platform-tools', 'adb.exe'),
       process.env.HOME && join(process.env.HOME, 'Library', 'Android', 'sdk', 'platform-tools', 'adb'),
+      bluestacksDir && join(bluestacksDir, 'HD-Adb.exe'),
     ]
       .filter(Boolean)
       .find(works) || ''
   )
 }
 
-const adb = skipInstall ? '' : findAdb()
+/**
+ * BlueStacks ships with ADB access switched off (bst.enable_adb_access="0"),
+ * and with it off the port still accepts a connection but every shell/sync
+ * request comes back "closed" — which adb reports as an unhelpful
+ * "connect error for write". Read the flag rather than letting install fail.
+ */
+const bluestacksAdbOn = (() => {
+  try {
+    return /bst\.enable_adb_access="1"/.test(
+      readFileSync(`${process.env.ProgramData}\\BlueStacks_nxt\\bluestacks.conf`, 'utf8'),
+    )
+  } catch {
+    return false
+  }
+})()
+
+// --bluestacks goes through the file association, so adb is not consulted at all.
+const adb = skipInstall || wantBluestacks ? '' : findAdb()
+
+// Emulators speak adb over TCP but only show up once something connects to them.
+if (adb && bluestacksDir && bluestacksAdbOn) {
+  const hit = bluestacksPorts().find(
+    (p) => `${sh(adb, ['connect', `127.0.0.1:${p}`], { encoding: 'utf8' }).stdout || ''}`.match(/connected to/i),
+  )
+  if (hit) say(`\n  BlueStacks is up on port ${hit}.`)
+}
+
+// With BlueStacks' ADB access off, a stale adb server still lists its emulator
+// but every install to it dies with "connect error for write: closed". Don't
+// offer it as a target — a real phone over USB is the only thing that can work.
+const unreachableEmulator = (serial) =>
+  bluestacksDir && !bluestacksAdbOn && /^(emulator-|127\.0\.0\.1:|localhost:)/.test(serial)
+
 const devices = adb
   ? (sh(adb, ['devices'], { encoding: 'utf8' }).stdout || '')
       .split('\n')
       .slice(1)
       .filter((l) => l.trim().endsWith('\tdevice'))
+      .map((l) => l.split('\t')[0].trim())
+      .filter((s) => !unreachableEmulator(s))
   : []
 
 if (adb && devices.length) {
-  say(`\n  Installing over USB (${devices.length} device${devices.length > 1 ? 's' : ''})...`)
-  if (sh(adb, ['install', '-r', file], { stdio: 'inherit' }).status === 0) {
-    say('\n  ok  Installed. Look for "AS Company" in your app drawer.\n')
+  say(`\n  Installing to ${devices.join(', ')} ...`)
+  if (sh(adb, ['-s', devices[0], 'install', '-r', file], { stdio: 'inherit' }).status === 0) {
+    say('\n  ok  Installed. Look for "AS Company" in the app drawer.\n')
     process.exit(0)
   }
-  say('\n  adb install failed - falling back to the download link.')
+  say('\n  adb install failed - falling back below.')
+}
+
+/**
+ * Windows registers BlueStacks as the .apk handler, so handing the file to the
+ * shell installs it. This is the only route that works with ADB access off,
+ * which is how BlueStacks ships. Opt-in, so it never steals a run meant for a
+ * real phone on a machine that happens to have BlueStacks installed.
+ */
+if (wantBluestacks && isWin) {
+  if (!bluestacksDir) die('BlueStacks does not look installed - no BlueStacks_nxt folder.')
+  say('\n  Handing the APK to BlueStacks...')
+  if (!bluestacksAdbOn) {
+    say('  (ADB access is off in BlueStacks, so adb install is not available.')
+    say('   Turn on Settings > Advanced > Android Debug Bridge to enable it.)')
+  }
+  const r = sh('cmd', ['/c', 'start', '""', file])
+  if (r.status === 0) {
+    say('\n  ok  Sent to BlueStacks. Accept its install prompt, then look for')
+    say('      "AS Company" on the BlueStacks home screen.\n')
+    process.exit(0)
+  }
+  say('  Could not launch it - open the file manually (path below).')
 }
 
 if (skipServe) {
@@ -240,18 +332,25 @@ const server = createServer((req, res) => {
     .catch(() => say('  (download interrupted - just reload on the phone)'))
 })
 
-server.on('error', (e) =>
-  die(
-    e.code === 'EADDRINUSE'
-      ? `Port ${port} is busy. Re-run with --port 8091.`
-      : `Local server failed: ${e.message}`,
-  ),
-)
+// A previous run left holding the port shouldn't cost you the whole download.
+let tryPort = port
+server.on('error', (e) => {
+  if (e.code !== 'EADDRINUSE') die(`Local server failed: ${e.message}`)
+  if (tryPort - port >= 5) die(`Ports ${port}-${tryPort} are all busy. Pass --port <n>.`)
+  tryPort += 1
+  say(`  (port ${tryPort - 1} busy, trying ${tryPort})`)
+  server.listen(tryPort)
+})
 
-server.listen(port, () => {
-  say('\n  -- Get it on your Samsung -----------------------------------')
+server.on('listening', () => {
+  const bound = server.address().port
+  if (bluestacksDir) {
+    say('\n  Testing on BlueStacks instead? Re-run with --bluestacks,')
+    say('  or just double-click the .apk (Windows opens it with BlueStacks).')
+  }
+  say('\n  -- Get it on your phone -------------------------------------')
   say('\n  Make sure the phone is on the same Wi-Fi, then open:\n')
-  say(`      http://${lanIp || 'localhost'}:${port}\n`)
+  say(`      http://${lanIp || 'localhost'}:${bound}\n`)
   say('  Chrome will download the APK. Tap it, and allow "Install unknown')
   say('  apps" for Chrome when Android asks (Settings > Apps > Chrome >')
   say('  Install unknown apps). That prompt is normal for sideloading.')
@@ -260,3 +359,5 @@ server.listen(port, () => {
   say(`  the EAS link (expires ${new Date(build.expirationDate).toDateString()}):`)
   say(`  ${url}\n`)
 })
+
+server.listen(port)
