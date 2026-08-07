@@ -772,11 +772,146 @@ function RewardsTab() {
   )
 }
 
+const CUSTOMER_DEBOUNCE_MS = 200
+
+// Live customer picker. The list is populated from the customer directory the
+// moment the field is focused — an empty `search` returns the most recent
+// sign-ups — so staff can browse as well as search. Typing re-queries the
+// server rather than filtering a local copy, because the directory is far too
+// big to ship to the browser.
+function CustomerPicker({ picked, onPick }) {
+  const [search, setSearch] = useState('')
+  const [term, setTerm] = useState('') // debounced copy that actually queries
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(search.trim()), CUSTOMER_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data, isFetching } = useQuery({
+    queryKey: ['admin', 'customers', 'voucher-search', term],
+    queryFn: () => adminApi.listCustomers({ search: term, limit: 8 }),
+    enabled: open,
+    placeholderData: (prev) => prev, // keep the old rows visible while retyping
+  })
+
+  const rows = Array.isArray(data) ? data : []
+  useEffect(() => setActive(0), [term])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onPointerDown = (e) => {
+      if (!boxRef.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open])
+
+  const choose = (c) => {
+    onPick(c)
+    setOpen(false)
+    setSearch('')
+  }
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') return setOpen(false)
+    if (!rows.length) return undefined
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActive((a) => (a + 1) % rows.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActive((a) => (a - 1 + rows.length) % rows.length)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (rows[active]) choose(rows[active])
+    }
+    return undefined
+  }
+
+  if (picked) {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-admin-line/15 px-3 py-2">
+        <span className="min-w-0 truncate text-sm text-admin-text">
+          {picked.name || 'Customer'} · {picked.mobile || picked.email || `#${picked.id}`}
+        </span>
+        <Button variant="ghost" className="shrink-0 px-2 py-1 text-xs" onClick={() => onPick(null)}>
+          Change
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={boxRef} className="relative">
+      <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-text/40" />
+      <Input
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
+        placeholder="Name or 70 123 456"
+        className="pl-9"
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+      />
+      {isFetching && <Spinner className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />}
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-admin-line/10 bg-admin-surface p-1 shadow-xl shadow-black/10"
+        >
+          {rows.length === 0 ? (
+            <p className="px-2.5 py-3 text-sm text-admin-text/45">
+              {isFetching ? 'Searching…' : term ? `No customer matches “${term}”.` : 'No customers yet.'}
+            </p>
+          ) : (
+            rows.map((c, i) => (
+              <div
+                key={c.id}
+                role="option"
+                aria-selected={i === active}
+                onMouseEnter={() => setActive(i)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(c)}
+                className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 ${
+                  i === active ? 'bg-admin-bg' : ''
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-admin-text">
+                    {c.name || 'Customer'}
+                  </span>
+                  <span className="block truncate text-xs text-admin-text/45">
+                    {c.mobile || c.email || `#${c.id}`}
+                  </span>
+                </span>
+                {c.orderCount > 0 && (
+                  <span className="shrink-0 text-xs text-admin-text/45">
+                    {c.orderCount} order{c.orderCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Hand a reward to a specific customer — an apology, a competition, a walk-in.
 function GrantModal({ onClose }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const [search, setSearch] = useState('')
   const [picked, setPicked] = useState(null)
   const [f, setF] = useState({
     type: 'percent',
@@ -790,13 +925,6 @@ function GrantModal({ onClose }) {
   })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
-  // The customers endpoint filters on `search` and answers with a plain array.
-  const { data: customers } = useQuery({
-    queryKey: ['admin', 'customers', 'voucher-search', search],
-    queryFn: () => adminApi.listCustomers({ search, limit: 8 }),
-    enabled: search.trim().length >= 2,
-  })
-
   const grant = useMutation({
     mutationFn: () => adminApi.createVoucher({ ...f, customerId: picked.id }),
     onSuccess: (v) => {
@@ -807,7 +935,6 @@ function GrantModal({ onClose }) {
     onError: (e) => toast.error(e.message),
   })
 
-  const rows = Array.isArray(customers) ? customers : []
   const needsValue = f.type === 'percent' || f.type === 'amount'
 
   return (
@@ -827,35 +954,9 @@ function GrantModal({ onClose }) {
       }
     >
       <div className="space-y-4">
-        <Field label="Customer" hint="Search by name or mobile number.">
-          {picked ? (
-            <div className="flex items-center justify-between rounded-lg border border-admin-line/15 px-3 py-2">
-              <span className="text-sm text-admin-text">
-                {picked.name || 'Customer'} · {picked.mobile || `#${picked.id}`}
-              </span>
-              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => setPicked(null)}>
-                Change
-              </Button>
-            </div>
-          ) : (
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or 70 123 456" />
-          )}
+        <Field label="Customer" hint="Search by name, mobile or email — or pick from the list.">
+          <CustomerPicker picked={picked} onPick={setPicked} />
         </Field>
-
-        {!picked && rows.length > 0 && (
-          <div className="max-h-40 overflow-y-auto rounded-lg border border-admin-line/10">
-            {rows.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setPicked(c)}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-admin-bg"
-              >
-                <span className="text-admin-text">{c.name || 'Customer'}</span>
-                <span className="text-xs text-admin-text/45">{c.mobile || `#${c.id}`}</span>
-              </button>
-            ))}
-          </div>
-        )}
 
         <Field label="Reward type">
           <Select value={f.type} onChange={(e) => set('type', e.target.value)}>
