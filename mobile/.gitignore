@@ -33,6 +33,9 @@ yarn-error.*
 .expo-export-check/
 export.log
 
+# APKs downloaded by scripts/apk.mjs — ~90 MB each, always re-fetchable from EAS.
+build/
+
 # FCM/APNs push SECRETS — never commit (uploaded to EAS credentials instead).
 # NOTE: google-services.json / GoogleService-Info.plist are client configs that
 # ship inside the app binary and (private repo) are tracked so EAS Build includes
