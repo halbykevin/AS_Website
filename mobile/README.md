@@ -72,12 +72,14 @@ app/                         # Expo Router (file-based) routes
   checkout  search  orders/  #   commerce flow
   account/ auth/             #   profile + OTP sign in / register
   predictor.jsx              #   Guess the Score game
+  spin.jsx                   #   Daily Spin wheel (winnings live at account/rewards)
 src/
   theme/                     # ⭐ central design system (tokens + hooks)
   ui/                        # ⭐ primitives built on the theme (Screen, Text, Button…)
   components/                # feature components (ProductTile, EventCard, …)
   lib/                       # API clients + account + helpers
     storeApi.js  websiteApi.js  account.jsx  queries.js
+    spin.js  wheel.js         # Daily Spin client + the wheel's geometry
     format.js  whatsapp.js  storage.js
   store/                     # Redux Toolkit cart slice
   content/                   # ContentProvider (loads site content once) + defaults
@@ -156,6 +158,41 @@ nothing else changes.
 | What We Do + solution pages                     | `what-we-do` + `what-we-do/[slug]`                                     |
 | Guess the Score predictor                       | `predictor` (3‑step: score → share → details)                          |
 | Publish gate (Coming Soon)                      | Store tab respects `settings.published`                                |
+| — _(app only)_                                  | **Daily Spin** — `spin` + `account/rewards`, see below                 |
+
+### Daily Spin
+
+The prize wheel. It exists **only here** — there is no web storefront equivalent — but every part
+of it is configured from the AS Store CMS at `/admin/spin`: the copy, the slices, their odds and
+stock, the cooldown, and how long a won reward stays valid.
+
+```
+(tabs)/index  SpinBanner        ← hidden entirely unless a wheel is running
+account       "Daily Spin" row + "My rewards"
+   │
+spin.jsx      GET  /api/spin    → the wheel, and this customer's cooldown
+   │          POST /api/spin    → the server draws, records, mints the voucher
+   │             └─ the app animates to the slice it was handed, then reveals
+account/rewards               → every voucher won or granted
+checkout      GET /api/vouchers?subtotal= → the ones that apply, with the exact discount
+                POST /api/orders { voucherCode } → the server re-prices and consumes it
+```
+
+- **Signed-in only.** A reward has to belong to an account, and a cooldown means nothing without an
+  identity. Signed-out visitors still see the real wheel and prizes, with a sign-in prompt where the
+  spin button goes — that is what makes it worth opening.
+- **The animation is a reveal, never a decision.** `POST /api/spin` returns the winning slice id
+  (and the slice order it drew against); `SpinWheel.spinTo(index)` derives its final rotation from
+  that. Killing the app mid-spin does not lose the prize — it is already on the account.
+- **The cooldown is the server's.** `nextSpinAt` comes back with every fetch; nothing counts down
+  locally, so changing the device clock achieves nothing.
+- **Rewards are picked, not typed.** They are account-bound, so checkout lists the ones that apply to
+  the current bag rather than asking for a code. Percentage, amount and free-delivery rewards adjust
+  the total; a physical gift is fulfilled by staff and never touches checkout.
+- Geometry lives in [`src/lib/wheel.js`](src/lib/wheel.js) — a deliberate copy of the store's file,
+  so the admin's preview and the app's wheel land on the same slice.
+- **Needs a native rebuild.** The wheel draws with `react-native-svg`; adding it changed the native
+  dependency set, so ship a new build rather than an OTA update.
 
 ### Paying with Whish
 

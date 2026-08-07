@@ -51,6 +51,15 @@ async function req(path, { method = 'GET', body, auth = false, form = false } = 
   return data
 }
 
+// Build a query string from a params object, dropping empty values so a blank
+// filter never narrows a list to nothing.
+const qs = (params) => {
+  const s = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== '' && v != null),
+  ).toString()
+  return s ? `?${s}` : ''
+}
+
 export const adminApi = {
   // auth
   login: (email, password) => req('/api/auth/login', { method: 'POST', body: { email, password } }),
@@ -176,6 +185,19 @@ export const adminApi = {
   },
   getCustomer: (id) => req(`/api/admin/customers/${id}`, { auth: true }),
   deleteCustomer: (id) => req(`/api/admin/customers/${id}`, { method: 'DELETE', auth: true }),
+
+  // Daily Spin — the app's prize wheel, its spin log, and the vouchers it mints
+  getSpin: () => req('/api/admin/spin', { auth: true }),
+  updateSpin: (data) => req('/api/admin/spin', { method: 'PUT', auth: true, body: data }),
+  createSpinPrize: (data) => req('/api/admin/spin/prizes', { method: 'POST', auth: true, body: data }),
+  updateSpinPrize: (id, data) =>
+    req(`/api/admin/spin/prizes/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteSpinPrize: (id) => req(`/api/admin/spin/prizes/${id}`, { method: 'DELETE', auth: true }),
+  listSpins: (params = {}) => req(`/api/admin/spin/spins${qs(params)}`, { auth: true }),
+  listVouchers: (params = {}) => req(`/api/admin/vouchers${qs(params)}`, { auth: true }),
+  createVoucher: (data) => req('/api/admin/vouchers', { method: 'POST', auth: true, body: data }),
+  updateVoucher: (id, data) => req(`/api/admin/vouchers/${id}`, { method: 'PUT', auth: true, body: data }),
+  deleteVoucher: (id) => req(`/api/admin/vouchers/${id}`, { method: 'DELETE', auth: true }),
 
   // orders
   listOrders: (status) =>

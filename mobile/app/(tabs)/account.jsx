@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
+import { useSpin } from '@/src/lib/spin';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
@@ -14,6 +15,8 @@ export default function AccountScreen() {
   const { refresh } = useContent();
   const customer = account?.customer;
   const loading = account?.loading;
+  const { data: spin } = useSpin(Boolean(customer));
+  const spinOn = Boolean(spin?.enabled);
   const [google, setGoogle] = useState(false);
   const [error, setError] = useState('');
 
@@ -81,7 +84,21 @@ export default function AccountScreen() {
               <MenuRow icon="settings" label="Edit profile" onPress={() => router.push('/account/edit')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="mail" label="Notification settings" onPress={() => router.push('/account/notifications')} />
+              {spinOn ? (
+                <>
+                  <Divider inset={theme.spacing.lg} />
+                  <MenuRow icon="ticket" label="My rewards" onPress={() => router.push('/account/rewards')} />
+                </>
+              ) : null}
             </Card>
+
+            {/* Only offered once the CMS has a wheel running, so the account
+                never links to a screen that would say "no spin running". */}
+            {spinOn ? (
+              <Card padded={false}>
+                <MenuRow icon="trophy" label={spin?.title || 'Daily Spin'} onPress={() => router.push('/spin')} />
+              </Card>
+            ) : null}
 
             <Card padded={false}>
               <MenuRow icon="bag" label="Continue shopping" onPress={() => router.push('/')} />

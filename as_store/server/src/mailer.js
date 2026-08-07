@@ -106,7 +106,9 @@ function orderBody(order, { intro, trackUrl }) {
       ${
         // Only break the sum out when something was actually added on top — on
         // an order with free delivery and no VAT these rows are pure noise.
-        Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0
+        Number(order.deliveryFee) > 0 ||
+        Number(order.vatAmount) > 0 ||
+        Number(order.discountAmount) > 0
           ? `<tr>
         <td colspan="2" style="padding:10px 0 2px;color:${MUTED}">Subtotal</td>
         <td align="right" style="padding:10px 0 2px;color:${MUTED}">${money(order.subtotal)}</td>
@@ -116,6 +118,15 @@ function orderBody(order, { intro, trackUrl }) {
           ? `<tr>
         <td colspan="2" style="padding:2px 0;color:${MUTED}">Delivery</td>
         <td align="right" style="padding:2px 0;color:${MUTED}">${money(order.deliveryFee)}</td>
+      </tr>`
+          : ''
+      }
+      ${
+        // A Daily Spin reward. Named so the customer recognises what they won.
+        Number(order.discountAmount) > 0
+          ? `<tr>
+        <td colspan="2" style="padding:2px 0;color:${RED}">Reward${order.voucherCode ? ` (${esc(order.voucherCode)})` : ''}</td>
+        <td align="right" style="padding:2px 0;color:${RED}">-${money(order.discountAmount)}</td>
       </tr>`
           : ''
       }

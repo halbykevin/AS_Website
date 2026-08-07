@@ -213,7 +213,7 @@ export default function OrderDetailScreen() {
               </View>
             ))}
             <Divider inset={theme.spacing.lg} />
-            {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
+            {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0 || Number(order.discountAmount) > 0) && (
               <View style={{ gap: 4, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="callout" muted>Subtotal</Text>
@@ -223,6 +223,14 @@ export default function OrderDetailScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text variant="callout" muted>Delivery</Text>
                     <Text variant="callout" muted>{money(order.deliveryFee)}</Text>
+                  </View>
+                )}
+                {Number(order.discountAmount) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="callout" color="primary">
+                      Reward{order.voucherCode ? ` (${order.voucherCode})` : ''}
+                    </Text>
+                    <Text variant="callout" color="primary">-{money(order.discountAmount)}</Text>
                   </View>
                 )}
                 {Number(order.vatAmount) > 0 && (

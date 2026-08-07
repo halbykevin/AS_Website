@@ -56,6 +56,22 @@ src/
     Icon.jsx          # inline SVG icons
 ```
 
+## Daily Spin
+
+The mobile app's prize wheel is configured entirely from this CMS, at **`/admin/spin`** — three
+tabs: the wheel (rules, copy, slices, live preview), the spin log, and the rewards people have won.
+There is no storefront page: the wheel is app-only, the admin is here.
+
+- **Slices** carry a type (`percent` / `amount` / `free_delivery` / `gift` / `none`), a `weight`
+  that becomes the odds shown in the table, and optional `stock`. Anything hidden, weightless or
+  sold out drops off the wheel, and the preview mirrors that exactly.
+- **Rewards** are single-use vouchers bound to one account. Discount ones are picked at checkout in
+  the app and reduce the order total (`orders.discount_amount` / `voucher_code`); gifts are handed
+  over by staff — mark them **Handed over** in the Rewards tab. Staff can also **Grant a reward**
+  directly, void one, or reactivate a spent one.
+- The server owns the draw and every money rule — see `server/src/spin.js` and `db/spin.sql`. This
+  page only edits them.
+
 ## Next steps (prompt by prompt)
 
 - Category / product-detail pages (Apple PDP: full-bleed sections, sticky buy bar)

@@ -9,6 +9,7 @@ import { usePaymentMethods, useStoreSettings } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
 import { money } from '@/src/lib/format';
 import { deliveryFeeFor, vatAmountFor } from '@/src/lib/delivery';
+import { useVouchers, rewardWorth } from '@/src/lib/spin';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
@@ -24,8 +25,31 @@ export default function CheckoutScreen() {
   const dispatch = useDispatch();
   const { data: settings } = useStoreSettings();
   const deliveryFee = deliveryFeeFor(total, settings?.delivery);
-  const vatAmount = vatAmountFor(total + deliveryFee, settings?.vat);
-  const grandTotal = total + deliveryFee + vatAmount;
+
+  // Daily Spin rewards. The server decides what each one is worth against this
+  // exact cart (`eligible` + `discount` come back with the list), so the summary
+  // below only has to render its answer — and the order it later places is
+  // re-priced server-side anyway.
+  const [voucherCode, setVoucherCode] = useState('');
+  const { data: vouchers } = useVouchers(total, Boolean(customer) && items.length > 0);
+  const usable = (Array.isArray(vouchers) ? vouchers : []).filter(v => v.eligible);
+  const applied = usable.find(v => v.code === voucherCode) || null;
+
+  // A free-delivery reward waives the fee; everything else comes off the items.
+  // VAT follows what is actually payable, matching the API's own arithmetic.
+  const deliveryWaived = applied?.type === 'free_delivery' ? deliveryFee : 0;
+  const itemsDiscount = applied ? applied.discount - deliveryWaived : 0;
+  const discount = applied?.discount || 0;
+  const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), settings?.vat);
+  const grandTotal = total + deliveryFee + vatAmount - discount;
+
+  // A reward that stops applying (the bag shrank below its minimum, or it was
+  // spent on another device) must not silently ride along on the order. Keyed on
+  // the codes themselves, since `usable` is a fresh array on every render.
+  const usableCodes = usable.map(v => v.code).join(',');
+  useEffect(() => {
+    if (voucherCode && !usableCodes.split(',').includes(voucherCode)) setVoucherCode('');
+  }, [usableCodes, voucherCode]);
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true });
   const [addrId, setAddrId] = useState(null);
@@ -91,6 +115,7 @@ export default function CheckoutScreen() {
         city: form.city,
         notes: form.notes,
         saveAddress: form.saveAddress,
+        ...(applied ? { voucherCode: applied.code } : null),
         paymentMethod: online ? PAYMENT_WHISH : PAYMENT_COD,
         // Tells the API this payment comes from the app: Whish returns the browser
         // to the API, which deep-links back here with the order id appended.
@@ -134,6 +159,12 @@ export default function CheckoutScreen() {
             <Text variant="caption" muted>Delivery</Text>
             <Text variant="caption" muted>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</Text>
           </View>
+          {discount > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" color="primary">Reward ({applied.code})</Text>
+              <Text variant="caption" color="primary">-{money(discount)}</Text>
+            </View>
+          )}
           {vatAmount > 0 && (
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text variant="caption" muted>VAT ({Number(settings.vat.percent)}%)</Text>
@@ -175,6 +206,43 @@ export default function CheckoutScreen() {
             </View>
           ))}
         </Card>
+
+        {/* Daily Spin rewards. Only shown when at least one applies to this bag —
+            an empty picker would just raise questions about rewards they don't have. */}
+        {usable.length > 0 ? (
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="h3">Your rewards</Text>
+            {usable.map(v => {
+              const on = applied?.code === v.code;
+              return (
+                <Card
+                  key={v.id}
+                  onPress={() => setVoucherCode(on ? '' : v.code)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    borderColor: on ? theme.colors.primary : theme.colors.border,
+                    borderWidth: on ? 2 : 1
+                  }}
+                >
+                  <Icon name={on ? 'checkCircle' : 'ticket'} size={22} color={on ? theme.colors.primary : theme.colors.textFaint} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="title">{v.label || rewardWorth(v)}</Text>
+                    <Text variant="caption" muted style={{ marginTop: 2 }}>
+                      {rewardWorth(v)} · saves {money(v.discount)}
+                    </Text>
+                  </View>
+                </Card>
+              );
+            })}
+            <Text variant="caption" faint>
+              One reward per order.
+            </Text>
+          </View>
+        ) : null}
 
         {/* Saved addresses */}
         {savedAddresses.length > 0 ? (

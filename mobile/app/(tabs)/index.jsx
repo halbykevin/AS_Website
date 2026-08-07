@@ -11,6 +11,7 @@ import ProductTile from '@/src/components/ProductTile';
 import ProductGrid from '@/src/components/ProductGrid';
 import HRail from '@/src/components/HRail';
 import CategoryWall from '@/src/components/store/CategoryWall';
+import SpinBanner from '@/src/components/spin/SpinBanner';
 import useConfirmExit from '@/src/lib/useConfirmExit';
 
 const FEED_LIMIT = 48; // one bounded request feeds every section below
@@ -77,6 +78,9 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         ) : null}
+
+        {/* Daily Spin — hidden entirely unless a wheel is running in the CMS */}
+        <SpinBanner />
 
         {/* Hot deals — dark spotlight, only when a promotion is running */}
         {deals.length > 0 ? (

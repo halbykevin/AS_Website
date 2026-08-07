@@ -44,6 +44,13 @@ import {
 } from "./whish.js";
 import { notificationsRouter } from "./notifications/router.js";
 import { emitEvent } from "./notifications/service.js";
+import {
+  spinRouter,
+  redeemVoucher,
+  attachVoucherToOrder,
+  releaseVoucher,
+  VoucherError,
+} from "./spin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.resolve(
@@ -437,11 +444,15 @@ const orderJson = (r) => ({
   deliveryFee: Number(r.delivery_fee ?? 0),
   vatPercent: Number(r.vat_percent ?? 0), // the rate at the time of the order
   vatAmount: Number(r.vat_amount ?? 0),
+  // What a Daily Spin voucher took off, snapshotted like the fee and the VAT.
+  discountAmount: Number(r.discount_amount ?? 0),
+  voucherCode: r.voucher_code || "",
   // What the customer actually pays / paid.
   total:
     Number(r.subtotal ?? 0) +
     Number(r.delivery_fee ?? 0) +
-    Number(r.vat_amount ?? 0),
+    Number(r.vat_amount ?? 0) -
+    Number(r.discount_amount ?? 0),
   paymentMethod: r.payment_method || "cod",
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
@@ -1257,28 +1268,68 @@ app.post(
     );
     const deliveryFee = deliveryFeeFor(subtotal, setRows[0]);
     const vatPercent = Number(setRows[0]?.vat_percent ?? 0);
-    const vatAmount = vatAmountFor(subtotal + deliveryFee, setRows[0]);
-    const total = subtotal + deliveryFee + vatAmount;
 
-    const { rows } = await query(
-      `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, payment_method, payment_status, currency)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'unpaid','USD') RETURNING id`,
-      [
-        customerId,
-        fullName,
-        phone,
-        email,
-        address,
-        b.city || "",
-        b.notes || "",
-        subtotal,
-        deliveryFee,
-        vatPercent,
-        vatAmount,
-        paymentMethod,
-      ],
+    // A Daily Spin reward. Claimed here — before the order exists — because the
+    // atomic status flip inside redeemVoucher() is what stops the same code
+    // being spent twice; anything that throws below must give it back.
+    let voucher = null;
+    if (b.voucherCode) {
+      try {
+        voucher = await redeemVoucher({
+          code: b.voucherCode,
+          customerId,
+          subtotal,
+          deliveryFee,
+        });
+      } catch (e) {
+        if (e instanceof VoucherError)
+          return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    }
+    // The delivery fee stays on the order at its real price; a free-delivery
+    // voucher shows up as a discount instead, so the customer sees what they
+    // saved. VAT is charged on what is actually payable, hence the same
+    // subtraction on both sides.
+    const itemsDiscount = voucher?.itemsDiscount || 0;
+    const deliveryWaived = voucher?.deliveryWaived || 0;
+    const discountAmount =
+      Math.round((itemsDiscount + deliveryWaived) * 100) / 100;
+    const vatAmount = vatAmountFor(
+      subtotal - itemsDiscount + (deliveryFee - deliveryWaived),
+      setRows[0],
     );
-    const orderId = rows[0].id;
+    const total = subtotal + deliveryFee + vatAmount - discountAmount;
+
+    let orderId;
+    try {
+      const { rows } = await query(
+        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, payment_method, payment_status, currency)
+       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'unpaid','USD') RETURNING id`,
+        [
+          customerId,
+          fullName,
+          phone,
+          email,
+          address,
+          b.city || "",
+          b.notes || "",
+          subtotal,
+          deliveryFee,
+          vatPercent,
+          vatAmount,
+          discountAmount,
+          voucher?.code || null,
+          voucher?.id || null,
+          paymentMethod,
+        ],
+      );
+      orderId = rows[0].id;
+    } catch (e) {
+      if (voucher) await releaseVoucher(voucher.id).catch(() => {});
+      throw e;
+    }
+    if (voucher) await attachVoucherToOrder(voucher.id, orderId);
     for (const it of items) {
       await query(
         `INSERT INTO order_items (order_id, product_id, name, price, qty, image)
@@ -1348,9 +1399,13 @@ app.post(
         return res.status(201).json({ ...detail, trackToken, collectUrl });
       } catch (e) {
         console.error("[whish] create failed:", e?.message || e);
-        await query(`UPDATE orders SET status = 'cancelled' WHERE id = $1`, [
-          orderId,
-        ]);
+        await query(
+          `UPDATE orders SET status = 'cancelled', discount_amount = 0, voucher_id = NULL, voucher_code = NULL WHERE id = $1`,
+          [orderId],
+        );
+        // The order never reached a payment page, so the reward goes back to the
+        // customer rather than being burnt on a cancelled order.
+        if (voucher) await releaseVoucher(voucher.id).catch(() => {});
         return res.status(502).json({
           error: "Could not start the online payment. Please try again.",
         });
@@ -1551,9 +1606,17 @@ app.put(
     // the dedupe key, but this avoids no-op outbox rows).
     const { rows } = await query(
       `UPDATE orders SET status = $2 WHERE id = $1 AND status <> $2
-       RETURNING id, customer_id, status`,
+       RETURNING id, customer_id, status, voucher_id`,
       [req.params.id, status],
     );
+    // Cancelling gives the Daily Spin reward back — the customer never got the
+    // order it was spent on. It is not re-consumed if the order is reopened, so
+    // an admin who reverses a cancellation should check the voucher.
+    if (rows[0] && status === "cancelled" && rows[0].voucher_id) {
+      await releaseVoucher(rows[0].voucher_id).catch((e) =>
+        console.error("[spin] release voucher:", e?.message || e),
+      );
+    }
     if (rows[0]) {
       await emitEvent(
         "order_status_changed",
@@ -2839,6 +2902,7 @@ app.post("/api/uploads", requireAuth, upload.single("file"), (req, res) => {
 app.use(whatsappRouter);
 app.use(scraperRouter);
 app.use(notificationsRouter);
+app.use(spinRouter);
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {

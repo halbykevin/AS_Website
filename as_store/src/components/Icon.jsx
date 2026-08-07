@@ -126,6 +126,23 @@ const paths = {
     </>
   ),
   send: <path d="M4.5 12 20 4.5 15.5 20l-3.6-5.9L4.5 12Z" />,
+  // A wrapped box with a ribbon — the Daily Spin prizes and the vouchers they win.
+  gift: (
+    <>
+      <path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9Z" />
+      <path d="M3 7.5h18V11H3z" />
+      <path d="M12 7.5V21" />
+      <path d="M12 7.5S10.6 3 8.5 3a2.2 2.2 0 0 0 0 4.5H12Zm0 0S13.4 3 15.5 3a2.2 2.2 0 0 1 0 4.5H12Z" />
+    </>
+  ),
+  // A wheel: rim, hub, and the spokes that make the slices read as a wheel.
+  wheel: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="1.6" />
+      <path d="M12 3v7.4M12 13.6V21M3 12h7.4M13.6 12H21" />
+    </>
+  ),
   refresh: (
     <>
       <path d="M20 12a8 8 0 1 1-2.4-5.7" />

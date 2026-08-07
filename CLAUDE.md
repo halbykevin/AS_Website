@@ -52,6 +52,39 @@ Details in [server/README.md](server/README.md).
 > The store API **must** live inside the clone (`/opt/as-company/as_store/server`) — a standalone
 > copy of `as_store/server/` breaks `migrate.js`'s `../../db` lookup. See [as_store/DEPLOY.md](as_store/DEPLOY.md).
 
+## Daily Spin (mobile app + store admin)
+
+A once-per-cooldown prize wheel that lives **only in the mobile app** and is driven entirely from
+the AS Store CMS at `/admin/spin`. Schema in [as_store/db/spin.sql](as_store/db/spin.sql), API in
+[as_store/server/src/spin.js](as_store/server/src/spin.js), admin page in
+[as_store/src/app/admin/spin/page.jsx](as_store/src/app/admin/spin/page.jsx), app screen in
+[mobile/app/spin.jsx](mobile/app/spin.jsx).
+
+- **The server draws the prize**, always. `POST /api/spin` picks a slice (weighted, via
+  `crypto.randomInt`), records it and mints the voucher inside one transaction holding a
+  per-customer advisory lock; the app then animates to the id it was handed. The wheel can never
+  disagree with the award, and a customer who kills the app mid-spin has still won.
+- **Sign-in is required to spin** (`requireCustomer`), but `GET /api/spin` is public so the screen
+  shows the real prizes behind the sign-in prompt. The cooldown is the `spin_spins` log — the next
+  spin is allowed `cooldown_hours` after the customer's last row — so reinstalling, signing out or
+  changing the device clock buys nothing.
+- Tables: `spin_settings` (singleton id=1: copy, `cooldown_hours`, default voucher validity),
+  `spin_prizes` (the slices: `type` `percent|amount|free_delivery|gift|none`, `weight` = odds,
+  `stock`, colour), `spin_spins` (the log **and** the cooldown clock), `vouchers` (what a win is
+  worth — account-bound, single-use, `source` `spin|admin`). `orders` gained
+  `discount_amount`/`voucher_code`/`voucher_id`, snapshotted like the delivery fee and VAT, so
+  total = subtotal + delivery + VAT − discount.
+- **Redemption is real money**: `redeemVoucher()` in `spin.js` is the single place the rules live
+  (status, expiry, minimum order, percent cap) and is called by `POST /api/orders`. It flips the
+  voucher to `used` *before* the order exists — that atomic flip is what stops double-spending —
+  and `releaseVoucher()` gives it back if the order fails, Whish rejects the payment, or an admin
+  cancels the order. `gift` prizes are staff-fulfilled and never touch checkout.
+- The app picks rewards at checkout from `GET /api/vouchers?subtotal=`, which returns each one with
+  `eligible` + the exact `discount` — the client never re-implements the money rules.
+- Geometry lives in `src/lib/wheel.js` in **both** packages (a deliberate copy — the admin preview
+  and the app wheel must land on the same slice). The app needs `react-native-svg`, so a native
+  rebuild is required, not just an OTA update.
+
 ## Backend
 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.

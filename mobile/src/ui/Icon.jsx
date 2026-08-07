@@ -53,6 +53,7 @@ const MAP = {
   play: 'play-circle-outline',
   trophy: 'trophy-outline',
   basketball: 'basketball-outline',
+  refresh: 'refresh-outline',
 
   // contact / social
   whatsapp: 'logo-whatsapp',
