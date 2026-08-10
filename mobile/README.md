@@ -79,6 +79,7 @@ app/                         # Expo Router (file-based) routes
   checkout  search  orders/  #   commerce flow
   account/ auth/             #   profile + OTP sign in / register
     delete.jsx               #   permanent account deletion (store requirement)
+    points.jsx               #   AS Points — balance, redeem, history
   predictor.jsx              #   Guess the Score game
   spin.jsx                   #   Daily Spin wheel (winnings live at account/rewards)
 src/
@@ -90,6 +91,7 @@ src/
     storeApi.js  websiteApi.js  account.jsx  queries.js
     session.js                # one place to react to an expired/revoked token
     spin.js  wheel.js         # Daily Spin client + the wheel's geometry
+    loyalty.js                # AS Points client (balance, redeem, history)
     format.js  whatsapp.js  storage.js
   store/                     # Redux Toolkit cart slice
   content/                   # ContentProvider (loads site content once) + defaults
@@ -169,6 +171,7 @@ nothing else changes.
 | Guess the Score predictor                       | `predictor` (3‑step: score → share → details)                          |
 | Publish gate (Coming Soon)                      | Store tab respects `settings.published`                                |
 | — _(app only)_                                  | **Daily Spin** — `spin` + `account/rewards`, see below                 |
+| AS Points loyalty                               | `account/points` — balance, redeem, history (also on the website)      |
 
 ### Daily Spin
 
@@ -203,6 +206,28 @@ checkout      GET /api/vouchers?subtotal= → the ones that apply, with the exac
   so the admin's preview and the app's wheel land on the same slice.
 - **Needs a native rebuild.** The wheel draws with `react-native-svg`; adding it changed the native
   dependency set, so ship a new build rather than an OTA update.
+
+### AS Points
+
+The loyalty programme — unlike the spin, it exists on the website too, and the two read the same
+API. Configured from the AS Store CMS at `/admin/loyalty`; defaults to **$1 = 1 point** and
+**1,000 points = $50 off**.
+
+```
+account       "AS Points" row, with the balance on it
+   │
+account/points  GET  /api/loyalty         → the rules, this balance, points on the way, history
+   │            POST /api/loyalty/redeem  → trades whole blocks for a reward voucher
+account/rewards                           → where that reward then lives
+checkout      the reward is picked like any other — nothing points-specific here
+```
+
+- **Points come from orders, and the server reconciles them.** Nothing is counted on the device; the
+  balance is the sum of a server-side ledger, and an order that is cancelled after delivery takes
+  its points back.
+- **Redeeming is always the customer's choice**, and it produces a reward they then choose to spend.
+  Two deliberate steps — the screen never spends points for anyone.
+- **Pure JS.** Unlike the wheel this adds no native dependency, so it ships as an OTA update.
 
 ### Paying with Whish
 

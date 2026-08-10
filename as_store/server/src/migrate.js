@@ -9,7 +9,8 @@ import { pool } from './db.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const dbDir = path.join(__dirname, '..', '..', 'db')
 
-for (const name of ['schema.sql', 'notifications.sql', 'spin.sql']) {
+// loyalty.sql comes after spin.sql: redeeming points mints a row in `vouchers`.
+for (const name of ['schema.sql', 'notifications.sql', 'spin.sql', 'loyalty.sql']) {
   const sql = fs.readFileSync(path.join(dbDir, name), 'utf8')
   await pool.query(sql)
   console.log(`AS Store ${name} applied.`)

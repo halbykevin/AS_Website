@@ -68,7 +68,9 @@ Store-publishing requirements that are easy to break and hard to notice:
   personal but keeps the order rows (bookkeeping/warranty) with their PII scrubbed, and refuses while
   an order is in flight. The endpoint, that screen's copy, and the "Deleting your account" section of
   [as_store/src/components/PrivacyPolicy.jsx](as_store/src/components/PrivacyPolicy.jsx) describe the
-  same behaviour on purpose — that policy is what Google Play and the App Store review.
+  same behaviour on purpose — that policy is what Google Play and the App Store review. Anything new
+  that hangs off a customer (the AS Points ledger, for instance) must cascade on `customers.id` and
+  be named in all three.
 - **The privacy policy covers the app, not just the website**, and is reachable from the account tab
   **signed out** ([mobile/app/legal.jsx](mobile/app/legal.jsx)). Anything new the app collects — push
   tokens, device info, a new sign-in method — belongs in that page in the same change.
@@ -117,6 +119,36 @@ the AS Store CMS at `/admin/spin`. Schema in [as_store/db/spin.sql](as_store/db/
 - Geometry lives in `src/lib/wheel.js` in **both** packages (a deliberate copy — the admin preview
   and the app wheel must land on the same slice). The app needs `react-native-svg`, so a native
   rebuild is required, not just an OTA update.
+
+## AS Points (loyalty — store + app + admin)
+
+Spend money, collect points; trade a block of them for money off. Schema in
+[as_store/db/loyalty.sql](as_store/db/loyalty.sql), API in
+[as_store/server/src/loyalty.js](as_store/server/src/loyalty.js), CMS at `/admin/loyalty`
+([page](as_store/src/app/admin/loyalty/page.jsx)), customer pages at `/account/points` on the
+website and [mobile/app/account/points.jsx](mobile/app/account/points.jsx) in the app. Defaults:
+**$1 = 1 point, 1,000 points = $50 off**, all three numbers CMS-editable.
+
+- **There is no balance column.** A balance is `SUM(loyalty_ledger.points)` — every point traces to
+  the order that paid for it, and nothing can drift out of step with the history the customer reads.
+  Rows are append-only; a correction is another row (`earn` / `revoke` / `redeem` / `adjust`).
+- **Earning is reconciled, not appended.** `syncOrderPoints(orderId)` compares what an order *should*
+  have awarded against what it already did and writes only the difference, so it is safe to call from
+  anywhere an order changes — it is wired into order creation, `markWhishPaid`, and the admin status
+  route. That is what makes delivered → cancelled → delivered land on the right number instead of
+  paying twice. `POST /api/admin/loyalty/resync` replays it over every order (the way to apply a
+  changed rate to history, or to backfill orders that predate the programme).
+- Points land per `settings.award_on` — `delivered` (default), `confirmed`, or `created` — and a
+  cancellation always takes them back. The basis is the items subtotal minus item discounts;
+  delivery and VAT never earn, and a free-delivery voucher therefore doesn't reduce it.
+- **Redeeming mints a voucher** (`source='points'`, `type='amount'`, `points_spent` recording the
+  cost) rather than adding a second discount path to checkout — the money rules stay the proven ones
+  in `spin.js`. Redemption is always a deliberate customer action from their points screen, in whole
+  blocks; the reward then appears in My rewards and the checkout picker like any other. Voiding or
+  deleting a points reward in the admin calls `refundVoucherPoints()` and hands the points back
+  (`spin.js` → `loyalty.js` is a one-way import; loyalty knows nothing about the spin).
+- The **website checkout gained the reward picker** the app already had — without it a redeemed
+  reward would be unspendable on the web.
 
 ## Backend
 

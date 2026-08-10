@@ -144,7 +144,8 @@ export default function PrivacyPolicy({ settings }) {
           <p>
             Deleting your account permanently removes your name, mobile number, email address, saved delivery
             addresses, sign-in history, notification settings and push tokens, rewards and prize-draw entries,
-            and any unused vouchers. It cannot be undone, and it stops all notifications to your devices.
+            any unused vouchers, and your AS Points balance and its history. It cannot be undone, and it stops
+            all notifications to your devices.
           </p>
           <p>
             We keep the record of orders you already placed — the items, amounts, and dates — because Lebanese

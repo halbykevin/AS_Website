@@ -211,8 +211,9 @@ export default function CheckoutScreen() {
           ))}
         </Card>
 
-        {/* Daily Spin rewards. Only shown when at least one applies to this bag —
-            an empty picker would just raise questions about rewards they don't have. */}
+        {/* Rewards — Daily Spin wins, redeemed AS Points, staff grants. Only
+            shown when at least one applies to this bag; an empty picker would
+            just raise questions about rewards they don't have. */}
         {usable.length > 0 ? (
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="h3">Your rewards</Text>
@@ -237,6 +238,7 @@ export default function CheckoutScreen() {
                     <Text variant="title">{v.label || rewardWorth(v)}</Text>
                     <Text variant="caption" muted style={{ marginTop: 2 }}>
                       {rewardWorth(v)} · saves {money(v.discount)}
+                      {v.source === 'points' ? ' · from AS Points' : ''}
                     </Text>
                   </View>
                 </Card>

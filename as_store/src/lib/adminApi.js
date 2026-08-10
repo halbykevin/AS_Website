@@ -199,6 +199,15 @@ export const adminApi = {
   updateVoucher: (id, data) => req(`/api/admin/vouchers/${id}`, { method: 'PUT', auth: true, body: data }),
   deleteVoucher: (id) => req(`/api/admin/vouchers/${id}`, { method: 'DELETE', auth: true }),
 
+  // AS Points — the loyalty programme: the rules, the ledger, manual adjustments
+  getLoyalty: () => req('/api/admin/loyalty', { auth: true }),
+  updateLoyalty: (data) => req('/api/admin/loyalty', { method: 'PUT', auth: true, body: data }),
+  listLoyaltyLedger: (params = {}) => req(`/api/admin/loyalty/ledger${qs(params)}`, { auth: true }),
+  adjustPoints: (data) => req('/api/admin/loyalty/adjust', { method: 'POST', auth: true, body: data }),
+  // Re-runs the earn rules over every order. Safe to repeat — it writes only
+  // the difference — and the way to apply a changed rate to past orders.
+  resyncPoints: () => req('/api/admin/loyalty/resync', { method: 'POST', auth: true }),
+
   // orders
   listOrders: (status) =>
     req(`/api/admin/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`, { auth: true }),

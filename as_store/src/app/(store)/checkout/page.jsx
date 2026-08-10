@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
-import { useAccount } from '@/lib/account'
+import Icon from '@/components/Icon.jsx'
+import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { money, deliveryFeeFor, vatAmountFor } from '@/lib/orders'
 import { trackBeginCheckout } from '@/lib/analytics'
@@ -48,9 +49,47 @@ export default function CheckoutPage() {
   }, [])
 
   const deliveryFee = deliveryFeeFor(total, delivery)
+
+  // Rewards on this account — redeemed AS Points, Daily Spin wins, staff grants.
+  // The server prices each one against this exact cart (`eligible` + `discount`
+  // come back with the list), so this page only renders its answer; the order it
+  // places is re-priced server-side regardless.
+  const [voucherCode, setVoucherCode] = useState('')
+  const [rewards, setRewards] = useState([])
+  useEffect(() => {
+    if (!customer || !items.length) {
+      setRewards([])
+      return undefined
+    }
+    let alive = true
+    accountApi
+      .vouchers(total)
+      .then((list) => alive && setRewards(Array.isArray(list) ? list : []))
+      .catch(() => alive && setRewards([]))
+    return () => {
+      alive = false
+    }
+  }, [customer, items.length, total])
+
+  const usable = rewards.filter((v) => v.eligible)
+  const applied = usable.find((v) => v.code === voucherCode) || null
+
+  // A free-delivery reward waives the fee; everything else comes off the items.
+  // VAT follows what is actually payable, matching the API's own arithmetic.
+  const deliveryWaived = applied?.type === 'free_delivery' ? deliveryFee : 0
+  const itemsDiscount = applied ? applied.discount - deliveryWaived : 0
+  const discount = applied?.discount || 0
   // Delivery is part of the taxable amount — same base the API uses.
-  const vatAmount = vatAmountFor(total + deliveryFee, vat)
-  const grandTotal = total + deliveryFee + vatAmount
+  const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), vat)
+  const grandTotal = total + deliveryFee + vatAmount - discount
+
+  // A reward that stops applying (the bag shrank below its minimum, or it was
+  // spent on another device) must not silently ride along on the order. Keyed on
+  // the codes themselves, since `usable` is a fresh array on every render.
+  const usableCodes = usable.map((v) => v.code).join(',')
+  useEffect(() => {
+    if (voucherCode && !usableCodes.split(',').includes(voucherCode)) setVoucherCode('')
+  }, [usableCodes, voucherCode])
 
   // Reaching this page IS beginning checkout — reported once per visit, and
   // only once the cart has hydrated from localStorage (the first render can
@@ -134,6 +173,7 @@ export default function CheckoutPage() {
         notes: form.notes,
         saveAddress: form.saveAddress,
         paymentMethod: pay,
+        ...(applied ? { voucherCode: applied.code } : null),
       })
       if (form.saveAddress) {
         setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
@@ -238,6 +278,45 @@ export default function CheckoutPage() {
               )}
             </div>
 
+            {/* Rewards. Only shown when at least one applies to this bag — an
+                empty picker would just raise questions about rewards they don't
+                have. Picking is optional and reversible right up to placing the
+                order: tapping the applied one again puts it back. */}
+            {usable.length > 0 && (
+              <div className="mt-6">
+                <p className="mb-2 text-sm font-medium text-as-ink/70">Your rewards</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {usable.map((v) => {
+                    const on = applied?.code === v.code
+                    return (
+                      <button
+                        type="button"
+                        key={v.id}
+                        onClick={() => setVoucherCode(on ? '' : v.code)}
+                        aria-pressed={on}
+                        className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
+                          on ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
+                        }`}
+                      >
+                        <Icon
+                          name={on ? 'check' : 'star'}
+                          className={`h-5 w-5 shrink-0 ${on ? 'text-as-red' : 'text-as-ink/35'}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold text-as-ink">{v.label || v.code}</span>
+                          <span className="mt-0.5 block text-sm text-as-ink/55">
+                            Saves {money(v.discount)}
+                            {v.source === 'points' ? ' · redeemed with AS Points' : ''}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-as-ink/45">One reward per order.</p>
+              </div>
+            )}
+
             <div className="mt-6">
               <p className="mb-2 text-sm font-medium text-as-ink/70">Payment</p>
               <div className="grid grid-cols-1 gap-2">
@@ -304,6 +383,12 @@ export default function CheckoutPage() {
                 <div className="flex items-center justify-between text-as-ink/60">
                   <span>VAT ({Number(vat.percent)}%)</span>
                   <span>{money(vatAmount)}</span>
+                </div>
+              )}
+              {discount > 0 && (
+                <div className="flex items-center justify-between font-medium text-as-red">
+                  <span className="truncate">{applied?.label || 'Reward'}</span>
+                  <span>−{money(discount)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between pt-1">

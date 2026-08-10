@@ -18,6 +18,10 @@ import crypto from 'node:crypto'
 import { query, withTransaction } from './db.js'
 import { requireAuth } from './auth.js'
 import { requireCustomer, optionalCustomer } from './customerAuth.js'
+// One-way edge: loyalty.js knows nothing about the spin, so importing it here
+// cannot create a cycle. Voiding a reward that was bought with points has to
+// hand those points back, and the admin voucher routes live in this file.
+import { refundVoucherPoints } from './loyalty.js'
 
 const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
 
@@ -110,6 +114,9 @@ const voucherJson = (r) => {
     maxDiscount: Number(r.max_discount ?? 0),
     label: r.label || '',
     description: r.description || '',
+    // Non-zero only on a reward bought with AS Points — and the amount that
+    // goes back to the customer if staff void it.
+    pointsSpent: Number(r.points_spent ?? 0),
     status,
     // Can checkout apply it right now, ignoring the cart? (A gift never can.)
     redeemable: status === 'active' && REDEEMABLE_TYPES.has(r.type),
@@ -759,6 +766,13 @@ r.put(
       ],
     )
     if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+    // Voiding a reward the customer *bought* with AS Points puts the points
+    // back on their account — otherwise cancelling it would quietly take them.
+    if (status === 'cancelled' && rows[0].source === 'points') {
+      await refundVoucherPoints(rows[0].id).catch((e) =>
+        console.error('[points] refund voucher:', e?.message || e),
+      )
+    }
     res.json(voucherJson(rows[0]))
   }),
 )
@@ -767,6 +781,11 @@ r.delete(
   '/api/admin/vouchers/:id',
   requireAuth,
   ah(async (req, res) => {
+    // Refund before the row goes: loyalty_ledger.voucher_id is ON DELETE SET
+    // NULL, so afterwards there is nothing left to work out what was owed.
+    await refundVoucherPoints(req.params.id).catch((e) =>
+      console.error('[points] refund voucher:', e?.message || e),
+    )
     await query(`DELETE FROM vouchers WHERE id = $1`, [Number(req.params.id)])
     res.status(204).end()
   }),

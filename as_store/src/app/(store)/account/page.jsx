@@ -45,9 +45,11 @@ export default function AccountPage() {
           </button>
         </div>
 
+        <PointsCard />
+
         <Link
           href="/account/notifications"
-          className="mt-10 flex items-center gap-3 rounded-2xl border border-as-ink/10 p-5 transition hover:border-as-ink/25"
+          className="mt-4 flex items-center gap-3 rounded-2xl border border-as-ink/10 p-5 transition hover:border-as-ink/25"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-as-red/10 text-as-red">
             <Icon name="bell" className="h-5 w-5" />
@@ -66,6 +68,45 @@ export default function AccountPage() {
         <ProfileForm customer={customer} onSaved={setCustomer} />
       </div>
     </section>
+  )
+}
+
+// The points balance, with the one thing worth surfacing here: whether there is
+// enough to cash in. Hidden entirely while the programme is off *and* the
+// customer has no balance — an account that collected points before it was
+// paused still gets to see them.
+function PointsCard() {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    accountApi.loyalty().then(setData).catch(() => setData(null))
+  }, [])
+
+  if (!data || (!data.enabled && !data.balance)) return null
+  const ready = Number(data.blocks || 0) > 0
+
+  return (
+    <Link
+      href="/account/points"
+      className="mt-10 flex items-center gap-3 rounded-2xl border border-as-ink/10 p-5 transition hover:border-as-ink/25"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-as-red/10 text-as-red">
+        <Icon name="star" className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-as-ink">
+          {Number(data.balance || 0).toLocaleString()} {data.title || 'AS Points'}
+        </span>
+        <span className="block text-sm text-as-ink/55">
+          {ready
+            ? `Ready to redeem for ${money(data.blocks * data.redeemValue)} off`
+            : `Earn ${Number(data.redeemBlock || 0).toLocaleString()} points for ${money(data.redeemValue)} off`}
+        </span>
+      </span>
+      {ready && (
+        <span className="rounded-full bg-as-red px-3 py-1 text-xs font-semibold text-white">Redeem</span>
+      )}
+      <Icon name="chevronRight" className="h-5 w-5 text-as-ink/40" />
+    </Link>
   )
 }
 

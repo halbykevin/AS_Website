@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { useSpin } from '@/src/lib/spin';
+import { useLoyalty, points as fmtPoints } from '@/src/lib/loyalty';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
@@ -21,6 +22,12 @@ export default function AccountScreen() {
   const loading = account?.loading;
   const { data: spin } = useSpin(Boolean(customer));
   const spinOn = Boolean(spin?.enabled);
+  // Points get a row of their own with the balance on it — the number is the
+  // reason anyone taps through. Kept out of the menu when the programme is off
+  // *and* there is nothing collected, so the account never links to an empty
+  // screen; a paused programme still shows a balance that was earned.
+  const { data: loyalty } = useLoyalty(Boolean(customer));
+  const pointsOn = Boolean(loyalty?.enabled || Number(loyalty?.balance) > 0);
   const [google, setGoogle] = useState(false);
   const [error, setError] = useState('');
 
@@ -91,6 +98,17 @@ export default function AccountScreen() {
             {/* Menu */}
             <Card padded={false}>
               <MenuRow icon="box" label="Your orders" onPress={() => router.push('/orders')} />
+              {pointsOn ? (
+                <>
+                  <Divider inset={theme.spacing.lg} />
+                  <MenuRow
+                    icon="star"
+                    label={loyalty?.title || 'AS Points'}
+                    value={`${fmtPoints(loyalty?.balance)} pts`}
+                    onPress={() => router.push('/account/points')}
+                  />
+                </>
+              ) : null}
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="bell" label="Notifications" onPress={() => router.push('/notifications')} />
               <Divider inset={theme.spacing.lg} />
@@ -99,7 +117,9 @@ export default function AccountScreen() {
               <MenuRow icon="settings" label="Edit profile" onPress={() => router.push('/account/edit')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="mail" label="Notification settings" onPress={() => router.push('/account/notifications')} />
-              {spinOn ? (
+              {/* Rewards come from the spin *and* from redeemed points, so the
+                  row shows whenever either can produce one. */}
+              {spinOn || pointsOn ? (
                 <>
                   <Divider inset={theme.spacing.lg} />
                   <MenuRow icon="ticket" label="My rewards" onPress={() => router.push('/account/rewards')} />
@@ -139,7 +159,7 @@ export default function AccountScreen() {
   );
 }
 
-function MenuRow({ icon, label, onPress }) {
+function MenuRow({ icon, label, value, onPress }) {
   const theme = useTheme();
   return (
     <Card onPress={onPress} bordered={false} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
@@ -147,6 +167,11 @@ function MenuRow({ icon, label, onPress }) {
       <Text variant="body" style={{ flex: 1 }}>
         {label}
       </Text>
+      {value ? (
+        <Text variant="callout" weight="semibold" color="primary">
+          {value}
+        </Text>
+      ) : null}
       <Icon name="chevronRight" size={20} color={theme.colors.textFaint} />
     </Card>
   );

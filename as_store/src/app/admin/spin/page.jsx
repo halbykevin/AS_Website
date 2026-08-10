@@ -709,7 +709,16 @@ function RewardsTab() {
                   </td>
                   <td className="py-2.5 pr-3">
                     <p className="text-admin-text">{v.label || typeLabel(v.type)}</p>
-                    <p className="text-xs text-admin-text/45">{prizeWorth(v)}</p>
+                    <p className="text-xs text-admin-text/45">
+                      {prizeWorth(v)}
+                      {/* Where it came from matters here: voiding a points
+                          reward hands those points back to the customer. */}
+                      {v.source === 'points'
+                        ? ` · bought with ${Number(v.pointsSpent || 0).toLocaleString()} AS Points`
+                        : v.source === 'admin'
+                          ? ' · granted by staff'
+                          : ''}
+                    </p>
                   </td>
                   <td className="py-2.5 pr-3">
                     <VoucherStatusBadge status={v.status} />

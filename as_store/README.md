@@ -72,6 +72,25 @@ There is no storefront page: the wheel is app-only, the admin is here.
 - The server owns the draw and every money rule — see `server/src/spin.js` and `db/spin.sql`. This
   page only edits them.
 
+## AS Points
+
+The loyalty programme, configured at **`/admin/loyalty`** — two tabs: the deal (the rules and the
+copy) and the points ledger. Customers see it at `/account/points` on the website and under Account
+in the app. Defaults: **$1 spent = 1 point, 1,000 points = $50 off**.
+
+- **Balances are the sum of a ledger**, never a stored total, so every point traces back to the order
+  that paid for it. Nothing is ever edited or deleted — a correction is another row.
+- **Points land when an order is delivered** by default (`confirmed` and `created` are the other
+  options), and a cancellation takes them straight back. They are earned on the items subtotal after
+  discounts; delivery and VAT don't earn.
+- **Redeeming makes a reward, not an automatic discount.** The customer chooses how many whole
+  blocks to trade; what they get is a single-use `$ off` voucher on their account, picked at
+  checkout exactly like a Daily Spin reward. Voiding one in the Rewards tab returns the points.
+- Changed the rate, or have orders that predate the programme? **Recalculate all orders** replays
+  the earn rules over the whole history — safe to run any number of times, since it only ever writes
+  the difference. Staff can also give or take points by hand, with a reason the customer sees.
+- Rules live in `server/src/loyalty.js` and `db/loyalty.sql`. This page only edits them.
+
 ## Next steps (prompt by prompt)
 
 - Category / product-detail pages (Apple PDP: full-bleed sections, sticky buy bar)

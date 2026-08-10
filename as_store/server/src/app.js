@@ -51,6 +51,7 @@ import {
   releaseVoucher,
   VoucherError,
 } from "./spin.js";
+import { loyaltyRouter, syncOrderPointsSafe } from "./loyalty.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.resolve(
@@ -1178,8 +1179,9 @@ app.put(
 // Required by both app stores for any app that creates accounts, and the only
 // honest answer to "delete my data". Deleting the customers row cascades to
 // everything personal (notifications, device tokens + prefs, login history,
-// survey answers, spins, vouchers, pending OAuth codes), so pushes stop and the
-// account cannot be signed back into.
+// survey answers, spins, vouchers, the AS Points ledger and its balance,
+// pending OAuth codes), so pushes stop and the account cannot be signed back
+// into.
 //
 // Orders are the exception: `orders.customer_id` is ON DELETE SET NULL, so the
 // financial record survives the account — Lebanese bookkeeping needs the sale,
@@ -1407,6 +1409,9 @@ app.post(
         [customerId, fullName, phone, address, email],
       );
     }
+    // AS Points. A no-op unless the programme awards on 'created' — under the
+    // default rule this order earns nothing until it is delivered.
+    await syncOrderPointsSafe(orderId);
     // Transactional outbox: the notification worker turns this into the
     // "order received" message. Never blocks or fails the order.
     await emitEvent(
@@ -1466,8 +1471,10 @@ app.post(
           [orderId],
         );
         // The order never reached a payment page, so the reward goes back to the
-        // customer rather than being burnt on a cancelled order.
+        // customer rather than being burnt on a cancelled order — and so do any
+        // points it had already earned.
         if (voucher) await releaseVoucher(voucher.id).catch(() => {});
+        await syncOrderPointsSafe(orderId);
         return res.status(502).json({
           error: "Could not start the online payment. Please try again.",
         });
@@ -1498,6 +1505,9 @@ async function markWhishPaid(orderId) {
   console.log(
     `[whish] order #${orderId} → marked PAID + confirmed, sending emails`,
   );
+  // Being paid moves the order to 'confirmed' — points if the programme
+  // awards that early, nothing yet under the default 'delivered' rule.
+  await syncOrderPointsSafe(orderId);
   const detail = await loadOrderDetail(orderId);
   sendOrderEmails(detail, signOrderToken(orderId)).catch((e) =>
     console.error("[mail]", e?.message || e),
@@ -1679,6 +1689,10 @@ app.put(
         console.error("[spin] release voucher:", e?.message || e),
       );
     }
+    // AS Points. Reconciled rather than awarded, so this is safe on any
+    // transition — reaching 'delivered' credits the order, leaving it (a
+    // cancellation, a correction back to 'shipped') takes the points back.
+    if (rows[0]) await syncOrderPointsSafe(rows[0].id);
     if (rows[0]) {
       await emitEvent(
         "order_status_changed",
@@ -1732,6 +1746,7 @@ const CUSTOMER_SORTS = {
   logins: "login_count",
   orders: "order_count",
   spent: "total_spent",
+  points: "points_balance",
 };
 
 const customerRowJson = (r) => ({
@@ -1750,6 +1765,7 @@ const customerRowJson = (r) => ({
   orderCount: Number(r.order_count || 0),
   totalSpent: Number(r.total_spent || 0),
   lastOrderAt: r.last_order_at,
+  pointsBalance: Number(r.points_balance || 0),
 });
 
 const loginRowJson = (r) => ({
@@ -1773,7 +1789,8 @@ const CUSTOMER_SELECT = `
     (SELECT array_agg(DISTINCT l.method) FROM customer_logins l WHERE l.customer_id = c.id) AS methods_used,
     (SELECT count(*) FROM orders o WHERE o.customer_id = c.id)::int AS order_count,
     (SELECT COALESCE(sum(o.subtotal + o.delivery_fee + o.vat_amount), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
-    (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at
+    (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at,
+    (SELECT COALESCE(sum(l.points), 0) FROM loyalty_ledger l WHERE l.customer_id = c.id)::int AS points_balance
   FROM customers c`;
 
 app.get(
@@ -2965,6 +2982,7 @@ app.use(whatsappRouter);
 app.use(scraperRouter);
 app.use(notificationsRouter);
 app.use(spinRouter);
+app.use(loyaltyRouter);
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {
