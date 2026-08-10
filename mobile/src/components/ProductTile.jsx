@@ -101,7 +101,10 @@ function ProductTile({ product, fluid = false, width }) {
       </Pressable>
 
       <Pressable onPress={open} style={styles.imageWrap}>
-        <RemoteImage uri={image} style={styles.image} contentFit="contain" fallbackIcon="box" />
+        {/* `fallbackBackground` stays tinted on purpose: with the wrap now white,
+            a missing image would otherwise be a blank white void with a faint
+            icon in it, indistinguishable from a photo that simply hasn't loaded. */}
+        <RemoteImage uri={image} style={styles.image} contentFit="contain" fallbackIcon="box" fallbackBackground={theme.colors.surfaceAlt} />
         {/* Overlaid rather than stacked in the footer: as a flow row it was the
             only part of the tile that appeared conditionally, which made the
             height vary and getItemLayout impossible. */}
@@ -151,7 +154,9 @@ const makeStyles = t => ({
     height: IMAGE_H,
     borderRadius: t.radii.xl,
     overflow: 'hidden',
-    backgroundColor: t.colors.surfaceAlt
+    // White, not surfaceAlt: the photos already come on white, so a tinted box
+    // here reads as a white rectangle pasted into a grey one. See `productMedia`.
+    backgroundColor: t.colors.productMedia
   },
   image: { width: '100%', height: '100%' },
   footer: { marginTop: t.spacing.md },

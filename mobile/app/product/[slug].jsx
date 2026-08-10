@@ -117,12 +117,12 @@ export default function ProductDetailScreen() {
               key={i}
               onPress={() => img && setViewerAt(i)}
               disabled={!img}
-              style={{ width: galleryWidth, aspectRatio: 1, backgroundColor: theme.colors.surfaceAlt }}
+              style={{ width: galleryWidth, aspectRatio: 1, backgroundColor: theme.colors.productMedia }}
               accessibilityRole="imagebutton"
               accessibilityLabel={`${product.name}, photo ${i + 1} of ${images.length || 1}`}
               accessibilityHint="Opens full screen, where you can zoom"
             >
-              <RemoteImage uri={img} style={{ width: '100%', height: '100%' }} contentFit="contain" fallbackIcon="box" />
+              <RemoteImage uri={img} style={{ width: '100%', height: '100%' }} contentFit="contain" fallbackIcon="box" fallbackBackground={theme.colors.surfaceAlt} />
             </Pressable>
           ))}
         </ScrollView>

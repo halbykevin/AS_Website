@@ -38,6 +38,16 @@ export const lightColors = {
   surface: palette.white,
   surfaceAlt: palette.asFog,
   surfaceSunken: palette.asBg,
+  // The surface a *product photo* sits on. Product photography is shot on white,
+  // so anything tinted behind it just frames the photo's own white background as
+  // a visible rectangle inside the tile — the picture stops being the product and
+  // starts being a white box. White here makes that seam disappear.
+  //
+  // Kept separate from `surface` even though they match today: this one is
+  // dictated by the photography, not by the design. A dark theme would flip
+  // `surface` to ink and must leave this alone, or every product in the catalog
+  // gets a glowing white slab behind it.
+  productMedia: palette.white,
   // The dark chrome used by the store nav / hero blocks.
   inverse: palette.asInk,
   inverseSoft: palette.asInkSoft,
