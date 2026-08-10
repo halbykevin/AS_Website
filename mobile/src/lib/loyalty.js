@@ -62,6 +62,25 @@ export function useRedeemPoints() {
   });
 }
 
+// --- earn estimates --------------------------------------------------------
+//
+// What a shopper is told they will earn, before the order exists. These mirror
+// `pointsForOrder()` in as_store/server/src/loyalty.js exactly — earned on the
+// money that buys goods, after item discounts, rounded down — so the promise
+// made on a product page is the one the server keeps. Delivery and VAT are not
+// part of the basis and must never be passed in.
+
+export const pointsFor = (amount, rules) => {
+  if (!rules?.enabled) return 0;
+  const rate = Number(rules.earnRate) || 0;
+  return Math.max(0, Math.floor((Number(amount) || 0) * rate));
+};
+
+// Points are only ever spendable a whole block at a time, so a pro-rata
+// "value" would promise money that could not actually be redeemed.
+export const blocksIn = (n, rules) => Math.floor((Number(n) || 0) / Math.max(1, Number(rules?.redeemBlock) || 1));
+export const blocksWorth = (n, rules) => blocksIn(n, rules) * (Number(rules?.redeemValue) || 0);
+
 // --- display helpers -------------------------------------------------------
 
 export const points = n => Number(n || 0).toLocaleString();

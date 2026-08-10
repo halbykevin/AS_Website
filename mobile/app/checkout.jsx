@@ -14,6 +14,7 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 import RemoteImage from '@/src/components/RemoteImage';
+import PointsEarn from '@/src/components/PointsEarn';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -210,6 +211,12 @@ export default function CheckoutScreen() {
             </View>
           ))}
         </Card>
+
+        {/* What this order earns. Deliberately here rather than in the sticky
+            total bar: it is not a charge, and that stack reads like one. The
+            basis is the items after any discount — the same one the server
+            credits on. */}
+        <PointsEarn amount={total - itemsDiscount} signedIn={Boolean(customer)} verb="You'll earn" />
 
         {/* Rewards — Daily Spin wins, redeemed AS Points, staff grants. Only
             shown when at least one applies to this bag; an empty picker would

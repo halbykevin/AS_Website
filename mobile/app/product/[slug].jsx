@@ -11,6 +11,7 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion, Markdown } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
+import PointsEarn from '@/src/components/PointsEarn';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -171,6 +172,9 @@ export default function ProductDetailScreen() {
             <Text variant="h2">{money(priceNum)}</Text>
           )}
         </View>
+
+        {/* What buying this earns — hidden entirely when the programme is off. */}
+        <PointsEarn amount={priceNum} verb="Earn" />
 
         {/* Colours */}
         {Array.isArray(product.colors) && product.colors.length ? (

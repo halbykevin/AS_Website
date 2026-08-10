@@ -7,6 +7,7 @@ import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
+import { useLoyalty } from '@/lib/loyalty'
 
 export default function AccountPage() {
   const { customer, loading, logout, setCustomer } = useAccount()
@@ -76,10 +77,7 @@ export default function AccountPage() {
 // customer has no balance — an account that collected points before it was
 // paused still gets to see them.
 function PointsCard() {
-  const [data, setData] = useState(null)
-  useEffect(() => {
-    accountApi.loyalty().then(setData).catch(() => setData(null))
-  }, [])
+  const { data } = useLoyalty()
 
   if (!data || (!data.enabled && !data.balance)) return null
   const ready = Number(data.blocks || 0) > 0

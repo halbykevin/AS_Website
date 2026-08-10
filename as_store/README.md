@@ -86,6 +86,10 @@ in the app. Defaults: **$1 spent = 1 point, 1,000 points = $50 off**.
 - **Redeeming makes a reward, not an automatic discount.** The customer chooses how many whole
   blocks to trade; what they get is a single-use `$ off` voucher on their account, picked at
   checkout exactly like a Daily Spin reward. Voiding one in the Rewards tab returns the points.
+- **Shoppers see it before they buy**: "Earn 1,260 AS Points with this purchase" sits under the price
+  on a product page and above the Place order button at checkout. Both disappear when the programme
+  is off, and both quote value in whole redeemable blocks — never a pro-rata figure that couldn't
+  actually be cashed in.
 - Changed the rate, or have orders that predate the programme? **Recalculate all orders** replays
   the earn rules over the whole history — safe to run any number of times, since it only ever writes
   the difference. Staff can also give or take points by hand, with a reason the customer sees.

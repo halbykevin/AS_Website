@@ -10,18 +10,22 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
+import { useLoyalty, num } from '@/lib/loyalty'
 import { money } from '@/lib/orders'
 
-const num = (n) => Number(n || 0).toLocaleString()
 const when = (d) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
 
 export default function PointsPage() {
   const { customer, loading } = useAccount()
   const router = useRouter()
-  const [data, setData] = useState(null)
+  const qc = useQueryClient()
+  // The one shared ['loyalty'] query — invalidating it after a redemption also
+  // refreshes the account card and the checkout estimate.
+  const { data, isError } = useLoyalty()
   const [busy, setBusy] = useState(false)
   const [blocks, setBlocks] = useState(1)
   const [error, setError] = useState('')
@@ -31,24 +35,21 @@ export default function PointsPage() {
     if (!loading && !customer) router.replace('/login?next=/account/points')
   }, [loading, customer, router])
 
-  const load = () =>
-    accountApi
-      .loyalty()
-      .then((d) => {
-        setData(d)
-        setBlocks((b) => Math.min(Math.max(1, b), Math.max(1, d.blocks || 1)))
-      })
-      .catch(() => setData({ enabled: false }))
-
+  // Keep the chosen amount inside what the balance can actually buy — it shrinks
+  // the moment a redemption goes through.
+  const maxBlocks = Math.max(1, Number(data?.blocks) || 1)
   useEffect(() => {
-    if (customer) load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customer])
+    setBlocks((b) => Math.min(Math.max(1, b), maxBlocks))
+  }, [maxBlocks])
 
   if (loading || !customer || !data) {
     return (
       <section className="bg-white pt-28 sm:pt-32">
-        <div className="mx-auto max-w-2xl px-6 py-20 text-center text-as-ink/40">Loading…</div>
+        <div className="mx-auto max-w-2xl px-6 py-20 text-center text-as-ink/40">
+          {/* Never leave it spinning on a failed fetch — a balance that won't
+              load is exactly the moment a customer needs to be told why. */}
+          {isError ? 'We couldn’t load your points just now. Please try again in a moment.' : 'Loading…'}
+        </div>
       </section>
     )
   }
@@ -59,7 +60,10 @@ export default function PointsPage() {
     try {
       const res = await accountApi.redeemPoints(blocks)
       setWon(res.reward)
-      await load()
+      // Refreshes the balance, the history, and the account card behind it.
+      // (Checkout fetches its rewards on mount, so it picks the new one up on
+      // its own next visit.)
+      await qc.invalidateQueries({ queryKey: ['loyalty'] })
     } catch (e) {
       setError(e.message)
     } finally {

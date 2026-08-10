@@ -14,6 +14,7 @@ import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
 import { trackViewItem } from '@/lib/analytics'
+import { useLoyalty, pointsFor, num } from '@/lib/loyalty'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
@@ -135,6 +136,8 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               )}
             </div>
 
+            <PointsLine amount={price * qty} />
+
             {colors.length > 0 && (
               <div className="mt-6">
                 <p className="mb-2 text-sm font-medium text-as-ink/70">Colour</p>
@@ -209,5 +212,33 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
         <ProductTabs description={product.description} specs={product.specs} />
       </div>
     </section>
+  )
+}
+
+// "Earn 1,260 AS Points with this purchase." Renders nothing at all unless the
+// programme is running and this amount actually earns something, so a shop with
+// no loyalty scheme sees no trace of it.
+//
+// The figure follows the quantity stepper because that is what the order will
+// be worth. It is deliberately quiet about value: points are only spendable a
+// full block at a time, so the rule is stated instead of a pro-rata "$63 back"
+// that could not be redeemed.
+function PointsLine({ amount }) {
+  const { data: rules } = useLoyalty()
+  const points = pointsFor(amount, rules)
+  if (!points) return null
+
+  return (
+    <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-as-fog px-4 py-3">
+      <Icon name="star" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
+      <p className="text-sm text-as-ink/70">
+        Earn <strong className="font-semibold text-as-ink">{num(points)} {rules.title || 'AS Points'}</strong>{' '}
+        with this purchase
+        <span className="block text-xs text-as-ink/45">
+          {num(rules.redeemBlock)} points = {money(rules.redeemValue)} off a future order · added once yours is
+          delivered
+        </span>
+      </p>
+    </div>
   )
 }

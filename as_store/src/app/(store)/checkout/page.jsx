@@ -10,6 +10,7 @@ import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { money, deliveryFeeFor, vatAmountFor } from '@/lib/orders'
 import { trackBeginCheckout } from '@/lib/analytics'
+import { useLoyalty, pointsFor, blocksIn, blocksWorth, pointsToBlock, num } from '@/lib/loyalty'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -90,6 +91,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (voucherCode && !usableCodes.split(',').includes(voucherCode)) setVoucherCode('')
   }, [usableCodes, voucherCode])
+
+  // What this order will earn. Same basis the server credits on — the items,
+  // after any item discount — so the promise made here is the one kept.
+  const { data: loyalty } = useLoyalty()
+  const pointsEarned = pointsFor(total - itemsDiscount, loyalty)
+  // Measured against what they already hold, so the "almost there" line is the
+  // truth for this shopper rather than for a brand-new account.
+  const pointsAfter = Number(loyalty?.balance || 0) + pointsEarned
 
   // Reaching this page IS beginning checkout — reported once per visit, and
   // only once the cart has hydrated from localStorage (the first render can
@@ -396,6 +405,27 @@ export default function CheckoutPage() {
                 <span className="text-xl font-semibold text-as-ink">{money(grandTotal)}</span>
               </div>
             </div>
+            {/* What the order earns, kept out of the money column above — it is
+                not a charge, and putting it in that stack reads like one. */}
+            {pointsEarned > 0 && (
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-as-fog px-4 py-3">
+                <Icon name="star" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
+                <p className="text-sm text-as-ink/70">
+                  You’ll earn{' '}
+                  <strong className="font-semibold text-as-ink">
+                    {num(pointsEarned)} {loyalty.title || 'AS Points'}
+                  </strong>{' '}
+                  on this order
+                  <span className="block text-xs text-as-ink/45">
+                    {blocksIn(pointsAfter, loyalty) > 0
+                      ? `Takes you to ${money(blocksWorth(pointsAfter, loyalty))} off a future order.`
+                      : `${num(pointsToBlock(pointsAfter, loyalty))} more and you can redeem ${money(loyalty.redeemValue)} off.`}{' '}
+                    Added once this order is delivered.
+                  </span>
+                </p>
+              </div>
+            )}
+
             <button type="submit" disabled={busy} className="pill mt-5 w-full justify-center">
               {busy ? 'Please wait…' : pay === 'whish' ? 'Continue to payment' : 'Place order'}
             </button>

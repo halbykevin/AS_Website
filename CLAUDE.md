@@ -149,6 +149,13 @@ website and [mobile/app/account/points.jsx](mobile/app/account/points.jsx) in th
   (`spin.js` → `loyalty.js` is a one-way import; loyalty knows nothing about the spin).
 - The **website checkout gained the reward picker** the app already had — without it a redeemed
   reward would be unspendable on the web.
+- **"Earn N points" appears on the product page and at checkout**, on both platforms
+  ([as_store/src/lib/loyalty.js](as_store/src/lib/loyalty.js) → `pointsFor`, and
+  [mobile/src/components/PointsEarn.jsx](mobile/src/components/PointsEarn.jsx)). Those estimates
+  mirror `pointsForOrder()` on the server exactly — item spend after discounts, rounded down — so a
+  promise made before checkout is the one the server keeps; pass item money only, never delivery or
+  VAT. They render nothing when the programme is off. Value is quoted in **whole blocks only**
+  (`blocksWorth`), never pro-rata: points can't be redeemed a fraction of a block at a time.
 
 ## Backend
 
