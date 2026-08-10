@@ -160,6 +160,19 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_purchase_label        TEXT DEF
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_begin_checkout_label  TEXT DEFAULT '';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS ads_add_to_cart_label     TEXT DEFAULT '';
 
+-- --- "Call for price" ------------------------------------------------------
+-- What a price-hidden product shows instead. One set of copy for the whole
+-- catalogue; which products use it is the per-product `call_for_price` flag.
+--
+-- The button opens WhatsApp to `contact_whatsapp` with `call_for_price_message`
+-- pre-filled ({product} and {url} are substituted), unless call_for_price_url
+-- is set — that wins, and is the escape hatch for pointing somewhere else.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_label   TEXT DEFAULT 'Call for price';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_button  TEXT DEFAULT 'Ask for a price';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_note    TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_message TEXT DEFAULT 'Hi AS Store, I''d like a price for {product} — {url}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_url     TEXT DEFAULT '';
+
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (
   id         SERIAL PRIMARY KEY,
@@ -201,6 +214,16 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS source_url TEXT DEFAULT '';
 
 -- Backfill the structured specifications table on databases created before it existed.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS specs JSONB DEFAULT '[]'::jsonb;
+
+-- "Call for price": hide this product's price and offer a WhatsApp enquiry
+-- instead. Used for lines we may not advertise a price on (Apple hardware).
+--
+-- The price stays in this column — the sales engine, past orders and the admin
+-- all still need it. What the flag changes is that the public API stops
+-- returning it, so it is absent from the page, the JSON and the structured data
+-- Google reads, and the product cannot be added to a bag or ordered.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS call_for_price BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_products_call_for_price ON products(call_for_price) WHERE call_for_price;
 
 CREATE INDEX IF NOT EXISTS idx_products_brand  ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);

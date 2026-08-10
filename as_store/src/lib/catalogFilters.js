@@ -49,6 +49,12 @@ export function tileLayout(cols) {
 
 const price = (p) => Number(p.price) || 0
 const onSale = (p) => Boolean(p.oldPrice) && Number(p.oldPrice) > price(p)
+// "Call for price" products arrive with price === null. Left alone they would
+// read as $0: bottom of the price slider, first result under "Low to High",
+// and a match for any price filter. They have no price, so they take no part in
+// price arithmetic — excluded from the bounds and from a price-filtered result,
+// and sorted last rather than first.
+const noPrice = (p) => Boolean(p.callForPrice) || p.price == null
 
 // Unique categories present in the list, with a product count, sorted by name.
 // Used on /shop where the list spans the whole catalog.
@@ -80,7 +86,7 @@ export function brandFacets(products) {
 
 // Min/max price across the list (rounded to whole units).
 export function priceBounds(products) {
-  const prices = products.map(price)
+  const prices = products.filter((p) => !noPrice(p)).map(price)
   if (!prices.length) return { min: 0, max: 0 }
   return { min: Math.floor(Math.min(...prices)), max: Math.ceil(Math.max(...prices)) }
 }
@@ -89,6 +95,9 @@ export function applyFilters(products, { cat = '', brand = '', min = null, max =
   return products.filter((p) => {
     if (cat && p.categorySlug !== cat) return false
     if (brand && slugify(p.brand) !== brand) return false
+    // A product with no price cannot satisfy a price range — saying it does
+    // would put an unpriced item inside "under $500".
+    if ((min != null || max != null) && noPrice(p)) return false
     if (min != null && price(p) < min) return false
     if (max != null && price(p) > max) return false
     if (sale && !onSale(p)) return false
@@ -118,10 +127,11 @@ export function paginate(products, page, perPage = PAGE_SIZE) {
 export function sortProducts(products, sort) {
   const arr = [...products]
   switch (sort) {
+    // Unpriced products go last in both directions — they are not "cheapest".
     case 'price-asc':
-      return arr.sort((a, b) => price(a) - price(b))
+      return arr.sort((a, b) => noPrice(a) - noPrice(b) || price(a) - price(b))
     case 'price-desc':
-      return arr.sort((a, b) => price(b) - price(a))
+      return arr.sort((a, b) => noPrice(a) - noPrice(b) || price(b) - price(a))
     case 'newest':
       return arr.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
     case 'name':

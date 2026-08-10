@@ -8,6 +8,7 @@ import { addItem } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 import { SITE_URL } from '@/lib/seo'
 import { productImage } from '@/lib/productImage'
+import { isCallForPrice, useCallForPrice, enquiryUrl } from '@/lib/callForPrice'
 
 // Clean Apple Store product card: name, tagline, centered image, colour dots,
 // "From $X", and an Add to Bag pill (wired to Redux). `fluid` fills its parent
@@ -25,6 +26,13 @@ import { productImage } from '@/lib/productImage'
 // full-width line under both.
 export default function ProductTile({ product, fluid = false, layout = 'card' }) {
   const dispatch = useDispatch()
+  // Price-hidden products (Apple hardware, mostly): the API sends no price for
+  // these at all, so the tile shows the enquiry label where the price goes and
+  // swaps Add to Bag for the WhatsApp button. They must not be addable — the
+  // server refuses to sell them, and a bag that can't be checked out is worse
+  // than no button.
+  const cfp = useCallForPrice()
+  const quoteOnly = isCallForPrice(product)
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
 
@@ -96,7 +104,9 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
 
   const Price = ({ className = '' }) => (
     <div className={className}>
-      {onSale ? (
+      {quoteOnly ? (
+        <p className="text-sm font-semibold text-as-red sm:text-base">{cfp.label}</p>
+      ) : onSale ? (
         <p className={`flex gap-2 text-sm sm:text-base ${S.price}`}>
           <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
           <span className="text-xs text-as-ink/40 line-through sm:text-sm">${oldPrice.toLocaleString()}</span>
@@ -163,9 +173,20 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
         {/* Action row: the bag pill takes the space, share sits beside it — kept
             in normal flow so it can never overlap the name/price on narrow cards. */}
         <div className="mt-2 flex w-full items-center gap-2 sm:mt-3">
-          <button onClick={add} className="pill min-w-0 flex-1 px-3 text-sm sm:px-5 sm:text-base">
-            Add to Bag
-          </button>
+          {quoteOnly ? (
+            <Link
+              href={enquiryUrl(product, cfp) || href}
+              target={enquiryUrl(product, cfp) ? '_blank' : undefined}
+              rel="noreferrer"
+              className="pill min-w-0 flex-1 justify-center px-3 text-sm sm:px-5 sm:text-base"
+            >
+              {cfp.button}
+            </Link>
+          ) : (
+            <button onClick={add} className="pill min-w-0 flex-1 px-3 text-sm sm:px-5 sm:text-base">
+              Add to Bag
+            </button>
+          )}
           <ShareMenu
             url={slug ? `${SITE_URL}/product/${slug}` : undefined}
             title={name}

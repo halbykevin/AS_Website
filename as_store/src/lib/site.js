@@ -37,6 +37,15 @@ export const defaultSettings = {
     adsBeginCheckoutLabel: '',
     adsAddToCartLabel: '',
   },
+  // What a price-hidden product shows instead of a price. Mirrors the column
+  // defaults so the fallback settings still render a sensible button.
+  callForPrice: {
+    label: 'Call for price',
+    button: 'Ask for a price',
+    note: '',
+    message: "Hi AS Store, I'd like a price for {product} — {url}",
+    url: '',
+  },
   // The category links are built from the categories themselves; these are just
   // extra custom links appended after them (the nav menu is category-driven).
   navLinks: [{ label: 'Support', href: '/pages/support' }],
@@ -46,6 +55,16 @@ export const defaultSettings = {
     { title: 'Company', links: [{ label: 'About AS', href: '/pages/about' }, { label: 'Privacy Policy', href: '/pages/privacy' }] },
   ],
 }
+
+// Flattens the two settings branches the "call for price" UI needs into the one
+// object its components consume, so no call site has to know the settings shape.
+// Lives here rather than beside the provider because the storefront layout is a
+// server component and cannot call a function exported from a 'use client' file.
+export const callForPriceConfig = (settings) => ({
+  ...defaultSettings.callForPrice,
+  ...(settings?.callForPrice || {}),
+  whatsapp: settings?.contact?.whatsapp || '',
+})
 
 export async function loadSettings() {
   try {
@@ -61,6 +80,7 @@ export async function loadSettings() {
       loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
       delivery: { ...defaultSettings.delivery, ...(s.delivery || {}) },
       tracking: { ...defaultSettings.tracking, ...(s.tracking || {}) },
+      callForPrice: { ...defaultSettings.callForPrice, ...(s.callForPrice || {}) },
       socials: s.socials || {},
       navLinks: s.navLinks?.length ? s.navLinks : defaultSettings.navLinks,
       footerGroups: s.footerGroups?.length ? s.footerGroups : defaultSettings.footerGroups,

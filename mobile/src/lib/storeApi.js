@@ -80,6 +80,15 @@ export const defaultStoreSettings = {
   delivery: { fee: 0, freeOver: 100 },
   // VAT rate in percent; 0 = no VAT line at checkout.
   vat: { percent: 0 },
+  // What a price-hidden product shows instead of a price. Mirrors the web's
+  // defaults so both read the same when the CMS field is untouched.
+  callForPrice: {
+    label: 'Call for price',
+    button: 'Ask for a price',
+    note: '',
+    message: "Hi, I'd like a price for {product} — {url}",
+    url: ''
+  },
   navLinks: [],
   footerGroups: []
 };
@@ -97,7 +106,8 @@ export async function loadStoreSettings() {
       contact: { ...defaultStoreSettings.contact, ...(s.contact || {}) },
       homeNew: { ...defaultStoreSettings.homeNew, ...(s.homeNew || {}) },
       delivery: { ...defaultStoreSettings.delivery, ...(s.delivery || {}) },
-      vat: { ...defaultStoreSettings.vat, ...(s.vat || {}) }
+      vat: { ...defaultStoreSettings.vat, ...(s.vat || {}) },
+      callForPrice: { ...defaultStoreSettings.callForPrice, ...(s.callForPrice || {}) }
     };
   } catch {
     return defaultStoreSettings;

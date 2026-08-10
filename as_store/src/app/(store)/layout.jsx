@@ -5,7 +5,8 @@ import StorePopup from '@/components/StorePopup.jsx'
 import ChatWidget from '@/components/ChatWidget.jsx'
 import PublishGate from '@/components/PublishGate.jsx'
 import ComingSoon from '@/components/ComingSoon.jsx'
-import { loadSettings } from '@/lib/site'
+import { loadSettings, callForPriceConfig } from '@/lib/site'
+import { CallForPriceProvider } from '@/lib/callForPrice'
 import { loadCategories } from '@/lib/catalog'
 import { aiConfigured } from '@/lib/ai'
 
@@ -35,6 +36,10 @@ export default async function StoreLayout({ children }) {
     <PublishGate published={Boolean(settings.published)} fallback={<ComingSoon settings={settings} />}>
       {/* overflow-x-clip (not hidden — sticky still works) so no wide
           animation track can ever expand the mobile layout viewport. */}
+      {/* Price-hidden products render from tiles all over the storefront — the
+          grids, the rails and the nav's search dialog — so their copy is
+          provided once around the whole tree rather than drilled to each. */}
+      <CallForPriceProvider config={callForPriceConfig(settings)}>
       <div className="flex min-h-screen flex-col overflow-x-clip">
         <Nav settings={settings} categories={categories} />
         <main className="flex-1">{children}</main>
@@ -47,6 +52,7 @@ export default async function StoreLayout({ children }) {
             never reaches the browser. Hides itself during checkout too. */}
         {aiConfigured() && <ChatWidget />}
       </div>
+      </CallForPriceProvider>
     </PublishGate>
   )
 }

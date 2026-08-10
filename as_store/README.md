@@ -72,6 +72,24 @@ There is no storefront page: the wheel is app-only, the admin is here.
 - The server owns the draw and every money rule — see `server/src/spin.js` and `db/spin.sql`. This
   page only edits them.
 
+## Call for price
+
+For products you may not advertise a price on (Apple hardware, typically). Switch on **Call for
+price** in a product, or select several in **Products** and use the **Call for price** button — the
+price disappears from the storefront and the app, and a WhatsApp button takes its place.
+
+- The wording is one setting for the whole catalogue: **Settings → Call for price** (the label, the
+  button, an optional note, and the message the customer's WhatsApp opens with — `{product}` and
+  `{url}` are filled in). It messages the number under **Settings → Contact** unless you give it a
+  URL to use instead.
+- **The price is kept, not deleted.** It stays in the product for your own reference, for sales, and
+  for switching the flag back off — but the API stops sending it to anyone who isn't signed into the
+  admin, so it is absent from the page, the app, the JSON and the data Google reads.
+- **These products can't be bought.** Add to Bag is replaced everywhere, and checkout refuses them
+  even if one is still sitting in an old bag — the customer is told which item and why.
+- They also drop out of price filters and sort to the end of "Price: Low to High", because they have
+  no price to compare.
+
 ## AS Points
 
 The loyalty programme, configured at **`/admin/loyalty`** — two tabs: the deal (the rules and the

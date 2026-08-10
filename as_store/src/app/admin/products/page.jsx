@@ -150,6 +150,23 @@ export default function ProductsPage() {
       bulkRemove.mutate(ids)
   }
 
+  // "Call for price" on a whole selection. This is how the feature is actually
+  // used: filter to a brand and a category (Apple → Laptops), select all, flip.
+  // One request, not one per product.
+  const bulkCallForPrice = useMutation({
+    mutationFn: ({ ids, on }) => adminApi.bulkCallForPrice(ids, on),
+    onSuccess: (r) => {
+      invalidate()
+      sel.clear()
+      toast.success(
+        r.callForPrice
+          ? `${r.updated} product${r.updated > 1 ? 's' : ''} now show “call for price”`
+          : `${r.updated} product${r.updated > 1 ? 's' : ''} show their price again`,
+      )
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -247,10 +264,31 @@ export default function ProductsPage() {
                 {selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select all'}
               </label>
               {selectedIds.length > 0 && (
-                <Button variant="danger" onClick={onBulkDelete} disabled={bulkRemove.isPending} className="px-3 py-1.5">
-                  <Icon name="trash" className="h-4 w-4" />
-                  {bulkRemove.isPending ? 'Deleting…' : `Delete ${selectedIds.length}`}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => bulkCallForPrice.mutate({ ids: selectedIds, on: true })}
+                    disabled={bulkCallForPrice.isPending}
+                    className="px-3 py-1.5"
+                    title="Hide the price and show an enquiry button on these products"
+                  >
+                    <Icon name="whatsapp" className="h-4 w-4" />
+                    Call for price
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => bulkCallForPrice.mutate({ ids: selectedIds, on: false })}
+                    disabled={bulkCallForPrice.isPending}
+                    className="px-3 py-1.5"
+                    title="Show the price again on these products"
+                  >
+                    Show price
+                  </Button>
+                  <Button variant="danger" onClick={onBulkDelete} disabled={bulkRemove.isPending} className="px-3 py-1.5">
+                    <Icon name="trash" className="h-4 w-4" />
+                    {bulkRemove.isPending ? 'Deleting…' : `Delete ${selectedIds.length}`}
+                  </Button>
+                </div>
               )}
             </div>
             <ul className="divide-y divide-admin-line/5">
@@ -288,6 +326,13 @@ export default function ProductsPage() {
                     </span>
                     {p.oldPrice ? (
                       <span className="ml-1 line-through">${Number(p.oldPrice).toLocaleString()}</span>
+                    ) : null}
+                    {/* The list keeps showing the real price — staff need it —
+                        with a marker saying the storefront does not. */}
+                    {p.callForPrice ? (
+                      <span className="ml-1.5 rounded-full bg-as-red/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-as-red">
+                        Call for price
+                      </span>
                     ) : null}
                   </p>
                 </div>

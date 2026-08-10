@@ -10,6 +10,9 @@ import { useDispatch } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import { addItem } from '@/src/store/cartSlice';
 import { money, cleanDescription } from '@/src/lib/format';
+import { useStoreSettings } from '@/src/lib/queries';
+import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
+import { openUrl } from '@/src/lib/whatsapp';
 import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
 import Badge from '@/src/ui/Badge';
@@ -58,6 +61,14 @@ function ProductTile({ product, fluid = false, width }) {
   const dispatch = useDispatch();
   const { fontScale } = useWindowDimensions();
   const { id, name, tagline, price, image, colors = [], brand, slug } = product;
+
+  // Price-hidden product: the API sends no price for these at all, so the tile
+  // shows the enquiry label where the price goes and swaps Add to Bag for the
+  // WhatsApp button. They must not be addable — the server refuses to sell
+  // them, and a bag that cannot be checked out is worse than no button.
+  const { data: settings } = useStoreSettings();
+  const quoteOnly = isCallForPrice(product);
+  const copy = callForPriceCopy(settings);
 
   const priceNum = Number(price) || 0;
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null;
@@ -118,7 +129,11 @@ function ProductTile({ product, fluid = false, width }) {
       </Pressable>
 
       <View style={styles.footer}>
-        {onSale ? (
+        {quoteOnly ? (
+          <Text variant="title" color="primary" numberOfLines={1}>
+            {copy.label}
+          </Text>
+        ) : onSale ? (
           <View style={styles.priceRow}>
             <Text variant="title" color="primary">
               {money(priceNum)}
@@ -131,7 +146,22 @@ function ProductTile({ product, fluid = false, width }) {
           <Text variant="title">From {money(priceNum)}</Text>
         )}
 
-        <Button label="Add to Bag" onPress={add} size="sm" fullWidth style={{ marginTop: theme.spacing.sm }} />
+        {quoteOnly ? (
+          <Button
+            label={copy.button}
+            icon="whatsapp"
+            onPress={() => {
+              const url = enquiryUrl(product, settings);
+              if (url) openUrl(url);
+              else open();
+            }}
+            size="sm"
+            fullWidth
+            style={{ marginTop: theme.spacing.sm }}
+          />
+        ) : (
+          <Button label="Add to Bag" onPress={add} size="sm" fullWidth style={{ marginTop: theme.spacing.sm }} />
+        )}
       </View>
     </View>
   );

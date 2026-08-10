@@ -12,6 +12,7 @@ import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyStat
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
 import PointsEarn from '@/src/components/PointsEarn';
+import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -78,6 +79,11 @@ export default function ProductDetailScreen() {
     );
   }
 
+  // Price-hidden product: no price anywhere, no bag, no points estimate — just
+  // the enquiry. The server refuses to sell these, so the app must not offer to.
+  const quoteOnly = isCallForPrice(product);
+  const cfp = callForPriceCopy(storeSettings);
+
   const priceNum = Number(product.price) || 0;
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null;
   const onSale = Boolean(oldPrice) && oldPrice > priceNum;
@@ -96,15 +102,38 @@ export default function ProductDetailScreen() {
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
-          <View>
-            <Text variant="caption" faint>
-              {onSale ? 'Now' : 'Price'}
-            </Text>
-            <Text variant="h3" color={onSale ? 'primary' : 'text'}>
-              {money(priceNum)}
-            </Text>
-          </View>
-          <Button label={atCap ? 'Max in bag' : 'Add to Bag'} icon={atCap ? 'check' : 'bag'} onPress={add} disabled={atCap} size="lg" style={{ flex: 1 }} />
+          {quoteOnly ? (
+            <>
+              <View style={{ flexShrink: 1 }}>
+                <Text variant="caption" faint>
+                  Price
+                </Text>
+                <Text variant="h3" color="primary" numberOfLines={1}>
+                  {cfp.label}
+                </Text>
+              </View>
+              <Button
+                label={cfp.button}
+                icon="whatsapp"
+                onPress={() => openUrl(enquiryUrl(product, storeSettings))}
+                disabled={!enquiryUrl(product, storeSettings)}
+                size="lg"
+                style={{ flex: 1 }}
+              />
+            </>
+          ) : (
+            <>
+              <View>
+                <Text variant="caption" faint>
+                  {onSale ? 'Now' : 'Price'}
+                </Text>
+                <Text variant="h3" color={onSale ? 'primary' : 'text'}>
+                  {money(priceNum)}
+                </Text>
+              </View>
+              <Button label={atCap ? 'Max in bag' : 'Add to Bag'} icon={atCap ? 'check' : 'bag'} onPress={add} disabled={atCap} size="lg" style={{ flex: 1 }} />
+            </>
+          )}
         </View>
       }
     >
@@ -158,7 +187,11 @@ export default function ProductDetailScreen() {
 
         {/* Price */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-          {onSale ? (
+          {quoteOnly ? (
+            <Text variant="h2" color="primary">
+              {cfp.label}
+            </Text>
+          ) : onSale ? (
             <>
               <Text variant="h2" color="primary">
                 {money(priceNum)}
@@ -173,8 +206,16 @@ export default function ProductDetailScreen() {
           )}
         </View>
 
-        {/* What buying this earns — hidden entirely when the programme is off. */}
-        <PointsEarn amount={priceNum} verb="Earn" />
+        {/* No price, no points estimate — there is no figure to earn on. */}
+        {quoteOnly ? (
+          cfp.note ? (
+            <Text variant="caption" muted>
+              {cfp.note}
+            </Text>
+          ) : null
+        ) : (
+          <PointsEarn amount={priceNum} verb="Earn" />
+        )}
 
         {/* Colours */}
         {Array.isArray(product.colors) && product.colors.length ? (

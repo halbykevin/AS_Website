@@ -87,6 +87,30 @@ Store-publishing requirements that are easy to break and hard to notice:
   `<Boundary>`. All of it funnels through `reportError`, the one place to wire a reporting service.
   There is no crash *reporting* wired up today.
 
+## Call for price (store + app + admin)
+
+Per-product flag (`products.call_for_price`) that hides a price and offers a WhatsApp enquiry
+instead — for lines AS may not advertise a price on (Apple hardware). Copy lives in
+`settings.call_for_price_*`; helpers in [as_store/src/lib/callForPrice.jsx](as_store/src/lib/callForPrice.jsx)
+and [mobile/src/lib/callForPrice.js](mobile/src/lib/callForPrice.js).
+
+- **Hiding it means the API stops sending it.** `productJson(row, admin)` nulls
+  `price`/`oldPrice`/`salePercent` unless the caller is an authenticated admin — hiding the number in
+  the UI while still serving it in JSON (to scrapers, to Google) would not be hiding it. The detail
+  routes carry `optionalAuth` for exactly that; the admin's `?all=1` list and the create/update
+  responses pass `admin: true` so the CMS still sees the real price. The price stays in the column —
+  the sales engine, past orders and switching the flag back off all need it.
+- **It must also be unsellable.** `POST /api/orders` rejects any such line with
+  `code: 'call_for_price'`, naming the product. That is the real guard: the storefront hides Add to
+  Bag, but a bag saved before the flag was set still arrives at checkout.
+- Price arithmetic must skip these: `productJsonLd` omits the Offer price (else Google keeps
+  advertising it), and `catalogFilters.js` + the API's `minPrice/maxPrice` exclude them from ranges
+  and sort them last — a null price otherwise reads as $0 and wins "Price: Low to High".
+- Marking is manual: a toggle in the product editor and a bulk **Call for price / Show price** pair
+  in the admin products list (`PUT /api/products/bulk/call-for-price`), so filtering to Apple →
+  Laptops and flipping all of them is one click. Nothing is automatic — a brand rule would hide
+  prices on scraper-imported products nobody has looked at yet.
+
 ## Daily Spin (mobile app + store admin)
 
 A once-per-cooldown prize wheel that lives **only in the mobile app** and is driven entirely from

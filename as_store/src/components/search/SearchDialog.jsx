@@ -18,6 +18,7 @@ import {
   readRecent,
   removeRecent,
 } from '@/lib/search'
+import { useCallForPrice } from '@/lib/callForPrice'
 
 const DEBOUNCE_MS = 180
 const optionId = (i) => `as-search-option-${i}`
@@ -42,6 +43,7 @@ function Thumb({ src, icon = 'box', className = '' }) {
 }
 
 function ProductRow({ product, query }) {
+  const cfp = useCallForPrice()
   const price = Number(product.price) || 0
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
   const onSale = Boolean(oldPrice) && oldPrice > price
@@ -60,8 +62,16 @@ function ProductRow({ product, query }) {
         )}
       </span>
       <span className="shrink-0 text-right text-[13px] leading-tight">
-        <span className={onSale ? 'font-semibold text-as-red' : 'text-as-ink'}>{money(price)}</span>
-        {onSale && <span className="block text-[11px] text-as-ink/35 line-through">{money(oldPrice)}</span>}
+        {/* Price-hidden products carry no price at all — money(null) would
+            render "$0" and quietly undo the whole point of the flag. */}
+        {product.callForPrice ? (
+          <span className="font-semibold text-as-red">{cfp.label}</span>
+        ) : (
+          <>
+            <span className={onSale ? 'font-semibold text-as-red' : 'text-as-ink'}>{money(price)}</span>
+            {onSale && <span className="block text-[11px] text-as-ink/35 line-through">{money(oldPrice)}</span>}
+          </>
+        )}
       </span>
     </>
   )

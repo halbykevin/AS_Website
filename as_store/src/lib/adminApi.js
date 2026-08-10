@@ -70,6 +70,15 @@ export const adminApi = {
   createProduct: (data) => req('/api/products', { method: 'POST', auth: true, body: data }),
   updateProduct: (id, data) => req(`/api/products/${id}`, { method: 'PUT', auth: true, body: data }),
   deleteProduct: (id) => req(`/api/products/${id}`, { method: 'DELETE', auth: true }),
+  // Flip "call for price" across a whole selection in one request — marking
+  // every Apple laptop one at a time is the difference between the feature
+  // being used and not.
+  bulkCallForPrice: (ids, callForPrice) =>
+    req('/api/products/bulk/call-for-price', {
+      method: 'PUT',
+      auth: true,
+      body: { ids, callForPrice },
+    }),
 
   // product images
   listImages: (id) => req(`/api/products/${id}/images`, { auth: true }),

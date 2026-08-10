@@ -17,7 +17,7 @@ const slugify = (s) =>
 const BLANK = {
   name: '', slug: '', tagline: '', description: '', price: '', oldPrice: '',
   categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true,
-  colors: [], specs: [],
+  callForPrice: false, colors: [], specs: [],
 }
 
 export default function ProductEditor({ id }) {
@@ -63,7 +63,8 @@ export default function ProductEditor({ id }) {
       categoryId: p.categoryId != null ? String(p.categoryId) : '',
       brandId: p.brandId != null ? String(p.brandId) : '',
       stock: String(p.stock ?? 0), isNew: !!p.isNew, featured: !!p.featured,
-      visible: p.visible !== false, colors: Array.isArray(p.colors) ? p.colors : [],
+      visible: p.visible !== false, callForPrice: !!p.callForPrice,
+      colors: Array.isArray(p.colors) ? p.colors : [],
       specs: Array.isArray(p.specs) ? p.specs.filter((r) => Array.isArray(r) && r.length >= 2) : [],
     })
   }, [editing, id, products.data])
@@ -166,6 +167,7 @@ export default function ProductEditor({ id }) {
       isNew: form.isNew,
       featured: form.featured,
       visible: form.visible,
+      callForPrice: form.callForPrice,
       colors: form.colors,
       specs: form.specs.filter(([k, v]) => String(k).trim() && String(v).trim()),
     }
@@ -245,6 +247,20 @@ export default function ProductEditor({ id }) {
             <Field label="Compare-at price ($)" hint="Optional — shows as a strikethrough.">
               <Input type="number" step="0.01" value={form.oldPrice} onChange={(e) => set('oldPrice', e.target.value)} placeholder="—" />
             </Field>
+            {/* Spans both columns: this changes what the price above *does*, so
+                it belongs with it rather than among the visibility switches. */}
+            <div className="col-span-2 rounded-xl border border-admin-line/15 p-4">
+              <Toggle
+                checked={form.callForPrice}
+                onChange={(v) => set('callForPrice', v)}
+                label="Call for price — hide the price, show an enquiry button"
+              />
+              <p className="mt-2 text-xs text-admin-text/50">
+                {form.callForPrice
+                  ? 'The price above is kept but never sent to the storefront, the app, or Google. Customers see your “call for price” wording and a WhatsApp button instead, and this product cannot be added to a bag or ordered.'
+                  : 'For products you may not advertise a price on. Set the wording once in Settings → Call for price.'}
+              </p>
+            </div>
             <Field label="Category">
               <Select value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
                 <option value="">— None —</option>

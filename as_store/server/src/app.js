@@ -214,8 +214,14 @@ const salePrice = (base, pct) => Math.round(Number(base) * (100 - pct)) / 100;
 // SALE_JOIN is in scope.
 const EFFECTIVE_PRICE = `ROUND(p.price * (100 - COALESCE(sale.percent, 0)) / 100.0, 2)`;
 
-const productJson = (r) => {
+// `admin` opens up the fields the storefront must not see. It defaults to false
+// so the safe shape is the one you get by forgetting: a "call for price"
+// product's price is stripped from every public response, which is the whole
+// point of the flag — hiding it in the UI while still serving it in the JSON
+// (and therefore to scrapers and to Google) would not be hiding it at all.
+const productJson = (r, admin = false) => {
   const pct = Number(r.sale_percent) || 0;
+  const hidePrice = Boolean(r.call_for_price) && !admin;
   return {
     id: r.id,
     name: r.name,
@@ -223,9 +229,10 @@ const productJson = (r) => {
     tagline: r.tagline || "",
     description: r.description || "",
     specs: Array.isArray(r.specs) ? r.specs : [],
-    price: pct ? salePrice(r.price, pct) : r.price,
-    oldPrice: pct ? Number(r.price) : r.old_price,
-    salePercent: pct || null,
+    callForPrice: Boolean(r.call_for_price),
+    price: hidePrice ? null : pct ? salePrice(r.price, pct) : r.price,
+    oldPrice: hidePrice ? null : pct ? Number(r.price) : r.old_price,
+    salePercent: hidePrice ? null : pct || null,
     categoryId: r.category_id,
     category: r.category_name || "",
     categorySlug: r.category_slug || "",
@@ -258,6 +265,15 @@ const settingsJson = (r) => ({
     address: r.contact_address || "",
   },
   socials: r.socials || {},
+  // Copy for price-hidden products. Which products use it is the per-product
+  // `callForPrice` flag; this is only what they say.
+  callForPrice: {
+    label: r.call_for_price_label ?? "Call for price",
+    button: r.call_for_price_button ?? "Ask for a price",
+    note: r.call_for_price_note || "",
+    message: r.call_for_price_message || "",
+    url: r.call_for_price_url || "",
+  },
   navLinks: Array.isArray(r.nav_links) ? r.nav_links : [],
   footerGroups: Array.isArray(r.footer_groups) ? r.footer_groups : [],
   showcaseBg: r.showcase_bg || "#000000",
@@ -507,6 +523,7 @@ const SECTION_COLS = {
   settings: "settings",
   visible: "visible",
   sort: "sort",
+  callForPrice: "call_for_price",
 };
 
 const SALE_JOIN = `
@@ -1290,12 +1307,31 @@ app.post(
 
     const ids = cleaned.map((i) => i.productId);
     const { rows: prods } = await query(
-      `SELECT p.id, p.name, p.price, sale.percent AS sale_percent,
+      `SELECT p.id, p.name, p.price, p.call_for_price, sale.percent AS sale_percent,
         (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort, pi.id LIMIT 1) AS image
        FROM products p ${SALE_JOIN} WHERE p.id = ANY($1)`,
       [ids],
     );
     const byId = new Map(prods.map((p) => [p.id, p]));
+
+    // A "call for price" product has no advertised price, so it cannot be sold
+    // here at any figure — least of all the hidden one in the database. This is
+    // the guard that makes the flag mean something: the storefront hides Add to
+    // Bag, but a stale bag from before the flag was set, or a hand-made request,
+    // both arrive here. Naming the item is what lets the shopper fix it.
+    const quoteOnly = cleaned
+      .map((i) => byId.get(i.productId))
+      .filter((p) => p?.call_for_price);
+    if (quoteOnly.length) {
+      return res.status(400).json({
+        error:
+          quoteOnly.length === 1
+            ? `${quoteOnly[0].name} is available by enquiry only — please remove it and message us for a price.`
+            : `${quoteOnly.length} items in your bag are available by enquiry only — please remove them and message us for a price.`,
+        code: "call_for_price",
+        productIds: quoteOnly.map((p) => p.id),
+      });
+    }
     const items = [];
     let subtotal = 0;
     for (const it of cleaned) {
@@ -2089,6 +2125,12 @@ app.get(
     };
     const minPrice = priceBound(req.query.minPrice);
     const maxPrice = priceBound(req.query.maxPrice);
+    // A price-hidden product has no price to compare, so it cannot satisfy a
+    // range — matching one on its hidden figure would drop an unpriced item
+    // into "under $500". Mirrors the same rule in lib/catalogFilters.js.
+    if (minPrice !== null || maxPrice !== null) {
+      where.push(`p.call_for_price = false`);
+    }
     if (minPrice !== null) {
       params.push(minPrice);
       where.push(`${EFFECTIVE_PRICE} >= $${params.length}`);
@@ -2109,7 +2151,7 @@ app.get(
       sql += ` LIMIT $${params.length}`;
     }
     const { rows } = await query(sql, params);
-    res.json(rows.map(productJson));
+    res.json(rows.map((r) => productJson(r, Boolean(req.admin))));
   }),
 );
 
@@ -2187,23 +2229,25 @@ app.get(
 
 app.get(
   "/api/products/id/:id",
+  optionalAuth,
   ah(async (req, res) => {
     const { rows } = await query(`${DETAIL_SELECT} WHERE p.id = $1`, [
       req.params.id,
     ]);
     if (!rows[0]) return res.status(404).json({ error: "Not found" });
-    res.json(productJson(rows[0]));
+    res.json(productJson(rows[0], Boolean(req.admin)));
   }),
 );
 
 app.get(
   "/api/products/:slug",
+  optionalAuth,
   ah(async (req, res) => {
     const { rows } = await query(`${DETAIL_SELECT} WHERE p.slug = $1`, [
       req.params.slug,
     ]);
     if (!rows[0]) return res.status(404).json({ error: "Not found" });
-    res.json(productJson(rows[0]));
+    res.json(productJson(rows[0], Boolean(req.admin)));
   }),
 );
 
@@ -2218,8 +2262,8 @@ app.post(
     const { rows } = await query(
       `INSERT INTO products
          (name, slug, tagline, description, specs, price, old_price, category_id, brand_id,
-          colors, stock, is_new, featured, visible, sort)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15)
+          colors, stock, is_new, featured, visible, sort, call_for_price)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
         name,
@@ -2237,6 +2281,7 @@ app.post(
         b.featured ?? false,
         b.visible ?? true,
         b.sort ?? 0,
+        b.callForPrice ?? false,
       ],
     );
     if (Array.isArray(b.images)) {
@@ -2255,7 +2300,7 @@ app.post(
     const { rows: full } = await query(`${DETAIL_SELECT} WHERE p.id = $1`, [
       rows[0].id,
     ]);
-    res.status(201).json(productJson(full[0]));
+    res.status(201).json(productJson(full[0], true));
   }),
 );
 
@@ -2286,7 +2331,29 @@ app.put(
     const { rows: full } = await query(`${DETAIL_SELECT} WHERE p.id = $1`, [
       rows[0].id,
     ]);
-    res.json(productJson(full[0]));
+    res.json(productJson(full[0], true));
+  }),
+);
+
+// Flip "call for price" on a whole selection at once. Marking every Apple
+// laptop one product at a time is the difference between the feature being used
+// and not, so this is one statement rather than N requests from the browser.
+// The two-segment path keeps it clear of "/api/products/:id", which only ever
+// matches a single segment.
+app.put(
+  "/api/products/bulk/call-for-price",
+  requireAuth,
+  ah(async (req, res) => {
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : [])
+      .map(Number)
+      .filter(Number.isInteger);
+    const on = Boolean(req.body?.callForPrice);
+    if (!ids.length) return res.status(400).json({ error: "No products selected" });
+    const { rows } = await query(
+      `UPDATE products SET call_for_price = $2 WHERE id = ANY($1::int[]) RETURNING id`,
+      [ids, on],
+    );
+    res.json({ updated: rows.length, callForPrice: on });
   }),
 );
 
@@ -2597,7 +2664,12 @@ app.put(
          ads_purchase_label        = COALESCE($30, ads_purchase_label),
          ads_begin_checkout_label  = COALESCE($31, ads_begin_checkout_label),
          ads_add_to_cart_label     = COALESCE($32, ads_add_to_cart_label),
-         vat_percent               = COALESCE($33, vat_percent)
+         vat_percent               = COALESCE($33, vat_percent),
+         call_for_price_label      = COALESCE($34, call_for_price_label),
+         call_for_price_button     = COALESCE($35, call_for_price_button),
+         call_for_price_note       = COALESCE($36, call_for_price_note),
+         call_for_price_message    = COALESCE($37, call_for_price_message),
+         call_for_price_url        = COALESCE($38, call_for_price_url)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -2642,6 +2714,11 @@ app.put(
         // Rate: clamped to 0–100 for the same reason the money fields are
         // clamped — a typo here multiplies every order.
         percentValue(b.vat?.percent),
+        b.callForPrice?.label ?? null,
+        b.callForPrice?.button ?? null,
+        b.callForPrice?.note ?? null,
+        b.callForPrice?.message ?? null,
+        b.callForPrice?.url ?? null,
       ],
     );
     res.json(settingsJson(rows[0]));

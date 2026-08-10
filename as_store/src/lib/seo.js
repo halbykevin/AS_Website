@@ -78,17 +78,32 @@ export function productJsonLd(product) {
       ? [product.image]
       : []
   const price = Number(product.price) || 0
-  const offer = {
-    '@type': 'Offer',
-    url: absoluteUrl(`/product/${product.slug}`),
-    priceCurrency: CURRENCY,
-    price: price.toFixed(2),
-    // Visible products are assumed sellable; wire this to a real stock field
-    // when the catalog carries one.
-    availability: 'https://schema.org/InStock',
-    itemCondition: 'https://schema.org/NewCondition',
-    ...(product.brand ? { seller: { '@type': 'Organization', name: 'AS Store' } } : {}),
-  }
+  // "Call for price" products carry no price anywhere public, and that has to
+  // include the structured data — this is the copy Google reads for rich
+  // results and Merchant Center. Publishing a price here would put the number
+  // back on the search page we just took it off the product page for.
+  // schema.org has no "ask us" price, so the offer states availability and
+  // sends people to the page; PriceSpecification is omitted entirely.
+  const offer = product.callForPrice
+    ? {
+        '@type': 'Offer',
+        url: absoluteUrl(`/product/${product.slug}`),
+        priceCurrency: CURRENCY,
+        availability: 'https://schema.org/InStoreOnly',
+        itemCondition: 'https://schema.org/NewCondition',
+        ...(product.brand ? { seller: { '@type': 'Organization', name: 'AS Store' } } : {}),
+      }
+    : {
+        '@type': 'Offer',
+        url: absoluteUrl(`/product/${product.slug}`),
+        priceCurrency: CURRENCY,
+        price: price.toFixed(2),
+        // Visible products are assumed sellable; wire this to a real stock field
+        // when the catalog carries one.
+        availability: 'https://schema.org/InStock',
+        itemCondition: 'https://schema.org/NewCondition',
+        ...(product.brand ? { seller: { '@type': 'Organization', name: 'AS Store' } } : {}),
+      }
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',

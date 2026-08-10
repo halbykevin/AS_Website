@@ -22,6 +22,13 @@ const EMPTY = {
   loginButton: { label: 'Continue with email', logo: '', weight: 'medium' },
   delivery: { fee: 0, freeOver: 100 },
   vat: { percent: 0 },
+  callForPrice: {
+    label: 'Call for price',
+    button: 'Ask for a price',
+    note: '',
+    message: "Hi AS Store, I'd like a price for {product} — {url}",
+    url: '',
+  },
   tracking: {
     enabled: true,
     ga4Id: '',
@@ -97,6 +104,7 @@ export default function SettingsPage() {
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
         delivery: { ...EMPTY.delivery, ...(data.delivery || {}) },
+        callForPrice: { ...EMPTY.callForPrice, ...(data.callForPrice || {}) },
         vat: { ...EMPTY.vat, ...(data.vat || {}) },
         tracking: { ...EMPTY.tracking, ...(data.tracking || {}) },
         socials: { ...EMPTY.socials, ...(data.socials || {}) },
@@ -288,6 +296,79 @@ export default function SettingsPage() {
             )
           ) : (
             <>Delivery is free on every order — no fee is added at checkout.</>
+          )}
+        </p>
+      </Section>
+
+      {/* Call for price */}
+      <Section
+        title="Call for price"
+        summary={`“${form.callForPrice.label}” · ${
+          form.callForPrice.url ? 'links to a custom URL' : 'opens WhatsApp'
+        }`}
+      >
+        <p className="text-sm text-admin-text/50">
+          What a price-hidden product shows instead of its price. Which products use this is set per
+          product — open one and switch on <b>Call for price</b>, or select several in Products and use
+          the <b>Call for price</b> button.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Instead of the price" hint="Shown where the price would be.">
+            <Input
+              value={form.callForPrice.label}
+              onChange={(e) => setNested('callForPrice', 'label', e.target.value)}
+              placeholder="Call for price"
+            />
+          </Field>
+          <Field label="Button" hint="Replaces Add to Bag.">
+            <Input
+              value={form.callForPrice.button}
+              onChange={(e) => setNested('callForPrice', 'button', e.target.value)}
+              placeholder="Ask for a price"
+            />
+          </Field>
+        </div>
+        <Field label="Note under the price" hint="Optional. A line of reassurance on the product page.">
+          <Input
+            value={form.callForPrice.note}
+            onChange={(e) => setNested('callForPrice', 'note', e.target.value)}
+            placeholder="Message us for current pricing and availability."
+          />
+        </Field>
+        <Field
+          label="WhatsApp message"
+          hint="Pre-filled for the customer. {product} becomes the product name, {url} its page link."
+        >
+          <Input
+            value={form.callForPrice.message}
+            onChange={(e) => setNested('callForPrice', 'message', e.target.value)}
+          />
+        </Field>
+        <Field
+          label="Send somewhere else instead (optional)"
+          hint="A full URL — a contact page or a form. Leave empty to use WhatsApp."
+        >
+          <Input
+            value={form.callForPrice.url}
+            onChange={(e) => setNested('callForPrice', 'url', e.target.value)}
+            placeholder="https://…"
+          />
+        </Field>
+        <p className="rounded-lg bg-admin-bg px-3 py-2 text-sm text-admin-text/70">
+          {form.callForPrice.url ? (
+            <>
+              The button opens <b>{form.callForPrice.url}</b>.
+            </>
+          ) : form.contact.whatsapp ? (
+            <>
+              The button opens WhatsApp to <b>{form.contact.whatsapp}</b> with the message above already
+              typed.
+            </>
+          ) : (
+            <>
+              ⚠ No WhatsApp number is set under <b>Contact</b> and no URL here, so the button has nowhere
+              to go — price-hidden products will show a plain “contact us” line instead.
+            </>
           )}
         </p>
       </Section>

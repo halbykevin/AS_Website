@@ -15,6 +15,7 @@ import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
 import { trackViewItem } from '@/lib/analytics'
 import { useLoyalty, pointsFor, num } from '@/lib/loyalty'
+import { isCallForPrice, useCallForPrice, enquiryUrl } from '@/lib/callForPrice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
@@ -38,6 +39,14 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
     }
     setQty((q) => q + 1)
   }
+
+  // Price-hidden product: the API sends no price for these, so there is nothing
+  // to render and nothing to sell. The quantity stepper and Add to Bag go with
+  // the price — a bag the server will refuse at checkout is worse than no
+  // button — and the enquiry replaces them.
+  const cfp = useCallForPrice()
+  const quoteOnly = isCallForPrice(product)
+  const enquireHref = quoteOnly ? enquiryUrl(product, cfp) : ''
 
   const price = Number(product.price) || 0
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null
@@ -125,8 +134,12 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
             {product.tagline && <p className="mt-3 text-xl text-as-ink/60">{product.tagline}</p>}
 
             <div className="mt-6 flex items-center gap-3">
-              <span className="text-2xl font-semibold text-as-ink">{money(price)}</span>
-              {onSale && (
+              {quoteOnly ? (
+                <span className="text-2xl font-semibold text-as-red">{cfp.label}</span>
+              ) : (
+                <span className="text-2xl font-semibold text-as-ink">{money(price)}</span>
+              )}
+              {!quoteOnly && onSale && (
                 <>
                   <span className="text-lg text-as-ink/40 line-through">{money(oldPrice)}</span>
                   <span className="rounded-full bg-as-red/10 px-2 py-0.5 text-xs font-semibold text-as-red">
@@ -136,7 +149,9 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               )}
             </div>
 
-            <PointsLine amount={price * qty} />
+            {/* No price, no points estimate — there is no figure to earn on. */}
+            {!quoteOnly && <PointsLine amount={price * qty} />}
+            {quoteOnly && cfp.note && <p className="mt-3 text-sm text-as-ink/55">{cfp.note}</p>}
 
             {colors.length > 0 && (
               <div className="mt-6">
@@ -158,6 +173,7 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
             )}
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
+              {!quoteOnly && (
               <div className="flex items-center rounded-full border border-as-ink/15">
                 <button
                   onClick={() => {
@@ -181,9 +197,28 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                   <Icon name="plus" className="h-4 w-4" />
                 </button>
               </div>
-              <button onClick={add} className="pill flex-1 justify-center sm:flex-none sm:px-10">
-                Add to Bag
-              </button>
+              )}
+              {quoteOnly ? (
+                enquireHref ? (
+                  <a
+                    href={enquireHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="pill flex-1 justify-center sm:flex-none sm:px-10"
+                  >
+                    <Icon name="whatsapp" className="h-[18px] w-[18px]" />
+                    {cfp.button}
+                  </a>
+                ) : (
+                  // Nowhere to send them: no WhatsApp number and no override URL
+                  // in Settings. Say so plainly rather than render a dead button.
+                  <p className="text-sm text-as-ink/55">Contact us for a price on this product.</p>
+                )
+              ) : (
+                <button onClick={add} className="pill flex-1 justify-center sm:flex-none sm:px-10">
+                  Add to Bag
+                </button>
+              )}
               <ShareMenu
                 url={product.slug ? `${SITE_URL}/product/${product.slug}` : undefined}
                 title={product.name}
@@ -194,7 +229,7 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               />
             </div>
 
-            {maxHit && <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />}
+            {!quoteOnly && maxHit && <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />}
 
             {product.categorySlug && (
               <p className="mt-5 text-sm text-as-ink/50">
