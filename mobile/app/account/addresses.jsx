@@ -6,6 +6,10 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, Divider, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const genId = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const blank = () => ({ id: genId(), title: '', fullName: '', phone: '', address: '', city: '', isDefault: false });
 

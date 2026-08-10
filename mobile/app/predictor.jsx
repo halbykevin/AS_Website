@@ -9,6 +9,10 @@ import { Screen, Text, Header, Button, Card, Icon, Badge, EmptyState } from '@/s
 import { Field, Input } from '@/src/ui/Input';
 import RemoteImage from '@/src/components/RemoteImage';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const PLATFORMS = [
   { id: 'instagram', label: 'Instagram Story', icon: 'instagram' },
   { id: 'facebook', label: 'Facebook Story', icon: 'facebook' },

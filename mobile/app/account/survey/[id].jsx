@@ -10,6 +10,10 @@ import { notificationsApi } from '@/src/lib/notifications';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Button, Icon, Input, EmptyState, Skeleton } from '@/src/ui';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function SurveyScreen() {
   const theme = useTheme();
   const account = useAccount();

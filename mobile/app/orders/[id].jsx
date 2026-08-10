@@ -11,6 +11,10 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Badge, Icon, Divider, Skeleton, EmptyState } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' };
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered'];
 const WHISH_LOGO = require('../../assets/whish.png');

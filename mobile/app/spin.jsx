@@ -21,6 +21,10 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState, Divider } from '@/src/ui';
 import SpinWheel from '@/src/components/spin/SpinWheel';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function SpinScreen() {
   const theme = useTheme();
   const { customer } = useAccount();

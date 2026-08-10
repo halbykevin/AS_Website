@@ -1,6 +1,6 @@
 {
   "name": "as-company-mobile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "AS Company mobile app — the AS Website (events + what we do) and AS Store (e-commerce) in one Expo app, sharing a single design system.",
   "main": "expo-router/entry",
@@ -25,7 +25,10 @@
     "build:ios": "npx --yes eas-cli@latest build --platform ios --profile production",
     "build:all": "npx --yes eas-cli@latest build --platform all --profile production",
     "credentials": "npx --yes eas-cli@latest credentials",
-    "submit:android": "npx --yes eas-cli@latest submit --platform android --profile production"
+    "submit:android": "npx --yes eas-cli@latest submit --platform android --profile production",
+    "//update": "Ship a JS-only fix to already-installed apps, no store review. The branch must match the profile's channel in eas.json. Native/dependency changes need a real build instead — the fingerprint runtimeVersion will refuse to hand them to an incompatible binary.",
+    "update": "npx --yes eas-cli@latest update --branch production",
+    "update:preview": "npx --yes eas-cli@latest update --branch preview"
   },
   "dependencies": {
     "@expo/vector-icons": "15.0.3",
@@ -49,6 +52,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
+    "expo-updates": "~29.0.19",
     "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",

@@ -7,6 +7,10 @@ import { PAYMENT_WHISH } from '@/src/lib/payments';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const STATUS_TONE = { pending: 'amber', confirmed: 'ink', shipped: 'ink', delivered: 'success', cancelled: 'danger' };
 
 export default function OrdersScreen() {

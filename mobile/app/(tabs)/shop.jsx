@@ -9,6 +9,10 @@ import AppHeader from '@/src/components/AppHeader';
 import ComingSoon from '@/src/components/ComingSoon';
 import CategoryWall from '@/src/components/store/CategoryWall';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function ShopScreen() {
   const theme = useTheme();
   const { storeSettings, refresh: refreshContent } = useContent();

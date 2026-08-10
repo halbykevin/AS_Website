@@ -8,6 +8,10 @@ import { Screen, Text, Header, Button, Card } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 import { AuthShell, CodeForm, ChannelToggle, GoogleButton } from '@/src/components/auth';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const RESEND_SECONDS = 30;
 
 export default function LoginScreen() {

@@ -9,6 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STORE_API_URL } from '@/src/config/env';
 import { getCustomerToken } from './account';
+import { noteAuthFailure } from './session';
 
 const API = STORE_API_URL;
 
@@ -23,6 +24,7 @@ async function req(path, { method = 'GET', body } = {}) {
   });
   const data = res.status === 204 ? null : await res.json().catch(() => ({}));
   if (!res.ok) {
+    noteAuthFailure(res.status, Boolean(token));
     const err = new Error(data?.error || `Request failed (${res.status})`);
     err.status = res.status;
     err.data = data;

@@ -37,6 +37,8 @@ const MAP = {
   check: 'checkmark',
   checkCircle: 'checkmark-circle',
   info: 'information-circle-outline',
+  alert: 'alert-circle-outline',
+  document: 'document-text-outline',
   settings: 'settings-outline',
   logout: 'log-out-outline',
 

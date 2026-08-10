@@ -3,7 +3,7 @@
     "name": "AS Company",
     "slug": "as-company-mobile",
     "scheme": "ascompany",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,6 +11,13 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/d4b13079-b3bf-42e1-8edf-cb9aed914ec6",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lb.com.as.company",
@@ -59,6 +66,7 @@
     "extra": {
       "websiteApiUrl": "https://asapi.as.com.lb",
       "storeApiUrl": "https://store-api.as.com.lb",
+      "storeWebUrl": "https://store.as.com.lb",
       "router": {},
       "eas": {
         "projectId": "d4b13079-b3bf-42e1-8edf-cb9aed914ec6"

@@ -22,13 +22,16 @@ export default function Button({
 
   const v = styles[variant] || styles.primary;
   const s = styles[`size_${size}`] || styles.size_md;
-  const textColor = variant === 'primary' ? 'textOnPrimary' : variant === 'inverse' ? 'text' : variant === 'link' ? 'primary' : 'text';
+  // `primary` and `danger` are the two solid brand fills, so both need the
+  // on-primary ink; everything else sits on a light surface.
+  const solidFill = variant === 'primary' || variant === 'danger';
+  const textColor = solidFill ? 'textOnPrimary' : variant === 'link' ? 'primary' : 'text';
   const textVariant = size === 'sm' ? 'callout' : 'title';
 
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: isDisabled, busy: loading }} onPress={isDisabled ? undefined : onPress} hitSlop={theme.layout.hitSlop} style={({ pressed }) => [styles.base, v, s, fullWidth && styles.fullWidth, isDisabled && styles.disabled, pressed && !isDisabled && styles.pressed, style]} {...rest}>
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? theme.colors.textOnPrimary : theme.colors.primary} />
+        <ActivityIndicator size="small" color={solidFill ? theme.colors.textOnPrimary : theme.colors.primary} />
       ) : (
         <View style={styles.content}>
           {icon ? <Icon name={icon} size={size === 'sm' ? 16 : 18} color={theme.colors[textColor]} /> : null}

@@ -10,6 +10,10 @@ import { useVouchers, rewardWorth, STATUS_LABEL } from '@/src/lib/spin';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const shortDate = iso =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 

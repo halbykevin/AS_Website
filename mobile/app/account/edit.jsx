@@ -6,6 +6,10 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function EditProfileScreen() {
   const theme = useTheme();
   const account = useAccount();

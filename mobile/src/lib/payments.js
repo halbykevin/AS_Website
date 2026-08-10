@@ -20,7 +20,15 @@ export const PAYMENT_WHISH = 'whish';
 
 // Where Whish should hand the customer back: the server appends `/<orderId>?…`.
 // Resolves to `ascompany://orders` in a build and `exp://<host>/--/orders` in
-// Expo Go, so the flow is testable in development too.
+// Expo Go.
+//
+// The API only honours schemes on its `APP_RETURN_SCHEMES` allowlist (`ascompany`
+// in production) — an open redirect here would leak the order's track token to
+// whatever URL an attacker put in the request. So in Expo Go the deep link is
+// rejected and the customer lands on the *web* order page instead of back in the
+// app. That is the allowlist doing its job, not a bug; to exercise the real
+// return leg in development, add `exp` to APP_RETURN_SCHEMES on a **development**
+// API only, or test with a preview build, which uses the real scheme.
 export const paymentReturnUrl = () => ExpoLinking.createURL('/orders');
 
 // Open the hosted Whish page and wait for the customer to come back.

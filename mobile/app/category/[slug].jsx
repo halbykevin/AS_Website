@@ -11,6 +11,10 @@ import CatalogToolbar from '@/src/components/store/CatalogToolbar';
 import { buildCatalogIndex, queryCatalog, categoryFacets, brandFacets, priceBounds, resolveColumns } from '@/src/lib/catalogFilters';
 import { logCatalogLoad, logFacets, logFilterResult } from '@/src/lib/filterDebug';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const EMPTY_FILTERS = { cat: '', brand: '', min: null, max: null, sale: false, cols: '' };
 
 export default function CategoryScreen() {

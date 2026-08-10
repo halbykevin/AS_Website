@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { STORE_API_URL } from '@/src/config/env';
 import { secureStorage, KEYS } from './storage';
 import { detachDeviceFromCustomer } from './pushToken';
+import { noteAuthFailure, setSessionExpiredHandler } from './session';
 
 const API = STORE_API_URL;
 
@@ -25,16 +26,19 @@ async function clearPersistedToken() {
 
 async function req(path, { method = 'GET', body, auth = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (auth && cachedToken) headers.Authorization = `Bearer ${cachedToken}`;
+  const sentToken = Boolean(auth && cachedToken);
+  if (sentToken) headers.Authorization = `Bearer ${cachedToken}`;
   const res = await fetch(`${API}${path}`, {
     method,
     headers,
     body: body != null ? JSON.stringify(body) : undefined
   });
   if (!res.ok) {
+    noteAuthFailure(res.status, sentToken);
     const e = await res.json().catch(() => ({}));
     const err = new Error(e.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.data = e;
     throw err;
   }
   return res.status === 204 ? null : res.json();
@@ -57,6 +61,9 @@ export const accountApi = {
   verifyLink: (channel, identifier, code) => req('/api/account/link/verify', { method: 'POST', auth: true, body: { channel, identifier, code } }),
   me: () => req('/api/account/me', { auth: true }),
   update: data => req('/api/account', { method: 'PUT', auth: true, body: data }),
+  // Permanent. The API refuses (409, `code: 'orders_in_flight'`) while an order
+  // is still on its way, so the screen can explain why instead of failing.
+  deleteAccount: () => req('/api/account', { method: 'DELETE', auth: true }),
   saveAddresses: addresses => req('/api/account/addresses', { method: 'PUT', auth: true, body: { addresses } }),
   createOrder: data => req('/api/orders', { method: 'POST', auth: true, body: data }),
   listOrders: () => req('/api/orders', { auth: true }),
@@ -127,7 +134,29 @@ export function AccountProvider({ children }) {
 
   const logout = useCallback(async () => {
     // Stop account-targeted pushes on this device (keeps guest broadcasts).
-    detachDeviceFromCustomer();
+    // Not awaited — sign-out shouldn't wait on the network — so the bearer token
+    // is captured *now*, before the line below wipes it out from under the call.
+    detachDeviceFromCustomer(getCustomerToken());
+    await clearPersistedToken();
+    setCustomer(null);
+  }, []);
+
+  // A 401 from any authenticated call: the token is expired, revoked, or its
+  // account is gone. Drop it rather than leaving the app in the half-signed-in
+  // state where the UI shows an account but every request fails.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      clearPersistedToken();
+      setCustomer(null);
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
+
+  // Delete the account for good. The API clears everything personal and stops
+  // this device's account pushes; we then drop the session locally, exactly as
+  // sign-out does.
+  const deleteAccount = useCallback(async () => {
+    await accountApi.deleteAccount();
     await clearPersistedToken();
     setCustomer(null);
   }, []);
@@ -138,7 +167,7 @@ export function AccountProvider({ children }) {
     return c;
   }, []);
 
-  return <AccountContext.Provider value={{ customer, loading, loginWithOtp, adoptToken, linkChannel, logout, refresh, setCustomer }}>{children}</AccountContext.Provider>;
+  return <AccountContext.Provider value={{ customer, loading, loginWithOtp, adoptToken, linkChannel, logout, deleteAccount, refresh, setCustomer }}>{children}</AccountContext.Provider>;
 }
 
 export const useAccount = () => useContext(AccountContext);

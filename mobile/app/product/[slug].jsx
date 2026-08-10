@@ -12,6 +12,10 @@ import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyStat
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 // Below this the spec table's two columns get too narrow to read and it stacks
 // each row instead. Measured against the tightest phone we support (320pt),
 // which leaves ~248pt inside the screen gutters and the card's own padding.

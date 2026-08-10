@@ -7,6 +7,10 @@ import { Screen, Text, Chip, EmptyState } from '@/src/ui';
 import AppHeader from '@/src/components/AppHeader';
 import EventCard from '@/src/components/EventCard';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function EventsScreen() {
   const theme = useTheme();
   const { events, content, loading, refresh } = useContent();

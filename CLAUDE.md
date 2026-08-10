@@ -52,6 +52,39 @@ Details in [server/README.md](server/README.md).
 > The store API **must** live inside the clone (`/opt/as-company/as_store/server`) — a standalone
 > copy of `as_store/server/` breaks `migrate.js`'s `../../db` lookup. See [as_store/DEPLOY.md](as_store/DEPLOY.md).
 
+## Mobile app (`mobile/`)
+
+An Expo (SDK 54 / React Native 0.81) app that is **both** products in one binary: the marketing site's
+events and What We Do, and the full AS Store storefront with accounts, cart, checkout and orders. It
+talks to the same two APIs as the web (`websiteApiUrl` / `storeApiUrl`, plus `storeWebUrl` for the
+legal pages it links out to) and has no backend of its own. Everything visual comes from
+[mobile/src/theme](mobile/src/theme) + [mobile/src/ui](mobile/src/ui) — build new screens from those
+primitives rather than raw `View`/`Text`. Full detail in [mobile/README.md](mobile/README.md).
+
+Store-publishing requirements that are easy to break and hard to notice:
+
+- **Account deletion must exist and must stay honest.** `DELETE /api/account` +
+  [mobile/app/account/delete.jsx](mobile/app/account/delete.jsx). Deleting cascades everything
+  personal but keeps the order rows (bookkeeping/warranty) with their PII scrubbed, and refuses while
+  an order is in flight. The endpoint, that screen's copy, and the "Deleting your account" section of
+  [as_store/src/components/PrivacyPolicy.jsx](as_store/src/components/PrivacyPolicy.jsx) describe the
+  same behaviour on purpose — that policy is what Google Play and the App Store review.
+- **The privacy policy covers the app, not just the website**, and is reachable from the account tab
+  **signed out** ([mobile/app/legal.jsx](mobile/app/legal.jsx)). Anything new the app collects — push
+  tokens, device info, a new sign-in method — belongs in that page in the same change.
+- **OTA updates**: `expo-updates` with the `fingerprint` runtime policy and a channel per EAS profile.
+  `npm run update` ships a JS-only fix without a store review; anything touching native code needs a
+  real build, and fingerprint is what stops such an update from reaching a binary that can't run it.
+- **Error containment — nothing should take the whole app down.** Four layers, each catching what the
+  one below can't see: `<Boundary>` around a section ([mobile/src/components/Boundary.jsx](mobile/src/components/Boundary.jsx)),
+  `ScreenBoundary` exported as every route's `ErrorBoundary` (a broken screen keeps the tab bar
+  alive), [CrashScreen.jsx](mobile/src/components/CrashScreen.jsx) as the root last resort, and
+  `installGlobalErrorHandler()` ([mobile/src/lib/errors.js](mobile/src/lib/errors.js)) for throws
+  **outside** render — which React boundaries cannot see and which otherwise kill a release build.
+  New screens should keep the `ErrorBoundary` export; new data-driven sections should get a
+  `<Boundary>`. All of it funnels through `reportError`, the one place to wire a reporting service.
+  There is no crash *reporting* wired up today.
+
 ## Daily Spin (mobile app + store admin)
 
 A once-per-cooldown prize wheel that lives **only in the mobile app** and is driven entirely from

@@ -7,6 +7,10 @@ import { Screen, Text, Icon, EmptyState, Skeleton } from '@/src/ui';
 import { Input } from '@/src/ui/Input';
 import ProductTile from '@/src/components/ProductTile';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function SearchScreen() {
   const theme = useTheme();
   const [term, setTerm] = useState('');

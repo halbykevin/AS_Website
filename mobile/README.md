@@ -57,28 +57,38 @@ See [`src/config/env.js`](src/config/env.js).
 | Default | `http://localhost:8080`                            | `http://localhost:8081`                             |
 | Drives  | settings, events, what‑we‑do, solutions, predictor | products, categories, cart source, orders, accounts |
 
+A third URL, `EXPO_PUBLIC_STORE_WEB_URL` / `expo.extra.storeWebUrl`, points at
+the store **website** rather than an API. It is only used for the documents the
+app links out to (privacy policy, warranty, shipping, support), so it should stay
+on the real domain even in development — those pages are the public ones the app
+stores review.
+
 ---
 
 ## Architecture
 
 ```
 app/                         # Expo Router (file-based) routes
-  _layout.jsx                #   root: providers + Stack
+  _layout.jsx                #   root: providers + Stack, and the ErrorBoundary export
   (tabs)/                    #   bottom tabs (store-first): Home (storefront) ·
                              #   Shop (browse) · Bag (cart) · Events · Account
   company.jsx                #   the informative AS Company (website) page
+  legal.jsx                  #   privacy policy + warranty/shipping/support links
   what-we-do/  events/       #   marketing detail screens
   product/ category/         #   store screens
   checkout  search  orders/  #   commerce flow
   account/ auth/             #   profile + OTP sign in / register
+    delete.jsx               #   permanent account deletion (store requirement)
   predictor.jsx              #   Guess the Score game
   spin.jsx                   #   Daily Spin wheel (winnings live at account/rewards)
 src/
   theme/                     # ⭐ central design system (tokens + hooks)
   ui/                        # ⭐ primitives built on the theme (Screen, Text, Button…)
   components/                # feature components (ProductTile, EventCard, …)
+    CrashScreen.jsx          #   dependency-free fallback when a route throws
   lib/                       # API clients + account + helpers
     storeApi.js  websiteApi.js  account.jsx  queries.js
+    session.js                # one place to react to an expired/revoked token
     spin.js  wheel.js         # Daily Spin client + the wheel's geometry
     format.js  whatsapp.js  storage.js
   store/                     # Redux Toolkit cart slice
@@ -224,6 +234,12 @@ checkout                POST /api/orders { paymentMethod:'whish', returnUrl:'asc
   API appends `/<orderId>`. The server only honours schemes in its
   `APP_RETURN_SCHEMES` allow‑list. Changing `expo.scheme` in `app.json` means
   changing that list too.
+- **In Expo Go the return leg does not come back to the app**, by design: `exp`
+  is not on the production allow‑list, so the API bounces to the *web* order page
+  instead. The redirect carries the order's track token, and honouring an
+  arbitrary scheme would hand that token to whatever URL the request asked for.
+  To exercise the real return, use a preview build (real scheme) or add `exp` to
+  `APP_RETURN_SCHEMES` on a **development** API only.
 - Whish rejects `localhost`, so testing the flow against a local API needs a
   tunnel (`cloudflared` / `ngrok`) in `PUBLIC_API_URL`. Without the deep link
   the flow still completes — the customer closes the tab and the order screen
@@ -261,6 +277,123 @@ GoogleButton  → openAuthSessionAsync(
 
 Email and WhatsApp one‑time codes still work out of the box against the same API.
 
+### Sessions expire; the app notices
+
+Customer tokens last 30 days, but they can stop working sooner — the account was
+deleted, the secret rotated, the clock ran out. Every API client
+(`account.jsx`, `notifications.jsx`, `spin.js`) routes a **401 on a request that
+actually sent a token** through `noteAuthFailure` in
+[`src/lib/session.js`](src/lib/session.js); `AccountProvider` registers the
+handler and drops the session. Without it the app sat in a half–signed-in state,
+showing an account whose every request failed.
+
+The "sent a token" part matters: several endpoints are public, and signing the
+customer out over a 401 from one of those is a bug that looks like a random
+logout.
+
+---
+
+## Publishing
+
+### Account deletion
+
+**Account → Delete account** ([`app/account/delete.jsx`](app/account/delete.jsx))
+calls `DELETE /api/account`. Both app stores require this to exist in-app before
+they will list an app that creates accounts, and it is deliberately as easy to
+find as sign-out rather than buried in a settings sub-screen.
+
+The screen states what goes and what stays before asking the customer to type
+`DELETE`. What stays is the order record itself — bookkeeping and warranty claims
+need it — with the personal columns scrubbed server-side. An order still in
+flight gets a **409** back, which the screen shows as a plain explanation.
+
+Keep the copy here, the endpoint, and the "Deleting your account" section of the
+privacy policy saying the same thing; that text is what the stores review.
+
+### Privacy & legal
+
+[`app/legal.jsx`](app/legal.jsx) is reachable from the account tab **signed in or
+out** — the privacy policy has to be findable without an account. The documents
+live on the store website (`STORE_WEB_URL` in
+[`src/config/env.js`](src/config/env.js)) and open in an in-app browser tab, so
+there is one canonical text rather than a copy that drifts. The same URL,
+`https://store.as.com.lb/pages/privacy`, is what you give Google Play and the App
+Store.
+
+### Over-the-air updates
+
+`expo-updates` is configured with the **`fingerprint`** runtime-version policy and
+one channel per build profile (`development` / `preview` / `production` in
+[`eas.json`](eas.json)).
+
+```bash
+npm run update           # JS-only fix → production channel, no store review
+npm run update:preview   # same, for internal preview builds
+```
+
+Fingerprint hashes the native project, so an update is only offered to a binary
+whose native side matches. Add a library with native code (as `react-native-svg`
+was for the spin wheel) and the fingerprint changes — those builds simply stop
+seeing the update instead of crashing on a missing native module. That case needs
+a real build, not `npm run update`.
+
+`fallbackToCacheTimeout` is **0**: the app always launches instantly from the
+bundle it already has and fetches the update in the background, so a customer on
+a bad connection never stares at the splash screen waiting for a download. The
+trade-off is that a published fix lands on the customer's **next** launch, not the
+current one. Don't raise this to "make updates apply faster" — you would be paying
+for it with launch time on every single cold start, for every customer, forever.
+
+### Error containment
+
+The goal is that **nothing the customer does takes the whole app down**. A single
+bad CMS record or one null field from the API used to be enough: React unmounts
+the entire tree when a render throws and nothing catches it, and in a release
+build an uncaught async error kills the process outright. Four layers now stand
+between that and the customer, each catching what the one below it can't see.
+
+| Layer | Where | Catches | Customer sees |
+| --- | --- | --- | --- |
+| Section | `<Boundary>` around a rail/banner/card | a render throw inside that section | a small "didn't load · Try again" card, or nothing (`fallback={null}`) |
+| Screen | `export { ScreenBoundary as ErrorBoundary }` in every route file | a render throw anywhere in that screen | that screen fails, **tab bar and navigation keep working** |
+| Root | `CrashScreen` exported from [`app/_layout.jsx`](app/_layout.jsx) | a throw in the layout/providers themselves | full-screen "Something went wrong · Try again" |
+| Global | `installGlobalErrorHandler()`, [`src/lib/errors.js`](src/lib/errors.js) | throws **outside** render — async callbacks, timers, native modules | nothing; logged, app keeps running |
+
+Notes worth knowing before you change any of it:
+
+- **Boundaries only see render errors.** That's a React limit, not a choice —
+  hence the global handler, which is the only thing standing between a stray
+  `.then()` throw and a release build tearing the app down mid-checkout. In
+  `__DEV__` it forwards everything to the default handler so you still get the
+  red box; swallowing errors while building is how bugs ship.
+- **`CrashScreen` is deliberately dependency-free** — no theme, no UI kit, no
+  fonts. It renders precisely when something upstream is broken, so anything it
+  reached for could be the broken thing.
+- **The promo frame degrades rather than fails.** `GlobalPromoFrame` and
+  `StorePopupModal` render above *every* screen, so no per-screen boundary can
+  help if they throw. The frame's boundary falls back to the same navigator
+  without the banner around it — marketing chrome is the first thing you drop.
+- **Retry remounts under a new key**, because React gives you no way to
+  "un-throw". Most of these errors come from data that was momentarily wrong, so
+  the refetch behind the remount genuinely tends to fix it.
+- **`<Boundary>` renders a keyed Fragment, not a View.** A wrapper would occupy a
+  slot in a `gap` column even when its child renders nothing, leaving a hole
+  wherever a section legitimately hides itself. For the same reason, put the
+  Boundary *inside* a section's conditional, not around it.
+- `reportError` in `errors.js` is the single funnel every layer already calls —
+  if you ever wire up Sentry or similar, that's the one place it goes.
+
+### Still needed before you can submit
+
+- **Play service account** — download the JSON, put it at
+  `credentials/play-service-account.json` (gitignored), then `npm run
+  submit:android`. The submit profile targets the **internal** track as a draft.
+- **iOS push credentials** — only `google-services.json` (Android/FCM) is in the
+  repo; an APNs key has to be uploaded to EAS before notifications work on iOS.
+- **Play Data Safety form** — declare what the policy already describes: name,
+  phone, email, address, order history, push tokens, device/app info; no
+  advertising ID; no cross-app tracking.
+
 ---
 
 ## Scripts
@@ -270,6 +403,7 @@ npm run start      # expo start (dev server + QR)
 npm run android    # open on Android
 npm run ios        # open on iOS (macOS)
 npm run web        # run in the browser
+npm run update     # publish a JS-only OTA update to the production channel
 ```
 
 ## Notes

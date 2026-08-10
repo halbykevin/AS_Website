@@ -13,6 +13,7 @@ import { STORE_API_URL } from '@/src/config/env';
 import { storage, KEYS } from './storage';
 import { getCustomerToken, useAccount } from './account';
 import { rememberPushToken } from './pushToken';
+import { noteAuthFailure } from './session';
 
 const API = STORE_API_URL;
 
@@ -20,13 +21,15 @@ async function req(path, { method = 'GET', body, auth = true } = {}) {
   const headers = {};
   if (body != null) headers['Content-Type'] = 'application/json';
   const token = getCustomerToken();
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
+  const sentToken = Boolean(auth && token);
+  if (sentToken) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, {
     method,
     headers,
     body: body != null ? JSON.stringify(body) : undefined
   });
   if (!res.ok) {
+    noteAuthFailure(res.status, sentToken);
     const e = await res.json().catch(() => ({}));
     const err = new Error(e.error || `Request failed (${res.status})`);
     err.status = res.status;

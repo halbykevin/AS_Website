@@ -271,6 +271,13 @@ r.post(
 
 // Sign-out (`detach`: device stays for guest broadcasts) or full opt-out
 // (`revoke`: never push to this token again).
+//
+// A token that belongs to an account may only be changed by that account.
+// Knowing the token string is not proof of anything — Expo tokens travel through
+// our own push payloads and logs — and without this check anyone holding one
+// could silently switch off a customer's order notifications. Guest rows have no
+// owner to check against, so the caller's knowledge of the token is all there is
+// (and all a guest opt-out needs).
 r.delete(
   '/api/devices',
   optionalCustomer,
@@ -278,6 +285,16 @@ r.delete(
     const token = String(req.body?.token || req.query.token || '').trim()
     if (!token) return res.status(400).json({ error: 'token is required' })
     const mode = req.body?.mode === 'revoke' ? 'revoke' : 'detach'
+
+    const { rows } = await query(`SELECT customer_id FROM device_tokens WHERE token = $1`, [token])
+    // Unknown token: nothing to change, and saying so would confirm which tokens
+    // are registered. Report the same success as a real detach.
+    if (!rows[0]) return res.json({ ok: true })
+    const owner = rows[0].customer_id
+    if (owner && String(owner) !== String(req.customerId ?? '')) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
     if (mode === 'revoke') {
       await query(`UPDATE device_tokens SET revoked_at = now(), customer_id = NULL WHERE token = $1`, [token])
     } else {

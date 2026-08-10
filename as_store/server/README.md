@@ -65,6 +65,42 @@ Whish is advertised by `/api/payment/methods` only when its credentials and both
 public HTTPS return origins are configured. This prevents checkout from offering
 a payment route that cannot complete.
 
+## Account deletion
+
+`DELETE /api/account` (customer session) is what the app's **Account → Delete account** screen calls,
+and what both app stores require to exist before they will list an app that creates accounts.
+
+Deleting the `customers` row cascades to everything personal — notifications, device tokens and prefs,
+login history, survey answers, spins, vouchers, pending OAuth codes — so pushes stop at once and the
+account cannot be signed back into. Orders are the exception: `orders.customer_id` is
+`ON DELETE SET NULL`, so the sale survives for bookkeeping, refunds and warranty claims, while the
+endpoint scrubs the personal columns on those rows first (`full_name` becomes `Deleted account`; phone,
+email, address, city and notes are emptied). Order items and money are untouched.
+
+An order still in flight (`pending`, `confirmed`, `shipped`) blocks the delete with **409** and
+`code: "orders_in_flight"` plus the order ids, so the app can explain instead of failing — erasing the
+delivery address of a parcel already on its way helps nobody.
+
+The customer's JWT stays cryptographically valid until it expires, but every route that loads the row
+now 404s, and the app drops the token on its first 401/404. Nothing needs revoking.
+
+> Whatever this endpoint does must stay in step with the "Deleting your account" section of the
+> privacy policy (`as_store/src/components/PrivacyPolicy.jsx`) — that text is what Google Play and the
+> App Store review, and it promises exactly the behaviour described above.
+
+## Push device tokens
+
+`POST /api/devices` registers a token; `DELETE /api/devices` detaches it from the account (sign-out)
+or revokes it entirely (`mode: "revoke"`). A row that belongs to an account may only be changed **by
+that account** — knowing the Expo token is not authorization, since tokens travel through push
+payloads and logs, and without the check anyone holding one could switch off a customer's order
+notifications. Guest rows (no `customer_id`) have no owner to verify against, so knowledge of the
+token is all a guest opt-out needs. An unknown token returns the same `{ ok: true }` as a real detach
+rather than confirming which tokens are registered.
+
+Because of this, the app captures its bearer token **before** clearing the session at sign-out and
+sends it with the detach call — see `detachDeviceFromCustomer` in `mobile/src/lib/pushToken.js`.
+
 ## Google sign-in for the mobile app
 
 The mobile app starts the normal Google OAuth flow at

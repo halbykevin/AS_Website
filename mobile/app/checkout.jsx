@@ -15,6 +15,10 @@ import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 import RemoteImage from '@/src/components/RemoteImage';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const WHISH_LOGO = require('../assets/whish.png');
 
 export default function CheckoutScreen() {

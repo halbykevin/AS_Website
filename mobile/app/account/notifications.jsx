@@ -11,6 +11,10 @@ import { notificationsApi, useNotifications } from '@/src/lib/notifications';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Button, Icon, Divider, Skeleton, EmptyState, Field, Input } from '@/src/ui';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 const OPTIONAL_CATEGORIES = [
   { key: 'promo', label: 'Offers & promotions', hint: 'Sales, new arrivals, vouchers' },
   { key: 'news', label: 'News & events', hint: 'Announcements from AS Company' },

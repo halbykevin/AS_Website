@@ -4,6 +4,10 @@ import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Card, Header, Icon, SectionHeader } from '@/src/ui';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function WhatWeDoScreen() {
   const theme = useTheme();
   const { content } = useContent();

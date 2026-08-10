@@ -9,6 +9,10 @@ import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
 import { GoogleButton } from '@/src/components/auth';
 import BrandBar from '@/src/components/BrandBar';
 
+// Contain a crash in this screen: expo-router renders this instead of letting
+// the error reach the root boundary, so navigation stays alive around it.
+export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
+
 export default function AccountScreen() {
   const theme = useTheme();
   const account = useAccount();
@@ -56,7 +60,18 @@ export default function AccountScreen() {
               </View>
             ) : null}
           </Card>
-        ) : (
+        ) : null}
+
+        {/* Signed out, legal gets its own card so the privacy policy is still
+            one tap away — it has to be reachable without an account. Signed in,
+            the same row sits in the menu below. */}
+        {!customer ? (
+          <Card padded={false}>
+            <MenuRow icon="shield" label="Privacy & legal" onPress={() => router.push('/legal')} />
+          </Card>
+        ) : null}
+
+        {customer ? (
           <>
             {/* Profile card */}
             <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
@@ -106,11 +121,19 @@ export default function AccountScreen() {
               <MenuRow icon="calendar" label="Browse events" onPress={() => router.push('/events')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="info" label="About AS Company" onPress={() => router.push('/company')} />
+              <Divider inset={theme.spacing.lg} />
+              <MenuRow icon="shield" label="Privacy & legal" onPress={() => router.push('/legal')} />
             </Card>
 
-            <Button label="Sign out" variant="ghost" icon="logout" onPress={() => account.logout()} fullWidth />
+            <View style={{ gap: theme.spacing.sm }}>
+              <Button label="Sign out" variant="ghost" icon="logout" onPress={() => account.logout()} fullWidth />
+              {/* Plainly reachable, not buried in a settings sub-screen — the
+                  app stores expect deletion to be about as easy to find as
+                  sign-out, and the confirmation lives on the screen itself. */}
+              <Button label="Delete account" variant="link" icon="trash" onPress={() => router.push('/account/delete')} fullWidth />
+            </View>
           </>
-        )}
+        ) : null}
       </View>
     </Screen>
   );

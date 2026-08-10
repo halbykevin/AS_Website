@@ -1174,6 +1174,68 @@ app.put(
   }),
 );
 
+// --- Account deletion -------------------------------------------------------
+// Required by both app stores for any app that creates accounts, and the only
+// honest answer to "delete my data". Deleting the customers row cascades to
+// everything personal (notifications, device tokens + prefs, login history,
+// survey answers, spins, vouchers, pending OAuth codes), so pushes stop and the
+// account cannot be signed back into.
+//
+// Orders are the exception: `orders.customer_id` is ON DELETE SET NULL, so the
+// financial record survives the account — Lebanese bookkeeping needs the sale,
+// and a refund six months from now still has to find its order. What we do
+// remove is the personal data *on* those rows, since that is the part the
+// deletion request is actually about. Items and money are untouched.
+//
+// An order still in flight blocks the delete: we'd be throwing away the name
+// and address of a parcel that is on its way, and a paid-but-undelivered order
+// with no contact details is a dispute nobody can settle.
+const IN_FLIGHT_ORDER_STATUSES = ["pending", "confirmed", "shipped"];
+
+app.delete(
+  "/api/account",
+  requireCustomer,
+  ah(async (req, res) => {
+    const { rows: inFlight } = await query(
+      `SELECT id FROM orders
+        WHERE customer_id = $1 AND status = ANY($2::text[])
+        ORDER BY id`,
+      [req.customerId, IN_FLIGHT_ORDER_STATUSES],
+    );
+    if (inFlight.length) {
+      return res.status(409).json({
+        error:
+          inFlight.length === 1
+            ? `Order #${inFlight[0].id} is still on its way. We can delete your account once it has been delivered or cancelled.`
+            : `You have ${inFlight.length} orders still on their way. We can delete your account once they have been delivered or cancelled.`,
+        code: "orders_in_flight",
+        orderIds: inFlight.map((o) => o.id),
+      });
+    }
+
+    const deleted = await withTransaction(async (client) => {
+      // Scrub first: once the customer row is gone, customer_id is NULL and
+      // these orders can no longer be found by owner.
+      await client.query(
+        `UPDATE orders SET
+           full_name = 'Deleted account', phone = '', email = '',
+           address = '', city = '', notes = ''
+         WHERE customer_id = $1`,
+        [req.customerId],
+      );
+      const { rowCount } = await client.query(
+        `DELETE FROM customers WHERE id = $1`,
+        [req.customerId],
+      );
+      return rowCount;
+    });
+    if (!deleted) return res.status(404).json({ error: "Not found" });
+
+    console.log(`[account] customer #${req.customerId} deleted their account`);
+    res.status(204).end();
+  }),
+);
+
 const MAX_ITEM_QTY = 2;
 
 app.get("/api/payment/methods", (_req, res) =>
