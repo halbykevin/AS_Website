@@ -385,14 +385,27 @@ Notes worth knowing before you change any of it:
 
 ### Still needed before you can submit
 
-- **Play service account** — download the JSON, put it at
-  `credentials/play-service-account.json` (gitignored), then `npm run
-  submit:android`. The submit profile targets the **internal** track as a draft.
+- **Play service account** — a JSON key with the **Release manager** role, from
+  Google Cloud → IAM → Service accounts, then granted access in Play Console →
+  Users and permissions. Put it at `credentials/play-service-account.json`
+  (`credentials/` is gitignored — this key can publish to your store listing) and
+  run `npm run submit:android`. The submit profile uploads to the **internal**
+  track as a **draft**; promote to production from the Play Console once you've
+  checked the build.
+- **iOS submit config** — the `submit.production` block has no `ios` section. Add
+  `appleId` / `ascAppId` / `appleTeamId`, or just run `eas submit --platform ios`
+  and let it prompt.
 - **iOS push credentials** — only `google-services.json` (Android/FCM) is in the
   repo; an APNs key has to be uploaded to EAS before notifications work on iOS.
 - **Play Data Safety form** — declare what the policy already describes: name,
   phone, email, address, order history, push tokens, device/app info; no
   advertising ID; no cross-app tracking.
+
+> **`eas.json` takes no comments.** Unlike `package.json`, where the repo uses
+> `"//key"` entries freely, EAS validates this file against a strict schema and
+> refuses to run on an unknown top-level key — `eas build:list` fails with
+> `"//channels" is not allowed` and every script that shells out to it dies with
+> it. Explanations go here in the README instead.
 
 ---
 

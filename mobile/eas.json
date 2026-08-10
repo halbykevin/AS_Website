@@ -3,7 +3,6 @@
     "version": ">= 20.5.1",
     "appVersionSource": "remote"
   },
-  "//channels": "Each profile subscribes its builds to an update channel. `eas update --branch <name>` publishes JS to the branch that channel points at, so a fix reaches installed apps without a store review. Native changes still need a new build: runtimeVersion uses the `fingerprint` policy, so an update whose native fingerprint differs from a build simply is not offered to it — it can never crash an app by calling a native module that binary doesn't have.",
   "build": {
     "development": {
       "developmentClient": true,
@@ -44,7 +43,6 @@
       }
     }
   },
-  "//submit": "Play needs a service-account JSON with the 'Release manager' role, downloaded from Google Cloud → IAM → Service accounts and granted access in Play Console → Users and permissions. Keep it OUT of git: `credentials/` is gitignored. `track: internal` uploads to the internal testing track — promote to production from the Play Console once you have checked the build. For iOS, fill in appleId / ascAppId / appleTeamId, or drop the block and let `eas submit` prompt for them.",
   "submit": {
     "production": {
       "android": {
