@@ -54,9 +54,11 @@ export default function SaleSpotlight({ products = [], maxPercent = 0 }) {
           </Reveal>
         </div>
 
-        <div className="no-scrollbar -mx-6 mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-2 sm:-mx-10 sm:px-10">
+        <div className="no-scrollbar mt-12 grid grid-cols-1 gap-5 sm:-mx-10 sm:flex sm:snap-x sm:snap-mandatory sm:overflow-x-auto sm:px-10 sm:pb-2">
           {products.map((p) => (
-            <ProductTile key={p.id} product={p} />
+            <div key={p.id} className="w-full sm:w-[300px] sm:shrink-0 sm:snap-start">
+              <ProductTile product={p} fluid layout="auto" />
+            </div>
           ))}
         </div>
       </div>

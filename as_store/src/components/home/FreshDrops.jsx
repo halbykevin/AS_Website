@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Icon from '@/components/Icon.jsx'
 import ProductTile from '@/components/ProductTile.jsx'
 import Reveal from '@/components/Reveal.jsx'
+import { gridClass, tileLayout } from '@/lib/catalogFilters'
 
 // A product strip on white — the latest arrivals in a staggered reveal grid.
 // Reused for both the admin-controlled homepage "New arrivals" section (heading,
@@ -43,10 +44,10 @@ export default function FreshDrops({
           </Reveal>
         </div>
 
-        <div className="mt-12 grid grid-cols-2 gap-4 sm:gap-6 xl:grid-cols-4">
+        <div className={`mt-12 grid gap-5 ${gridClass()}`}>
           {products.map((p, i) => (
             <Reveal key={p.id} delay={(i % 4) * 0.08} className="[&>div]:h-full">
-              <ProductTile product={p} fluid />
+              <ProductTile product={p} fluid layout={tileLayout()} />
             </Reveal>
           ))}
         </div>
