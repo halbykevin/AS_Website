@@ -117,7 +117,12 @@ The admin **Import products** page spawns `as_store/scraper/scrape.py` and inges
 `products.json` (brands, categories, products, images — idempotent on `source_url`).
 When the source shop blocks the VPS's IP, run the same import by hand from a machine
 that isn't blocked: `npm run import-scrape` / `node src/import-scrape.js` — see
-[OFFLINE-IMPORT.md](../OFFLINE-IMPORT.md). `npm run backfill-images` pulls any
+[OFFLINE-IMPORT.md](../OFFLINE-IMPORT.md).
+
+A whole-catalog run also **delists**: a product the shop no longer sells is hidden
+here (`visible = false` + a `products.delisted_at` stamp), never deleted, and un-hidden
+if it comes back. It only fires when the scrape covers enough of what we already hold
+from that shop — a half-finished crawl otherwise looks identical to a mass delisting. `npm run backfill-images` pulls any
 still-hotlinked product photo onto our own `/uploads`.
 
 ## Env (`.env`)

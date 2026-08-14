@@ -16,11 +16,13 @@
  *                       so no product ever points at an image that isn't there)
  *   5. backup           pg_dump of the live database
  *   6. dry run          prints what would change — then asks you
- *   7. import           updates existing products, inserts new ones, purges the
- *                       storefront cache
+ *   7. import           updates existing products, inserts new ones, hides the
+ *                       ones the shop has dropped, purges the storefront cache
  *
- * Nothing is ever deleted: see as_store/OFFLINE-IMPORT.md. Your hand-uploaded
- * category images are snapshotted and verified by step 7 itself.
+ * A whole-catalog run is a mirror: a product that is no longer on the shop is
+ * hidden here too (--no-delist opts out). Hidden, never deleted — see
+ * as_store/OFFLINE-IMPORT.md. Your hand-uploaded category images are
+ * snapshotted and verified by step 7 itself.
  *
  * The VPS target comes from deploy.env at the repo root — the same file
  * `npm run deploy` uses.
@@ -48,6 +50,7 @@ Scrape the source shop here, then update the live AS Store.
   --limit <n>       Stop after n products     (default 0 = everything)
   --workers <n>     Parallel fetches          (default 10)
   --reuse <dir>     Skip the scrape, use an existing run folder
+  --no-delist       Keep products the shop no longer sells (default: hide them)
   --dry-run         Stop after showing what the import would change
   --yes             Don't ask before writing to the live database
   --deploy          Put the import tool on the VPS first if it isn't there yet
@@ -69,7 +72,7 @@ function fail(msg) {
 }
 
 // --- args ------------------------------------------------------------------
-const opts = { url: 'https://pacmax.me', mode: 'site', limit: 0, workers: 10, reuse: '', dryRun: false, yes: false, deploy: false }
+const opts = { url: 'https://pacmax.me', mode: 'site', limit: 0, workers: 10, reuse: '', dryRun: false, yes: false, deploy: false, delist: true }
 const argv = process.argv.slice(2)
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
@@ -78,6 +81,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--limit') opts.limit = Number(argv[++i])
   else if (a === '--workers') opts.workers = Number(argv[++i])
   else if (a === '--reuse') opts.reuse = argv[++i]
+  else if (a === '--no-delist') opts.delist = false
   else if (a === '--dry-run') opts.dryRun = true
   else if (a === '--yes' || a === '-y') opts.yes = true
   else if (a === '--deploy') opts.deploy = true
@@ -99,7 +103,7 @@ function duration(ms) {
 // `progress` turns a child's own "[483/1330]" chatter into a time estimate: the
 // long steps here are a 20-minute scrape and a few thousand image downloads, and
 // watching them without knowing how much is left is the worst part of the job.
-function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = null, noStdin = false } = {}) {
+function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = null, noStdin = false, okCodes = [0] } = {}) {
   return new Promise((resolve, reject) => {
     if (!quiet) dim(`$ ${cmd} ${args.join(' ')}`)
     const t0 = Date.now()
@@ -161,7 +165,7 @@ function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = nu
     child.on('error', (e) => reject(new Error(e.code === 'ENOENT' ? `'${cmd}' is not on your PATH.` : e.message)))
     child.on('exit', (code) => {
       if (progress) dim(`(${duration(Date.now() - t0)})`)
-      code === 0 ? resolve() : reject(new Error(`${cmd} exited with ${code}`))
+      okCodes.includes(code) ? resolve(code) : reject(new Error(`${cmd} exited with ${code}`))
     })
     if (stdin !== null) {
       child.stdin.write(stdin)
@@ -243,13 +247,26 @@ const REMOTE_SERVER = `${T.remotePath}/as_store/server`
 
 // Remote scripts go over stdin (`bash -s`) so nothing has to survive a round of
 // shell quoting on the way there.
-const remote = (script, quiet = false) => run('ssh', [...SSH_ARGS, TARGET, 'bash -s'], { stdin: script, quiet })
+const remote = (script, { quiet = false, okCodes = [0] } = {}) =>
+  run('ssh', [...SSH_ARGS, TARGET, 'bash -s'], { stdin: script, quiet, okCodes })
 const remoteCapture = (script) => capture('ssh', [...SSH_ARGS, TARGET, 'bash -s'], { stdin: script })
 
 // ===========================================================================
+// Mirroring only makes sense for a run that could have seen the whole shop.
+// A single-product, one-category or --limit run legitimately brings back a
+// fraction of the catalog, and calling the remainder "delisted" would hide the
+// store. The import re-checks this against the database (--delist-floor).
+const delist = opts.delist && opts.mode === 'site' && !(opts.limit > 0)
+const DELIST = delist ? ' --delist' : ''
+
 console.log(`${C.bold}AS Store — catalog sync${C.off}`)
 info(`source:  ${opts.url}  (${opts.mode})`)
 info(`target:  ${TARGET}:${T.port}  ${REMOTE_SERVER}`)
+info(
+  delist
+    ? `mirror:  on — products no longer on ${opts.url.replace(/^https?:\/\//, '')} get hidden here`
+    : `mirror:  off — products no longer on the shop stay live${opts.delist ? ' (partial run)' : ' (--no-delist)'}`,
+)
 
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
 const runDir = opts.reuse ? path.resolve(opts.reuse) : path.join(SERVER_DIR, 'scrapes', `sync-${stamp}`)
@@ -333,6 +350,10 @@ if (present !== 'HAVE') {
     'as_store/scripts',
     'as_store/server/src',
     'as_store/src',
+    // The schema the import needs (products.delisted_at). deploy.sh fingerprints
+    // as_store/db/*.sql to decide whether to migrate, so leaving it out would
+    // ship code that reads a column the live database doesn't have yet.
+    'as_store/db',
     'as_store/server/package.json',
     'as_store/package.json',
     'as_store/OFFLINE-IMPORT.md',
@@ -389,7 +410,7 @@ if (missing.length) {
 
 // --- 5. upload + unpack the photos ----------------------------------------
 step('Uploading')
-await remote(`mkdir -p '${remoteDir}'`, true)
+await remote(`mkdir -p '${remoteDir}'`, { quiet: true })
 await run('scp', [...SCP_ARGS, ...(missing.length ? [tarball] : []), productsFile, `${TARGET}:${remoteDir}/`])
 
 if (missing.length) {
@@ -419,7 +440,7 @@ echo "    $(du -h '${remoteDir}/as_store-before-import.sql' | cut -f1) -> ${remo
 `)
 
 step('Dry run — what the import would change')
-await remote(`cd '${REMOTE_SERVER}' && node src/import-scrape.js '${remoteDir}/products.json' --dry-run`)
+await remote(`cd '${REMOTE_SERVER}' && node src/import-scrape.js '${remoteDir}/products.json' --dry-run${DELIST}`)
 
 if (opts.dryRun) {
   console.log(`\n${C.green}Dry run only — the live database was not touched.${C.off}`)
@@ -428,15 +449,29 @@ if (opts.dryRun) {
 }
 
 // --- 7. import -------------------------------------------------------------
-if (!(await confirm(`Update the live store with these ${products.length} product(s)?`))) {
+const ask =
+  delist ?
+    `Update the live store with these ${products.length} product(s), and hide the ones listed above as gone?`
+  : `Update the live store with these ${products.length} product(s)?`
+if (!(await confirm(ask))) {
   console.log(`\nStopped. Nothing was written. The photos are already uploaded (harmless).`)
   console.log(`Resume later with:  npm run sync-catalog -- --reuse "${runDir}"`)
   process.exit(0)
 }
 
 step('Importing into the live catalog')
-await remote(`cd '${REMOTE_SERVER}' && node src/import-scrape.js '${remoteDir}/products.json' --purge`)
+// Exit 3 = imported fine, but the delist guard judged the scrape too incomplete
+// to mirror. Not a failure of the import, so it must not roll the run back —
+// but it must not read as a clean success either.
+const code = await remote(
+  `cd '${REMOTE_SERVER}' && node src/import-scrape.js '${remoteDir}/products.json' --purge${DELIST}`,
+  { okCodes: [0, 3] },
+)
 
 console.log(`\n${C.green}${C.bold}Live store updated${C.off} — ${duration(Date.now() - started)} in total.`)
+if (code === 3) {
+  console.log(`${C.red}But nothing was hidden — see DELISTING SKIPPED above. The catalog still lists${C.off}`)
+  console.log(`${C.red}products the shop may have dropped.${C.off}`)
+}
 info(`backup:  ${TARGET}:${remoteDir}/as_store-before-import.sql`)
 info(`local:   ${runDir}`)

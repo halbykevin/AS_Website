@@ -225,6 +225,16 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS specs JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS call_for_price BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_products_call_for_price ON products(call_for_price) WHERE call_for_price;
 
+-- Delisted: the catalog sync found this product gone from the source shop and
+-- hid it (see scraper.js -> applyDelist). The stamp is what makes the hide
+-- *ours*, which is how a person's decision survives every later sync:
+--   hidden + stamped    we hid it; the sync un-hides it if the shop lists it again
+--   hidden + no stamp   a person hid it; the sync will never un-hide it
+--   visible + stamped   a person overrode our hide; the sync leaves it alone
+-- Cleared when the shop lists the product again.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS delisted_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_products_delisted ON products(delisted_at) WHERE delisted_at IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_products_brand  ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);
 

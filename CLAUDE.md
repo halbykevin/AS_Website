@@ -111,6 +111,36 @@ and [mobile/src/lib/callForPrice.js](mobile/src/lib/callForPrice.js).
   Laptops and flipping all of them is one click. Nothing is automatic — a brand rule would hide
   prices on scraper-imported products nobody has looked at yet.
 
+## Catalog sync (store)
+
+`cd as_store && npm run sync-catalog` scrapes the source shop **from your machine**
+(the VPS's IP is blocked, which is the whole reason the script exists), ships the photos
+and `products.json` up, and imports them —
+[scripts/sync-catalog.mjs](as_store/scripts/sync-catalog.mjs) →
+[server/src/import-scrape.js](as_store/server/src/import-scrape.js) →
+`ingestProducts` in [server/src/scraper.js](as_store/server/src/scraper.js). Full detail in
+[as_store/OFFLINE-IMPORT.md](as_store/OFFLINE-IMPORT.md).
+
+- **There is no mobile database.** The app reads the same API and Postgres as the web, so
+  an import is live everywhere the moment it commits — no rebuild, no OTA. `--purge` only
+  clears the *Next.js* storefront cache; the app's own React Query cache is 5 minutes.
+- **A whole-catalog run is a mirror, not an append.** `applyDelist()` hides what the shop
+  has stopped selling (`visible = false` + a `products.delisted_at` stamp) — the import
+  still never deletes a product, because past orders, warranty lookups and photos hang off
+  the row. A product the shop lists again is un-hidden by the next run.
+- `delisted_at` is what makes a hide *ours*, and it is the only thing standing between a
+  nightly sync and someone's manual decision: **hidden + stamped** = we hid it (restorable),
+  **hidden + no stamp** = a person hid it (never touched), **visible + stamped** = a person
+  overrode us (never touched). Anything that changes product visibility automatically must
+  respect those three states.
+- **A partial scrape is indistinguishable from a mass delisting**, so delisting only runs on
+  a `--mode site` scrape with no `--limit`, and only when the file covers ≥ `--delist-floor`
+  (0.5) of what we already hold from that host. Below it: nothing is hidden, and the run
+  exits 3. Scope is by source host, so hand-made products (`source_url = ''`) and other
+  shops' imports can never be caught.
+- Everything else stays additive on purpose: category images are snapshotted and restored,
+  admin-added product images survive, and `--dry-run` names every product it would hide.
+
 ## Daily Spin (mobile app + store admin)
 
 A once-per-cooldown prize wheel that lives **only in the mobile app** and is driven entirely from

@@ -244,6 +244,10 @@ const productJson = (r, admin = false) => {
     isNew: r.is_new,
     featured: r.featured,
     visible: r.visible,
+    // Set only when the catalog sync hid this product because the source shop
+    // stopped listing it — so the admin can tell that apart from a hide someone
+    // chose. Always null on a visible product.
+    delistedAt: r.delisted_at || null,
     sort: r.sort,
     image: r.image || (Array.isArray(r.images) ? r.images[0] : "") || "",
     images: Array.isArray(r.images) ? r.images : [],

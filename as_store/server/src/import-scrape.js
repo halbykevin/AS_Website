@@ -15,6 +15,9 @@
 // It reuses ingestProducts() — the same upsert the admin tool runs — so it is
 // idempotent and additive: it never writes categories.image_url, never deletes
 // a row, and never replaces an existing product image. See --dry-run.
+//
+// --delist is the one thing that goes the other way: it hides what the shop no
+// longer lists, turning a full-site run into a mirror. Still no deletes.
 
 import 'dotenv/config'
 import fs from 'node:fs'
@@ -31,17 +34,26 @@ Options
   --dry-run             Report what the import would change. Read-only.
   --purge               After a successful import, purge the storefront cache so
                         the new products show up immediately.
+  --delist              Hide the products this file does not contain — i.e. the
+                        ones the shop has dropped. Only for a whole-catalog
+                        scrape: on a partial file it would hide the rest of the
+                        shop. Nothing is deleted, and a product that comes back
+                        is un-hidden by the next run.
+  --delist-floor <0-1>  How much of what we already hold from that shop the file
+                        must cover before --delist is trusted (default 0.5).
   --workers <n>         Parallel image downloads (default 6).
   --limit <n>           Only handle the first n products of the file.
 `
 
 function parseArgs(argv) {
-  const opts = { file: '', stageDir: '', dryRun: false, purge: false, workers: 6, limit: 0 }
+  const opts = { file: '', stageDir: '', dryRun: false, purge: false, workers: 6, limit: 0, delist: false, delistFloor: 0.5 }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--stage-images') opts.stageDir = argv[++i]
     else if (a === '--dry-run') opts.dryRun = true
     else if (a === '--purge') opts.purge = true
+    else if (a === '--delist') opts.delist = true
+    else if (a === '--delist-floor') opts.delistFloor = Number(argv[++i])
     else if (a === '--workers') opts.workers = Number(argv[++i])
     else if (a === '--limit') opts.limit = Number(argv[++i])
     else if (a === '-h' || a === '--help') opts.help = true
@@ -62,6 +74,10 @@ if (opts.help || !opts.file) {
   console.log(USAGE)
   process.exit(opts.file ? 0 : 1)
 }
+if (!(opts.delistFloor >= 0 && opts.delistFloor <= 1)) {
+  console.error('--delist-floor must be between 0 and 1.')
+  process.exit(1)
+}
 
 // A run folder (server/scrapes/<id>) holds products.json — accept either.
 let file = path.resolve(opts.file)
@@ -79,7 +95,7 @@ if (opts.stageDir) {
   process.env.UPLOAD_DIR = dir
 }
 
-const { ingestProducts, localizeImage, isLocalImage, imageHash, existingForHash, slugify, cleanCategoryName, normalizeUrl, isPlaceholderImage } =
+const { ingestProducts, findDelisted, localizeImage, isLocalImage, imageHash, existingForHash, slugify, cleanCategoryName, normalizeUrl, isPlaceholderImage } =
   await import('./scraper.js')
 
 let products = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -88,6 +104,13 @@ if (!Array.isArray(products)) {
   process.exit(1)
 }
 if (opts.limit > 0) products = products.slice(0, opts.limit)
+
+// --limit deliberately truncates the file, which is exactly the shape that makes
+// delisting dangerous — everything past n would read as "gone from the shop".
+if (opts.delist && opts.limit > 0) {
+  console.error('--delist cannot be combined with --limit: a truncated file would hide the rest of the catalog.')
+  process.exit(1)
+}
 
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(path.dirname(file), 'uploads'))
 console.log(`${products.length} product(s) from ${file}`)
@@ -215,6 +238,31 @@ if (opts.dryRun) {
   console.log(`categories: ${slugs.length} referenced — ${existing.length} already exist, ${slugs.length - existing.length} would be created`)
   console.log(`            ${withImage} of the existing ones have an image; the import keeps every one of them`)
   console.log('            (it only ever inserts a missing slug — name, image, sort and visibility are left alone)')
+
+  // The same read the real --delist run does, so this is the actual list.
+  const { hosts, owned, missing } = await findDelisted(products)
+  if (owned.length) {
+    const covered = owned.length - missing.length
+    const pct = Math.round((covered / owned.length) * 100)
+    console.log(`\ndelisting:  we hold ${owned.length} product(s) from ${hosts.join(', ')}; this file covers ${covered} (${pct}%)`)
+    if (!opts.delist) {
+      console.log(`            ${missing.length} not in the file — run with --delist to hide them, otherwise they stay live`)
+    } else if (pct / 100 < opts.delistFloor) {
+      console.log(`            below the ${Math.round(opts.delistFloor * 100)}% floor — --delist would refuse and hide NOTHING`)
+    } else {
+      // Same rule as applyDelist: live and unstamped only, so this list is
+      // exactly what the real run would touch.
+      const live = missing.filter((r) => r.visible && !r.delisted_at)
+      const kept = missing.length - live.length
+      console.log(`            --delist would hide ${live.length}${kept ? ` (${kept} already hidden, or kept live by hand)` : ''}:`)
+      for (const r of live.slice(0, 25)) console.log(`              · ${r.name}`)
+      if (live.length > 25) console.log(`              … and ${live.length - 25} more`)
+      const gone = new Set(missing)
+      const back = owned.filter((r) => r.delisted_at && !gone.has(r)).length
+      if (back) console.log(`            and un-hide ${back} that the shop lists again`)
+    }
+  }
+
   console.log('\nNote: a product that the scrape puts in a category will be moved there, so a')
   console.log('manual re-categorisation in the admin is the one edit a re-import can overwrite.')
   await pool.end()
@@ -285,8 +333,12 @@ const imagesBefore = categoriesBefore.filter((r) => r.image_url).length
 console.log(`\ncategories: ${categoriesBefore.length} rows, ${imagesBefore} with an image — backed up to ${backupFile}`)
 
 // --- Import ----------------------------------------------------------------
+// Set when --delist was asked for but the coverage guard refused it: the import
+// itself succeeded, so this can't throw, but it must not exit 0 either — the
+// sync script reads that to tell you the mirror is incomplete.
+let delistFailed = false
 console.log('\nImporting…')
-const summary = await ingestProducts(products)
+const summary = await ingestProducts(products, { delist: opts.delist, delistFloor: opts.delistFloor })
 console.log(
   `Done. ${summary.created} new, ${summary.updated} updated, ${summary.skipped} skipped · ` +
     `${summary.brands} brand(s), ${summary.categories} categor(ies)` +
@@ -295,6 +347,23 @@ console.log(
 )
 if (summary.unpriced) {
   console.log(`${summary.unpriced} new product(s) had no price — imported HIDDEN, price them in /admin/products.`)
+}
+if (summary.delisted) {
+  const d = summary.delisted
+  if (d.aborted) {
+    // Loud, and a non-zero exit: the products import fine, but the mirror did
+    // not happen and the catalog is now stale in a way nobody would notice.
+    console.log(`\nDELISTING SKIPPED — ${d.aborted}.`)
+    console.log('The products above were still imported. Re-run the scrape, or lower --delist-floor if you')
+    console.log('really did mean to drop that much of the catalog.')
+    delistFailed = true
+  } else {
+    console.log(
+      `delisted: ${d.hidden} product(s) hidden (gone from ${d.hosts.join(', ')}), ` +
+        `${d.restored} un-hidden (listed again) — of ${d.checked} we hold from there.`,
+    )
+    if (d.hidden) console.log('          they keep their photos and order history; un-hide any of them in /admin/products.')
+  }
 }
 
 // Drop any placeholder an EARLIER import already stored — the logo rows are
@@ -361,3 +430,4 @@ if (opts.purge) {
 }
 
 await pool.end()
+if (delistFailed) process.exit(3)

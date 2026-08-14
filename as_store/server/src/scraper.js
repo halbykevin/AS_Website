@@ -263,7 +263,113 @@ async function uniqueSlug(base) {
   }
 }
 
-export async function ingestProducts(products) {
+// ---- Delisting: what the source shop no longer sells -----------------------
+// The upsert above is additive, so on its own the catalog only ever grows: a
+// product the shop dropped keeps selling here, at a price nobody honours any
+// more. These two functions make a full-site sync a mirror instead.
+//
+// Hiding, never deleting. `visible = false` takes it off the storefront, the
+// app, search and the sitemap — which is what "removed" means to a customer —
+// while the row, its photos and the link from every past order survive, and a
+// wrong call costs one click to undo. See db/schema.sql (`delisted_at`).
+
+export const hostOf = (url) => {
+  try {
+    return new URL(String(url)).hostname.replace(/^www\./i, '').toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+// Read-only: which of our products from the scraped shop(s) were not in this
+// run. Identity is the normalized source url, the same key the upsert matches
+// on — so "seen" here means exactly "upserted above", and --dry-run can report
+// the real answer without writing anything.
+export async function findDelisted(products) {
+  const seen = new Set()
+  const hosts = new Set()
+  for (const p of Array.isArray(products) ? products : []) {
+    const url = normalizeUrl(p?.url || '')
+    if (!url) continue
+    seen.add(url)
+    const h = hostOf(url)
+    if (h) hosts.add(h)
+  }
+  if (!hosts.size) return { hosts: [], owned: [], missing: [], seen: 0 }
+
+  // Scope: only products imported from the host(s) this run actually covered.
+  // A hand-made product has source_url '' and can never match, and neither can
+  // one imported from a different shop. Both url forms, because rows written
+  // before normalizeUrl() existed may still carry the www. host.
+  const likes = []
+  for (const h of hosts) likes.push(`%//${h}/%`, `%//www.${h}/%`)
+  const { rows: owned } = await query(
+    `SELECT id, name, price, visible, delisted_at, source_url
+       FROM products
+      WHERE source_url <> '' AND source_url LIKE ANY($1::text[])
+      ORDER BY name`,
+    [likes],
+  )
+  const missing = owned.filter((r) => !seen.has(normalizeUrl(r.source_url)))
+  return { hosts: [...hosts], owned, missing, seen: seen.size }
+}
+
+// Hide what the shop no longer lists, restore what came back.
+//
+// `floor` is the guard that matters: a scrape that dies halfway, gets
+// rate-limited, or was run with --limit produces a short file that is
+// indistinguishable from a mass delisting. Below this much coverage of what we
+// already hold, the run is treated as incomplete and nothing is hidden.
+export async function applyDelist(products, { floor = 0.5 } = {}) {
+  const { hosts, owned, missing } = await findDelisted(products)
+  const base = { hosts, checked: owned.length, hidden: 0, restored: 0, missing: missing.length }
+  if (!hosts.length) return { ...base, aborted: 'the scrape produced no usable product urls' }
+  if (!owned.length) return base
+
+  const covered = owned.length - missing.length
+  const ratio = covered / owned.length
+  if (ratio < floor) {
+    return {
+      ...base,
+      aborted:
+        `the scrape covered only ${covered} of the ${owned.length} product(s) we hold from ` +
+        `${hosts.join(', ')} (${Math.round(ratio * 100)}%, floor ${Math.round(floor * 100)}%) — ` +
+        `too incomplete to tell a delisting from a failed crawl`,
+      ratio,
+    }
+  }
+
+  // Hide only a product that is live and unstamped. Those two conditions are
+  // what keep a person's decision from being overwritten, in both directions:
+  //
+  //   visible = false, delisted_at IS NULL  someone hid it by hand → not ours to
+  //                                         stamp, and so never auto-restored
+  //   visible = true,  delisted_at NOT NULL only reachable by an admin un-hiding
+  //                                         a product we delisted → they want it
+  //                                         sold anyway; leave it alone
+  if (missing.length) {
+    const { rowCount } = await query(
+      `UPDATE products SET visible = false, delisted_at = now()
+        WHERE id = ANY($1::int[]) AND visible = true AND delisted_at IS NULL`,
+      [missing.map((r) => r.id)],
+    )
+    base.hidden = rowCount
+  }
+
+  // Back on the shop: undo our own hide, and only ours.
+  const gone = new Set(missing)
+  const back = owned.filter((r) => r.delisted_at && !gone.has(r)).map((r) => r.id)
+  if (back.length) {
+    const { rowCount } = await query(
+      `UPDATE products SET visible = true, delisted_at = NULL WHERE id = ANY($1::int[])`,
+      [back],
+    )
+    base.restored = rowCount
+  }
+  return base
+}
+
+export async function ingestProducts(products, { delist = false, delistFloor = 0.5 } = {}) {
   const brandSlugs = new Set()
   const catSlugs = new Set()
   let created = 0
@@ -404,6 +510,10 @@ export async function ingestProducts(products) {
     }
   }
 
+  // After the upserts, never before: a product is only "missing" once
+  // everything the file does contain has been written.
+  const delisted = delist ? await applyDelist(products, { floor: delistFloor }) : null
+
   return {
     products: Array.isArray(products) ? products.length : 0,
     created,
@@ -413,6 +523,7 @@ export async function ingestProducts(products) {
     unpriced,
     brands: brandSlugs.size,
     categories: catSlugs.size,
+    delisted,
   }
 }
 
@@ -492,13 +603,25 @@ scraperRouter.post('/api/scrape', (req, res) => {
       }
       const products = JSON.parse(fs.readFileSync(file, 'utf8'))
       append(`\nIngesting ${products.length} scraped product(s) into the catalog…\n`)
-      job.summary = await ingestProducts(products)
+      // Delisting is only meaningful for a run that saw the whole shop: a
+      // single-product or --limit run legitimately returns a fraction of the
+      // catalog, and treating the rest as gone would empty the store. Opt-in,
+      // and only where the request could have covered everything.
+      const delist = Boolean(opts.delist) && opts.mode === 'site' && !(Math.floor(num(opts.limit, 0)) > 0)
+      job.summary = await ingestProducts(products, { delist })
       job.status = 'done'
       const s = job.summary
       append(
         `Done. ${s.created} new, ${s.updated} updated, ${s.skipped} skipped · ` +
           `${s.brands} brand(s), ${s.categories} categor(ies).\n`,
       )
+      if (s.delisted) {
+        append(
+          s.delisted.aborted
+            ? `Delisting skipped — ${s.delisted.aborted}\n`
+            : `Delisted: ${s.delisted.hidden} hidden, ${s.delisted.restored} restored.\n`,
+        )
+      }
     } catch (e) {
       job.status = 'error'
       job.error = e.message
