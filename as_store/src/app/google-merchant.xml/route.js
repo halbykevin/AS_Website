@@ -19,14 +19,28 @@ import { SITE_NAME, SITE_URL } from '@/lib/seo'
 // price at all for "call for price" products, whose price the API strips before
 // this code ever sees it.
 
-// Rendered per request, but the data underneath is not: the loader reads
-// through the shared 'store' cache tag (one hour's TTL, purged by the admin's
-// save via /api/revalidate), so a fetch costs a serialisation and not a
-// database round-trip, and a price edit reaches the feed exactly when it
-// reaches the product page. Deliberately not `force-static`: a build that
-// happened while the API was unreachable would otherwise bake an EMPTY feed and
-// serve it for an hour, which reads to Google as the whole catalogue going away.
-export const dynamic = 'force-dynamic'
+// Cached exactly like the sitemap next door: regenerated at most hourly, and
+// purged the moment an admin saves (/api/revalidate calls revalidatePath on
+// this route by name, because a route handler is not reached by the layout
+// sweep). So a price edit lands in the feed as fast as it lands on the product
+// page.
+//
+// This has to be cached, and the reason is worth recording. The route was
+// briefly `force-dynamic` — to guarantee the empty-catalogue guard below always
+// ran fresh — and that quietly opted every fetch inside it out of the data
+// cache as well. The result in production: 5.7 MB re-fetched from the API and
+// re-serialised on EVERY request, 21 s a time, with Vercel refusing to
+// CDN-cache a dynamic response (`Cache-Control: public, max-age=0`). Google
+// would have been made to wait 21 s for each fetch. Serving the whole catalogue
+// is a ~32 s query upstream; it must happen once an hour, not once a request.
+//
+// `force-static` is required, not decorative: Next 15 treats a route handler as
+// dynamic by default, so `revalidate` on its own changes nothing (the build
+// still marks it ƒ, and Vercel still refuses to CDN-cache it). With both, this
+// route is prerendered and served from the edge exactly like /sitemap.xml —
+// measured there as an `X-Vercel-Cache: HIT` in ~1.3 s.
+export const dynamic = 'force-static'
+export const revalidate = 3600
 
 export async function GET() {
   const [products, categories] = await Promise.all([loadProductsWithGallery(), loadCategories()])
@@ -35,6 +49,13 @@ export async function GET() {
   // products — so it means the API is down and the loader returned its []
   // fallback. Answer 503 and let Google keep the last good copy: submitting an
   // empty feed would delist every offer in the account.
+  //
+  // Caching does not put this guard at risk, which was the original worry.
+  // Verified by building with the API stopped: Next refuses to prerender a
+  // non-200 response, so the route silently falls back to dynamic (`ƒ`) for
+  // that build instead of freezing a 503 at the edge — and it starts returning
+  // the real feed again the moment the API answers. A build during an outage
+  // therefore costs performance, never correctness.
   if (!Array.isArray(products) || products.length === 0) {
     return new Response('Product catalogue unavailable', {
       status: 503,
@@ -60,8 +81,10 @@ export async function GET() {
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      // Google fetches this on a schedule; let the CDN answer most of those.
-      'Cache-Control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+      // Vercel's ISR layer owns Cache-Control on a cached route, so this is not
+      // where the CDN behaviour comes from — `revalidate` above is. Stated
+      // anyway for anyone serving this from somewhere other than Vercel.
+      'CDN-Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
     },
   })
 }

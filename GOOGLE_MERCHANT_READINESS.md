@@ -119,6 +119,14 @@ price, at least one absolute image, a title and a description.
 If the catalogue comes back empty (API down), the route answers **503** rather than serving an empty
 feed, because an empty feed delists every offer in the account.
 
+**Caching:** the route is `force-static` + `revalidate = 3600`, prerendered and served from
+Vercel's edge, and purged by `/api/revalidate` on every admin save. Both exports are needed —
+Next 15 makes route handlers dynamic by default, and a dynamic response is one Vercel will not
+CDN-cache. Measured in production before the fix: **21 s per request**, every request, re-fetching
+5.7 MB from an API whose full-catalogue query takes ~32 s. After: served from cache in
+**~0.03 s**. Building while the API is down does not freeze a 503 at the edge — Next declines to
+prerender a non-200 and falls back to dynamic for that build, then self-heals.
+
 ---
 
 ## Product identifiers
