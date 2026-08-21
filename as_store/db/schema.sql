@@ -225,6 +225,25 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS specs JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS call_for_price BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_products_call_for_price ON products(call_for_price) WHERE call_for_price;
 
+-- --- Manufacturer identifiers (GTIN / MPN) ---------------------------------
+-- What Google Merchant Center and schema.org call a product's *real* identity,
+-- as assigned by whoever made it — not by us:
+--   gtin  the barcode: EAN-13 / UPC-12 / GTIN-8 / GTIN-14 (digits only)
+--   mpn   the manufacturer's own part number, e.g. "MGEA4LL/A"
+--
+-- Both start empty and are only ever filled in by a person who has the box or
+-- the manufacturer's page in front of them. Nothing derives them: an internal
+-- SKU is not a GTIN, and our products.id is not an MPN — submitting either as
+-- one is a misrepresentation Google will eventually catch, and it breaks the
+-- product matching these fields exist to enable. A product with neither is fed
+-- to Google as `identifier_exists: no`, which is a supported, honest answer.
+--
+-- The GTIN is stored normalised (digits only) and checksum-validated on write;
+-- see gtinDigits()/isValidGtin() in server/src/app.js.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS gtin TEXT NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS mpn  TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_products_gtin ON products(gtin) WHERE gtin <> '';
+
 -- Delisted: the catalog sync found this product gone from the source shop and
 -- hid it (see scraper.js -> applyDelist). The stamp is what makes the hide
 -- *ours*, which is how a person's decision survives every later sync:

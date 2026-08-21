@@ -104,6 +104,7 @@ export default function Footer({ settings }) {
               Shipping &amp; Returns
             </FooterLink>
             <FooterLink href="/pages/warranty">Warranty</FooterLink>
+            <FooterLink href="/pages/terms">Terms</FooterLink>
             <FooterLink href="/pages/privacy">Privacy Policy</FooterLink>
             <FooterLink href="/pages/contact">Contact</FooterLink>
           </div>

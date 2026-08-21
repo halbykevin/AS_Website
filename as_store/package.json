@@ -10,6 +10,8 @@
     "lint": "next lint",
     "ship": "node scripts/ship.mjs",
     "sync-catalog": "node scripts/sync-catalog.mjs",
+    "check-feed": "node scripts/check-merchant-feed.mjs",
+    "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON test/*.test.js",
     "deploy:store": "node ../scripts/deploy.mjs --app store"
   },
   "dependencies": {

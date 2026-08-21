@@ -1,5 +1,12 @@
 // Central SEO configuration + helpers.
 //
+// NOTE: this module and lib/merchant.js import each other. The cycle is safe
+// and deliberate — merchant.js only ever *calls* what it imports from here
+// (SITE_URL, CURRENCY, metaDescription) from inside function bodies, never at
+// module scope, so neither half needs the other to have finished evaluating.
+// Keep it that way: a top-level `const X = SITE_URL + …` in merchant.js would
+// turn this into a temporal-dead-zone crash at import time.
+//
 // SITE_URL is the storefront's public origin. Set NEXT_PUBLIC_SITE_URL in the
 // environment (Vercel + .env.local) to the real domain — everything else
 // (metadataBase, canonicals, sitemap URLs, OpenGraph images, JSON-LD) derives
@@ -11,6 +18,21 @@ export const SITE_URL = (
 export const SITE_NAME = 'AS Store'
 export const SITE_TAGLINE = 'Online shopping for tech & electronics in Lebanon'
 export const CURRENCY = 'USD'
+
+// The Merchant-feed derivations. Product structured data and the XML feed are
+// built from the same functions so they cannot disagree about a price, an
+// availability or an identifier — see lib/merchant.js.
+import {
+  availabilityOf,
+  jsonLdDescription,
+  merchantId,
+  productGtin,
+  productImages,
+  productMpn,
+  productUrl,
+  salePricing,
+  schemaAvailability,
+} from './merchant.js'
 
 // Absolute URL for a site-relative path (safe for OG images / canonicals).
 export const absoluteUrl = (path = '/') =>
@@ -69,54 +91,71 @@ export function organizationJsonLd(settings = {}) {
 }
 
 // Product JSON-LD (Product + Offer) — the schema Google reads for rich results
-// and that Merchant Center / Shopping ads validate against.
+// and that Merchant Center cross-checks the feed against.
+//
+// Every number and every identifier below comes from lib/merchant.js, the same
+// module that builds /google-merchant.xml. That is the point: Google compares
+// the page's structured data with the offer submitted for it, and a
+// disagreement over price or availability is treated as a misrepresentation.
+// One derivation, two consumers.
 export function productJsonLd(product) {
   if (!product) return null
-  const images = product.images?.length
-    ? product.images
-    : product.image
-      ? [product.image]
-      : []
-  const price = Number(product.price) || 0
+  const images = productImages(product)
+  const gtin = productGtin(product)
+  const mpn = productMpn(product)
+  const description = jsonLdDescription(product)
+
   // "Call for price" products carry no price anywhere public, and that has to
   // include the structured data — this is the copy Google reads for rich
-  // results and Merchant Center. Publishing a price here would put the number
-  // back on the search page we just took it off the product page for.
-  // schema.org has no "ask us" price, so the offer states availability and
-  // sends people to the page; PriceSpecification is omitted entirely.
-  const offer = product.callForPrice
+  // results. Publishing a price here would put the number back on the search
+  // page we just took it off the product page for. schema.org has no "ask us"
+  // price, so the offer states availability and sends people to the page;
+  // PriceSpecification is omitted entirely. These products are also excluded
+  // from the Merchant feed (merchantEligible -> REASONS.CALL_FOR_PRICE).
+  const url = productUrl(product)
+  const seller = { '@type': 'Organization', name: SITE_NAME }
+  const pricing = salePricing(product)
+  const offer = pricing
     ? {
         '@type': 'Offer',
-        url: absoluteUrl(`/product/${product.slug}`),
+        url,
         priceCurrency: CURRENCY,
-        availability: 'https://schema.org/InStoreOnly',
+        // The price a shopper pays today. `salePricing` puts the pre-discount
+        // figure in `price` and the discounted one in `salePrice`; schema.org's
+        // single `price` is the payable one, so it is the sale price when there
+        // is one.
+        price: (pricing.salePrice ?? pricing.price).toFixed(2),
+        availability: schemaAvailability(availabilityOf(product)),
         itemCondition: 'https://schema.org/NewCondition',
-        ...(product.brand ? { seller: { '@type': 'Organization', name: 'AS Store' } } : {}),
+        seller,
       }
     : {
         '@type': 'Offer',
-        url: absoluteUrl(`/product/${product.slug}`),
+        url,
         priceCurrency: CURRENCY,
-        price: price.toFixed(2),
-        // Visible products are assumed sellable; wire this to a real stock field
-        // when the catalog carries one.
-        availability: 'https://schema.org/InStock',
+        availability: 'https://schema.org/InStoreOnly',
         itemCondition: 'https://schema.org/NewCondition',
-        ...(product.brand ? { seller: { '@type': 'Organization', name: 'AS Store' } } : {}),
+        seller,
       }
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
     ...(images.length ? { image: images } : {}),
-    ...(product.description
-      ? { description: metaDescription(product.description, product.tagline) }
-      : product.tagline
-        ? { description: product.tagline }
-        : {}),
+    ...(description ? { description } : {}),
     ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
-    ...(product.sku ? { sku: String(product.sku) } : {}),
-    ...(product.id ? { mpn: String(product.id) } : {}),
+    // Our own stock-keeping identifier — the same value the feed sends as g:id,
+    // so Google can tie the two together. It is NOT an mpn: `mpn` means the
+    // *manufacturer's* part number, and an internal database key presented as
+    // one is a fabricated identifier that breaks Google's product matching.
+    // (This page used to emit `mpn: product.id`. It doesn't any more.)
+    ...(merchantId(product) ? { sku: merchantId(product) } : {}),
+    // Real manufacturer identifiers only, when a person has entered them.
+    // `gtin` is the modern, length-agnostic property; the checksum is verified
+    // before it is published.
+    ...(gtin ? { gtin } : {}),
+    ...(mpn ? { mpn } : {}),
     offers: offer,
   }
 }

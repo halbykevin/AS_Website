@@ -60,6 +60,22 @@ export async function loadAllProducts() {
   }
 }
 
+// Every visible product *with its full gallery* — what the Google Merchant feed
+// reads (app/google-merchant.xml). Separate from loadAllProducts() rather than a
+// flag on it because the two want different things: the storefront grids need
+// one photo per product and are fetched constantly, while the feed wants every
+// photo and is fetched hourly. Its own URL means its own cache entry, still
+// under the shared 'store' tag, so an admin save purges both together.
+export async function loadProductsWithGallery() {
+  try {
+    const res = await fetch(`${API}/api/products?images=all`, STORE_CACHE)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 // Search products by name (server-side, no cache).
 export async function searchProducts(q) {
   const term = (q || '').trim()
@@ -105,12 +121,24 @@ export async function loadPage(slug) {
   }
 }
 
-// Single product by slug (full image gallery). Returns null if not found.
+// Single product by slug (full image gallery). Returns null if not found — or
+// if the product is hidden.
+//
+// That second case is not fussiness. GET /api/products/:slug deliberately has
+// no `visible` filter, because the admin and the app read the same route, so a
+// hidden product used to render a completely normal, indexable, add-to-bag page
+// to anyone holding its URL — and Google holds them all, since the product was
+// in the sitemap until the day it was hidden. The catalog sync hides delisted
+// products exactly this way (visible=false + delisted_at), so every product the
+// source shop dropped kept a live page advertising something we no longer sell.
+// A storefront loader answering "no such product" is the right shape; the page
+// then 404s and Google drops the URL.
 export async function loadProduct(slug) {
   try {
     const res = await fetch(`${API}/api/products/${encodeURIComponent(slug)}`, STORE_CACHE)
     if (!res.ok) return null
-    return await res.json()
+    const product = await res.json()
+    return product?.visible === false ? null : product
   } catch {
     return null
   }

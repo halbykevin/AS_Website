@@ -10,6 +10,7 @@ import { loadPage } from '@/lib/site'
 // than hitting the API on every crawler request.
 export const revalidate = 3600
 
+// CMS-backed pages: included only if the row actually exists (loadPage below).
 const STATIC_PAGES = ['/pages/about', '/pages/support', '/pages/warranty']
 
 export default async function sitemap() {
@@ -19,8 +20,11 @@ export default async function sitemap() {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/shop`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.3 },
-    // Bespoke code page (always exists) — not gated by loadPage below.
+    // Bespoke code pages (always exist) — not gated by loadPage below. These
+    // are the ones Google Merchant Center reads, so they must be discoverable.
     { url: `${SITE_URL}/pages/privacy`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/pages/shipping`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${SITE_URL}/pages/terms`, changeFrequency: 'yearly', priority: 0.3 },
   ].map((r) => ({ lastModified: now, ...r }))
 
   const [products, categories] = await Promise.all([loadAllProducts(), loadCategories()])

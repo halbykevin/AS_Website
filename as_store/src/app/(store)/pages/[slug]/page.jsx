@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import ContactBody from '@/components/ContactBody.jsx'
 import AboutContent from '@/components/AboutContent.jsx'
 import PrivacyPolicy from '@/components/PrivacyPolicy.jsx'
+import ShippingReturns from '@/components/ShippingReturns.jsx'
+import TermsConditions from '@/components/TermsConditions.jsx'
 import { loadPage, loadSettings } from '@/lib/site'
 import { loadBrands } from '@/lib/catalog'
 
@@ -20,6 +22,19 @@ export async function generateMetadata({ params }) {
       title: 'Privacy Policy — AS Store',
       description: 'How AS Store collects, uses, and protects your information.',
     }
+  if (params.slug === 'shipping')
+    return {
+      title: 'Shipping & Returns — AS Store',
+      description:
+        'Delivery across Lebanon in 2–5 days, delivery charges, and our 3-day return and refund policy.',
+      alternates: { canonical: '/pages/shipping' },
+    }
+  if (params.slug === 'terms')
+    return {
+      title: 'Terms & Conditions — AS Store',
+      description: 'The terms that apply to orders placed on AS Store.',
+      alternates: { canonical: '/pages/terms' },
+    }
   const page = await loadPage(params.slug)
   return { title: page ? `${page.title} — AS Store` : 'AS Store' }
 }
@@ -37,6 +52,20 @@ export default async function ContentPage({ params }) {
   if (params.slug === 'privacy') {
     const settings = await loadSettings()
     return <PrivacyPolicy settings={settings} />
+  }
+
+  // Shipping & Returns and Terms = bespoke pages, kept in code for the same
+  // reason as Privacy: Merchant Center reads them against what the checkout
+  // charges, and every figure on them is derived from the same settings the
+  // till uses, so a CMS edit can't put them out of step.
+  if (params.slug === 'shipping') {
+    const settings = await loadSettings()
+    return <ShippingReturns settings={settings} />
+  }
+
+  if (params.slug === 'terms') {
+    const settings = await loadSettings()
+    return <TermsConditions settings={settings} />
   }
 
   // Support = the contact/help page: email form + WhatsApp button.

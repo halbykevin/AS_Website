@@ -176,6 +176,31 @@ app.use(
 );
 app.use("/uploads", express.static(UPLOAD_DIR));
 
+// robots.txt for the API host. Product photos are served from here, so
+// Googlebot-Image has to be able to reach /uploads — Merchant Center will not
+// accept an offer whose image it is blocked from fetching, and this host
+// answering 404 for robots.txt only *happens* to allow that today. Stating it
+// makes the permission deliberate and stops a future blanket Disallow from
+// silently disqualifying every product in the feed.
+//
+// Everything else is closed: the JSON API is for the storefront and the app,
+// not for search results, and an indexed /api/products would put raw prices in
+// front of Google outside the pages that explain them.
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send(
+    [
+      "User-agent: *",
+      "Allow: /uploads/",
+      "Disallow: /",
+      "",
+      "User-agent: Googlebot-Image",
+      "Allow: /uploads/",
+      "Disallow: /",
+      "",
+    ].join("\n"),
+  );
+});
+
 const ah = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -238,6 +263,13 @@ const productJson = (r, admin = false) => {
     categorySlug: r.category_slug || "",
     brandId: r.brand_id,
     brand: r.brand_name || "",
+    // Manufacturer identifiers, public by nature: a barcode and a part number
+    // are printed on the box. Google's product matching (and the Product
+    // JSON-LD on the page) is the whole reason they are stored, so unlike the
+    // price these are not gated on `admin` — an empty string means "we have
+    // not been told", never "hidden".
+    gtin: r.gtin || "",
+    mpn: r.mpn || "",
     sourceUrl: r.source_url || "",
     colors: Array.isArray(r.colors) ? r.colors : [],
     stock: r.stock,
@@ -527,7 +559,6 @@ const SECTION_COLS = {
   settings: "settings",
   visible: "visible",
   sort: "sort",
-  callForPrice: "call_for_price",
 };
 
 const SALE_JOIN = `
@@ -549,6 +580,23 @@ const LIST_SELECT = `
     sale.percent AS sale_percent,
     (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id
        ORDER BY pi.sort, pi.id LIMIT 1) AS image
+  FROM products p
+  LEFT JOIN categories c ON c.id = p.category_id
+  LEFT JOIN brands b ON b.id = p.brand_id
+  ${SALE_JOIN}`;
+
+// LIST_SELECT plus the full gallery. Only the Merchant feed asks for this
+// (GET /api/products?images=all): Shopping ads carry additional images, and the
+// plain list deliberately returns one photo per product because the grids and
+// rails that drive the storefront would otherwise pay for galleries they never
+// render — on a 1,700-product catalogue that is megabytes per request.
+const LIST_SELECT_GALLERY = `
+  SELECT p.*, c.name AS category_name, c.slug AS category_slug, b.name AS brand_name,
+    sale.percent AS sale_percent,
+    (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id
+       ORDER BY pi.sort, pi.id LIMIT 1) AS image,
+    COALESCE((SELECT json_agg(pi.url ORDER BY pi.sort, pi.id)
+              FROM product_images pi WHERE pi.product_id = p.id), '[]') AS images
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id
   LEFT JOIN brands b ON b.id = p.brand_id
@@ -623,6 +671,43 @@ function pushSearchRank(tokens, params) {
 // Ties broken by in-stock, then the admin's manual order.
 const SEARCH_TIEBREAK = `(COALESCE(p.stock, 0) > 0) DESC, p.sort, p.id`;
 
+/* ---- Manufacturer identifiers ------------------------------------------ */
+
+// A GTIN is digits only; shops and spreadsheets write them with spaces, dashes
+// or a leading apostrophe, so normalise before judging.
+const gtinDigits = (raw) => String(raw ?? "").replace(/\D/g, "");
+
+// GTIN-8 / UPC-12 / EAN-13 / GTIN-14, verified against the standard mod-10 check
+// digit. The checksum is the point: it is what separates a real barcode from a
+// SKU that happens to be thirteen digits long, and a wrong identifier is worse
+// for Google's product matching than no identifier at all.
+export function isValidGtin(raw) {
+  const d = gtinDigits(raw);
+  if (![8, 12, 13, 14].includes(d.length)) return false;
+  if (/^0+$/.test(d)) return false;
+  const body = d.slice(0, -1).split("").reverse();
+  const sum = body.reduce(
+    (t, c, i) => t + Number(c) * (i % 2 === 0 ? 3 : 1),
+    0,
+  );
+  return (10 - (sum % 10)) % 10 === Number(d.slice(-1));
+}
+
+// Normalises a submitted GTIN, or throws so the route answers 400 rather than
+// storing something Google will reject months later. '' clears the field.
+export function normalizeGtin(raw) {
+  const d = gtinDigits(raw);
+  if (!d) return "";
+  if (!isValidGtin(d)) {
+    const err = new Error(
+      "gtin must be a valid GTIN-8, UPC-12, EAN-13 or GTIN-14 (check digit failed)",
+    );
+    err.status = 400;
+    throw err;
+  }
+  return d;
+}
+
 // Columns that admin create/update accept, mapped from camelCase body keys.
 const PRODUCT_COLS = {
   name: "name",
@@ -640,6 +725,14 @@ const PRODUCT_COLS = {
   featured: "featured",
   visible: "visible",
   sort: "sort",
+  // Was declared on SECTION_COLS (homepage sections) by mistake, where nothing
+  // ever sent it — so the per-product "Call for price" toggle saved on create
+  // but silently did nothing on edit, and only the bulk endpoint actually
+  // worked. It belongs here: this flag decides whether a product is sellable
+  // and whether it may be offered to Google at all.
+  callForPrice: "call_for_price",
+  gtin: "gtin",
+  mpn: "mpn",
 };
 
 // ========================= Health =========================
@@ -2149,7 +2242,10 @@ app.get(
     const orderBy = tokens.length
       ? `${pushSearchRank(tokens, params)}, ${SEARCH_TIEBREAK}`
       : "p.sort, p.id";
-    let sql = `${LIST_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${orderBy}`;
+    // ?images=all returns every product photo instead of just the first —
+    // what the Google Merchant feed needs for additional_image_link.
+    const select = req.query.images === "all" ? LIST_SELECT_GALLERY : LIST_SELECT;
+    let sql = `${select} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${orderBy}`;
     if (req.query.limit) {
       params.push(Number(req.query.limit) || 24);
       sql += ` LIMIT $${params.length}`;
@@ -2266,8 +2362,8 @@ app.post(
     const { rows } = await query(
       `INSERT INTO products
          (name, slug, tagline, description, specs, price, old_price, category_id, brand_id,
-          colors, stock, is_new, featured, visible, sort, call_for_price)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16)
+          colors, stock, is_new, featured, visible, sort, call_for_price, gtin, mpn)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         name,
@@ -2286,6 +2382,8 @@ app.post(
         b.visible ?? true,
         b.sort ?? 0,
         b.callForPrice ?? false,
+        normalizeGtin(b.gtin),
+        String(b.mpn ?? "").trim(),
       ],
     );
     if (Array.isArray(b.images)) {
@@ -2320,6 +2418,13 @@ app.put(
       if (key === "colors" || key === "specs") {
         params.push(JSON.stringify(Array.isArray(b[key]) ? b[key] : []));
         sets.push(`${col} = $${params.length}::jsonb`);
+      } else if (key === "gtin") {
+        // Throws 400 on a number that isn't a barcode, rather than storing it.
+        params.push(normalizeGtin(b[key]));
+        sets.push(`${col} = $${params.length}`);
+      } else if (key === "mpn") {
+        params.push(String(b[key] ?? "").trim());
+        sets.push(`${col} = $${params.length}`);
       } else {
         params.push(b[key]);
         sets.push(`${col} = $${params.length}`);

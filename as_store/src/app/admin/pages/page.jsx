@@ -12,6 +12,14 @@ const slugify = (s) =>
 
 const BLANK = { title: '', slug: '', body: '', visible: true, sort: 0 }
 
+// Slugs whose page is rendered from a React component, not from this table.
+// They are legal/policy pages that Google Merchant Center reads and compares
+// against what the checkout actually charges, so their delivery fee, threshold
+// and VAT rate are derived from Settings rather than typed — which means a row
+// here would be silently ignored. Flagged in the list so nobody edits one and
+// wonders why the site did not change.
+const CODE_BACKED = new Set(['privacy', 'shipping', 'terms', 'about', 'contact', 'support'])
+
 export default function PagesPage() {
   const qc = useQueryClient()
   const toast = useToast()
@@ -55,6 +63,11 @@ export default function PagesPage() {
                   <p className="truncate font-medium text-admin-text">{p.title}</p>
                   <p className="truncate text-xs text-admin-text/40">/pages/{p.slug}</p>
                 </div>
+                {CODE_BACKED.has(p.slug) && (
+                  <Badge tone="amber" title="This page is built in code — editing the text here has no effect">
+                    Built in code
+                  </Badge>
+                )}
                 {p.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
                   <a

@@ -14,7 +14,7 @@
     "deploy:all": "node ../../scripts/deploy.mjs",
     "backfill-images": "node src/backfill-images.js",
     "import-scrape": "node src/import-scrape.js",
-    "test": "node --test"
+    "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON"
   },
   "dependencies": {
     "cors": "^2.8.5",

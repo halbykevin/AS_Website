@@ -31,5 +31,14 @@ export async function POST(req) {
   }
   revalidateTag('store')
   revalidatePath('/', 'layout')
-  return NextResponse.json({ revalidated: true, scope: ['tag:store', 'path:/ (layout)'], now: Date.now() })
+  // The Merchant feed and the sitemap are route handlers, not pages, so the
+  // 'layout' sweep above does not reach them. Google reads a stale price as a
+  // mismatch against the product page, so purge them by name.
+  revalidatePath('/google-merchant.xml')
+  revalidatePath('/sitemap.xml')
+  return NextResponse.json({
+    revalidated: true,
+    scope: ['tag:store', 'path:/ (layout)', 'path:/google-merchant.xml', 'path:/sitemap.xml'],
+    now: Date.now(),
+  })
 }

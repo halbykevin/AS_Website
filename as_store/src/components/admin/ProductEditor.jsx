@@ -17,7 +17,7 @@ const slugify = (s) =>
 const BLANK = {
   name: '', slug: '', tagline: '', description: '', price: '', oldPrice: '',
   categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true,
-  callForPrice: false, colors: [], specs: [],
+  callForPrice: false, gtin: '', mpn: '', colors: [], specs: [],
 }
 
 export default function ProductEditor({ id }) {
@@ -64,6 +64,7 @@ export default function ProductEditor({ id }) {
       brandId: p.brandId != null ? String(p.brandId) : '',
       stock: String(p.stock ?? 0), isNew: !!p.isNew, featured: !!p.featured,
       visible: p.visible !== false, callForPrice: !!p.callForPrice,
+      gtin: p.gtin || '', mpn: p.mpn || '',
       colors: Array.isArray(p.colors) ? p.colors : [],
       specs: Array.isArray(p.specs) ? p.specs.filter((r) => Array.isArray(r) && r.length >= 2) : [],
     })
@@ -168,6 +169,8 @@ export default function ProductEditor({ id }) {
       featured: form.featured,
       visible: form.visible,
       callForPrice: form.callForPrice,
+      gtin: form.gtin.trim(),
+      mpn: form.mpn.trim(),
       colors: form.colors,
       specs: form.specs.filter(([k, v]) => String(k).trim() && String(v).trim()),
     }
@@ -284,6 +287,32 @@ export default function ProductEditor({ id }) {
             </Field>
             <Field label="Stock">
               <Input type="number" value={form.stock} onChange={(e) => set('stock', e.target.value)} />
+            </Field>
+          </Card>
+
+          {/* Manufacturer identifiers — what Google matches this product to the
+              rest of the internet with. Empty is a perfectly good answer; a
+              made-up number is not, which is why neither field is generated
+              from anything and the barcode is checksum-validated on save. */}
+          <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <p className="text-sm font-semibold text-admin-text">Manufacturer identifiers</p>
+              <p className="mt-1 text-xs text-admin-text/50">
+                Optional, and only ever copied from the box or the manufacturer&rsquo;s own page. They
+                are what Google Shopping uses to recognise the product — leave them blank rather than
+                guessing, and never put our own reference in either one.
+              </p>
+            </div>
+            <Field label="Barcode (GTIN / EAN / UPC)" hint="8, 12, 13 or 14 digits. Rejected on save if the check digit is wrong.">
+              <Input
+                value={form.gtin}
+                onChange={(e) => set('gtin', e.target.value)}
+                inputMode="numeric"
+                placeholder="0194253715818"
+              />
+            </Field>
+            <Field label="MPN (manufacturer part number)" hint="The maker's own model code, e.g. MGEA4LL/A.">
+              <Input value={form.mpn} onChange={(e) => set('mpn', e.target.value)} placeholder="MGEA4LL/A" />
             </Field>
           </Card>
 
