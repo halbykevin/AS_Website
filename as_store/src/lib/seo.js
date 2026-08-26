@@ -34,6 +34,10 @@ import {
   schemaAvailability,
 } from './merchant.js'
 
+// The return window and return cost, from the one module that states them.
+// Safe to import at module scope: lib/returnPolicy.js imports nothing.
+import { merchantReturnPolicyJsonLd } from './returnPolicy.js'
+
 // Absolute URL for a site-relative path (safe for OG images / canonicals).
 export const absoluteUrl = (path = '/') =>
   `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
@@ -70,6 +74,10 @@ export function organizationJsonLd(settings = {}) {
         ...(sameAs.length ? { sameAs } : {}),
         ...(settings?.contact?.email ? { email: settings.contact.email } : {}),
         ...(settings?.contact?.phone ? { telephone: settings.contact.phone } : {}),
+        // Site-wide return policy. Google Merchant Center's account settings
+        // take precedence over this markup, so its real job is the organic free
+        // listings — which is exactly why it must not disagree with them.
+        hasMerchantReturnPolicy: merchantReturnPolicyJsonLd(SITE_URL),
       },
       {
         '@type': 'WebSite',
@@ -114,6 +122,10 @@ export function productJsonLd(product) {
   // from the Merchant feed (merchantEligible -> REASONS.CALL_FOR_PRICE).
   const url = productUrl(product)
   const seller = { '@type': 'Organization', name: SITE_NAME }
+  // Same policy the Organization publishes, repeated per offer because Google
+  // reads the offer-level one for product results. One builder, so a change to
+  // the window or the cost lands in both.
+  const returnPolicy = merchantReturnPolicyJsonLd(SITE_URL)
   const pricing = salePricing(product)
   const offer = pricing
     ? {
@@ -128,6 +140,7 @@ export function productJsonLd(product) {
         availability: schemaAvailability(availabilityOf(product)),
         itemCondition: 'https://schema.org/NewCondition',
         seller,
+        hasMerchantReturnPolicy: returnPolicy,
       }
     : {
         '@type': 'Offer',
@@ -136,6 +149,7 @@ export function productJsonLd(product) {
         availability: 'https://schema.org/InStoreOnly',
         itemCondition: 'https://schema.org/NewCondition',
         seller,
+        hasMerchantReturnPolicy: returnPolicy,
       }
 
   return {

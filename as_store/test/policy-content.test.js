@@ -13,9 +13,18 @@
 //   delivery cost      $5 under $100, free at $100 or more
 //   returns            3 days from delivery, opened items still eligible
 //   VAT                11%, added at checkout, NOT included in shown prices
+//
+// Confirmed 2026-08-26:
+//   return cost        free - returned in person at an AS shop, nothing
+//                      deducted from the refund
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {
+  RETURN_DAYS,
+  RETURN_IS_FREE,
+  merchantReturnPolicyJsonLd,
+} from '../src/lib/returnPolicy.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +34,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8')
 
 const SHIPPING = read('src/components/ShippingReturns.jsx')
 const TERMS = read('src/components/TermsConditions.jsx')
+const SEO = read('src/lib/seo.js')
 
 /* -- The superseded claims are gone ---------------------------------------- */
 
@@ -61,7 +71,8 @@ test('the shipping page states the 2-5 day delivery estimate', () => {
 })
 
 test('the shipping page states a 3-day return window, measured from delivery', () => {
-  assert.match(SHIPPING, /const RETURN_DAYS = 3/)
+  assert.equal(RETURN_DAYS, 3)
+  assert.match(SHIPPING, /import \{ RETURN_DAYS \} from '@\/lib\/returnPolicy'/)
   assert.match(SHIPPING, /days from the day your order is delivered/)
 })
 
@@ -76,8 +87,80 @@ test('the shipping page says there is no refund after the window', () => {
 })
 
 test('both policy pages agree on the return window', () => {
-  assert.match(TERMS, /const RETURN_DAYS = 3/)
+  // They agree by construction now: neither page holds its own copy of the
+  // number, both read lib/returnPolicy.js. Assert that, not two equal literals.
+  for (const [name, src] of [['ShippingReturns', SHIPPING], ['Terms', TERMS]]) {
+    assert.match(
+      src,
+      /import \{ RETURN_DAYS \} from '@\/lib\/returnPolicy'/,
+      `${name} does not read the return window from lib/returnPolicy`,
+    )
+    const body = src.replace(/^\s*\/\/.*$/gm, '')
+    assert.ok(!/const RETURN_DAYS/.test(body), `${name} keeps its own copy of RETURN_DAYS`)
+  }
   assert.match(TERMS, /days of delivery/)
+})
+
+/* -- The return COST is stated, not implied -------------------------------- */
+
+test('both policy pages state what a return costs the customer', () => {
+  // The gap Google Merchant Center reported as "Return cost: Incomplete" in
+  // August 2026: the window was verified, the cost was nowhere. A policy that
+  // leaves it to be asked about is scored as missing, so it has to be on the
+  // page in words.
+  assert.equal(RETURN_IS_FREE, true)
+  assert.match(SHIPPING, /title="Return cost"/)
+  assert.match(SHIPPING, /Returning a product is free/)
+  assert.match(SHIPPING, /nothing is taken off your refund to cover it/)
+  assert.match(TERMS, /A return costs you nothing/)
+})
+
+test('the return cost is not deferred to a conversation', () => {
+  // "Contact us and we will tell you what it costs" is the exact pattern that
+  // fails Google's completeness review, and the exact thing this page used to
+  // say. Scoped to the return sections.
+  const returnCopy = SHIPPING.slice(SHIPPING.indexOf('id="returns"'))
+  assert.ok(
+    !/how to get the product back to us/i.test(returnCopy),
+    'the shipping page still defers the return arrangements instead of stating them',
+  )
+  assert.ok(
+    !/(cost|amount|fee)[^.]{0,60}when you contact us/i.test(returnCopy),
+    'the shipping page defers the return cost to a conversation',
+  )
+})
+
+test('the return address is read from settings, never typed into the copy', () => {
+  assert.match(SHIPPING, /settings\?\.contact/)
+  assert.match(SHIPPING, /const address = String\(contact\.address \|\| ''\)/)
+})
+
+/* -- The structured data says the same thing as the page ------------------- */
+
+test('MerchantReturnPolicy markup matches the policy the pages state', () => {
+  const policy = merchantReturnPolicyJsonLd('https://store.as.com.lb')
+  assert.equal(policy['@type'], 'MerchantReturnPolicy')
+  assert.equal(policy.merchantReturnDays, RETURN_DAYS)
+  assert.equal(policy.applicableCountry, 'LB')
+  assert.equal(policy.returnPolicyCategory, 'https://schema.org/MerchantReturnFiniteReturnWindow')
+  assert.equal(policy.returnMethod, 'https://schema.org/ReturnInStore')
+  // Free on the page must be FreeReturn in the markup. Google treats a
+  // disagreement between the two as a misrepresentation.
+  assert.equal(policy.returnFees, 'https://schema.org/FreeReturn')
+  assert.match(policy.merchantReturnLink, /\/pages\/shipping#returns$/)
+})
+
+test('the return policy is attached to the Organization and to every product Offer', () => {
+  // Google reads the offer-level policy for product results and the
+  // organization-level one for the site; emitting only one leaves half the
+  // surfaces without a return window.
+  const hits = SEO.match(/hasMerchantReturnPolicy/g) || []
+  assert.ok(hits.length >= 3, `expected Organization + both Offer branches, found ${hits.length}`)
+  assert.match(SEO, /import \{ merchantReturnPolicyJsonLd \} from '\.\/returnPolicy\.js'/)
+  assert.ok(
+    !/'@type': 'MerchantReturnPolicy'/.test(SEO),
+    'seo.js hand-rolls a return policy instead of using the shared builder',
+  )
 })
 
 /* -- Nothing is invented --------------------------------------------------- */

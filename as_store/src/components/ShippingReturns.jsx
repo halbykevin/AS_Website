@@ -15,15 +15,20 @@ import { money } from '@/lib/orders'
 // admin and this page changes with it. Nothing can be stated here that the
 // till does not do.
 //
-// The delivery ESTIMATE and the RETURN WINDOW are the two things no setting
-// holds, so they are constants — confirmed by the store owner (2026-08-21):
-// 2-5 days, and a 3-day refund window measured from delivery.
+// The delivery ESTIMATE is the one thing no setting holds, so it is a constant
+// — confirmed by the store owner (2026-08-21): 2-5 days.
+//
+// The RETURN terms live in lib/returnPolicy.js instead of here, because this
+// page is no longer the only thing that states them: the MerchantReturnPolicy
+// structured data in lib/seo.js says the same window and the same cost to
+// Google, and /pages/terms summarises them. One module, several consumers.
 
-const UPDATED = 'August 21, 2026'
+import { RETURN_DAYS } from '@/lib/returnPolicy'
+
+const UPDATED = 'August 26, 2026'
 
 // Owner-confirmed, and not derivable from anything in the database.
 const DELIVERY_ESTIMATE = '2–5 days'
-const RETURN_DAYS = 3
 
 function Section({ id, title, children }) {
   return (
@@ -52,6 +57,11 @@ export default function ShippingReturns({ settings }) {
   // side of "over $100" they are on.
   const wa = String(contact.whatsapp || '').replace(/\D/g, '')
 
+  // Where a return is handed over. Read from Site Settings -> Contact rather
+  // than typed, so a move does not leave a shopper at the old counter. The copy
+  // reads correctly with or without it.
+  const address = String(contact.address || '').trim()
+
   return (
     <article className="bg-white pb-24 pt-28 sm:pt-32">
       <div className="mx-auto w-full max-w-[760px] px-6">
@@ -63,7 +73,8 @@ export default function ShippingReturns({ settings }) {
         <div className="mt-8 space-y-3 text-lg leading-relaxed text-as-ink/70">
           <p>
             AS Store delivers across Lebanon. This page explains what delivery costs, how long it
-            takes, and how to return something you have changed your mind about.
+            takes, and how to return something you have changed your mind about — including what a
+            return costs you.
           </p>
         </div>
 
@@ -155,11 +166,27 @@ export default function ShippingReturns({ settings }) {
           </p>
         </Section>
 
+        {/*
+          Stated as its own section, with its own heading, on purpose. Google
+          Merchant Center grades "return cost" separately from "return window",
+          and a policy that leaves the cost implied — or answers it with "contact
+          us" — is scored as incomplete even when the window is verified. It is
+          also simply the question a shopper asks second.
+        */}
+        <Section id="return-cost" title="Return cost">
+          <p>
+            <strong className="font-semibold text-as-ink">Returning a product is free.</strong>{' '}
+            You bring it back to us in person{address ? <> at {address}</> : null}, so there is
+            nothing to pay to make the return, and nothing is taken off your refund to cover it.
+          </p>
+          <p>This applies anywhere in Lebanon and to every product on the site.</p>
+        </Section>
+
         <Section id="how-to-return" title="How to start a return">
           <p>
             Contact us within the {RETURN_DAYS} days with your order number and tell us what you would
-            like to return. We will confirm how to get the product back to us and how your refund will
-            be issued.
+            like to return. We will confirm the details with you, and you then bring the product to us
+            in person{address ? <> at {address}</> : null}, where your refund is issued.
           </p>
           <ul className="space-y-1">
             {wa && (

@@ -9,7 +9,8 @@ import { money } from '@/lib/orders'
 //   (b) a behaviour the code demonstrably has — server-side pricing, the
 //       payment methods actually offered, the quantity cap, "call for price",
 //       order cancellation, account deletion, or
-//   (c) a rule the store owner confirmed (2-5 day delivery, 3-day refunds).
+//   (c) a rule the store owner confirmed (2-5 day delivery, 3-day refunds,
+//       returned in person at no cost).
 //
 // Deliberately NOT here: governing law, jurisdiction, arbitration, limitation
 // of liability, company registration numbers, statutory-rights language. None
@@ -17,10 +18,13 @@ import { money } from '@/lib/orders'
 // see, and inventing a legal clause is worse than omitting one. They are listed
 // under LEGAL/BUSINESS INPUT REQUIRED in GOOGLE_MERCHANT_READINESS.md.
 
-const UPDATED = 'August 21, 2026'
+// The return terms come from lib/returnPolicy.js, the single source this page,
+// /pages/shipping and the MerchantReturnPolicy structured data all read.
+import { RETURN_DAYS } from '@/lib/returnPolicy'
+
+const UPDATED = 'August 26, 2026'
 
 const DELIVERY_ESTIMATE = '2–5 days'
-const RETURN_DAYS = 3
 
 // Mirrors MAX_QTY in store/cartSlice.js — the cap the bag actually enforces.
 const MAX_QTY = 2
@@ -173,6 +177,10 @@ export default function TermsConditions({ settings }) {
             <strong className="font-semibold text-as-ink">{RETURN_DAYS} days of delivery</strong>, and having
             opened the product does not disqualify you. After {RETURN_DAYS} days we are not able to
             offer a refund.
+          </p>
+          <p>
+            A return costs you nothing: you bring the product back to us in person, and nothing is
+            taken off your refund to cover it.
           </p>
           <p>
             The full policy, and how to start a return, is on the{' '}
