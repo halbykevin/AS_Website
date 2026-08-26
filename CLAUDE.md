@@ -135,9 +135,19 @@ and `products.json` up, and imports them —
   respect those three states.
 - **A partial scrape is indistinguishable from a mass delisting**, so delisting only runs on
   a `--mode site` scrape with no `--limit`, and only when the file covers ≥ `--delist-floor`
-  (0.5) of what we already hold from that host. Below it: nothing is hidden, and the run
-  exits 3. Scope is by source host, so hand-made products (`source_url = ''`) and other
-  shops' imports can never be caught.
+  (0.5) of what we **still list** from that host. Below it: nothing is hidden, and the run
+  exits 3. Already-archived rows are out of that ratio on purpose — counting them would make
+  the guard refuse for ever once a shop shrinks (pacmax.me went 1787 → 384, which scores 21%
+  against everything ever imported and 100% against what we still list). Scope is by source
+  host, matched with an anchored regex: `LIKE '%//host/%'` needs a slash after the hostname
+  and silently matched **nothing** for a shop on plain WordPress permalinks
+  (`https://pacmax.me?product=slug`), so the mirror reported "on" and hid nothing for months.
+  Hand-made products (`source_url = ''`) and other shops' imports can never be caught.
+- **Identity is `source_url`, then `products.source_sku`.** A shop that deletes and re-creates
+  a product hands it a new url, and a url-only match reads that as a new product — the old row
+  stays live and the catalog carries both (one pacmax rebuild did this 30 times). The SKU
+  survives a re-slug. It is scoped to the same host and treats two matches as no match; it is
+  never shown to a customer and is not `mpn` (that one is staff-owned and goes to Google).
 - Everything else stays additive on purpose: category images are snapshotted and restored,
   admin-added product images survive, and `--dry-run` names every product it would hide.
 

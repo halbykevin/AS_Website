@@ -51,6 +51,10 @@ Scrape the source shop here, then update the live AS Store.
   --workers <n>     Parallel fetches          (default 10)
   --reuse <dir>     Skip the scrape, use an existing run folder
   --no-delist       Keep products the shop no longer sells (default: hide them)
+  --delist-floor <n>  How much of what we still list the scrape must cover before
+                    the mirror is trusted, 0-1 (default 0.5). Lower it only when
+                    you know the shop really has shrunk that much — it is the one
+                    guard between a half-finished crawl and a mass hiding.
   --dry-run         Stop after showing what the import would change
   --yes             Don't ask before writing to the live database
   --deploy          Put the import tool on the VPS first if it isn't there yet
@@ -72,7 +76,7 @@ function fail(msg) {
 }
 
 // --- args ------------------------------------------------------------------
-const opts = { url: 'https://pacmax.me', mode: 'site', limit: 0, workers: 10, reuse: '', dryRun: false, yes: false, deploy: false, delist: true }
+const opts = { url: 'https://pacmax.me', mode: 'site', limit: 0, workers: 10, reuse: '', dryRun: false, yes: false, deploy: false, delist: true, delistFloor: null }
 const argv = process.argv.slice(2)
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
@@ -82,6 +86,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--workers') opts.workers = Number(argv[++i])
   else if (a === '--reuse') opts.reuse = argv[++i]
   else if (a === '--no-delist') opts.delist = false
+  else if (a === '--delist-floor') opts.delistFloor = Number(argv[++i])
   else if (a === '--dry-run') opts.dryRun = true
   else if (a === '--yes' || a === '-y') opts.yes = true
   else if (a === '--deploy') opts.deploy = true
@@ -257,7 +262,11 @@ const remoteCapture = (script) => capture('ssh', [...SSH_ARGS, TARGET, 'bash -s'
 // fraction of the catalog, and calling the remainder "delisted" would hide the
 // store. The import re-checks this against the database (--delist-floor).
 const delist = opts.delist && opts.mode === 'site' && !(opts.limit > 0)
-const DELIST = delist ? ' --delist' : ''
+if (opts.delistFloor !== null && !(opts.delistFloor >= 0 && opts.delistFloor <= 1)) {
+  fail('--delist-floor must be a number between 0 and 1.')
+}
+const FLOOR = delist && opts.delistFloor !== null ? ` --delist-floor ${opts.delistFloor}` : ''
+const DELIST = delist ? ` --delist${FLOOR}` : ''
 
 console.log(`${C.bold}AS Store — catalog sync${C.off}`)
 info(`source:  ${opts.url}  (${opts.mode})`)
@@ -267,6 +276,9 @@ info(
     ? `mirror:  on — products no longer on ${opts.url.replace(/^https?:\/\//, '')} get hidden here`
     : `mirror:  off — products no longer on the shop stay live${opts.delist ? ' (partial run)' : ' (--no-delist)'}`,
 )
+if (FLOOR) {
+  info(`floor:   ${Math.round(opts.delistFloor * 100)}% (lowered from 50%) — the scrape may hide that much of the catalog`)
+}
 
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
 const runDir = opts.reuse ? path.resolve(opts.reuse) : path.join(SERVER_DIR, 'scrapes', `sync-${stamp}`)

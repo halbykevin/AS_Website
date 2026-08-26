@@ -17,10 +17,18 @@ const NONE = '__none__'
 // default it to 0, nothing decrements it on an order, and the storefront treats
 // any visible product as sellable. Filtering on it would just return the whole
 // catalogue. Add it back the day the catalogue carries real inventory.
+//
+// "Hidden" and "Archived" are deliberately separate, because they answer
+// different questions. Archived = the catalog sync found the product gone from
+// the source shop and hid it (`delistedAt` stamped, restored automatically if
+// the shop lists it again). Hidden = someone here hid it, and no sync will ever
+// touch it. Mixed together, a shop that drops 1400 products buries every
+// merchandising decision anyone ever made. See db/schema.sql (`delisted_at`).
 const STATUSES = [
   { value: '', label: 'Any status' },
   { value: 'visible', label: 'Visible' },
-  { value: 'hidden', label: 'Hidden' },
+  { value: 'hidden', label: 'Hidden (by hand)' },
+  { value: 'archived', label: 'Archived (gone from the shop)' },
   { value: 'featured', label: 'Featured' },
   { value: 'sale', label: 'On sale' },
   { value: 'new', label: 'New' },
@@ -28,7 +36,8 @@ const STATUSES = [
 
 const statusMatch = {
   visible: (p) => p.visible,
-  hidden: (p) => !p.visible,
+  hidden: (p) => !p.visible && !p.delistedAt,
+  archived: (p) => Boolean(p.delistedAt),
   featured: (p) => p.featured,
   sale: (p) => Boolean(p.salePercent) || Number(p.oldPrice) > Number(p.price),
   new: (p) => p.isNew,
@@ -77,7 +86,11 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [brand, setBrand] = useState('')
   const [category, setCategory] = useState('')
-  const [status, setStatus] = useState('')
+  // Opens on the live catalog, not on everything. The sync archives whatever
+  // the source shop drops and never deletes it, so "everything" is the live
+  // catalog plus every product the shop has ever stopped selling — 384 rows
+  // against 1787 the day pacmax.me rebuilt itself. Archived is one dropdown away.
+  const [status, setStatus] = useState('visible')
   const [sort, setSort] = useState('default')
   const [dir, setDir] = useState('asc')
 

@@ -240,11 +240,19 @@ if (opts.dryRun) {
   console.log('            (it only ever inserts a missing slug — name, image, sort and visibility are left alone)')
 
   // The same read the real --delist run does, so this is the actual list.
-  const { hosts, owned, missing } = await findDelisted(products)
+  //
+  // One known overstatement: a product the shop re-slugged shows up here as
+  // both "new" and "would hide", because this preview reads the database as it
+  // stands. The real run matches it on source_sku first, updates the row in
+  // place and hides nothing. It errs towards looking more destructive than it
+  // is, which is the right direction for a preview to be wrong in.
+  const { hosts, owned, active, missing } = await findDelisted(products)
   if (owned.length) {
-    const covered = owned.length - missing.length
-    const pct = Math.round((covered / owned.length) * 100)
-    console.log(`\ndelisting:  we hold ${owned.length} product(s) from ${hosts.join(', ')}; this file covers ${covered} (${pct}%)`)
+    // Coverage is measured against what we still list, matching applyDelist —
+    // already-delisted rows are settled and belong in neither side of the ratio.
+    const covered = active.length - missing.filter((r) => !r.delisted_at).length
+    const pct = active.length ? Math.round((covered / active.length) * 100) : 100
+    console.log(`\ndelisting:  we still list ${active.length} product(s) from ${hosts.join(', ')}; this file covers ${covered} (${pct}%)`)
     if (!opts.delist) {
       console.log(`            ${missing.length} not in the file — run with --delist to hide them, otherwise they stay live`)
     } else if (pct / 100 < opts.delistFloor) {
@@ -360,7 +368,7 @@ if (summary.delisted) {
   } else {
     console.log(
       `delisted: ${d.hidden} product(s) hidden (gone from ${d.hosts.join(', ')}), ` +
-        `${d.restored} un-hidden (listed again) — of ${d.checked} we hold from there.`,
+        `${d.restored} un-hidden (listed again) — of ${d.checked} we still listed from there.`,
     )
     if (d.hidden) console.log('          they keep their photos and order history; un-hide any of them in /admin/products.')
   }

@@ -254,6 +254,19 @@ CREATE INDEX IF NOT EXISTS idx_products_gtin ON products(gtin) WHERE gtin <> '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS delisted_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_products_delisted ON products(delisted_at) WHERE delisted_at IS NOT NULL;
 
+-- The source shop's own SKU, captured at import. Identity, not merchandising.
+--
+-- source_url was the only key the importer matched on, and a shop that deletes
+-- and re-creates a product hands it a brand-new url — so the same product came
+-- back as a second row while the first stayed live. That is exactly how one
+-- pacmax.me rebuild put 30 duplicate listings in this catalog. The SKU survives
+-- a re-slug, so it is the fallback key (see scraper.js -> ingestProducts).
+--
+-- Not to be confused with `mpn`: that one is staff-owned and goes to Google.
+-- This is never shown to a customer and never fed anywhere.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS source_sku TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_products_source_sku ON products(source_sku) WHERE source_sku <> '';
+
 CREATE INDEX IF NOT EXISTS idx_products_brand  ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_source ON products(source_url);
 

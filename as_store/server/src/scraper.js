@@ -295,44 +295,64 @@ export async function findDelisted(products) {
     const h = hostOf(url)
     if (h) hosts.add(h)
   }
-  if (!hosts.size) return { hosts: [], owned: [], missing: [], seen: 0 }
+  if (!hosts.size) return { hosts: [], owned: [], active: [], missing: [], seen: 0 }
 
   // Scope: only products imported from the host(s) this run actually covered.
   // A hand-made product has source_url '' and can never match, and neither can
-  // one imported from a different shop. Both url forms, because rows written
-  // before normalizeUrl() existed may still carry the www. host.
-  const likes = []
-  for (const h of hosts) likes.push(`%//${h}/%`, `%//www.${h}/%`)
+  // one imported from a different shop.
+  //
+  // Anchored at the host rather than LIKE '%//host/%': that pattern needs a
+  // slash straight after the hostname, and a shop on plain WordPress permalinks
+  // stores as `https://pacmax.me?product=slug` — a `?`. It matched 0 of the 1787
+  // pacmax rows we held, so the mirror ran, reported "on", and hid nothing, for
+  // every run until 2026-08-26. Match the host and whatever legally follows it
+  // (`/`, `?`, `#`, or end of string), with or without the www.
+  const escaped = [...hosts].map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const hostRe = `^https?://(www\\.)?(${escaped.join('|')})([/?#]|$)`
   const { rows: owned } = await query(
-    `SELECT id, name, price, visible, delisted_at, source_url
+    `SELECT id, name, price, visible, delisted_at, source_url, source_sku
        FROM products
-      WHERE source_url <> '' AND source_url LIKE ANY($1::text[])
+      WHERE source_url <> '' AND source_url ~* $1
       ORDER BY name`,
-    [likes],
+    [hostRe],
   )
   const missing = owned.filter((r) => !seen.has(normalizeUrl(r.source_url)))
-  return { hosts: [...hosts], owned, missing, seen: seen.size }
+  // What we currently present as sellable from that shop — i.e. everything we
+  // have NOT already delisted. This, not `owned`, is what the coverage floor
+  // measures against; see applyDelist.
+  const active = owned.filter((r) => !r.delisted_at)
+  return { hosts: [...hosts], owned, active, missing, seen: seen.size }
 }
 
 // Hide what the shop no longer lists, restore what came back.
 //
 // `floor` is the guard that matters: a scrape that dies halfway, gets
 // rate-limited, or was run with --limit produces a short file that is
-// indistinguishable from a mass delisting. Below this much coverage of what we
-// already hold, the run is treated as incomplete and nothing is hidden.
+// indistinguishable from a mass delisting. Below this much coverage, the run is
+// treated as incomplete and nothing is hidden.
+//
+// Coverage is measured against what we still list from that shop (`active`),
+// not against everything we ever imported from it. Counting the already-hidden
+// rows in the denominator makes the ratio fall permanently the first time a
+// shop shrinks: after pacmax.me went from 1787 products to 384, a complete
+// scrape of all 384 would have scored 21% forever and refused every future run
+// — the guard would have switched itself off precisely once mirroring started
+// working. Against `active` a complete scrape scores 100%, and a half-finished
+// one still scores 50%, which is the case the floor is actually for.
 export async function applyDelist(products, { floor = 0.5 } = {}) {
-  const { hosts, owned, missing } = await findDelisted(products)
-  const base = { hosts, checked: owned.length, hidden: 0, restored: 0, missing: missing.length }
+  const { hosts, owned, active, missing } = await findDelisted(products)
+  const base = { hosts, checked: active.length, hidden: 0, restored: 0, missing: missing.length }
   if (!hosts.length) return { ...base, aborted: 'the scrape produced no usable product urls' }
   if (!owned.length) return base
 
-  const covered = owned.length - missing.length
-  const ratio = covered / owned.length
+  const missingActive = missing.filter((r) => !r.delisted_at).length
+  const covered = active.length - missingActive
+  const ratio = active.length ? covered / active.length : 1
   if (ratio < floor) {
     return {
       ...base,
       aborted:
-        `the scrape covered only ${covered} of the ${owned.length} product(s) we hold from ` +
+        `the scrape covered only ${covered} of the ${active.length} product(s) we still list from ` +
         `${hosts.join(', ')} (${Math.round(ratio * 100)}%, floor ${Math.round(floor * 100)}%) — ` +
         `too incomplete to tell a delisting from a failed crawl`,
       ratio,
@@ -468,13 +488,39 @@ export async function ingestProducts(products, { delist = false, delistFloor = 0
       existing = rows[0]
     }
 
+    // Fall back to the shop's SKU. A shop that deletes and re-creates a product
+    // gives it a new url, and the match above then reads it as something brand
+    // new: the old row stays live and the catalog carries the same product
+    // twice. That is not hypothetical — a pacmax.me rebuild did it 30 times.
+    //
+    // Scoped to the same host, so a hand-made product (source_url '') and
+    // another shop's import can never be claimed by this. Ambiguity is treated
+    // as no match: if two rows carry the SKU, guessing between them would
+    // silently overwrite the wrong product, and inserting is the recoverable
+    // mistake of the two.
+    const sourceSku = decodeEntities(String(p?.sku ?? '')).trim()
+    if (!existing && sourceSku && sourceUrl) {
+      const host = hostOf(sourceUrl)
+      if (host) {
+        const hostRe = `^https?://(www\\.)?${host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([/?#]|$)`
+        const { rows } = await query(
+          `SELECT id FROM products WHERE source_sku = $1 AND source_url ~* $2 LIMIT 2`,
+          [sourceSku, hostRe],
+        )
+        if (rows.length === 1) existing = rows[0]
+      }
+    }
+
     let productId
     if (existing) {
+      // source_sku only ever fills in, never blanks: a shop that stops printing
+      // a SKU must not cost us the key that survives its next re-slug.
       await query(
         `UPDATE products SET name=$2, tagline=$3, description=$4, specs=$5::jsonb, price=$6,
-           category_id=COALESCE($7, category_id), brand_id=COALESCE($8, brand_id), source_url=$9
+           category_id=COALESCE($7, category_id), brand_id=COALESCE($8, brand_id), source_url=$9,
+           source_sku=COALESCE(NULLIF($10, ''), source_sku)
          WHERE id=$1`,
-        [existing.id, title, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl],
+        [existing.id, title, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl, sourceSku],
       )
       productId = existing.id
       updated++
@@ -487,9 +533,9 @@ export async function ingestProducts(products, { delist = false, delistFloor = 0
       const priced = price > 0
       if (!priced) unpriced++
       const { rows } = await query(
-        `INSERT INTO products (name, slug, tagline, description, specs, price, category_id, brand_id, source_url, is_new, visible)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,true,$10) RETURNING id`,
-        [title, slug, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl, priced],
+        `INSERT INTO products (name, slug, tagline, description, specs, price, category_id, brand_id, source_url, is_new, visible, source_sku)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,true,$10,$11) RETURNING id`,
+        [title, slug, tagline, description, JSON.stringify(specs), price, categoryId, brandId, sourceUrl, priced, sourceSku],
       )
       productId = rows[0].id
       created++
