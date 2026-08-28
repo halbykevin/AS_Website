@@ -14,6 +14,8 @@
 --                  app only animates to the slice the server picked.
 --   spin_spins     one row per spin — the audit log AND the cooldown clock
 --                  (the next spin is allowed cooldown_hours after the last).
+--   spin_resets    staff handing one customer their spin back: the clock only
+--                  counts spins taken after the customer's latest reset.
 --   vouchers       what a win is worth. Account-bound and single-use, redeemed
 --                  at checkout (percent / amount / free delivery) or fulfilled
 --                  by staff (gift).
@@ -87,6 +89,18 @@ CREATE TABLE IF NOT EXISTS spin_spins (
 );
 CREATE INDEX IF NOT EXISTS idx_spin_spins_customer ON spin_spins(customer_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_spin_spins_created  ON spin_spins(created_at DESC);
+
+-- A staff-granted second chance. The cooldown clock ignores every spin taken
+-- before a customer's most recent reset, so granting one moves the starting
+-- line instead of erasing history: the spin log still records what they spun
+-- and won, and the reset itself is a row somebody can audit later.
+CREATE TABLE IF NOT EXISTS spin_resets (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  note        TEXT DEFAULT '',                 -- why staff gave it back
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_spin_resets_customer ON spin_resets(customer_id, created_at DESC);
 
 -- A won (or admin-granted) reward. Bound to one account, single use. The money
 -- fields are snapshotted from the prize so editing or deleting a prize later

@@ -164,9 +164,18 @@ const loadSettings = async (db = { query }) => {
 }
 
 // When may this customer spin again? null = right now.
+//
+// Spins taken before the customer's latest staff reset are invisible here: a
+// reset moves the starting line rather than deleting a spin, so the log keeps
+// recording what was actually spun and won while the clock starts again.
 async function nextSpinAt(customerId, cooldownHours, db = { query }) {
   const { rows } = await db.query(
-    `SELECT created_at FROM spin_spins WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    `SELECT created_at FROM spin_spins
+      WHERE customer_id = $1
+        AND created_at > COALESCE(
+              (SELECT max(created_at) FROM spin_resets WHERE customer_id = $1),
+              '-infinity'::timestamptz)
+      ORDER BY created_at DESC LIMIT 1`,
     [customerId],
   )
   if (!rows[0]) return null
@@ -627,19 +636,51 @@ r.get(
   ah(async (req, res) => {
     const limit = clampInt(req.query.limit, 1, 500, 100)
     const offset = clampInt(req.query.offset, 0, 1e6, 0)
+
+    // Finding one player in a log sorted by time is hopeless once the wheel has
+    // been running a while, and finding one player is the whole point of the
+    // reset button next to these rows. Mobiles are stored digits-only with the
+    // country code, so match the digits too — staff type them spaced.
+    const search = String(req.query.search || '').trim()
+    const params = []
+    let where = ''
+    if (search) {
+      params.push(`%${search}%`)
+      const p = `$${params.length}`
+      const clauses = [`c.name ILIKE ${p}`, `c.mobile ILIKE ${p}`]
+      const digits = search.replace(/\D/g, '')
+      if (digits.length >= 3) {
+        params.push(`%${digits}%`)
+        clauses.push(`regexp_replace(c.mobile, '[^0-9]', '', 'g') ILIKE $${params.length}`)
+      }
+      where = `WHERE (${clauses.join(' OR ')})`
+    }
+
+    const config = settingsJson(await loadSettings())
     const { rows } = await query(
       `SELECT s.*, c.name AS customer_name, c.mobile AS customer_mobile,
-              v.code AS voucher_code, v.status AS voucher_status
+              v.code AS voucher_code, v.status AS voucher_status,
+              (SELECT max(rst.created_at) FROM spin_resets rst
+                WHERE rst.customer_id = s.customer_id) AS reset_at
          FROM spin_spins s
          LEFT JOIN customers c ON c.id = s.customer_id
          LEFT JOIN vouchers  v ON v.spin_id = s.id
+        ${where}
         ORDER BY s.created_at DESC
-        LIMIT $1 OFFSET $2`,
-      [limit, offset],
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     )
-    const { rows: count } = await query(`SELECT count(*)::int AS n FROM spin_spins`)
+    const { rows: count } = await query(
+      `SELECT count(*)::int AS n FROM spin_spins s
+         LEFT JOIN customers c ON c.id = s.customer_id
+        ${where}`,
+      params,
+    )
     res.json({
       total: count[0].n,
+      // The client needs both of these to say whether a row's customer is still
+      // cooling down; it cannot know the rule otherwise.
+      cooldownHours: config.cooldownHours,
       spins: rows.map((s) => ({
         id: s.id,
         customerId: s.customer_id,
@@ -650,8 +691,40 @@ r.get(
         prizeType: s.prize_type || 'none',
         voucherCode: s.voucher_code || '',
         voucherStatus: s.voucher_status || '',
+        resetAt: s.reset_at,
         createdAt: s.created_at,
       })),
+    })
+  }),
+)
+
+// Hand one customer their spin back.
+//
+// This inserts a marker rather than deleting spins: `nextSpinAt` ignores
+// everything logged before a customer's latest reset, so the wheel opens up
+// again while the log still says what they spun and won. Two staff resetting
+// the same person twice is harmless — the latest row wins.
+r.post(
+  '/api/admin/spin/resets',
+  requireAuth,
+  ah(async (req, res) => {
+    const customerId = Number(req.body?.customerId)
+    if (!Number.isInteger(customerId) || customerId <= 0)
+      return res.status(400).json({ error: 'Pick a customer' })
+    const { rows: who } = await query(`SELECT id FROM customers WHERE id = $1`, [customerId])
+    if (!who[0]) return res.status(404).json({ error: 'No such customer' })
+
+    const note = String(req.body?.note || '').trim().slice(0, 500)
+    const { rows } = await query(
+      `INSERT INTO spin_resets (customer_id, note) VALUES ($1, $2)
+       RETURNING id, customer_id, note, created_at`,
+      [customerId, note],
+    )
+    return res.status(201).json({
+      id: rows[0].id,
+      customerId: rows[0].customer_id,
+      note: rows[0].note || '',
+      createdAt: rows[0].created_at,
     })
   }),
 )

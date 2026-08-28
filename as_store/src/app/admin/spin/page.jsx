@@ -516,11 +516,36 @@ function PrizeModal({ prize, onClose }) {
 // ---------------------------------------------------------------------------
 
 function SpinsTab() {
+  const qc = useQueryClient()
+  const toast = useToast()
   const [page, setPage] = useState(0)
+  const [search, setSearch] = useState('')
+  const [term, setTerm] = useState('')
   const limit = 50
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setTerm(search.trim())
+      setPage(0)
+    }, CUSTOMER_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'spins', page],
-    queryFn: () => adminApi.listSpins({ limit, offset: page * limit }),
+    queryKey: ['admin', 'spins', page, term],
+    queryFn: () => adminApi.listSpins({ limit, offset: page * limit, search: term }),
+    placeholderData: (prev) => prev,
+  })
+
+  // Unlocking somebody is a deliberate favour, so it reports back by name
+  // rather than silently refreshing the table under the cursor.
+  const reset = useMutation({
+    mutationFn: (row) => adminApi.resetSpinCooldown(row.customerId),
+    onSuccess: (_r, row) => {
+      qc.invalidateQueries({ queryKey: ['admin', 'spins'] })
+      toast.success(`${row.customerName || 'Customer'} can spin again`)
+    },
+    onError: (e) => toast.error(e.message),
   })
 
   if (isLoading) {
@@ -531,13 +556,41 @@ function SpinsTab() {
     )
   }
 
-  const spins = data?.spins || []
+  const cooldownHours = Number(data?.cooldownHours ?? 24)
+
+  // Only a customer's most recent spin can be holding them back, and the list
+  // arrives newest first — so the first row we see for an id is that spin.
+  // Rows from an earlier page are not considered: a cooldown that started
+  // before this page began is, by definition, already older than these.
+  const seen = new Set()
+  const spins = (data?.spins || []).map((s) => {
+    const latest = !seen.has(s.customerId)
+    seen.add(s.customerId)
+    // A spin taken before the customer's last reset no longer holds any clock.
+    const counts = !s.resetAt || new Date(s.createdAt) > new Date(s.resetAt)
+    const until = new Date(s.createdAt).getTime() + cooldownHours * 3600_000
+    return { ...s, cooling: latest && counts && until > Date.now(), until }
+  })
   const total = data?.total || 0
 
   return (
     <Card className="p-5">
+      <div className="relative mb-4 max-w-sm">
+        <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-text/40" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search a player by name or mobile"
+          className="pl-9"
+          name="spin-log-search"
+          autoComplete="off"
+        />
+      </div>
+
       {spins.length === 0 ? (
-        <p className="py-10 text-center text-sm text-admin-text/45">Nobody has spun yet.</p>
+        <p className="py-10 text-center text-sm text-admin-text/45">
+          {term ? `Nobody matching “${term}” has spun.` : 'Nobody has spun yet.'}
+        </p>
       ) : (
         <>
           <div className="overflow-x-auto">
@@ -548,6 +601,7 @@ function SpinsTab() {
                   <th className="py-2 pr-3 font-semibold">Customer</th>
                   <th className="py-2 pr-3 font-semibold">Result</th>
                   <th className="py-2 pr-3 font-semibold">Reward code</th>
+                  <th className="py-2 pr-3 font-semibold">Next spin</th>
                 </tr>
               </thead>
               <tbody>
@@ -572,6 +626,25 @@ function SpinsTab() {
                         </span>
                       ) : (
                         <span className="text-admin-text/35">—</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      {s.cooling ? (
+                        <div className="flex items-center gap-2">
+                          <span className="whitespace-nowrap text-xs text-admin-text/55">
+                            {when(new Date(s.until).toISOString())}
+                          </span>
+                          <Button
+                            variant="secondary"
+                            className="whitespace-nowrap px-2 py-1 text-xs"
+                            disabled={reset.isPending}
+                            onClick={() => reset.mutate(s)}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-admin-text/35">Ready</span>
                       )}
                     </td>
                   </tr>
@@ -899,8 +972,13 @@ function CustomerPicker({ picked, onPick }) {
                 role="option"
                 aria-selected={i === active}
                 onMouseEnter={() => setActive(i)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(c)}
+                // Select on mousedown, not click: preventDefault keeps focus in
+                // the input, and picking on the first event means nothing that
+                // re-renders between press and release can swallow the choice.
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  choose(c)
+                }}
                 className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 ${
                   i === active ? 'bg-admin-bg' : ''
                 }`}

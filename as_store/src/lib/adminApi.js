@@ -203,6 +203,9 @@ export const adminApi = {
     req(`/api/admin/spin/prizes/${id}`, { method: 'PUT', auth: true, body: data }),
   deleteSpinPrize: (id) => req(`/api/admin/spin/prizes/${id}`, { method: 'DELETE', auth: true }),
   listSpins: (params = {}) => req(`/api/admin/spin/spins${qs(params)}`, { auth: true }),
+  // Give one customer their spin back — records a reset, never deletes a spin.
+  resetSpinCooldown: (customerId, note = '') =>
+    req('/api/admin/spin/resets', { method: 'POST', auth: true, body: { customerId, note } }),
   listVouchers: (params = {}) => req(`/api/admin/vouchers${qs(params)}`, { auth: true }),
   createVoucher: (data) => req('/api/admin/vouchers', { method: 'POST', auth: true, body: data }),
   updateVoucher: (id, data) => req(`/api/admin/vouchers/${id}`, { method: 'PUT', auth: true, body: data }),
