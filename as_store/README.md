@@ -90,28 +90,36 @@ price disappears from the storefront and the app, and a WhatsApp button takes it
 - They also drop out of price filters and sort to the end of "Price: Low to High", because they have
   no price to compare.
 
-## AS Points
+## AS Wallet
 
-The loyalty programme, configured at **`/admin/loyalty`** — two tabs: the deal (the rules and the
-copy) and the points ledger. Customers see it at `/account/points` on the website and under Account
-in the app. Defaults: **$1 spent = 1 point, 1,000 points = $50 off**.
+Store credit, configured at **`/admin/wallet`** — two tabs: the deal (the rules and the copy) and the
+wallet ledger. Customers see it at `/account/wallet` on the website and under Account in the app.
+Default: **spend $1,000, get $50 back** (a 5% rate, CMS-editable).
 
-- **Balances are the sum of a ledger**, never a stored total, so every point traces back to the order
-  that paid for it. Nothing is ever edited or deleted — a correction is another row.
-- **Points land when an order is delivered** by default (`confirmed` and `created` are the other
-  options), and a cancellation takes them straight back. They are earned on the items subtotal after
-  discounts; delivery and VAT don't earn.
-- **Redeeming makes a reward, not an automatic discount.** The customer chooses how many whole
-  blocks to trade; what they get is a single-use `$ off` voucher on their account, picked at
-  checkout exactly like a Daily Spin reward. Voiding one in the Rewards tab returns the points.
-- **Shoppers see it before they buy**: "Earn 1,260 AS Points with this purchase" sits under the price
-  on a product page and above the Place order button at checkout. Both disappear when the programme
-  is off, and both quote value in whole redeemable blocks — never a pro-rata figure that couldn't
-  actually be cashed in.
-- Changed the rate, or have orders that predate the programme? **Recalculate all orders** replays
-  the earn rules over the whole history — safe to run any number of times, since it only ever writes
-  the difference. Staff can also give or take points by hand, with a reason the customer sees.
-- Rules live in `server/src/loyalty.js` and `db/loyalty.sql`. This page only edits them.
+This replaced **AS Points**. The deal is the same; the unit is the one customers already think in, so
+there is nothing to convert and nothing to redeem before it can be spent. Existing points balances
+were converted to credit at the old rate by `db/wallet.sql`; the `loyalty_*` tables are retained but
+no longer read.
+
+- **Balances are the sum of a ledger**, never a stored total, so every cent traces back to the order
+  that earned it or the order that spent it. Nothing is ever edited or deleted — a correction is
+  another row.
+- **Credit lands when an order is delivered** by default (`confirmed` and `created` are the other
+  options), and a cancellation takes it straight back. It is earned on the items subtotal after
+  discounts; delivery and VAT don't earn, and neither does the part of an order paid with credit —
+  that last rule is what stops credit breeding credit.
+- **Spending happens at checkout, not here.** The balance appears as a switch on the checkout page;
+  switching it on takes it off the total. It is a *payment*, not a discount, so it comes off after
+  VAT — the tax is on the goods whoever's money buys them. The server claims the debit before the
+  order exists, which is what stops the same balance being spent twice from two devices, and gives it
+  back if the order fails or is cancelled. `min_order` and `max_percent` bound where it can be used.
+- **Shoppers see it before they buy**: "Get $63.00 back in your AS Wallet" sits under the price on a
+  product page and above the Place order button at checkout. Both disappear when the wallet is off,
+  and both quote the exact money that will land — there are no blocks to reach.
+- Changed the rate, or have orders that predate the wallet? **Recalculate all orders** replays the
+  earn rules over the whole history — safe to run any number of times, since it only ever writes the
+  difference. Staff can also add or take credit by hand, with a reason the customer sees.
+- Rules live in `server/src/wallet.js` and `db/wallet.sql`. This page only edits them.
 
 ## Next steps (prompt by prompt)
 

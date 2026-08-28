@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { useSpin } from '@/src/lib/spin';
-import { useLoyalty, points as fmtPoints } from '@/src/lib/loyalty';
+import { useWallet } from '@/src/lib/wallet';
+import { money } from '@/src/lib/format';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
@@ -22,12 +23,12 @@ export default function AccountScreen() {
   const loading = account?.loading;
   const { data: spin } = useSpin(Boolean(customer));
   const spinOn = Boolean(spin?.enabled);
-  // Points get a row of their own with the balance on it — the number is the
-  // reason anyone taps through. Kept out of the menu when the programme is off
-  // *and* there is nothing collected, so the account never links to an empty
-  // screen; a paused programme still shows a balance that was earned.
-  const { data: loyalty } = useLoyalty(Boolean(customer));
-  const pointsOn = Boolean(loyalty?.enabled || Number(loyalty?.balance) > 0);
+  // The wallet gets a row of its own with the balance on it — the number is the
+  // reason anyone taps through. Kept out of the menu when the wallet is off
+  // *and* there is nothing in it, so the account never links to an empty
+  // screen; a paused wallet still shows credit that was earned.
+  const { data: wallet } = useWallet(Boolean(customer));
+  const walletOn = Boolean(wallet?.enabled || Number(wallet?.balance) > 0);
   const [google, setGoogle] = useState(false);
   const [error, setError] = useState('');
 
@@ -98,14 +99,14 @@ export default function AccountScreen() {
             {/* Menu */}
             <Card padded={false}>
               <MenuRow icon="box" label="Your orders" onPress={() => router.push('/orders')} />
-              {pointsOn ? (
+              {walletOn ? (
                 <>
                   <Divider inset={theme.spacing.lg} />
                   <MenuRow
                     icon="star"
-                    label={loyalty?.title || 'AS Points'}
-                    value={`${fmtPoints(loyalty?.balance)} pts`}
-                    onPress={() => router.push('/account/points')}
+                    label={wallet?.title || 'AS Wallet'}
+                    value={money(wallet?.balance)}
+                    onPress={() => router.push('/account/wallet')}
                   />
                 </>
               ) : null}
@@ -117,9 +118,9 @@ export default function AccountScreen() {
               <MenuRow icon="settings" label="Edit profile" onPress={() => router.push('/account/edit')} />
               <Divider inset={theme.spacing.lg} />
               <MenuRow icon="mail" label="Notification settings" onPress={() => router.push('/account/notifications')} />
-              {/* Rewards come from the spin *and* from redeemed points, so the
+              {/* Rewards come from the Daily Spin and from staff grants, so the
                   row shows whenever either can produce one. */}
-              {spinOn || pointsOn ? (
+              {spinOn ? (
                 <>
                   <Divider inset={theme.spacing.lg} />
                   <MenuRow icon="ticket" label="My rewards" onPress={() => router.push('/account/rewards')} />

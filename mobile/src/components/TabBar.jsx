@@ -9,8 +9,12 @@
 // The active pill springs in rather than snapping (Material 3's active-indicator
 // pattern), and pressing a tab dips it slightly for tactile feedback. Both are
 // skipped when the OS asks for reduced motion.
+//
+// The Bag tab is also where an add-to-bag flight lands: its icon registers as
+// the cart target, and the badge pops as the count changes so the number the
+// image just flew into is the one that moves.
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +23,7 @@ import { useSelector } from 'react-redux';
 import { selectCartCount } from '@/src/store/cartSlice';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import Text from '@/src/ui/Text';
+import { useCartTarget } from './FlyToCart';
 
 // route name → [outline icon, filled icon]
 const ICONS = {
@@ -36,6 +41,9 @@ export default function TabBar({ state, descriptors, navigation }) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const cartCount = useSelector(selectCartCount);
+  // Where a flying product photo lands. A screen pushed over the tabs registers
+  // its own bag button and takes over while it is up — see FlyToCart.
+  const bagRef = useCartTarget('tabbar:bag');
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -49,13 +57,23 @@ export default function TabBar({ state, descriptors, navigation }) {
           if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
         };
 
-        return <TabItem key={route.key} name={route.name} label={options.tabBarAccessibilityLabel ?? label} focused={focused} onPress={onPress} badge={route.name === 'bag' ? cartCount : 0} />;
+        return (
+          <TabItem
+            key={route.key}
+            name={route.name}
+            label={options.tabBarAccessibilityLabel ?? label}
+            focused={focused}
+            onPress={onPress}
+            badge={route.name === 'bag' ? cartCount : 0}
+            iconRef={route.name === 'bag' ? bagRef : null}
+          />
+        );
       })}
     </View>
   );
 }
 
-function TabItem({ name, label, focused, onPress, badge = 0 }) {
+function TabItem({ name, label, focused, onPress, badge = 0, iconRef = null }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const reduceMotion = useReducedMotion();
@@ -67,6 +85,20 @@ function TabItem({ name, label, focused, onPress, badge = 0 }) {
   // they can never drift out of alignment.
   const active = useSharedValue(focused ? 1 : 0);
   const press = useSharedValue(0);
+  // Badge pop. Only on a *rise*: removing something from the bag shouldn't
+  // celebrate, and the first paint after a restored cart isn't news either.
+  const pop = useSharedValue(0);
+  const lastBadge = useRef(badge);
+
+  useEffect(() => {
+    const grew = badge > lastBadge.current;
+    lastBadge.current = badge;
+    if (!grew || reduceMotion) return;
+    pop.value = 0;
+    pop.value = withSpring(1, { damping: 9, stiffness: 320, mass: 0.5 }, () => {
+      pop.value = withTiming(0, { duration: 200 });
+    });
+  }, [badge, reduceMotion, pop]);
 
   useEffect(() => {
     active.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, SPRING);
@@ -79,8 +111,10 @@ function TabItem({ name, label, focused, onPress, badge = 0 }) {
   }));
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: (1 + 0.08 * active.value) * (1 - 0.1 * press.value) }]
+    transform: [{ scale: (1 + 0.08 * active.value) * (1 - 0.1 * press.value) * (1 + 0.22 * pop.value) }]
   }));
+
+  const badgeStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.45 * pop.value }] }));
 
   const setPress = to => {
     press.value = reduceMotion ? to : withTiming(to, { duration: to ? 90 : 160 });
@@ -96,17 +130,19 @@ function TabItem({ name, label, focused, onPress, badge = 0 }) {
       onPressOut={() => setPress(0)}
       style={styles.item}
     >
-      <View style={styles.iconWrap}>
+      {/* collapsable={false} keeps the view around on Android, where a layout-only
+          container is otherwise flattened away and cannot be measured. */}
+      <View ref={iconRef} collapsable={false} style={styles.iconWrap}>
         <Animated.View style={[styles.pill, pillStyle]} />
         <Animated.View style={iconStyle}>
           <Ionicons name={focused ? filled : outline} size={22} color={color} />
         </Animated.View>
         {badge > 0 ? (
-          <View style={styles.badge}>
+          <Animated.View style={[styles.badge, badgeStyle]}>
             <Text variant="overline" color="textOnPrimary" style={styles.badgeText}>
               {badge > 99 ? '99+' : badge}
             </Text>
-          </View>
+          </Animated.View>
         ) : null}
       </View>
       <Text variant="caption" numberOfLines={1} style={[styles.label, focused && styles.labelActive, { color }]}>

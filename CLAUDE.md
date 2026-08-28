@@ -69,7 +69,7 @@ Store-publishing requirements that are easy to break and hard to notice:
   an order is in flight. The endpoint, that screen's copy, and the "Deleting your account" section of
   [as_store/src/components/PrivacyPolicy.jsx](as_store/src/components/PrivacyPolicy.jsx) describe the
   same behaviour on purpose — that policy is what Google Play and the App Store review. Anything new
-  that hangs off a customer (the AS Points ledger, for instance) must cascade on `customers.id` and
+  that hangs off a customer (the AS Wallet ledger, for instance) must cascade on `customers.id` and
   be named in all three.
 - **The privacy policy covers the app, not just the website**, and is reachable from the account tab
   **signed out** ([mobile/app/legal.jsx](mobile/app/legal.jsx)). Anything new the app collects — push
@@ -86,6 +86,41 @@ Store-publishing requirements that are easy to break and hard to notice:
   New screens should keep the `ErrorBoundary` export; new data-driven sections should get a
   `<Boundary>`. All of it funnels through `reportError`, the one place to wire a reporting service.
   There is no crash *reporting* wired up today.
+
+## Checkout requires a mobile number (store + app + API)
+
+Every order carries a number someone can actually be called on, whatever the sign-in was. Google and
+email-code sign-ins bring no mobile with them, so for those customers the checkout field starts empty
+and this is the only thing between that and an undeliverable order.
+
+- The rule lives in `POST /api/orders`: `normalizeMobile(phone)` must resolve, for **signed-in
+  customers too**, not only for guests. That is the one place the website, the app and anything else
+  all pass through.
+- Both checkouts mirror the same normaliser client-side (`isValidMobile` in
+  [as_store/src/lib/orders.js](as_store/src/lib/orders.js) and
+  [mobile/src/lib/format.js](mobile/src/lib/format.js)) purely to save the round trip. Loosen the
+  server rule without loosening these and valid numbers get rejected before they are ever sent.
+- A signed-in account with **no** `customers.mobile` gets the number backfilled from the order, so it
+  is never typed twice. Conditional on the column being empty and on no other account owning it — the
+  number on file is what signs them in, and a delivery contact must not silently rewrite it.
+
+## Add-to-Bag flight (mobile app)
+
+The product photo arcs out of the card and lands on the bag icon
+([mobile/src/components/FlyToCart.jsx](mobile/src/components/FlyToCart.jsx)), with the tab-bar badge
+popping as the count rises. Reanimated only — no native dependency, so it ships as an OTA update.
+
+- **The overlay is mounted above every screen** (in `AppProviders`). It has to be: the image starts
+  inside a virtualized list and ends on the app's chrome, and nothing rendered inside either one can
+  cross that boundary.
+- **The landing spot is registered, and registrations are a stack.** `useCartTarget()` on the tab
+  bar's bag, and again on the product screen's header bag — a screen pushed over the tabs covers the
+  tab bar, so it claims the target while it is up and hands it back on unmount. Each call gets its
+  own identity so two screens stack rather than overwrite.
+- **The flight is decoration only.** `dispatch(addItem(...))` runs first and unconditionally; leaving
+  the screen mid-flight cannot lose the item, and reduced motion skips the animation entirely.
+- Source views need `collapsable={false}` — Android flattens layout-only views away, and a view that
+  no longer exists cannot be measured.
 
 ## Call for price (store + app + admin)
 
@@ -184,42 +219,56 @@ the AS Store CMS at `/admin/spin`. Schema in [as_store/db/spin.sql](as_store/db/
   and the app wheel must land on the same slice). The app needs `react-native-svg`, so a native
   rebuild is required, not just an OTA update.
 
-## AS Points (loyalty — store + app + admin)
+## AS Wallet (store credit — store + app + admin)
 
-Spend money, collect points; trade a block of them for money off. Schema in
-[as_store/db/loyalty.sql](as_store/db/loyalty.sql), API in
-[as_store/server/src/loyalty.js](as_store/server/src/loyalty.js), CMS at `/admin/loyalty`
-([page](as_store/src/app/admin/loyalty/page.jsx)), customer pages at `/account/points` on the
-website and [mobile/app/account/points.jsx](mobile/app/account/points.jsx) in the app. Defaults:
-**$1 = 1 point, 1,000 points = $50 off**, all three numbers CMS-editable.
+Spend money, get a percentage back as credit; spend the credit on a later order. Schema in
+[as_store/db/wallet.sql](as_store/db/wallet.sql), API in
+[as_store/server/src/wallet.js](as_store/server/src/wallet.js), CMS at `/admin/wallet`
+([page](as_store/src/app/admin/wallet/page.jsx)), customer pages at `/account/wallet` on the website
+and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. Default:
+**spend $1,000, get $50 back** (`earn_percent` = 5), CMS-editable.
 
-- **There is no balance column.** A balance is `SUM(loyalty_ledger.points)` — every point traces to
-  the order that paid for it, and nothing can drift out of step with the history the customer reads.
-  Rows are append-only; a correction is another row (`earn` / `revoke` / `redeem` / `adjust`).
-- **Earning is reconciled, not appended.** `syncOrderPoints(orderId)` compares what an order *should*
-  have awarded against what it already did and writes only the difference, so it is safe to call from
-  anywhere an order changes — it is wired into order creation, `markWhishPaid`, and the admin status
-  route. That is what makes delivered → cancelled → delivered land on the right number instead of
-  paying twice. `POST /api/admin/loyalty/resync` replays it over every order (the way to apply a
-  changed rate to history, or to backfill orders that predate the programme).
-- Points land per `settings.award_on` — `delivered` (default), `confirmed`, or `created` — and a
-  cancellation always takes them back. The basis is the items subtotal minus item discounts;
-  delivery and VAT never earn, and a free-delivery voucher therefore doesn't reduce it.
-- **Redeeming mints a voucher** (`source='points'`, `type='amount'`, `points_spent` recording the
-  cost) rather than adding a second discount path to checkout — the money rules stay the proven ones
-  in `spin.js`. Redemption is always a deliberate customer action from their points screen, in whole
-  blocks; the reward then appears in My rewards and the checkout picker like any other. Voiding or
-  deleting a points reward in the admin calls `refundVoucherPoints()` and hands the points back
-  (`spin.js` → `loyalty.js` is a one-way import; loyalty knows nothing about the spin).
-- The **website checkout gained the reward picker** the app already had — without it a redeemed
-  reward would be unspendable on the web.
-- **"Earn N points" appears on the product page and at checkout**, on both platforms
-  ([as_store/src/lib/loyalty.js](as_store/src/lib/loyalty.js) → `pointsFor`, and
-  [mobile/src/components/PointsEarn.jsx](mobile/src/components/PointsEarn.jsx)). Those estimates
-  mirror `pointsForOrder()` on the server exactly — item spend after discounts, rounded down — so a
-  promise made before checkout is the one the server keeps; pass item money only, never delivery or
-  VAT. They render nothing when the programme is off. Value is quoted in **whole blocks only**
-  (`blocksWorth`), never pro-rata: points can't be redeemed a fraction of a block at a time.
+> This **replaced AS Points**. The deal is identical; the unit is the one customers already think in,
+> so there is nothing to convert and nothing to redeem before it can be spent — which is why the
+> redeem screens, `blocksWorth`, and the whole points→voucher path are gone. `wallet.sql` converts
+> any existing `loyalty_ledger` balance to credit at the old rate, once, guarded by a sentinel note.
+> The `loyalty_*` tables are **retained but never read**, like `reservations` on the marketing site.
+
+- **There is no balance column.** A balance is `SUM(wallet_ledger.amount)` — every cent traces to the
+  order that earned it or the order that spent it, and nothing can drift out of step with the history
+  the customer reads. Rows are append-only; a correction is another row (`earn` / `revoke` / `spend` /
+  `refund` / `adjust`).
+- **Earning is reconciled, not appended.** `syncOrderWallet(orderId)` compares what an order *should*
+  have credited against what it already did and writes only the difference, so it is safe to call
+  from anywhere an order changes — it is wired into order creation, `markWhishPaid`, and the admin
+  status route. That is what makes delivered → cancelled → delivered land on the right balance
+  instead of paying twice. `POST /api/admin/wallet/resync` replays it over every order (the way to
+  apply a changed rate to history, or to backfill orders that predate the wallet).
+- Credit lands per `settings.award_on` — `delivered` (default), `confirmed`, or `created` — and a
+  cancellation always takes it back. The basis is the items subtotal minus item discounts **minus
+  whatever the wallet itself paid**: delivery and VAT never earn (a free-delivery voucher therefore
+  doesn't reduce it), and credit must not breed credit.
+- **Spending is a payment, not a discount**, so it comes off *after* VAT — the tax is on the goods
+  whoever's money buys them. `orders.wallet_amount` snapshots it beside the delivery fee and VAT, and
+  total = subtotal + delivery + VAT − discount − wallet. Vouchers are untouched and still apply to
+  the same order: the voucher discounts the goods, the wallet pays what is left.
+- **The debit is claimed before the order exists.** `spendFromWallet()` writes it under a
+  per-customer advisory lock and returns an entry id; checkout then `attachWalletSpend()`s the order
+  onto it, or `releaseWalletSpend()`s it back — the same shape `redeemVoucher`/`releaseVoucher` uses,
+  and the only thing that stops one balance being spent twice from two devices. `refundOrderWallet()`
+  gives it back when an admin cancels; reopening a cancelled order deliberately does **not** re-take
+  it.
+- **Clients ask for the wallet, never for an amount.** `POST /api/orders { useWallet: true }` lets
+  the server decide what `min_order` / `max_percent` / the balance allow, and prices the order from
+  its own figure. `GET /api/wallet?total=` returns that same `spendable` number so a checkout can
+  show it first — the client never re-implements the money rules (the same reason the vouchers list
+  carries its own `discount`).
+- **"Get $N back" appears on the product page and at checkout**, on both platforms
+  ([as_store/src/lib/wallet.js](as_store/src/lib/wallet.js) → `creditFor`, and
+  [mobile/src/components/WalletEarn.jsx](mobile/src/components/WalletEarn.jsx)). Those estimates
+  mirror `walletEarnFor()` on the server exactly — item spend after discounts and after wallet
+  payment, floored to the cent — so a promise made before checkout is the one the server keeps; pass
+  item money only, never delivery or VAT. They render nothing when the wallet is off.
 
 ## Backend
 

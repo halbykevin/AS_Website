@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -11,7 +11,8 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion, Markdown } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
-import PointsEarn from '@/src/components/PointsEarn';
+import { useCartTarget, useFlyToCart } from '@/src/components/FlyToCart';
+import WalletEarn from '@/src/components/WalletEarn';
 import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
@@ -40,6 +41,10 @@ export default function ProductDetailScreen() {
   // handlers underneath a live pinch.
   const [viewerAt, setViewerAt] = useState(null);
   const closeViewer = useCallback(() => setViewerAt(null), []);
+  // The tab bar is covered on this screen, so the header's own bag button is
+  // where an add-to-bag flight has to land.
+  const galleryRef = useRef(null);
+  const flyToCart = useFlyToCart();
 
   const inCart = items.find(i => i.id === product?.id)?.qty || 0;
   const atCap = inCart >= MAX_QTY;
@@ -91,7 +96,9 @@ export default function ProductDetailScreen() {
 
   const add = () => {
     if (atCap) return;
-    dispatch(addItem({ id: product.id, title: product.name, image: product.image || images[0], price: priceNum, slug: product.slug }));
+    const image = product.image || images[0];
+    dispatch(addItem({ id: product.id, title: product.name, image, price: priceNum, slug: product.slug }));
+    flyToCart({ uri: images[active] || image, source: galleryRef });
   };
 
   const galleryWidth = Math.min(screenWidth, theme.layout.maxContentWidth);
@@ -140,7 +147,7 @@ export default function ProductDetailScreen() {
       <Header title={product.category || 'Product'} transparent right={<CartButton />} />
 
       {/* Gallery */}
-      <View>
+      <View ref={galleryRef} collapsable={false}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e => setActive(Math.round(e.nativeEvent.contentOffset.x / galleryWidth))}>
           {(images.length ? images : ['']).map((img, i) => (
             <Pressable
@@ -214,7 +221,7 @@ export default function ProductDetailScreen() {
             </Text>
           ) : null
         ) : (
-          <PointsEarn amount={priceNum} verb="Earn" />
+          <WalletEarn amount={priceNum} verb="Get" />
         )}
 
         {/* Colours */}
@@ -317,8 +324,11 @@ function SpecRow({ label, value, stacked }) {
 function CartButton() {
   const theme = useTheme();
   const count = useSelector(selectCartCount);
+  // Claims the landing spot for as long as this screen is mounted; the tab bar's
+  // bag takes it back on unmount.
+  const ref = useCartTarget('product:bag');
   return (
-    <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
+    <Pressable ref={ref} collapsable={false} onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
       <Icon name="bag" size={22} />
       {count > 0 ? (
         <View style={{ position: 'absolute', right: -8, top: -6, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>

@@ -24,7 +24,7 @@ const CONFIRM_WORD = 'DELETE';
 const GOES = [
   'Your name, mobile number, email and saved addresses',
   'Your rewards and Daily Spin history',
-  'Your AS Points balance and history',
+  'Your AS Wallet balance and history',
   'Your notifications and notification settings',
   'Your ability to sign in with this account'
 ];

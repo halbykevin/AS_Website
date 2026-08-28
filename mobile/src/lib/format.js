@@ -140,3 +140,22 @@ export const ORDER_STATUS_LABEL = {
   delivered: 'Delivered',
   cancelled: 'Cancelled'
 };
+
+// --- mobile numbers ---------------------------------------------------------
+//
+// A deliberate mirror of `normalizeMobile()` in as_store/server/src/customerAuth.js.
+// The server is the one that decides — every order goes through its check — but
+// a form that only finds out after a round trip is a form that wastes the tap.
+// Keep the two in step: a rule loosened there and not here silently rejects
+// numbers the server would have accepted.
+export function normalizeMobile(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (!d.startsWith('961')) {
+    if (d.startsWith('0')) d = d.slice(1);
+    if (d.length >= 6 && d.length <= 8) d = `961${d}`;
+  }
+  return d.length >= 9 && d.length <= 15 ? d : '';
+}
+
+export const isValidMobile = raw => Boolean(normalizeMobile(raw));

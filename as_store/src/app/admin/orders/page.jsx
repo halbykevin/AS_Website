@@ -7,7 +7,7 @@ import { Button, Card, Badge, Spinner, Select, Modal, Checkbox } from '@/compone
 import { useToast } from '@/components/admin/toast.jsx'
 import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
-import { ORDER_STATUSES, statusMeta, money, orderDate, orderTotal } from '@/lib/orders'
+import { ORDER_STATUSES, statusMeta, money, orderDate, orderTotal, paymentLabel } from '@/lib/orders'
 
 export default function OrdersAdmin() {
   const qc = useQueryClient()
@@ -206,7 +206,9 @@ function OrderModal({ id, onClose }) {
               ))}
             </ul>
             <div className="mt-3 space-y-1.5 border-t border-admin-line/10 pt-3">
-              {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
+              {(Number(order.deliveryFee) > 0 ||
+                Number(order.vatAmount) > 0 ||
+                Number(order.walletAmount) > 0) && (
                 <>
                   <div className="flex items-center justify-between text-sm text-admin-text/55">
                     <span>Subtotal</span>
@@ -224,6 +226,14 @@ function OrderModal({ id, onClose }) {
                       <span>{money(order.vatAmount)}</span>
                     </div>
                   )}
+                  {/* Paid in credit rather than money — worth seeing before
+                      chasing a payment that was never going to arrive. */}
+                  {Number(order.walletAmount) > 0 && (
+                    <div className="flex items-center justify-between text-sm font-medium text-as-red">
+                      <span>Paid from wallet</span>
+                      <span>−{money(order.walletAmount)}</span>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex items-center justify-between">
@@ -231,7 +241,7 @@ function OrderModal({ id, onClose }) {
                   Total ·{' '}
                   {order.paymentMethod === 'whish'
                     ? `Whish — ${order.paymentStatus === 'paid' ? 'paid' : 'unpaid'}`
-                    : 'Cash on delivery'}
+                    : paymentLabel(order)}
                 </span>
                 <span className="text-lg font-semibold text-admin-text">{money(orderTotal(order))}</span>
               </div>

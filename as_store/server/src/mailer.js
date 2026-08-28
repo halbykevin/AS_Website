@@ -47,6 +47,16 @@ const MUTED = '#6e6e73'
 // payment_status rather than assuming it.
 function paymentWording(order) {
   const paid = order?.paymentStatus === 'paid'
+  // Paid outright from the customer's wallet — no payment page, no cash at the
+  // door, nothing owed.
+  if (order?.paymentMethod === 'wallet') {
+    return {
+      tag: 'Paid from wallet',
+      totalLabel: 'Total — paid from your AS Wallet',
+      customerLine: 'This order was paid in full from your AS Wallet balance.',
+      staffLine: 'paid in full from the customer\'s AS Wallet',
+    }
+  }
   if (order?.paymentMethod === 'whish') {
     return {
       tag: 'Whish Pay',
@@ -108,7 +118,8 @@ function orderBody(order, { intro, trackUrl }) {
         // an order with free delivery and no VAT these rows are pure noise.
         Number(order.deliveryFee) > 0 ||
         Number(order.vatAmount) > 0 ||
-        Number(order.discountAmount) > 0
+        Number(order.discountAmount) > 0 ||
+        Number(order.walletAmount) > 0
           ? `<tr>
         <td colspan="2" style="padding:10px 0 2px;color:${MUTED}">Subtotal</td>
         <td align="right" style="padding:10px 0 2px;color:${MUTED}">${money(order.subtotal)}</td>
@@ -127,6 +138,16 @@ function orderBody(order, { intro, trackUrl }) {
           ? `<tr>
         <td colspan="2" style="padding:2px 0;color:${RED}">Reward${order.voucherCode ? ` (${esc(order.voucherCode)})` : ''}</td>
         <td align="right" style="padding:2px 0;color:${RED}">-${money(order.discountAmount)}</td>
+      </tr>`
+          : ''
+      }
+      ${
+        // Wallet credit. A payment rather than a discount, so it is listed after
+        // VAT — which is exactly where it comes off the sum.
+        Number(order.walletAmount) > 0
+          ? `<tr>
+        <td colspan="2" style="padding:2px 0;color:${RED}">Paid from your wallet</td>
+        <td align="right" style="padding:2px 0;color:${RED}">-${money(order.walletAmount)}</td>
       </tr>`
           : ''
       }

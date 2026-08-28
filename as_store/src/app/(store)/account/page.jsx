@@ -7,7 +7,7 @@ import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
 import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
-import { useLoyalty } from '@/lib/loyalty'
+import { useWallet } from '@/lib/wallet'
 
 export default function AccountPage() {
   const { customer, loading, logout, setCustomer } = useAccount()
@@ -46,7 +46,7 @@ export default function AccountPage() {
           </button>
         </div>
 
-        <PointsCard />
+        <WalletCard />
 
         <Link
           href="/account/notifications"
@@ -72,19 +72,20 @@ export default function AccountPage() {
   )
 }
 
-// The points balance, with the one thing worth surfacing here: whether there is
-// enough to cash in. Hidden entirely while the programme is off *and* the
-// customer has no balance — an account that collected points before it was
-// paused still gets to see them.
-function PointsCard() {
-  const { data } = useLoyalty()
+// The wallet balance — the number is the reason anyone clicks through. Hidden
+// entirely while the wallet is off *and* the customer has nothing in it, so the
+// account never links to an empty screen; a paused wallet still shows credit
+// that was earned.
+function WalletCard() {
+  const { data } = useWallet()
 
   if (!data || (!data.enabled && !data.balance)) return null
-  const ready = Number(data.blocks || 0) > 0
+  const balance = Number(data.balance || 0)
+  const pct = Number(data.earnPercent) || 0
 
   return (
     <Link
-      href="/account/points"
+      href="/account/wallet"
       className="mt-10 flex items-center gap-3 rounded-2xl border border-as-ink/10 p-5 transition hover:border-as-ink/25"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-as-red/10 text-as-red">
@@ -92,16 +93,18 @@ function PointsCard() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-semibold text-as-ink">
-          {Number(data.balance || 0).toLocaleString()} {data.title || 'AS Points'}
+          {money(balance)} in your {data.title || 'AS Wallet'}
         </span>
         <span className="block text-sm text-as-ink/55">
-          {ready
-            ? `Ready to redeem for ${money(data.blocks * data.redeemValue)} off`
-            : `Earn ${Number(data.redeemBlock || 0).toLocaleString()} points for ${money(data.redeemValue)} off`}
+          {balance > 0
+            ? 'Ready to spend at checkout'
+            : pct > 0
+              ? `Spend ${money(1000)}, get ${money((1000 * pct) / 100)} back`
+              : 'Money back on every order'}
         </span>
       </span>
-      {ready && (
-        <span className="rounded-full bg-as-red px-3 py-1 text-xs font-semibold text-white">Redeem</span>
+      {balance > 0 && (
+        <span className="rounded-full bg-as-red px-3 py-1 text-xs font-semibold text-white">Spend</span>
       )}
       <Icon name="chevronRight" className="h-5 w-5 text-as-ink/40" />
     </Link>

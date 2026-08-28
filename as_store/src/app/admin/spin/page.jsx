@@ -784,10 +784,11 @@ function RewardsTab() {
                     <p className="text-admin-text">{v.label || typeLabel(v.type)}</p>
                     <p className="text-xs text-admin-text/45">
                       {prizeWorth(v)}
-                      {/* Where it came from matters here: voiding a points
-                          reward hands those points back to the customer. */}
+                      {/* 'points' rows are leftovers from AS Points, which the
+                          wallet replaced — they are still spendable vouchers,
+                          but nothing is handed back when one is voided. */}
                       {v.source === 'points'
-                        ? ` · bought with ${Number(v.pointsSpent || 0).toLocaleString()} AS Points`
+                        ? ` · bought with ${Number(v.pointsSpent || 0).toLocaleString()} AS Points (retired)`
                         : v.source === 'admin'
                           ? ' · granted by staff'
                           : ''}

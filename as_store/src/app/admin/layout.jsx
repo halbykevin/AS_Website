@@ -16,7 +16,7 @@ const NAV = [
   { href: '/admin/homepage', label: 'Homepage', icon: 'image' },
   { href: '/admin/popup', label: 'Promotions popup', icon: 'star' },
   { href: '/admin/spin', label: 'Daily spin', icon: 'wheel' },
-  { href: '/admin/loyalty', label: 'AS Points', icon: 'star' },
+  { href: '/admin/wallet', label: 'AS Wallet', icon: 'star' },
   { href: '/admin/products', label: 'Products', icon: 'box' },
   { href: '/admin/sales', label: 'Sales', icon: 'percent' },
   { href: '/admin/categories', label: 'Categories', icon: 'tag' },

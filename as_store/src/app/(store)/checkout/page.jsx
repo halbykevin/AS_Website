@@ -3,14 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSelector, useDispatch } from 'react-redux'
 import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
 import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
-import { money, deliveryFeeFor, vatAmountFor } from '@/lib/orders'
+import { money, deliveryFeeFor, vatAmountFor, isValidMobile } from '@/lib/orders'
 import { trackBeginCheckout } from '@/lib/analytics'
-import { useLoyalty, pointsFor, blocksIn, blocksWorth, pointsToBlock, num } from '@/lib/loyalty'
+import { useWallet, creditFor, spendableOn } from '@/lib/wallet'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -20,8 +21,12 @@ export default function CheckoutPage() {
   const items = useSelector(selectCartItems)
   const total = useSelector(selectCartTotal)
   const dispatch = useDispatch()
+  const qc = useQueryClient()
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
+  // Focused when the number is missing or malformed, so the error names a field
+  // the shopper is already looking at.
+  const phoneRef = useRef(null)
   const [pay, setPay] = useState('cod') // 'cod' | 'whish'
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -51,7 +56,7 @@ export default function CheckoutPage() {
 
   const deliveryFee = deliveryFeeFor(total, delivery)
 
-  // Rewards on this account — redeemed AS Points, Daily Spin wins, staff grants.
+  // Rewards on this account — Daily Spin wins and staff grants.
   // The server prices each one against this exact cart (`eligible` + `discount`
   // come back with the list), so this page only renders its answer; the order it
   // places is re-priced server-side regardless.
@@ -82,7 +87,10 @@ export default function CheckoutPage() {
   const discount = applied?.discount || 0
   // Delivery is part of the taxable amount — same base the API uses.
   const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), vat)
-  const grandTotal = total + deliveryFee + vatAmount - discount
+  // What is owed before the wallet. Store credit is a payment, not a discount,
+  // so it comes off after VAT — the tax is on the goods whoever's money buys
+  // them, and the server prices it exactly this way.
+  const payable = total + deliveryFee + vatAmount - discount
 
   // A reward that stops applying (the bag shrank below its minimum, or it was
   // spent on another device) must not silently ride along on the order. Keyed on
@@ -92,13 +100,27 @@ export default function CheckoutPage() {
     if (voucherCode && !usableCodes.split(',').includes(voucherCode)) setVoucherCode('')
   }, [usableCodes, voucherCode])
 
-  // What this order will earn. Same basis the server credits on — the items,
-  // after any item discount — so the promise made here is the one kept.
-  const { data: loyalty } = useLoyalty()
-  const pointsEarned = pointsFor(total - itemsDiscount, loyalty)
-  // Measured against what they already hold, so the "almost there" line is the
-  // truth for this shopper rather than for a brand-new account.
-  const pointsAfter = Number(loyalty?.balance || 0) + pointsEarned
+  // AS Wallet. `spendable` is the server's own answer for this exact order; the
+  // mirrored helper only covers the moment before that answer arrives, and the
+  // server re-decides on submit either way.
+  const [useCredit, setUseCredit] = useState(false)
+  const { data: wallet } = useWallet(payable)
+  const walletBalance = Number(wallet?.balance || 0)
+  const walletSpendable = Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet))
+  const walletApplied = useCredit ? walletSpendable : 0
+  const grandTotal = Math.round((payable - walletApplied) * 100) / 100
+
+  // Credit that stops applying — the bag shrank below the minimum, or it was
+  // spent on another device — must not ride along looking like it still counts.
+  useEffect(() => {
+    if (useCredit && walletSpendable <= 0) setUseCredit(false)
+  }, [useCredit, walletSpendable])
+
+  // What this order gives back. Same basis the server credits on — the items,
+  // after any item discount, and after whatever the wallet itself is paying,
+  // which earns nothing — so the promise made here is the one kept.
+  const credit = creditFor(total - itemsDiscount - walletApplied, wallet)
+  const walletAfter = Math.round((walletBalance - walletApplied + credit) * 100) / 100
 
   // Reaching this page IS beginning checkout — reported once per visit, and
   // only once the cart has hydrated from localStorage (the first render can
@@ -168,6 +190,16 @@ export default function CheckoutPage() {
 
   const placeOrder = async (e) => {
     e.preventDefault()
+    // Every order needs a number we can actually call, whether the shopper is a
+    // guest, signed in with a code, or came through Google — the last of which
+    // brings no number with it, so the field starts empty and this is the only
+    // thing standing between that and an undeliverable order. The server checks
+    // the same rule; this just saves the round trip.
+    if (!isValidMobile(form.phone)) {
+      setError('Enter a valid mobile number so we can reach you about the delivery.')
+      phoneRef.current?.focus()
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -183,7 +215,15 @@ export default function CheckoutPage() {
         saveAddress: form.saveAddress,
         paymentMethod: pay,
         ...(applied ? { voucherCode: applied.code } : null),
+        // Ask for the wallet, never for an amount: the server decides what the
+        // rules allow and prices the order from its own figure.
+        ...(walletApplied > 0 ? { useWallet: true } : null),
       })
+      // The order just moved money: credit was spent, credit is on the way, and
+      // a reward may have been consumed. Drop the cached answer rather than
+      // letting the account page show a balance that is a minute out of date and
+      // a dollar wrong.
+      qc.invalidateQueries({ queryKey: ['wallet'] })
       if (form.saveAddress) {
         setCustomer((c) => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c))
       }
@@ -258,8 +298,17 @@ export default function CheckoutPage() {
                 <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className={inputCls} required />
               </Field>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Mobile number">
-                  <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputCls} required placeholder="70 123 456" autoComplete="tel" />
+                <Field label="Mobile number" hint="Required — we call this number to confirm delivery.">
+                  <input
+                    ref={phoneRef}
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => set('phone', e.target.value)}
+                    className={inputCls}
+                    required
+                    placeholder="70 123 456"
+                    autoComplete="tel"
+                  />
                 </Field>
                 <Field label="Email (optional)" hint="For your order confirmation.">
                   <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className={inputCls} autoComplete="email" />
@@ -315,7 +364,6 @@ export default function CheckoutPage() {
                           <span className="block text-sm font-semibold text-as-ink">{v.label || v.code}</span>
                           <span className="mt-0.5 block text-sm text-as-ink/55">
                             Saves {money(v.discount)}
-                            {v.source === 'points' ? ' · redeemed with AS Points' : ''}
                           </span>
                         </span>
                       </button>
@@ -323,6 +371,44 @@ export default function CheckoutPage() {
                   })}
                 </div>
                 <p className="mt-2 text-xs text-as-ink/45">One reward per order.</p>
+              </div>
+            )}
+
+            {/* AS Wallet. Only shown when there is a balance to spend — an empty
+                wallet at checkout is just a reminder of what you don't have. The
+                switch is deliberate: credit is money, and money is never spent
+                for someone. */}
+            {walletBalance > 0 && (
+              <div className="mt-6">
+                <h2 className="text-lg font-semibold text-as-ink">{wallet?.title || 'AS Wallet'}</h2>
+                <button
+                  type="button"
+                  onClick={() => walletSpendable > 0 && setUseCredit((v) => !v)}
+                  aria-pressed={useCredit}
+                  disabled={walletSpendable <= 0}
+                  className={`mt-3 flex w-full items-center gap-3 rounded-xl border p-4 text-left transition disabled:opacity-60 ${
+                    useCredit ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
+                  }`}
+                >
+                  <Icon
+                    name={useCredit ? 'check' : 'star'}
+                    className={`h-5 w-5 shrink-0 ${useCredit ? 'text-as-red' : 'text-as-ink/35'}`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-as-ink">
+                      {walletSpendable > 0
+                        ? `Use ${money(walletSpendable)} of your balance`
+                        : 'Not usable on this order'}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-as-ink/55">
+                      {money(walletBalance)} in your wallet
+                      {walletSpendable > 0 && walletSpendable < walletBalance ? ' · capped for this order' : ''}
+                      {walletSpendable <= 0 && Number(wallet?.minOrder) > 0
+                        ? ` · orders of ${money(wallet.minOrder)} or more`
+                        : ''}
+                    </span>
+                  </span>
+                </button>
               </div>
             )}
 
@@ -400,6 +486,12 @@ export default function CheckoutPage() {
                   <span>−{money(discount)}</span>
                 </div>
               )}
+              {walletApplied > 0 && (
+                <div className="flex items-center justify-between font-medium text-as-red">
+                  <span className="truncate">{wallet?.title || 'AS Wallet'}</span>
+                  <span>−{money(walletApplied)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <span className="text-as-ink/60">Total</span>
                 <span className="text-xl font-semibold text-as-ink">{money(grandTotal)}</span>
@@ -407,19 +499,17 @@ export default function CheckoutPage() {
             </div>
             {/* What the order earns, kept out of the money column above — it is
                 not a charge, and putting it in that stack reads like one. */}
-            {pointsEarned > 0 && (
+            {credit > 0 && (
               <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-as-fog px-4 py-3">
                 <Icon name="star" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
                 <p className="text-sm text-as-ink/70">
-                  You’ll earn{' '}
-                  <strong className="font-semibold text-as-ink">
-                    {num(pointsEarned)} {loyalty.title || 'AS Points'}
-                  </strong>{' '}
-                  on this order
+                  You’ll get{' '}
+                  <strong className="font-semibold text-as-ink">{money(credit)}</strong> back in your{' '}
+                  {wallet?.title || 'AS Wallet'}
                   <span className="block text-xs text-as-ink/45">
-                    {blocksIn(pointsAfter, loyalty) > 0
-                      ? `Takes you to ${money(blocksWorth(pointsAfter, loyalty))} off a future order.`
-                      : `${num(pointsToBlock(pointsAfter, loyalty))} more and you can redeem ${money(loyalty.redeemValue)} off.`}{' '}
+                    {walletAfter > credit
+                      ? `That takes you to ${money(walletAfter)} off a future order.`
+                      : 'Spend it on your next order.'}{' '}
                     Added once this order is delivered.
                   </span>
                 </p>

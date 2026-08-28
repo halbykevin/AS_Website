@@ -67,3 +67,32 @@ export const orderDate = (iso) => {
     return ''
   }
 }
+
+// --- mobile numbers ---------------------------------------------------------
+//
+// A deliberate mirror of `normalizeMobile()` in as_store/server/src/customerAuth.js.
+// The server is the one that decides — every order goes through its check — but
+// a form that only finds out after a round trip is a form that wastes the tap.
+// Keep the two in step: a rule loosened there and not here silently rejects
+// numbers the server would have accepted.
+export function normalizeMobile(raw) {
+  let d = String(raw || '').replace(/\D/g, '')
+  if (d.startsWith('00')) d = d.slice(2)
+  if (!d.startsWith('961')) {
+    if (d.startsWith('0')) d = d.slice(1)
+    if (d.length >= 6 && d.length <= 8) d = `961${d}`
+  }
+  return d.length >= 9 && d.length <= 15 ? d : ''
+}
+
+export const isValidMobile = (raw) => Boolean(normalizeMobile(raw))
+
+// How an order was paid, in one place, because five screens ask. 'wallet' means
+// store credit covered the whole thing — there was no payment page and there is
+// no cash to collect, so it must not read as either.
+export const paymentLabel = (order) => {
+  if (order?.paymentMethod === 'wallet') return 'Paid from wallet'
+  if (order?.paymentMethod === 'whish')
+    return order?.paymentStatus === 'paid' ? 'Paid online' : 'Online payment'
+  return 'Cash on delivery'
+}

@@ -483,7 +483,7 @@ function CustomerModal({ id, onClose }) {
                       {statusMeta(o.status).label}
                     </span>
                     <span className="text-xs text-admin-text/45">
-                      {o.paymentMethod === 'whish' ? 'Whish' : 'COD'} · {o.paymentStatus}
+                      {o.paymentMethod === 'whish' ? 'Whish' : o.paymentMethod === 'wallet' ? 'Wallet' : 'COD'} · {o.paymentStatus}
                     </span>
                     <span className="ml-auto font-semibold tabular-nums text-admin-text">
                       {money(orderTotal(o))}

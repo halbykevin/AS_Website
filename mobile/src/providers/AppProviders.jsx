@@ -13,6 +13,7 @@ import { ThemeProvider } from '@/src/theme';
 import { AccountProvider } from '@/src/lib/account';
 import { NotificationsProvider } from '@/src/lib/notifications';
 import { ContentProvider } from '@/src/content/ContentProvider';
+import { FlyToCartProvider } from '@/src/components/FlyToCart';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -64,7 +65,11 @@ export default function AppProviders({ children }) {
                 <SheetProvider>
                   <BottomSheetModalProvider>
                     <SheetHost />
-                    {children}
+                    {/* Outermost thing that can still see every screen: the
+                        add-to-bag flight starts inside a scrolling list and
+                        lands on the tab bar, so its overlay has to render
+                        above both. */}
+                    <FlyToCartProvider>{children}</FlyToCartProvider>
                   </BottomSheetModalProvider>
                 </SheetProvider>
               </ContentProvider>

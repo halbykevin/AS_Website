@@ -17,6 +17,16 @@ import { accountApi } from './account';
 
 export const PAYMENT_COD = 'cod';
 export const PAYMENT_WHISH = 'whish';
+// Never chosen at checkout — the server records it when wallet credit covered
+// the order outright, so there was no payment page and there is no cash to take.
+export const PAYMENT_WALLET = 'wallet';
+
+// How an order was paid, in one place, because several screens ask.
+export const paymentLabel = order => {
+  if (order?.paymentMethod === PAYMENT_WALLET) return 'Paid from wallet';
+  if (order?.paymentMethod === PAYMENT_WHISH) return order?.paymentStatus === 'paid' ? 'Paid with Whish' : 'Payment pending';
+  return 'Cash on delivery';
+};
 
 // Where Whish should hand the customer back: the server appends `/<orderId>?…`.
 // Resolves to `ascompany://orders` in a build and `exp://<host>/--/orders` in

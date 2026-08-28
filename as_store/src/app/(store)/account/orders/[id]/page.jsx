@@ -7,7 +7,7 @@ import { useDispatch } from 'react-redux'
 import Icon from '@/components/Icon.jsx'
 import { clearCart } from '@/store/cartSlice'
 import { useAccount, accountApi } from '@/lib/account'
-import { statusMeta, statusClasses, money, orderDate, orderTotal } from '@/lib/orders'
+import { statusMeta, statusClasses, money, orderDate, orderTotal, paymentLabel } from '@/lib/orders'
 import { trackPurchase } from '@/lib/analytics'
 
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
@@ -256,7 +256,9 @@ export default function OrderPage({ params }) {
               ))}
             </ul>
             <div className="mt-4 space-y-2 border-t border-as-ink/10 pt-4 text-sm">
-              {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0) && (
+              {(Number(order.deliveryFee) > 0 ||
+                Number(order.vatAmount) > 0 ||
+                Number(order.walletAmount) > 0) && (
                 <>
                   <div className="flex items-center justify-between text-as-ink/60">
                     <span>Subtotal</span>
@@ -274,16 +276,19 @@ export default function OrderPage({ params }) {
                       <span>{money(order.vatAmount)}</span>
                     </div>
                   )}
+                  {/* Wallet credit is a payment, not a discount, so it is listed
+                      after VAT — which is where it comes off the sum. */}
+                  {Number(order.walletAmount) > 0 && (
+                    <div className="flex items-center justify-between font-medium text-as-red">
+                      <span>Paid from your wallet</span>
+                      <span>−{money(order.walletAmount)}</span>
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex items-center justify-between pt-1">
                 <span className="text-as-ink/60">
-                  Total ·{' '}
-                  {order.paymentMethod === 'whish'
-                    ? order.paymentStatus === 'paid'
-                      ? 'Paid online'
-                      : 'Online payment'
-                    : 'Cash on delivery'}
+                  Total · {paymentLabel(order)}
                 </span>
                 <span className="text-xl font-semibold text-as-ink">{money(orderTotal(order))}</span>
               </div>

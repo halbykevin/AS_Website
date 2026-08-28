@@ -206,21 +206,22 @@ export default function TermsConditions({ settings }) {
           <p>
             To cancel an order, contact us as soon as possible — we can normally do so at any point
             before it goes out for delivery. If the order was paid online and is cancelled, the
-            payment is reversed; any points earned on it are removed and any voucher it used is
-            returned to your account.
+            payment is reversed; any wallet credit earned on it is removed, any wallet credit it
+            spent is returned, and any voucher it used goes back to your account.
           </p>
         </Section>
 
-        <Section n={vatPercent > 0 ? 11 : 10} title="Accounts, rewards and points">
+        <Section n={vatPercent > 0 ? 11 : 10} title="Accounts, rewards and wallet credit">
           <p>
             An account is identified by your mobile number. You are responsible for the details you
             give us being accurate — a wrong number or address is the most common reason an order
             cannot be delivered.
           </p>
           <p>
-            AS Points and rewards won in the app have no cash value, are tied to the account that
-            earned them, and cannot be transferred or exchanged for money. Points earned on an order
-            are withdrawn if that order is cancelled.
+            AS Wallet credit and rewards won in the app have no cash value, are tied to the account
+            that earned them, and cannot be transferred, withdrawn or exchanged for money — they are
+            only ever spent against an order in our store. Credit earned on an order is withdrawn if
+            that order is cancelled, and credit spent on a cancelled order is returned.
           </p>
           <p>
             You can delete your account at any time from the app. Doing so removes your personal

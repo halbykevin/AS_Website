@@ -458,7 +458,10 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) NOT NULL 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_percent NUMERIC(5,2)  NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_amount  NUMERIC(10,2) NOT NULL DEFAULT 0;
 
--- Online payment (Whish Pay). payment_method is 'cod' or 'whish'; payment_status
+-- Online payment (Whish Pay). payment_method is 'cod', 'whish', or 'wallet' —
+-- the last one is never chosen at checkout: the API records it when AS Wallet
+-- credit covered the order outright, so there was no payment page and there is
+-- no cash to collect. payment_status
 -- tracks the money axis independently of the fulfilment `status`, so a COD order
 -- can be confirmed+unpaid while a Whish order only confirms once paid. The
 -- external id (= our order id) + collect url tie the order to its Whish payment.

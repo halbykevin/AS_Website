@@ -3,7 +3,7 @@
 // (with sale strike-through) and an Add-to-Bag pill wired to Redux. `fluid`
 // fills its grid column; otherwise it's a fixed-width rail card.
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
@@ -17,6 +17,7 @@ import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
 import Badge from '@/src/ui/Badge';
 import RemoteImage from './RemoteImage';
+import { useFlyToCart } from './FlyToCart';
 
 // --- Fixed geometry ----------------------------------------------------------
 // The tile is a FIXED height so the catalog grid can hand FlatList a
@@ -59,6 +60,10 @@ function ProductTile({ product, fluid = false, width }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const dispatch = useDispatch();
+  const flyToCart = useFlyToCart();
+  // Measured on tap so the flight starts from where this tile actually is,
+  // wherever the list has scrolled to.
+  const imageRef = useRef(null);
   const { fontScale } = useWindowDimensions();
   const { id, name, tagline, price, image, colors = [], brand, slug } = product;
 
@@ -91,7 +96,12 @@ function ProductTile({ product, fluid = false, width }) {
   }, [product.description, tagline]);
 
   const open = () => slug && router.push(`/product/${slug}`);
-  const add = () => dispatch(addItem({ id, title: name, image, price: priceNum, slug }));
+  // The cart update comes first and unconditionally; the flight is decoration
+  // that a reduced-motion setting or a missing bag icon simply skips.
+  const add = () => {
+    dispatch(addItem({ id, title: name, image, price: priceNum, slug }));
+    flyToCart({ uri: image, source: imageRef });
+  };
 
   return (
     <View style={[styles.card, { height: productTileHeight(fontScale) }, fluid ? { width: '100%' } : { width: width || 260 }]}>
@@ -111,7 +121,9 @@ function ProductTile({ product, fluid = false, width }) {
         ) : null}
       </Pressable>
 
-      <Pressable onPress={open} style={styles.imageWrap}>
+      {/* collapsable={false}: Android flattens a layout-only view away, and a
+          view that no longer exists cannot be measured. */}
+      <Pressable ref={imageRef} collapsable={false} onPress={open} style={styles.imageWrap}>
         {/* `fallbackBackground` stays tinted on purpose: with the wrap now white,
             a missing image would otherwise be a blank white void with a faint
             icon in it, indistinguishable from a photo that simply hasn't loaded. */}

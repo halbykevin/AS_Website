@@ -3,7 +3,7 @@ import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { money, orderTotal, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
-import { PAYMENT_WHISH } from '@/src/lib/payments';
+import { paymentLabel } from '@/src/lib/payments';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Card, Badge, Icon, EmptyState, Skeleton } from '@/src/ui';
 
@@ -64,7 +64,7 @@ export default function OrdersScreen() {
                     {formatDateTime(o.createdAt)}
                   </Text>
                   <Text variant="caption" muted>
-                    {o.itemCount} item{o.itemCount === 1 ? '' : 's'} · {o.paymentMethod === PAYMENT_WHISH ? (o.paymentStatus === 'paid' ? 'Paid with Whish' : 'Payment pending') : 'Cash on delivery'}
+                    {o.itemCount} item{o.itemCount === 1 ? '' : 's'} · {paymentLabel(o)}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

@@ -14,7 +14,7 @@ import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
 import { trackViewItem } from '@/lib/analytics'
-import { useLoyalty, pointsFor, num } from '@/lib/loyalty'
+import { useWallet, creditFor } from '@/lib/wallet'
 import { isCallForPrice, useCallForPrice, enquiryUrl } from '@/lib/callForPrice'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
@@ -149,8 +149,8 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               )}
             </div>
 
-            {/* No price, no points estimate — there is no figure to earn on. */}
-            {!quoteOnly && <PointsLine amount={price * qty} />}
+            {/* No price, no wallet estimate — there is no figure to earn on. */}
+            {!quoteOnly && <WalletLine amount={price * qty} />}
             {quoteOnly && cfp.note && <p className="mt-3 text-sm text-as-ink/55">{cfp.note}</p>}
 
             {colors.length > 0 && (
@@ -250,28 +250,26 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   )
 }
 
-// "Earn 1,260 AS Points with this purchase." Renders nothing at all unless the
-// programme is running and this amount actually earns something, so a shop with
-// no loyalty scheme sees no trace of it.
+// "Get $63.00 back in your AS Wallet." Renders nothing at all unless the wallet
+// is running and this amount actually earns something, so a shop with no scheme
+// sees no trace of it.
 //
 // The figure follows the quantity stepper because that is what the order will
-// be worth. It is deliberately quiet about value: points are only spendable a
-// full block at a time, so the rule is stated instead of a pro-rata "$63 back"
-// that could not be redeemed.
-function PointsLine({ amount }) {
-  const { data: rules } = useLoyalty()
-  const points = pointsFor(amount, rules)
-  if (!points) return null
+// be worth — and it can be stated as money now, in full, because that is
+// exactly what lands: there is no block to reach and nothing to redeem first.
+function WalletLine({ amount }) {
+  const { data: rules } = useWallet()
+  const credit = creditFor(amount, rules)
+  if (!credit) return null
 
   return (
     <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-as-fog px-4 py-3">
       <Icon name="star" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
       <p className="text-sm text-as-ink/70">
-        Earn <strong className="font-semibold text-as-ink">{num(points)} {rules.title || 'AS Points'}</strong>{' '}
-        with this purchase
+        Get <strong className="font-semibold text-as-ink">{money(credit)}</strong> back in your{' '}
+        {rules.title || 'AS Wallet'}
         <span className="block text-xs text-as-ink/45">
-          {num(rules.redeemBlock)} points = {money(rules.redeemValue)} off a future order · added once yours is
-          delivered
+          Spend it on any future order · added once yours is delivered
         </span>
       </p>
     </div>

@@ -2,19 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { usePaymentMethods, useStoreSettings } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
-import { money } from '@/src/lib/format';
+import { money, isValidMobile } from '@/src/lib/format';
 import { deliveryFeeFor, vatAmountFor } from '@/src/lib/delivery';
 import { useVouchers, rewardWorth } from '@/src/lib/spin';
+import { useWallet, spendableOn } from '@/src/lib/wallet';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Icon, EmptyState } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
 import RemoteImage from '@/src/components/RemoteImage';
-import PointsEarn from '@/src/components/PointsEarn';
+import WalletEarn from '@/src/components/WalletEarn';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -28,6 +30,7 @@ export default function CheckoutScreen() {
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
   const dispatch = useDispatch();
+  const qc = useQueryClient();
   const { data: settings } = useStoreSettings();
   const deliveryFee = deliveryFeeFor(total, settings?.delivery);
 
@@ -46,7 +49,27 @@ export default function CheckoutScreen() {
   const itemsDiscount = applied ? applied.discount - deliveryWaived : 0;
   const discount = applied?.discount || 0;
   const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), settings?.vat);
-  const grandTotal = total + deliveryFee + vatAmount - discount;
+  // What is owed before the wallet. Store credit is a payment, not a discount,
+  // so it comes off after VAT — the tax is on the goods whoever's money buys
+  // them, and the server prices it exactly this way.
+  const payable = total + deliveryFee + vatAmount - discount;
+
+  // AS Wallet. `spendable` is the server's own answer for this order; the
+  // mirrored helper only covers the moment before that answer arrives, and the
+  // server re-decides on submit either way.
+  const [useCredit, setUseCredit] = useState(false);
+  const { data: wallet } = useWallet(Boolean(customer), payable);
+  const walletBalance = Number(wallet?.balance || 0);
+  const walletSpendable = Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet));
+  const walletApplied = useCredit ? walletSpendable : 0;
+  const grandTotal = Math.round((payable - walletApplied) * 100) / 100;
+
+  // A balance that stops applying — the bag shrank below the minimum, or it was
+  // spent on another device — must not ride along on the order looking like it
+  // still counts.
+  useEffect(() => {
+    if (useCredit && walletSpendable <= 0) setUseCredit(false);
+  }, [useCredit, walletSpendable]);
 
   // A reward that stops applying (the bag shrank below its minimum, or it was
   // spent on another device) must not silently ride along on the order. Keyed on
@@ -107,6 +130,14 @@ export default function CheckoutScreen() {
       setError('Name, mobile number and address are required.');
       return;
     }
+    // A number we can actually call, on every order. Signing in with Google or
+    // an email code brings no mobile with it, so for those customers this field
+    // starts empty and is the only thing between the order and nobody being
+    // able to arrange the delivery. The server enforces the same rule.
+    if (!isValidMobile(form.phone)) {
+      setError('Enter a valid mobile number so we can reach you about the delivery.');
+      return;
+    }
     setBusy(true);
     setError('');
     const online = payingOnline;
@@ -121,11 +152,20 @@ export default function CheckoutScreen() {
         notes: form.notes,
         saveAddress: form.saveAddress,
         ...(applied ? { voucherCode: applied.code } : null),
+        // Ask for the wallet, never for an amount: the server decides what the
+        // rules allow and prices the order from its own figure.
+        ...(walletApplied > 0 ? { useWallet: true } : null),
         paymentMethod: online ? PAYMENT_WHISH : PAYMENT_COD,
         // Tells the API this payment comes from the app: Whish returns the browser
         // to the API, which deep-links back here with the order id appended.
         ...(online ? { returnUrl: paymentReturnUrl() } : null)
       });
+      // The order just moved money: credit was spent, credit is on the way, and
+      // a reward may have been consumed. Drop the cached answers rather than
+      // letting the account screen show a balance that is 30 seconds out of date
+      // and a dollar wrong.
+      qc.invalidateQueries({ queryKey: ['wallet'] });
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
       if (form.saveAddress && customer) {
         setCustomer(c => (c ? { ...c, name: form.fullName, phone: form.phone, email: form.email, address: form.address } : c));
       }
@@ -168,6 +208,12 @@ export default function CheckoutScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text variant="caption" color="primary">Reward ({applied.code})</Text>
               <Text variant="caption" color="primary">-{money(discount)}</Text>
+            </View>
+          )}
+          {walletApplied > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" color="primary">{wallet?.title || 'AS Wallet'}</Text>
+              <Text variant="caption" color="primary">-{money(walletApplied)}</Text>
             </View>
           )}
           {vatAmount > 0 && (
@@ -216,7 +262,44 @@ export default function CheckoutScreen() {
             total bar: it is not a charge, and that stack reads like one. The
             basis is the items after any discount — the same one the server
             credits on. */}
-        <PointsEarn amount={total - itemsDiscount} signedIn={Boolean(customer)} verb="You'll earn" />
+        <WalletEarn amount={total - itemsDiscount - walletApplied} signedIn={Boolean(customer)} verb="You'll get" />
+
+        {/* AS Wallet. Only shown when there is a balance to spend — an empty
+            wallet on the checkout screen is just a reminder of what you don't
+            have. The switch is deliberate: credit is money, and money is never
+            spent for someone. */}
+        {walletBalance > 0 ? (
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="h3">{wallet?.title || 'AS Wallet'}</Text>
+            <Card
+              onPress={walletSpendable > 0 ? () => setUseCredit(v => !v) : undefined}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: useCredit, disabled: walletSpendable <= 0 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+                borderColor: useCredit ? theme.colors.primary : theme.colors.border,
+                borderWidth: useCredit ? 2 : 1,
+                opacity: walletSpendable > 0 ? 1 : 0.6
+              }}
+            >
+              <Icon name={useCredit ? 'checkCircle' : 'star'} size={22} color={useCredit ? theme.colors.primary : theme.colors.textFaint} />
+              <View style={{ flex: 1 }}>
+                <Text variant="title">
+                  {walletSpendable > 0 ? `Use ${money(walletSpendable)} of your balance` : 'Not usable on this order'}
+                </Text>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>
+                  {money(walletBalance)} in your wallet
+                  {walletSpendable > 0 && walletSpendable < walletBalance ? ' · capped for this order' : ''}
+                  {walletSpendable <= 0 && Number(wallet?.minOrder) > 0
+                    ? ` · orders of ${money(wallet.minOrder)} or more`
+                    : ''}
+                </Text>
+              </View>
+            </Card>
+          </View>
+        ) : null}
 
         {/* Rewards — Daily Spin wins, redeemed AS Points, staff grants. Only
             shown when at least one applies to this bag; an empty picker would
@@ -290,7 +373,7 @@ export default function CheckoutScreen() {
           <Field label="Full name">
             <Input value={form.fullName} onChangeText={v => set('fullName', v)} autoCapitalize="words" />
           </Field>
-          <Field label="Mobile number">
+          <Field label="Mobile number" hint="Required — we call this number to confirm delivery.">
             <Input value={form.phone} onChangeText={v => set('phone', v)} keyboardType="phone-pad" placeholder="70 123 456" />
           </Field>
           <Field label="Email (optional)" hint="For your order confirmation.">

@@ -73,11 +73,12 @@ export const accountApi = {
       method: 'POST',
       auth: true,
     }),
-  // AS Points. The GET works signed out — it returns the rules with a zero
-  // balance, so the page can explain the programme behind a sign-in prompt.
-  loyalty: () => req('/api/loyalty', { auth: true }),
-  redeemPoints: (blocks = 1) =>
-    req('/api/loyalty/redeem', { method: 'POST', auth: true, body: { blocks } }),
+  // AS Wallet. Works signed out — it returns the rules with a zero balance, so
+  // the page can explain the deal behind a sign-in prompt. Passing the order
+  // total asks how much of the balance that order could actually take, which is
+  // the one wallet question a checkout has.
+  wallet: (total = 0) =>
+    req(`/api/wallet${total > 0 ? `?total=${encodeURIComponent(total)}` : ''}`, { auth: true }),
   // Rewards on this account. Pass the cart subtotal and each one comes back
   // with `eligible` and the exact `discount` — the money rules stay server-side.
   vouchers: (subtotal = 0) =>

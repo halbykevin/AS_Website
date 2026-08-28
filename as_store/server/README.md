@@ -71,7 +71,7 @@ a payment route that cannot complete.
 and what both app stores require to exist before they will list an app that creates accounts.
 
 Deleting the `customers` row cascades to everything personal — notifications, device tokens and prefs,
-login history, survey answers, spins, vouchers, the AS Points ledger (and with it the balance, which
+login history, survey answers, spins, vouchers, the AS Wallet ledger (and with it the balance, which
 is only ever that ledger's sum), pending OAuth codes — so pushes stop at once and the
 account cannot be signed back into. Orders are the exception: `orders.customer_id` is
 `ON DELETE SET NULL`, so the sale survives for bookkeeping, refunds and warranty claims, while the

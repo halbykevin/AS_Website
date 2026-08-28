@@ -51,7 +51,15 @@ import {
   releaseVoucher,
   VoucherError,
 } from "./spin.js";
-import { loyaltyRouter, syncOrderPointsSafe } from "./loyalty.js";
+import {
+  walletRouter,
+  syncOrderWalletSafe,
+  spendFromWallet,
+  attachWalletSpend,
+  releaseWalletSpend,
+  refundOrderWalletSafe,
+  WalletError,
+} from "./wallet.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.resolve(
@@ -500,12 +508,16 @@ const orderJson = (r) => ({
   // What a Daily Spin voucher took off, snapshotted like the fee and the VAT.
   discountAmount: Number(r.discount_amount ?? 0),
   voucherCode: r.voucher_code || "",
+  // What the wallet paid towards it. A payment rather than a discount, so it
+  // comes off after VAT — see wallet.js.
+  walletAmount: Number(r.wallet_amount ?? 0),
   // What the customer actually pays / paid.
   total:
     Number(r.subtotal ?? 0) +
     Number(r.delivery_fee ?? 0) +
     Number(r.vat_amount ?? 0) -
-    Number(r.discount_amount ?? 0),
+    Number(r.discount_amount ?? 0) -
+    Number(r.wallet_amount ?? 0),
   paymentMethod: r.payment_method || "cod",
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
@@ -1293,7 +1305,7 @@ app.put(
 // Required by both app stores for any app that creates accounts, and the only
 // honest answer to "delete my data". Deleting the customers row cascades to
 // everything personal (notifications, device tokens + prefs, login history,
-// survey answers, spins, vouchers, the AS Points ledger and its balance,
+// survey answers, spins, vouchers, the AS Wallet ledger and its balance,
 // pending OAuth codes), so pushes stop and the account cannot be signed back
 // into.
 //
@@ -1385,12 +1397,21 @@ app.post(
         .json({ error: "Name, mobile number and address are required" });
     }
 
+    // A real, reachable mobile number is required on every order — signed in or
+    // not, and whatever the sign-in was. Someone who came in through Google or
+    // an email code has no number on their account, and an order nobody can be
+    // called about is an order that cannot be delivered. Validated here rather
+    // than only in the two checkout forms, because this is the only place both
+    // of them (and the app) pass through.
+    const mobile = normalizeMobile(phone);
+    if (!mobile)
+      return res
+        .status(400)
+        .json({ error: "Enter a valid mobile number", code: "mobile" });
+
     // Resolve the account: a signed-in customer, else find-or-create by mobile.
     let customerId = req.customerId;
     if (!customerId) {
-      const mobile = normalizeMobile(phone);
-      if (!mobile)
-        return res.status(400).json({ error: "Enter a valid mobile number" });
       const { customer, created } = await findOrCreateCustomerByMobile(
         mobile,
         { name: fullName, email, phone, address },
@@ -1400,6 +1421,21 @@ app.post(
       // Only a brand-new account is an entry point worth recording. A returning
       // guest did not authenticate, so it would not be a sign-in.
       if (created) recordLogin(customerId, "checkout", req, { isSignup: true });
+    } else {
+      // An account that signed in without a number (Google, email code) gets the
+      // one it just gave us, so it never has to be typed twice and support can
+      // reach them. Conditional on it being empty: the number on file is the one
+      // that signs them in, and a delivery contact must not silently rewrite it.
+      // ON CONFLICT DO NOTHING covers the case where another account already
+      // owns that mobile — the order still carries it either way.
+      await query(
+        `UPDATE customers SET mobile = $2
+          WHERE id = $1 AND COALESCE(mobile, '') = ''
+            AND NOT EXISTS (SELECT 1 FROM customers o WHERE o.mobile = $2)`,
+        [customerId, mobile],
+      ).catch((e) =>
+        console.error("[checkout] backfill mobile:", e?.message || e),
+      );
     }
 
     const ids = cleaned.map((i) => i.productId);
@@ -1496,15 +1532,52 @@ app.post(
       subtotal - itemsDiscount + (deliveryFee - deliveryWaived),
       setRows[0],
     );
-    const total = subtotal + deliveryFee + vatAmount - discountAmount;
+    const payable = subtotal + deliveryFee + vatAmount - discountAmount;
+
+    // AS Wallet. Store credit is a *payment*, so it comes off what is left after
+    // the voucher and after VAT — the tax is on the goods regardless of whose
+    // money buys them. Claimed here, before the order exists, because the debit
+    // written under a per-customer lock is what stops the same balance being
+    // spent twice from two devices; anything that throws below gives it back.
+    // `useWallet` asks for as much as the rules allow, `walletAmount` for a
+    // specific figure — and what the server grants is what prices the order,
+    // never the number the client asked for.
+    let walletSpend = null;
+    const wantsWallet = b.useWallet === true || Number(b.walletAmount) > 0;
+    if (wantsWallet && customerId) {
+      try {
+        walletSpend = await spendFromWallet({
+          customerId,
+          amount: Number(b.walletAmount) > 0 ? Number(b.walletAmount) : payable,
+          total: payable,
+        });
+      } catch (e) {
+        if (voucher) await releaseVoucher(voucher.id).catch(() => {});
+        if (e instanceof WalletError)
+          return res.status(400).json({ error: e.message, code: "wallet" });
+        throw e;
+      }
+    }
+    const walletAmount = walletSpend?.amount || 0;
+    const total = Math.round((payable - walletAmount) * 100) / 100;
+
+    // The wallet can cover an order outright, and then there is nothing left to
+    // collect: Whish has no $0 payment page, and there is no cash to take at the
+    // door either. So the credit *is* the payment — the order is recorded as
+    // paid with `payment_method = 'wallet'` and skips the Whish leg entirely.
+    // Saying 'whish' here instead would have every screen claim they paid online
+    // for something they never opened a payment page for.
+    const settledByWallet = walletAmount > 0 && total <= 0;
+    const storedMethod = settledByWallet ? "wallet" : paymentMethod;
 
     let orderId;
     try {
       const { rows } = await query(
-        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, payment_method, payment_status, currency)
-       VALUES ($1,'pending',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'unpaid','USD') RETURNING id`,
+        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, wallet_amount, payment_method, payment_status, currency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'USD') RETURNING id`,
         [
           customerId,
+          settledByWallet ? "confirmed" : "pending",
           fullName,
           phone,
           email,
@@ -1518,15 +1591,20 @@ app.post(
           discountAmount,
           voucher?.code || null,
           voucher?.id || null,
-          paymentMethod,
+          walletAmount,
+          storedMethod,
+          settledByWallet ? "paid" : "unpaid",
         ],
       );
       orderId = rows[0].id;
     } catch (e) {
       if (voucher) await releaseVoucher(voucher.id).catch(() => {});
+      if (walletSpend)
+        await releaseWalletSpend(walletSpend.entryId).catch(() => {});
       throw e;
     }
     if (voucher) await attachVoucherToOrder(voucher.id, orderId);
+    if (walletSpend) await attachWalletSpend(walletSpend.entryId, orderId);
     for (const it of items) {
       await query(
         `INSERT INTO order_items (order_id, product_id, name, price, qty, image)
@@ -1542,9 +1620,9 @@ app.post(
         [customerId, fullName, phone, address, email],
       );
     }
-    // AS Points. A no-op unless the programme awards on 'created' — under the
+    // AS Wallet. A no-op unless the programme credits on 'created' — under the
     // default rule this order earns nothing until it is delivered.
-    await syncOrderPointsSafe(orderId);
+    await syncOrderWalletSafe(orderId);
     // Transactional outbox: the notification worker turns this into the
     // "order received" message. Never blocks or fails the order.
     await emitEvent(
@@ -1560,7 +1638,7 @@ app.post(
     ).catch((e) => console.error("[notify] emit order_created:", e?.message || e));
 
     const trackToken = signOrderToken(orderId);
-    if (paymentMethod === "whish") {
+    if (paymentMethod === "whish" && !settledByWallet) {
       console.log(
         `[whish] order #${orderId} created (unpaid), starting payment: ` +
           `subtotal=${subtotal} + delivery=${deliveryFee} + vat=${vatAmount} = ${total} USD`,
@@ -1600,14 +1678,18 @@ app.post(
       } catch (e) {
         console.error("[whish] create failed:", e?.message || e);
         await query(
-          `UPDATE orders SET status = 'cancelled', discount_amount = 0, voucher_id = NULL, voucher_code = NULL WHERE id = $1`,
+          `UPDATE orders SET status = 'cancelled', discount_amount = 0, voucher_id = NULL, voucher_code = NULL, wallet_amount = 0 WHERE id = $1`,
           [orderId],
         );
-        // The order never reached a payment page, so the reward goes back to the
-        // customer rather than being burnt on a cancelled order — and so do any
-        // points it had already earned.
+        // The order never reached a payment page, so the reward and the wallet
+        // credit go back to the customer rather than being burnt on a cancelled
+        // order — and so does anything it had already earned. The release reads
+        // the ledger entry, not `wallet_amount`, so zeroing the column first is
+        // safe.
         if (voucher) await releaseVoucher(voucher.id).catch(() => {});
-        await syncOrderPointsSafe(orderId);
+        if (walletSpend)
+          await releaseWalletSpend(walletSpend.entryId).catch(() => {});
+        await syncOrderWalletSafe(orderId);
         return res.status(502).json({
           error: "Could not start the online payment. Please try again.",
         });
@@ -1638,9 +1720,9 @@ async function markWhishPaid(orderId) {
   console.log(
     `[whish] order #${orderId} → marked PAID + confirmed, sending emails`,
   );
-  // Being paid moves the order to 'confirmed' — points if the programme
+  // Being paid moves the order to 'confirmed' — wallet credit if the programme
   // awards that early, nothing yet under the default 'delivered' rule.
-  await syncOrderPointsSafe(orderId);
+  await syncOrderWalletSafe(orderId);
   const detail = await loadOrderDetail(orderId);
   sendOrderEmails(detail, signOrderToken(orderId)).catch((e) =>
     console.error("[mail]", e?.message || e),
@@ -1811,7 +1893,7 @@ app.put(
     // the dedupe key, but this avoids no-op outbox rows).
     const { rows } = await query(
       `UPDATE orders SET status = $2 WHERE id = $1 AND status <> $2
-       RETURNING id, customer_id, status, voucher_id`,
+       RETURNING id, customer_id, status, voucher_id, wallet_amount`,
       [req.params.id, status],
     );
     // Cancelling gives the Daily Spin reward back — the customer never got the
@@ -1822,10 +1904,17 @@ app.put(
         console.error("[spin] release voucher:", e?.message || e),
       );
     }
-    // AS Points. Reconciled rather than awarded, so this is safe on any
+    // Cancelling also gives back whatever the wallet paid towards the order —
+    // the customer never received it. Idempotent, and deliberately one-way: an
+    // admin who reverses a cancellation collects the difference like any other
+    // payment rather than having it silently taken again.
+    if (rows[0] && status === "cancelled" && Number(rows[0].wallet_amount) > 0) {
+      await refundOrderWalletSafe(rows[0].id);
+    }
+    // AS Wallet. Reconciled rather than awarded, so this is safe on any
     // transition — reaching 'delivered' credits the order, leaving it (a
-    // cancellation, a correction back to 'shipped') takes the points back.
-    if (rows[0]) await syncOrderPointsSafe(rows[0].id);
+    // cancellation, a correction back to 'shipped') takes the credit back.
+    if (rows[0]) await syncOrderWalletSafe(rows[0].id);
     if (rows[0]) {
       await emitEvent(
         "order_status_changed",
@@ -1879,7 +1968,7 @@ const CUSTOMER_SORTS = {
   logins: "login_count",
   orders: "order_count",
   spent: "total_spent",
-  points: "points_balance",
+  wallet: "wallet_balance",
 };
 
 const customerRowJson = (r) => ({
@@ -1898,7 +1987,7 @@ const customerRowJson = (r) => ({
   orderCount: Number(r.order_count || 0),
   totalSpent: Number(r.total_spent || 0),
   lastOrderAt: r.last_order_at,
-  pointsBalance: Number(r.points_balance || 0),
+  walletBalance: Number(r.wallet_balance || 0),
 });
 
 const loginRowJson = (r) => ({
@@ -1923,7 +2012,7 @@ const CUSTOMER_SELECT = `
     (SELECT count(*) FROM orders o WHERE o.customer_id = c.id)::int AS order_count,
     (SELECT COALESCE(sum(o.subtotal + o.delivery_fee + o.vat_amount), 0) FROM orders o WHERE o.customer_id = c.id) AS total_spent,
     (SELECT max(o.created_at) FROM orders o WHERE o.customer_id = c.id) AS last_order_at,
-    (SELECT COALESCE(sum(l.points), 0) FROM loyalty_ledger l WHERE l.customer_id = c.id)::int AS points_balance
+    (SELECT COALESCE(sum(w.amount), 0) FROM wallet_ledger w WHERE w.customer_id = c.id)::numeric AS wallet_balance
   FROM customers c`;
 
 app.get(
@@ -3183,7 +3272,7 @@ app.use(whatsappRouter);
 app.use(scraperRouter);
 app.use(notificationsRouter);
 app.use(spinRouter);
-app.use(loyaltyRouter);
+app.use(walletRouter);
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {

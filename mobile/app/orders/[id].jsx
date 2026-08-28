@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { clearCart } from '@/src/store/cartSlice';
-import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH } from '@/src/lib/payments';
+import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH, paymentLabel } from '@/src/lib/payments';
 import { money, orderTotal, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card, Badge, Icon, Divider, Skeleton, EmptyState } from '@/src/ui';
@@ -217,7 +217,7 @@ export default function OrderDetailScreen() {
               </View>
             ))}
             <Divider inset={theme.spacing.lg} />
-            {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0 || Number(order.discountAmount) > 0) && (
+            {(Number(order.deliveryFee) > 0 || Number(order.vatAmount) > 0 || Number(order.discountAmount) > 0 || Number(order.walletAmount) > 0) && (
               <View style={{ gap: 4, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="callout" muted>Subtotal</Text>
@@ -243,6 +243,14 @@ export default function OrderDetailScreen() {
                       VAT{Number(order.vatPercent) > 0 ? ` (${Number(order.vatPercent)}%)` : ''}
                     </Text>
                     <Text variant="callout" muted>{money(order.vatAmount)}</Text>
+                  </View>
+                )}
+                {/* Wallet credit is a payment, not a discount, so it is listed
+                    after VAT — which is where it comes off the sum. */}
+                {Number(order.walletAmount) > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="callout" color="primary">Paid from your wallet</Text>
+                    <Text variant="callout" color="primary">-{money(order.walletAmount)}</Text>
                   </View>
                 )}
               </View>
@@ -274,7 +282,7 @@ export default function OrderDetailScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {online ? <Image source={WHISH_LOGO} style={{ width: 44, height: 17 }} contentFit="contain" /> : <Icon name="truck" size={16} color={theme.colors.primary} />}
               <Text variant="caption" muted style={{ flex: 1 }}>
-                {online ? (order.paymentStatus === 'paid' ? 'Paid online' : 'Awaiting payment') : 'Cash on delivery'} · Placed {formatDateTime(order.createdAt)}
+                {online ? (order.paymentStatus === 'paid' ? 'Paid online' : 'Awaiting payment') : paymentLabel(order)} · Placed {formatDateTime(order.createdAt)}
               </Text>
               {online && order.paymentStatus === 'paid' ? <Badge label="Paid" tone="success" /> : null}
             </View>
