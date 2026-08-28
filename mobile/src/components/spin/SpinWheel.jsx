@@ -68,8 +68,6 @@ function SpinWheel({ slices = [], size = 300, onSettled }, ref) {
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <AnimatedView style={{ width: size, height: size, transform: [{ rotate: spin }] }}>
         <Svg viewBox={`0 0 ${VB} ${VB}`} width={size} height={size}>
-          {/* Rim */}
-          <Circle cx={C} cy={C} r={R + 7} fill={theme.colors.inverse} />
           {slices.map((s, i) => (
             <Path
               key={s.id ?? i}
