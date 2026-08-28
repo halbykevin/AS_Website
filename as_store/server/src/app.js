@@ -1937,9 +1937,24 @@ app.get(
     if (search) {
       params.push(`%${search}%`);
       const p = `$${params.length}`;
-      where.push(
-        `(c.name ILIKE ${p} OR c.email ILIKE ${p} OR c.mobile ILIKE ${p} OR c.phone ILIKE ${p})`,
-      );
+      const clauses = [
+        `c.name ILIKE ${p}`,
+        `c.email ILIKE ${p}`,
+        `c.mobile ILIKE ${p}`,
+        `c.phone ILIKE ${p}`,
+      ];
+      // A mobile is stored digits-only with the country code (96170123456),
+      // but staff type it the way it is written down — "70 123 456", the very
+      // format this field's own placeholder suggests. Matching the raw string
+      // alone finds nothing for that, so compare the digits too.
+      const digits = search.replace(/\D/g, "");
+      if (digits.length >= 3) {
+        params.push(`%${digits}%`);
+        const d = `$${params.length}`;
+        clauses.push(`regexp_replace(c.mobile, '[^0-9]', '', 'g') ILIKE ${d}`);
+        clauses.push(`regexp_replace(c.phone, '[^0-9]', '', 'g') ILIKE ${d}`);
+      }
+      where.push(`(${clauses.join(" OR ")})`);
     }
 
     const method = String(req.query.method || "");

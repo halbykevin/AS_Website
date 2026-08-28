@@ -857,6 +857,11 @@ function CustomerPicker({ picked, onPick }) {
   return (
     <div ref={boxRef} className="relative">
       <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-text/40" />
+      {/* Chrome reads a nameless field asking for "Name or 70 123 456" as a
+          contact field and drops its own address-autofill menu on top of our
+          results — the click then lands on Chrome's popup instead of on a
+          customer. The non-semantic name and the hints below keep the browser
+          out of a list it cannot fill. */}
       <Input
         value={search}
         onChange={(e) => {
@@ -870,6 +875,11 @@ function CustomerPicker({ picked, onPick }) {
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
+        name="voucher-customer-search"
+        autoComplete="new-password"
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore=""
       />
       {isFetching && <Spinner className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />}
 
