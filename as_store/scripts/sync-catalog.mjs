@@ -179,11 +179,20 @@ function run(cmd, args, { cwd = ROOT, stdin = null, quiet = false, progress = nu
   })
 }
 
+// How many product URLs the scraper found, as opposed to how many it managed to
+// read. The gap between the two tells a shrinking shop apart from a crawl that
+// fell over, and nothing downstream can see it — products.json records only the
+// successes.
+let discovered = 0
+
 // "[483/1330] Product name — 218.0 USD" while scraping products, and
 // "page 7: +25 product(s) (total 175)" while still collecting links.
 const scrapeProgress = (line) => {
   const m = /^\s*\[(\d+)\/(\d+)\]/.exec(line)
-  if (m) return { done: Number(m[1]), total: Number(m[2]) }
+  if (m) {
+    discovered = Number(m[2])
+    return { done: Number(m[1]), total: discovered }
+  }
   const c = /\(total (\d+)\)\s*$/.exec(line)
   return c ? { counting: Number(c[1]) } : null
 }
@@ -262,6 +271,8 @@ const remoteCapture = (script) => capture('ssh', [...SSH_ARGS, TARGET, 'bash -s'
 // fraction of the catalog, and calling the remainder "delisted" would hide the
 // store. The import re-checks this against the database (--delist-floor).
 const delist = opts.delist && opts.mode === 'site' && !(opts.limit > 0)
+// Share of the URLs it discovered that a mirroring run must actually read.
+const SCRAPE_FLOOR = 0.9
 if (opts.delistFloor !== null && !(opts.delistFloor >= 0 && opts.delistFloor <= 1)) {
   fail('--delist-floor must be a number between 0 and 1.')
 }
@@ -283,6 +294,10 @@ if (FLOOR) {
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
 const runDir = opts.reuse ? path.resolve(opts.reuse) : path.join(SERVER_DIR, 'scrapes', `sync-${stamp}`)
 const productsFile = path.join(runDir, 'products.json')
+// How complete the crawl was, written beside its output so that --reuse is held
+// to the same standard as the run that produced it -- reuse skips the scrape,
+// and an unverifiable partial run is the one most likely to be reused.
+const metaFile = path.join(runDir, 'scrape-meta.json')
 const stageDir = path.join(runDir, 'stage')
 const tarball = path.join(runDir, 'photos.tar.gz')
 const remoteDir = `/tmp/as-catalog-sync-${stamp}`
@@ -292,6 +307,15 @@ if (opts.reuse) {
   step('Scrape — skipped')
   if (!fs.existsSync(productsFile)) fail(`No products.json in ${runDir}`)
   info(`reusing ${productsFile}`)
+  if (fs.existsSync(metaFile)) {
+    discovered = JSON.parse(fs.readFileSync(metaFile, 'utf8')).discovered || 0
+  } else if (delist) {
+    fail(
+      `${runDir} has no scrape-meta.json, so there is no record of how complete that crawl was.\n` +
+        `  A partial scrape reused as a mirror hides every product it failed to read.\n` +
+        `  Re-scrape, or re-run with --no-delist to import it additively.`,
+    )
+  }
 } else {
   step(`Scraping ${opts.url}`)
   fs.mkdirSync(runDir, { recursive: true })
@@ -306,8 +330,38 @@ if (opts.reuse) {
 }
 if (!fs.existsSync(productsFile)) fail(`The scraper produced no products.json in ${runDir}`)
 const products = JSON.parse(fs.readFileSync(productsFile, 'utf8'))
+if (!opts.reuse && discovered) {
+  const meta = { discovered, read: products.length, url: opts.url, mode: opts.mode, at: new Date().toISOString() }
+  fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2))
+}
 info(`${C.green}${products.length} product(s)${C.off} in ${productsFile}`)
 if (!products.length) fail('Nothing was scraped — stopping before touching the live store.')
+
+// A crawl that found 1,339 products and read 782 of them is not a shop that has
+// stopped selling 557 things — it is a crawl that broke halfway. --delist-floor
+// cannot tell the difference: it sees only the 782 that arrived, which against a
+// catalog that size still clears 50% and would hide the rest as gone. The URLs
+// the scraper failed on are the only thing separating the two cases, and they
+// exist nowhere but here, so this is where it has to be checked. Only a
+// mirroring run is at risk — an additive one simply imports less.
+if (delist && discovered) {
+  const read = products.length / discovered
+  if (read < SCRAPE_FLOOR) {
+    fail(
+      `The scrape read only ${products.length} of the ${discovered} product(s) it found ` +
+        `(${Math.round(read * 100)}%, floor ${Math.round(SCRAPE_FLOOR * 100)}%).\n` +
+        `  That is a failed crawl, not a shrinking shop — mirroring it would hide the ` +
+        `${discovered - products.length} it could not read.\n` +
+        `  Check the [error] lines above (a repeated 'getaddrinfo failed' means DNS, not the shop), ` +
+        `then re-run.\n` +
+        `  To import what it did get without hiding anything: re-run with --no-delist.`,
+    )
+  }
+  if (read < 1) {
+    const missed = discovered - products.length
+    info(`${C.red}note${C.off}  the scrape missed ${missed} of ${discovered} product(s) — they will be treated as delisted`)
+  }
+}
 
 // --- 2. photos -------------------------------------------------------------
 step('Downloading the product photos')
