@@ -358,7 +358,7 @@ ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_x INTEGER DEFAULT 50;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_y INTEGER DEFAULT 50;
 -- Multi-date events + provenance for the events sync (idempotent upsert):
--- `source` names the ticketing site a row came from, '' = created by hand.
+-- The source column names the ticketing site a row came from; '' = made by hand.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
