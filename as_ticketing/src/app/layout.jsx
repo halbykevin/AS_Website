@@ -13,7 +13,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://ticketing.as.com.lb'
 // Off in dev and on preview deploys, so the property only ever counts real
 // visits — otherwise every local page load and every branch preview shows up as
 // traffic and quietly skews the numbers you make decisions on.
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-GMR1JFMHQF'
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-FTXR4CSMJ3'
 const ANALYTICS_ON =
   Boolean(GA_ID) && process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview'
 
