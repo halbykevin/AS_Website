@@ -5,7 +5,7 @@ import { optimizedImage } from '../lib/api'
 import BannerCta from './BannerCta'
 
 // Homepage image slideshow — the same simple, image-only carousel as the events
-// BannerSlider, but every slide opens the AS Store (settings.storeUrl, default
+// the events panel, but every slide opens the AS Store (settings.storeUrl, default
 // https://store.as.com.lb; the in-site coming-soon page only if the URL is
 // cleared). Panels are admin-managed images (uploaded in /admin/story); no
 // captions, headings or animations — just the picture cropped to fill.
@@ -13,7 +13,7 @@ import BannerCta from './BannerCta'
 const INTERVAL = 5000
 
 // Every image is cropped (object-cover) to a shared height, set by the admin as
-// the aspect ratio 16 : N (the `height` prop). Matches the events BannerSlider.
+// the aspect ratio 16 : N (the `height` prop). Matches the events TicketingPanel.
 // `fill` makes the strip stretch to its parent's height (used inside the
 // desktop bento grid) instead of imposing its own 16:N aspect ratio.
 export default function HorizontalStory({ story, height, fill = false }) {

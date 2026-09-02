@@ -130,8 +130,15 @@ export default function BannersAdmin() {
         actions={!editing && <Button onClick={startNew}>+ New banner</Button>}
       />
 
+      <Banner kind="warning">
+        <strong>These are not shown on the site right now.</strong> The homepage panel that used to
+        run this slideshow now displays the AS Ticketing Hub logo and opens the ticketing platform
+        instead. Your banners are kept here untouched — nothing has been deleted — so the slideshow
+        can be brought back at any time.
+      </Banner>
+
       <Banner kind="info">
-        Banners are the homepage slideshow. Add them straight from your events below (each uses the
+        Banners were the homepage slideshow. Add them straight from your events below (each uses the
         event’s image, title and link), or build one manually. Use the ↑ ↓ arrows to set the order.
       </Banner>
 

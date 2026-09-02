@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useReducedMotion } from 'framer-motion'
 import BannerCta from '../components/BannerCta.jsx'
-import BannerSlider from '../components/BannerSlider.jsx'
+import TicketingPanel from '../components/TicketingPanel.jsx'
 import HorizontalStory from '../components/HorizontalStory.jsx'
 import { useContent } from '../store/content.jsx'
 
@@ -24,14 +24,14 @@ export function stripStyle(bannerHeight) {
 //    banner takes the tall left column, with the Store slideshow and What We Do
 //    stacked on the right.
 export default function Home() {
-  const { story, banners, services, bannerHeight } = useContent()
+  const { story, services, bannerHeight } = useContent()
 
   return (
     <>
       {/* Mobile: stacked strips (unchanged) */}
       <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5 md:hidden">
         <HorizontalStory story={story} height={bannerHeight} />
-        <BannerSlider banners={banners} height={bannerHeight} />
+        <TicketingPanel height={bannerHeight} />
         <WhatWeDoSection services={services} height={bannerHeight} />
       </div>
 
@@ -45,7 +45,7 @@ export default function Home() {
           </div>
           {/* Events banner — top right */}
           <div className="min-h-0">
-            <BannerSlider banners={banners} height={bannerHeight} fill />
+            <TicketingPanel height={bannerHeight} fill />
           </div>
           {/* What We Do — bottom right */}
           <div className="min-h-0">

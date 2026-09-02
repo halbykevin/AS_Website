@@ -145,7 +145,10 @@ export function Banner({ kind = 'info', children }) {
   const styles = {
     info: 'bg-as-charcoal/5 text-as-charcoal',
     success: 'bg-green-50 text-green-700',
+    // Not an error — the page still works — but the admin needs to know that
+    // what they are about to edit is not currently on the site.
+    warning: 'bg-amber-50 text-amber-800 ring-1 ring-amber-200',
     error: 'bg-as-red/10 text-as-red',
   }
-  return <div className={`rounded-xl px-4 py-3 text-sm font-medium ${styles[kind]}`}>{children}</div>
+  return <div className={`rounded-xl px-4 py-3 text-sm font-medium ${styles[kind] || styles.info}`}>{children}</div>
 }

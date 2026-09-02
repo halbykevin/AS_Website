@@ -1,9 +1,21 @@
+import Script from 'next/script'
 import './globals.css'
 import { getSettings } from '@/lib/api'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://ticketing.as.com.lb'
+
+// Its own GA4 property, deliberately separate from as.com.lb (G-EX7D8HZPKY)
+// and the store (G-HVDQE4SMTB): three different audiences doing three different
+// things, and pooling them would make all three reports useless.
+//
+// Off in dev and on preview deploys, so the property only ever counts real
+// visits — otherwise every local page load and every branch preview shows up as
+// traffic and quietly skews the numbers you make decisions on.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-GMR1JFMHQF'
+const ANALYTICS_ON =
+  Boolean(GA_ID) && process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview'
 
 export const metadata = {
   metadataBase: new URL(SITE),
@@ -40,6 +52,22 @@ export default async function RootLayout({ children }) {
         <link rel="preconnect" href="https://images-ihjoz-com.s3.amazonaws.com" crossOrigin="" />
       </head>
       <body className="flex min-h-screen flex-col">
+        {ANALYTICS_ON && (
+          <>
+            {/* afterInteractive, not beforeInteractive: analytics must never sit
+                in front of the events rendering. */}
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_ID}');`}
+            </Script>
+          </>
+        )}
         <Header />
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />

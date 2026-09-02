@@ -320,8 +320,9 @@ optional `category_id` → `categories`; multi-day events carry a `dates` JSONB 
 synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),
 `categories` (event categories shown as image tiles:
 name/slug/image/sort/visible; events filter by them on the site),
-`banners` (homepage slideshow: image/title/subtitle/link/active, plus an optional `event_id` →
-the banner then borrows that event's image/title/link, resolved client-side in `lib/api.js`),
+`banners` (**retained, no longer rendered** — was the homepage slideshow: image/title/subtitle/link/
+active, plus an optional `event_id` → the banner borrowed that event's image/title/link, resolved
+client-side in `lib/api.js`),
 `sections` (admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
 `popup` (single row, id=1: a one-time announcement/ad popup —
 enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
@@ -491,7 +492,7 @@ src/
   store/content.jsx        # ContentProvider + useContent()
   lib/flags.js              # country list + flagcdn.com flag URLs (national-team rounds)
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
-  components/               # Layout, Navbar, Footer, Icon, EventCard, BannerSlider, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
+  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
   admin/
@@ -519,7 +520,15 @@ divisions. The same solutions populate the homepage **What We Do** card grid (`H
 linking to its detail page. Static defaults / offline fallback live in `content/site.js`
 (`whatWeDo`, `solutions`).
 
-The homepage opens with an admin-managed **horizontal story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a self-playing, fixed-height showcase whose panels auto-advance on a timer and travel horizontally in a loop (pauses on hover, clickable dots, typewriter heading on the active panel). Reduced-motion users get a static swipe carousel instead. Hidden until enabled with ≥1 visible panel. It is followed on the homepage by the events **BannerSlider**, then the **Hero** (whose editable copy is the "Powering connection across Lebanon since 2008…" text), then the rest of the sections.
+The homepage's **events panel** ([components/TicketingPanel.jsx](src/components/TicketingPanel.jsx))
+shows the **AS Ticketing Hub logo and nothing else**, and opens the ticketing platform. It replaced
+an admin-managed carousel of event artwork: once events moved to `ticketing.as.com.lb` the panel's
+job changed from "show what's on" to "point at where what's on lives", and a rotating gallery would
+have competed with that. The `banners` table and `/admin/banners` are **retained but no longer
+rendered** (like `reservations`) — the page carries a warning saying so, and the slideshow can be
+restored by putting a carousel back in that panel.
+
+The homepage opens with an admin-managed **horizontal story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a self-playing, fixed-height showcase whose panels auto-advance on a timer and travel horizontally in a loop (pauses on hover, clickable dots, typewriter heading on the active panel). Reduced-motion users get a static swipe carousel instead. Hidden until enabled with ≥1 visible panel. It is followed on the homepage by the events **TicketingPanel**, then the **Hero** (whose editable copy is the "Powering connection across Lebanon since 2008…" text), then the rest of the sections.
 
 ## Brand
 
