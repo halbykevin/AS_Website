@@ -73,6 +73,19 @@ plus the `metadata` exports on each route.
   front of the artwork that is the LCP on every page. Event pages are also
   pre-rendered (`generateStaticParams`) for the same reason.
 
+**Google Search Console** verifies this property two ways, and both must stay
+put: the `verification.google` token in `src/app/layout.jsx`, and
+`public/googlef1358e29e1c14b07.html` — a 53-byte file whose only content is its
+own name. It looks like debris; it isn't. Google re-checks the proof
+periodically and silently unverifies the property if it disappears, which takes
+the Events report and the sitemap submission with it.
+
+Neither is the DNS TXT record Search Console offers first. `ticketing.as.com.lb`
+is a CNAME to Vercel, and DNS forbids a name carrying a CNAME from carrying any
+other record, so that TXT can never resolve — and the property must be
+`https://ticketing.as.com.lb`, **not** `www.ticketing.as.com.lb`, which does not
+exist in DNS at all.
+
 The other half of this lives outside `as_ticketing/`: `as.com.lb/events` and
 `/events/<slug>` **301 here** from the root `vercel.json`, and are out of that
 site's `public/sitemap.xml` with them. Two domains rendering the same events
