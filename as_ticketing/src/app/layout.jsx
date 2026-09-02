@@ -64,6 +64,13 @@ export const metadata = {
     googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
   formatDetection: { telephone: false },
+  // Search Console ownership. It is a meta tag rather than the DNS TXT record
+  // Google offers first, because ticketing.as.com.lb is a CNAME to Vercel and
+  // DNS forbids a name with a CNAME from carrying any other record — the TXT
+  // would never resolve. So this is a URL-prefix property, the same shape
+  // store.as.com.lb uses, verified the same way as.com.lb is in index.html.
+  // The token is public by design; it proves ownership, it grants nothing.
+  verification: { google: 'O09cw4G_w43VUgYsbLUsdzyfT_SQcE_JncjGcfxPbbA' },
 }
 
 export const viewport = {
