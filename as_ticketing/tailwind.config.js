@@ -22,7 +22,17 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // --font-inter is set by next/font in the root layout (self-hosted).
+        // The rest is the fallback stack while it swaps in.
+        sans: [
+          'var(--font-inter)',
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif',
+        ],
       },
     },
   },

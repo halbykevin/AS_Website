@@ -1,5 +1,9 @@
 import Link from 'next/link'
 
+// Next already emits `noindex` on its own for a 404, so this only names the
+// page — a second robots tag saying the same thing would just be two.
+export const metadata = { title: 'Event not found' }
+
 export default function NotFound() {
   return (
     <section className="mx-auto max-w-3xl px-5 py-28 text-center sm:px-8">

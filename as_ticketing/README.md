@@ -32,6 +32,56 @@ homepage. Don't change the slug scheme without changing it there too.
 `/` redirects to `/events`: the platform *is* its events, and a separate
 homepage would just compete with the listing for the same search term.
 
+It is a **308**, not the 307 `redirect()` gives by default — a permanent
+redirect is what hands the root domain's authority to `/events` and gets that
+URL indexed instead. A temporary one leaves the two competing indefinitely.
+
+## SEO
+
+Search is how someone finds an event they don't yet know exists, so it is a
+feature here, not a chore. Everything lives in [`src/lib/seo.js`](src/lib/seo.js)
+plus the `metadata` exports on each route.
+
+- **`schema.org/Event` on every event page** is the one thing that matters most:
+  it is what makes Google show the date/venue card and put the event in the
+  Search and Maps *Events* experience. Copy alone cannot earn that. A multi-night
+  run emits **one Event per night** sharing the page URL and differing by `@id` —
+  each night is a separate thing a person searches for, and a ten-day span shown
+  as one entry is wrong on every day but the first.
+- **No price in `offers`.** We don't know it (the box offices price per tier and
+  the sync never scrapes it) and a fabricated `0` would be a misrepresentation in
+  the one place Google checks markup against reality. A missing price is a
+  warning; a wrong one is a penalty.
+- **`startDate` carries the local time when the free-text `time` parses**, with
+  the Beirut offset computed **for that date** — the zone is +02:00 in winter and
+  +03:00 in summer, and a listing an hour out is worse than one with no time.
+- **Every category filter is its own indexable page.** `/events?category=<slug>`
+  gets its own title, description and self-canonical, and is in the sitemap:
+  somebody searching "concerts in Lebanon" should land on the concerts tab. A
+  `category` that matches nothing is noindexed instead — an empty page under a
+  real-sounding URL is how a listing site accumulates thin content.
+- **Finished events keep their page**, marked ended and `noindex, follow`, and
+  drop out of the listing and the sitemap. A 404 the morning after the show
+  throws away every link the event earned and sends a searcher to an error
+  instead of to what else is on. (The sync eventually prunes the row, and *then*
+  it 404s — which is the right end state, just not the right same-day one.)
+- **`Organization` + `WebSite` once, in the layout.** Every Event points its
+  `organizer` at that `@id` rather than restating the company, so Google reads
+  one publisher across a few hundred pages.
+- **Inter is self-hosted via `next/font`**, not linked from fonts.googleapis.com:
+  the stylesheet it replaced was render-blocking on a third-party origin, in
+  front of the artwork that is the LCP on every page. Event pages are also
+  pre-rendered (`generateStaticParams`) for the same reason.
+
+The other half of this lives outside `as_ticketing/`: `as.com.lb/events` and
+`/events/<slug>` **301 here** from the root `vercel.json`, and are out of that
+site's `public/sitemap.xml` with them. Two domains rendering the same events
+under different URLs split the ranking signals between them — which is what the
+matching slugs above exist to avoid. That destination is hardcoded (a static host
+can't read `settings.ticketing_url`), so if the setting is ever turned off, take
+the redirect out in the same change or the marketing site will link to an
+`/events` that redirects away.
+
 ## Running it
 
 ```bash

@@ -1,4 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/events",
+      "destination": "https://ticketing.as.com.lb/events",
+      "permanent": true
+    },
+    {
+      "source": "/events/:path*",
+      "destination": "https://ticketing.as.com.lb/events/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

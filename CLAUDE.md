@@ -53,6 +53,25 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
   visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
   reservation, worded the same way.
+- **Search is a feature here, not a chore** — it is how someone finds an event they
+  didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
+  one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
+  `schema.org/Event` on every event page (the date/venue rich result, and the Events
+  experience on Search and Maps); a multi-night run emits **one Event per night**, `offers`
+  deliberately carries **no price** (we don't know it, and a fabricated `0` is a
+  misrepresentation where Google checks markup against reality), and each
+  `/events?category=<slug>` is its own indexable page while an unknown one is noindexed.
+  A finished event keeps its page — marked ended, `noindex, follow`, out of the sitemap —
+  because a 404 the morning after the show discards every link it earned. Full reasoning in
+  [as_ticketing/README.md](as_ticketing/README.md).
+- **`as.com.lb/events` 301s here**, one-to-one, from the root [vercel.json](vercel.json) —
+  and is out of the marketing site's `public/sitemap.xml` with it. Two domains rendering
+  the same events under different URLs split the ranking signals between them, and the
+  slugs match precisely so that this redirect can be an exact mapping rather than a dump
+  onto a listing page. The destination is hardcoded there because a static host cannot
+  read `settings.ticketing_url`: turning that setting off would put the marketing site's
+  own `/events` back in the nav while the redirect still sent everyone here, so unset the
+  redirect in the same change.
 - **The chrome is light because the logo is.** The supplied artwork
   (`as_ticketing/public/Logo/logo.png`) is a square stacked lockup on a white card, so a dark
   header would frame it in a white box. The header also can't use the lockup as-is — at 34px

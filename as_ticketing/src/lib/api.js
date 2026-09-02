@@ -3,6 +3,8 @@
 // and categories are managed once, at as.com.lb/admin, and the events sync
 // (three ticketing sites -> Postgres) keeps them current for both properties.
 
+import { isEventPast } from './events.js'
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 // Events change when someone runs the sync or edits one in the admin — minutes
@@ -23,22 +25,31 @@ async function get(path, fallback) {
   }
 }
 
-const isPast = (event) => {
-  const days = (event.dates || []).map((d) => d.date).filter(Boolean)
-  const last = days.length ? days.sort().at(-1) : event.date
-  return Boolean(last) && last < new Date().toISOString().slice(0, 10)
-}
+const byDate = (a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999'))
 
-/** Upcoming events, soonest first. */
-export async function getEvents() {
+/** Every event the API knows about, past included, soonest first. */
+export async function getAllEvents() {
   const rows = await get('/api/events', [])
-  return rows
-    .filter((e) => !isPast(e))
-    .sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')))
+  return [...rows].sort(byDate)
 }
 
+/** Upcoming events, soonest first — what the listing and the sitemap show. */
+export async function getEvents() {
+  return (await getAllEvents()).filter((e) => !isEventPast(e))
+}
+
+/**
+ * One event by slug, **including events that have already happened**.
+ *
+ * A page that Google has indexed must not turn into a 404 the morning after the
+ * show: that throws away every link and every ranking signal the event earned,
+ * and sends a visitor who searched for it to an error instead of to what else
+ * is on. Past events keep their page, marked as finished and noindexed, and
+ * drop out of the listing and the sitemap — which is the treatment Google's own
+ * event documentation asks for.
+ */
 export async function getEvent(slug) {
-  const rows = await getEvents()
+  const rows = await getAllEvents()
   return rows.find((e) => e.slug === slug) || null
 }
 

@@ -15,7 +15,7 @@ import { useContent } from '../store/content.jsx'
 // `to` is the part AFTER /events: '' for the listing, '?category=concerts' for
 // a filter, '/some-event-slug' for one event.
 //
-// Same tab on purpose. The plan is for as.com.lb/events to 301 to the platform,
+// Same tab on purpose. as.com.lb/events 301s to the platform (see vercel.json),
 // and a redirect never opens a new tab — links that did would behave
 // differently from typing the URL. (The AS Store button is the opposite case:
 // a genuinely separate shopping trip.)
