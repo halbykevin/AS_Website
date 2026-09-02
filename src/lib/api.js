@@ -79,7 +79,6 @@ export const defaultContent = {
   eventsSection: defaults.eventsSection,
   store: defaults.store,
   storeShowcase: defaults.storeShowcase,
-  ticketing: defaults.ticketing,
   about: defaults.about,
   contact: defaults.contact,
   banners: [],

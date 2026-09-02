@@ -245,13 +245,6 @@ export const storeShowcase = {
   ],
 }
 
-export const ticketing = {
-  // Events / reservations are powered by Ticketing Box Office.
-  logo: '/ticketing-box-office.png',
-  name: 'Ticketing Box Office',
-  note: 'Reservations powered by Ticketing Box Office.',
-}
-
 export const about = {
   heading: 'About AS Company',
   body: [

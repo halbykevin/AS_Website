@@ -196,7 +196,7 @@ export default function BannersAdmin() {
                 <TextInput value={form.subtitle} onChange={set('subtitle')} />
               </Field>
               <Field label="Link (URL)" hint="Opened when visitors click the banner or “Buy tickets”.">
-                <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
+                <TextInput value={form.linkUrl} onChange={set('linkUrl')} placeholder="https://tickit.co/events/..." />
               </Field>
               <Field label="Sort order"><TextInput type="number" value={form.sort} onChange={set('sort')} /></Field>
             </div>

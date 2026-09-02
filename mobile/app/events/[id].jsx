@@ -43,9 +43,6 @@ export default function EventDetailScreen() {
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background }}>
           <Button label={past ? 'Event has ended' : 'Reserve on WhatsApp'} icon={past ? undefined : 'whatsapp'} onPress={reserve} disabled={past || !(event.bookingUrl || event.ticketUrl)} fullWidth size="lg" />
-          <Text variant="caption" faint center style={{ marginTop: 8 }}>
-            Reservations powered by Ticketing Box Office
-          </Text>
         </View>
       }
     >

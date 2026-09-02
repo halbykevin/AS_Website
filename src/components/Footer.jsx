@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 
 export default function Footer() {
-  const { brand, contact, ticketing } = useContent()
+  const { brand, contact } = useContent()
   return (
     <footer id="contact" className="border-t border-black/5 bg-white">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
@@ -13,10 +13,6 @@ export default function Footer() {
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-as-charcoal/60">
               {brand.tagline}
             </p>
-            <div className="mt-5 flex items-center gap-2">
-              <img src={ticketing.logo} alt={ticketing.name} className="h-7 w-auto" />
-              <span className="text-xs text-as-charcoal/45">{ticketing.note}</span>
-            </div>
           </div>
 
           {/* Explore */}

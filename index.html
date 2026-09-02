@@ -35,7 +35,9 @@
     <!-- Warm up the API + event-image CDN early: the homepage data and the LCP
          banner image come from these origins (Lighthouse "preconnect candidates"). -->
     <link rel="preconnect" href="https://asapi.as.com.lb" crossorigin />
-    <link rel="preconnect" href="https://cdn.ticketingboxoffice.com" />
+    <link rel="preconnect" href="https://cdn.ticketingboxoffice.com" crossorigin />
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://images-ihjoz-com.s3.amazonaws.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Load fonts without blocking render: fetch as "print", then swap to "all" on load -->

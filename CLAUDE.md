@@ -1,6 +1,12 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (*Ticketing Box Office*). A built-in **admin dashboard** lets staff edit all content, manage events, and run a **web scraper** that syncs events from Ticketing Box Office into the site.
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (the partner's own booking page). A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
+
+> The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
+> Office" badge and its logo are gone from the footer, `/events`, the event detail page and the
+> mobile app, and `public/ticketing-box-office.png` + the `ticketing` block in `content/site.js`
+> were deleted with them. Partner names survive only in the admin's sync page, where they name a
+> data source. The banner slider is expected to gain a logo + slogan later — nothing is there now.
 
 > The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
 
@@ -278,7 +284,7 @@ Postgres tables: `settings` (single row, id=1, holds global content + the `publi
 `whatsapp_number` used to build the event reservation WhatsApp links),
 `services`, `events` (each has a `ticket_url` — included in the WhatsApp reservation message — plus an
 optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
-Ticketing-Box-Office-synced rows have `source`/`external_id` for idempotent re-sync),
+synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),
 `categories` (event categories shown as image tiles:
 name/slug/image/sort/visible; events filter by them on the site),
 `banners` (homepage slideshow: image/title/subtitle/link/active, plus an optional `event_id` →
@@ -363,20 +369,54 @@ output back for download (`archiver` zips the whole folder, images included).
   nothing in the site calls them, so re-adding a page is enough to bring the tool back.
 - `scrape.py` gained an `--auto <url>` mode (probe → single product vs. crawl) used by the backend;
   the existing `--url/--urls/--crawl` modes are unchanged.
-- **Events sync** (the only tool in the admin page): `POST /api/scrape/events` runs
-  [WebScarping/tbo_events.py](WebScarping/tbo_events.py), which scrapes **ticketingboxoffice.com**
-  (homepage = full current event list + category mapping via isotope CSS classes; each event/group
-  page for details) and writes `events.json`. `scraper.js` then **ingests** it into Postgres:
-  upserts `categories` (by slug, with tile images) and `events` (upsert keyed on
-  `source='ticketingboxoffice'` + `external_id`, so re-runs update rather than duplicate; manual
-  events are untouched). A **group** (one event, many shows/days — a play's nights or a tournament's
-  matches) becomes one event with a multi-entry `dates` array, each entry keeping its own booking
-  link. Returns a `{ created, updated, events, categories }` summary in the job. This is the basis
-  for the planned daily auto-sync.
+- **Events sync** (the only tool in the admin page) — see its own section below.
 - **VPS prereq:** Python 3 + `pip install -r WebScarping/requirements.txt` (and
   `playwright install chromium` only if the "JavaScript site" / `--render` option is used). Env:
   `PYTHON_BIN` (default `python3`), `SCRAPER_DIR` (default `../WebScarping`), `SCRAPE_DIR`
   (default `server/scrapes`).
+
+## Events sync (three ticketing sites → one events page)
+
+`POST /api/scrape/events` runs [WebScarping/events_sync.py](WebScarping/events_sync.py), which
+scrapes **ticketingboxoffice.com**, **tickit.co** and **ihjoz.com** into one `events.json`;
+[server/src/scraper.js](server/src/scraper.js) then imports it. Driven from `/admin/scraper`
+(pick the sites, the country, and whether to clear what the sites have taken down).
+
+- **One module per site** in [WebScarping/event_sources/](WebScarping/event_sources/), each
+  exporting `KEY`/`LABEL`/`fetch(fetcher, limit, country)`. Adding a fourth site means writing one
+  module and listing it in `SOURCES` — the pipeline, the importer and the admin need nothing new
+  beyond its key in `EVENT_SOURCES` (scraper.js) and `SOURCE_INFO` (ScraperAdmin.jsx). `tbo.py`
+  parses the homepage's isotope cards, `tickit.py` calls the JSON API tickit.co's own browser
+  bundle calls, `ihjoz.py` walks `/events/browse`.
+- **Three sites, one category vocabulary.** Ticketing Box Office has editorial categories, ihjoz an
+  event-type dropdown, Tick'it only music genres — left alone that is three near-duplicate tiles for
+  the same thing. [categories.py](WebScarping/event_sources/categories.py) folds every source label
+  into `CANONICAL` **before** it reaches the database, and its names deliberately reuse the ones
+  already in Postgres so their admin-set tile images survive. `ALIASES` is the tuning point;
+  `refine()` improves a vague category from the event's own title, and only a vague one — an
+  editorial tag from the site itself always wins over a keyword.
+- **Two things look like duplicates and need opposite treatment**
+  ([dedupe.py](WebScarping/event_sources/dedupe.py)): a **run** (one show, many nights — Tick'it
+  published a ten-night stand-up run as ten events) is *merged* into one event with ten `dates`,
+  and a **cross-listing** (the same night sold on two sites) is *dropped*, keeping whichever source
+  ranks first in `SOURCES`. Both need an overlapping date to fire, which is what stops two
+  unrelated nights sharing a generic name from being welded together; a run additionally needs the
+  same venue, so a touring show stays several events.
+- **Identity is `(source, external_id)`**, and the importer matches on **every** listing id a run
+  covers (`mergedIds`), not just today's primary — when the first night sells out and the site
+  retires it, the run gets a new primary id, and that is what stops it becoming a second row.
+  Hand-made events (`source = ''`) are never touched by any of this.
+- **A partial crawl looks exactly like a site emptying its calendar**, so `events_sync.py` only sets
+  `complete` when every requested source answered and no `--limit` was given, and the importer only
+  clears no-longer-listed events on a complete run, per source, and only for a source that returned
+  events. Explicitly-named rows (folded nights, cross-listings, past events) are always cleared —
+  the run identified them. Exit codes: 0 complete · 3 partial (imported, nothing pruned) · 1 nothing
+  scraped (nothing changed).
+- **Categories are the admin's.** The importer upserts by slug and never overwrites a name; the tile
+  image is only filled when empty. Rename or re-picture a category at `/admin/categories` and the
+  next sync leaves it alone.
+- `--country Lebanon` (the default) keeps Tick'it — which also sells in the Gulf and Europe — to what
+  AS Company's visitors can actually attend. Past events are dropped unless `--include-past`.
 
 ## Content flow (frontend)
 
@@ -403,7 +443,7 @@ To add an editable field: add the column (migrate) → map it in `app.js` → su
 vercel.json                # SPA rewrite (all paths -> index.html)
 WebScarping/               # Python scrapers, spawned by the API:
                            #   scrape.py + ecom_scraper/  (e-commerce products)
-                           #   tbo_events.py              (Ticketing Box Office events → DB)
+                           #   events_sync.py + event_sources/  (ticketing events → DB)
 server/                    # Express + Postgres API (deployed to the VPS)
   src/{index,app,db,auth,migrate,seed}.js
   src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output

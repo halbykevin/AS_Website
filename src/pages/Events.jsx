@@ -5,7 +5,7 @@ import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'
 
 export default function Events() {
-  const { ticketing, events, eventsSection, categories } = useContent()
+  const { events, eventsSection, categories } = useContent()
   const [params] = useSearchParams()
   const activeSlug = params.get('category') || ''
   const activeCategory = categories.find((c) => c.slug === activeSlug)
@@ -20,10 +20,6 @@ export default function Events() {
             {activeCategory ? activeCategory.name : eventsSection.heading}
           </h1>
           <p className="mt-4 text-base text-as-charcoal/60">{eventsSection.intro}</p>
-          <p className="mt-3 flex items-center gap-2 text-sm text-as-charcoal/55">
-            <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
-            {ticketing.note}
-          </p>
         </div>
 
         {categories.length > 0 && (

@@ -125,7 +125,7 @@ export default function EventsAdmin() {
               label="Ticket link (URL)"
               hint="Included in the WhatsApp reservation message so customers have the original event page. Set the WhatsApp number in Site Settings → Contact."
             >
-              <TextInput value={form.ticketUrl} onChange={set('ticketUrl')} placeholder="https://www.ticketingboxoffice.com/event/..." />
+              <TextInput value={form.ticketUrl} onChange={set('ticketUrl')} placeholder="https://tickit.co/events/..." />
             </Field>
             <Field label="Image" hint="Leave empty to keep the current image.">
               <div className="flex items-center gap-4">

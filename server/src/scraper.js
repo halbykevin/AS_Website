@@ -1,7 +1,10 @@
-// Web scraper bridge: lets the admin dashboard run the Python e-commerce
-// scraper (../../WebScarping/scrape.py) as a background job and download its
-// output. Each run gets its own folder under SCRAPE_DIR; the admin UI polls
-// for status/log and pulls the result files (and a zip of everything).
+// Web scraper bridge. Two jobs run out of ../../WebScarping as subprocesses:
+//   - the e-commerce product scraper (scrape.py), whose output the admin
+//     downloads as files or a zip;
+//   - the events sync (events_sync.py), which pulls every ticketing partner's
+//     listings and imports them straight into Postgres.
+// Each run gets its own folder under SCRAPE_DIR; the admin UI polls for
+// status/log while the job runs.
 
 import express from 'express'
 import { spawn } from 'node:child_process'
@@ -161,8 +164,16 @@ function startJob(opts) {
 }
 
 // ---------------------------------------------------------------------------
-// Ticketing Box Office events sync: run tbo_events.py → ingest the JSON into the
-// events + categories tables (idempotent, keyed on source + external_id).
+// Events sync: run events_sync.py across every ticketing partner, then ingest
+// the JSON it writes into the events + categories tables.
+//
+// The import is idempotent — every event is keyed on (source, external_id), so
+// re-running updates rather than duplicates, and hand-made events (source = '')
+// are never touched. What the Python side already decided is honoured here:
+// a multi-night run arrives as one event with many `dates`, a cross-listed
+// event arrives once, and the rows an earlier run created for the listings that
+// have since been folded away, expired or delisted are removed (see cleanup at
+// the bottom of ingestEvents).
 // ---------------------------------------------------------------------------
 const slugify = (s) =>
   String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -172,19 +183,21 @@ const makeExcerpt = (desc) => {
   return line.length > 140 ? line.slice(0, 137) + '…' : line
 }
 
+// Every source key the scraper knows about. Kept here (rather than derived from
+// the run) so a source that failed this time still has its rows left alone.
+const EVENT_SOURCES = ['ticketingboxoffice', 'tickit', 'ihjoz']
+
 async function uniqueSlug(base, extId) {
   const slug = base || 'event'
   const { rows } = await query('SELECT 1 FROM events WHERE slug=$1', [slug])
   if (!rows[0]) return slug
-  return `${slug}-${String(extId).replace(/\D/g, '') || Date.now()}`
+  return `${slug}-${String(extId).replace(/[^a-z0-9]/gi, '') || Date.now()}`
 }
 
-async function ingestEvents(jsonPath) {
-  const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
-  const cats = Array.isArray(data.categories) ? data.categories : []
-  const events = Array.isArray(data.events) ? data.events : []
-
-  // Upsert categories by slug (fill the tile image only if we don't have one yet).
+async function upsertCategories(cats) {
+  // The slug is the identity; the name belongs to the admin. A category renamed
+  // in the dashboard keeps its name across syncs, and its tile image is only
+  // filled in when we don't have one yet.
   let sort = 0
   for (const c of cats) {
     const slug = c.slug || slugify(c.name)
@@ -192,48 +205,139 @@ async function ingestEvents(jsonPath) {
     await query(
       `INSERT INTO categories (name, slug, image_url, sort, visible)
        VALUES ($1,$2,$3,$4,true)
-       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name,
-         image_url = CASE WHEN categories.image_url = '' THEN EXCLUDED.image_url ELSE categories.image_url END`,
+       ON CONFLICT (slug) DO UPDATE SET
+         image_url = CASE WHEN categories.image_url = '' THEN EXCLUDED.image_url
+                          ELSE categories.image_url END`,
       [c.name || slug, slug, c.image || '', sort++]
     )
   }
-  const catRows = await query('SELECT id, slug FROM categories')
-  const catBySlug = new Map(catRows.rows.map((r) => [r.slug, r.id]))
+  const { rows } = await query('SELECT id, slug FROM categories')
+  return new Map(rows.map((r) => [r.slug, r.id]))
+}
+
+async function ingestEvents(jsonPath, { prune = true } = {}) {
+  const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+  const cats = Array.isArray(data.categories) ? data.categories : []
+  const events = Array.isArray(data.events) ? data.events : []
+  const sources = data.sources || {}
+  const complete = Boolean(data.complete)
+
+  const catBySlug = await upsertCategories(cats)
 
   let created = 0
   let updated = 0
+  // (source, external_id) pairs this run vouches for — everything else that
+  // came from a source we just synced is a candidate for removal.
+  const keep = new Map(EVENT_SOURCES.map((k) => [k, new Set()]))
+
   for (const e of events) {
+    const source = String(e.source || '')
+    if (!EVENT_SOURCES.includes(source)) continue
+    const extId = String(e.externalId || '')
+    if (!extId) continue
+    keep.get(source).add(extId)
+
     const categoryId = catBySlug.get(slugify(e.categoryName || '')) || null
     const v = [
       e.title || '', e.primaryDate || null, e.primaryTime || '', e.venue || '', e.city || '',
-      e.imageUrl || '', e.ticketUrl || '', makeExcerpt(e.description), e.description || '',
-      categoryId, JSON.stringify(Array.isArray(e.dates) ? e.dates : []),
+      e.imageUrl || '', e.ticketUrl || '', e.excerpt || makeExcerpt(e.description),
+      e.description || '', categoryId, JSON.stringify(Array.isArray(e.dates) ? e.dates : []),
     ]
+
+    // Match on any of the run's listing ids, not just the one we key it on now:
+    // when the first night of a run sells out and the site retires it, the run
+    // gets a new primary id, and this is what stops that becoming a second row.
+    const ids = [extId, ...(Array.isArray(e.mergedIds) ? e.mergedIds.map(String) : [])]
     const existing = await query(
-      'SELECT id FROM events WHERE source=$1 AND external_id=$2',
-      ['ticketingboxoffice', String(e.externalId || '')]
+      'SELECT id FROM events WHERE source=$1 AND external_id = ANY($2) ORDER BY id LIMIT 1',
+      [source, ids]
     )
     if (existing.rows[0]) {
       await query(
         `UPDATE events SET title=$1, date=$2, time=$3, venue=$4, city=$5, image_url=$6,
-           ticket_url=$7, excerpt=$8, description=$9, category_id=$10, dates=$11
-         WHERE id=$12`,
-        [...v, existing.rows[0].id]
+           ticket_url=$7, excerpt=$8, description=$9, category_id=$10, dates=$11, external_id=$12
+         WHERE id=$13`,
+        [...v, extId, existing.rows[0].id]
       )
       updated++
     } else {
-      const slug = await uniqueSlug(slugify(e.title), e.externalId)
+      const slug = await uniqueSlug(slugify(e.title), extId)
       await query(
         `INSERT INTO events
            (title, slug, date, time, venue, city, image_url, ticket_url, status,
             excerpt, description, sort, category_id, dates, source, external_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'open',$9,$10,0,$11,$12,'ticketingboxoffice',$13)`,
-        [v[0], slug, v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], String(e.externalId || '')]
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'open',$9,$10,0,$11,$12,$13,$14)`,
+        [v[0], slug, v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], source, extId]
       )
       created++
     }
   }
-  return { categories: cats.length, events: events.length, created, updated }
+
+  // ---- Clean-up -----------------------------------------------------------
+  // Rows an earlier run created that this run says should no longer stand on
+  // their own: a night now folded into a run, a listing that turned out to be a
+  // cross-listing of another site's, or an event that has already happened.
+  // These are always safe to drop — they are named explicitly, and manual
+  // events (source = '') can never appear in the list.
+  const removeIds = []
+  for (const entry of [...(data.duplicates || []), ...(data.past || [])]) {
+    const source = String(entry.source || '')
+    if (!EVENT_SOURCES.includes(source)) continue
+    const ids = [String(entry.externalId || ''),
+                 ...(Array.isArray(entry.mergedIds) ? entry.mergedIds.map(String) : [])]
+      .filter(Boolean)
+      .filter((id) => !keep.get(source).has(id))
+    if (ids.length) removeIds.push([source, ids])
+  }
+  for (const e of events) {
+    const source = String(e.source || '')
+    if (!EVENT_SOURCES.includes(source)) continue
+    const folded = (Array.isArray(e.mergedIds) ? e.mergedIds.map(String) : [])
+      .filter((id) => id && !keep.get(source).has(id))
+    if (folded.length) removeIds.push([source, folded])
+  }
+
+  let removed = 0
+  for (const [source, ids] of removeIds) {
+    const { rowCount } = await query(
+      'DELETE FROM events WHERE source=$1 AND external_id = ANY($2)', [source, ids]
+    )
+    removed += rowCount
+  }
+
+  // Everything else the source has stopped listing — plus everything belonging
+  // to a site this run did not ask for. Which sites were selected IS the site's
+  // event feed: a run that leaves another site's events standing would put back
+  // the cross-listings this one just resolved (the same night is on two sites,
+  // and only a run covering both can tell). A source that was asked for and
+  // failed is the one thing left untouched — a half-finished crawl looks
+  // exactly like a site emptying its calendar.
+  let delisted = 0
+  const prunable = prune && complete
+    ? EVENT_SOURCES.filter((k) => !sources[k] || (sources[k].ok && keep.get(k).size > 0))
+    : []
+  for (const source of prunable) {
+    const { rowCount } = await query(
+      `DELETE FROM events WHERE source=$1 AND external_id <> '' AND NOT (external_id = ANY($2))`,
+      [source, [...keep.get(source)]]
+    )
+    delisted += rowCount
+  }
+
+  return {
+    categories: cats.length,
+    events: events.length,
+    created,
+    updated,
+    removed,
+    delisted,
+    pruned: prunable,
+    complete,
+    sources,
+    duplicates: (data.duplicates || []).length,
+    past: (data.past || []).length,
+    runsMerged: Number(data.runsMerged) || 0,
+  }
 }
 
 function startEventsJob(opts) {
@@ -249,8 +353,18 @@ function startEventsJob(opts) {
   jobs.set(id, job)
 
   const delay = Math.max(0, num(opts.delay, 0.3))
-  const args = ['tbo_events.py', '--out', jsonPath, '--delay', String(delay)]
+  const args = ['events_sync.py', '--out', jsonPath, '--delay', String(delay)]
+
+  const sources = (Array.isArray(opts.sources) ? opts.sources : [])
+    .map(String)
+    .filter((s) => EVENT_SOURCES.includes(s))
+  if (sources.length && sources.length < EVENT_SOURCES.length) {
+    args.push('--sources', sources.join(','))
+  }
+  // '' means every country; anything else is passed through as the filter.
+  args.push('--country', opts.country === undefined ? 'Lebanon' : String(opts.country))
   if (Math.floor(num(opts.limit, 0)) > 0) args.push('--limit', String(Math.floor(opts.limit)))
+  if (opts.includePast) args.push('--include-past')
 
   const proc = spawn(PYTHON_BIN, args, { cwd: SCRAPER_DIR, windowsHide: true })
   job.proc = proc
@@ -270,16 +384,24 @@ function startEventsJob(opts) {
   proc.on('close', async (code) => {
     job.proc = null
     if (job.status === 'error') return pruneJobs()
-    if (code !== 0) {
+    // 3 = at least one site answered but not all of them. Worth importing (the
+    // JSON says the run was partial, so nothing gets pruned), not worth failing.
+    if (code !== 0 && code !== 3) {
       job.status = 'error'
-      job.error = `Scraper exited with code ${code}`
+      job.error = code === 1
+        ? 'No events could be scraped — every source failed. Nothing was changed.'
+        : `Scraper exited with code ${code}`
       return pruneJobs()
     }
     job.log += '\nImporting into the database…\n'
     try {
-      job.summary = await ingestEvents(jsonPath)
-      job.log += `Imported: ${job.summary.created} new, ${job.summary.updated} updated ` +
-        `(${job.summary.events} events, ${job.summary.categories} categories).\n`
+      const s = await ingestEvents(jsonPath, { prune: opts.prune !== false })
+      job.summary = s
+      job.log +=
+        `Imported: ${s.created} new, ${s.updated} updated ` +
+        `(${s.events} events, ${s.categories} categories).\n` +
+        `Cleared: ${s.removed} folded/duplicate/past, ${s.delisted} no longer listed` +
+        (s.complete ? '' : ' (partial run — nothing was pruned)') + '.\n'
       job.status = 'done'
     } catch (err) {
       job.status = 'error'
@@ -294,7 +416,9 @@ function startEventsJob(opts) {
 export const scraperRouter = express.Router()
 scraperRouter.use(requireAuth)
 
-// Sync events from Ticketing Box Office into the database.
+// Sync events from the ticketing partners into the database. The body may narrow
+// the run: { sources: ['tickit'], country: 'Lebanon', limit, delay, prune,
+// includePast } — all optional, defaults are every source, Lebanon, prune on.
 scraperRouter.post('/events', (req, res) => {
   const job = startEventsJob(req.body || {})
   res.status(201).json(jobView(job))

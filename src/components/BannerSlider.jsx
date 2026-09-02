@@ -7,10 +7,9 @@ import BannerCta from './BannerCta'
 // (www.as.com.lb/events in production) rather than each banner's own link.
 const EVENTS_PATH = '/events'
 
-// Admin-managed hero banner carousel, styled like a box-office site
-// (ticketingboxoffice.com): full-bleed, a fixed cinematic aspect ratio with the
-// image cropped to fill. It carries the image only — no caption bar — and the
-// whole slide opens the events page.
+// Admin-managed hero banner carousel: full-bleed, a fixed cinematic aspect
+// ratio with the image cropped to fill. It carries the image only — no caption
+// bar — and the whole slide opens the events page.
 
 const INTERVAL = 5000
 

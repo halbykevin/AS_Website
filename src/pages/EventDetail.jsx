@@ -5,7 +5,7 @@ import { useContent } from '../store/content.jsx'
 
 export default function EventDetail() {
   const { id } = useParams()
-  const { ticketing, getEvent } = useContent()
+  const { getEvent } = useContent()
   const event = getEvent(id)
 
   if (!event) {
@@ -118,10 +118,6 @@ export default function EventDetail() {
                 Contact us to reserve your spot.
               </div>
             )}
-            <div className="mt-4 flex items-center justify-center gap-2 border-t border-black/5 pt-4">
-              <img src={ticketing.logo} alt={ticketing.name} className="h-6 w-auto" />
-              <span className="text-xs text-as-charcoal/45">{ticketing.note}</span>
-            </div>
           </div>
         </div>
       </div>

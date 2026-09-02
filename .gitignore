@@ -19,3 +19,7 @@ dev-server.log
 **/dev-server.log
 
 whyAS.png
+
+# Python bytecode (the scrapers in WebScarping/)
+__pycache__/
+*.py[cod]

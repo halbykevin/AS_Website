@@ -357,7 +357,8 @@ ALTER TABLE banners ADD COLUMN IF NOT EXISTS event_id INTEGER REFERENCES events(
 -- Per-banner focal point (%) so the admin controls how the image is cropped.
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_x INTEGER DEFAULT 50;
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_y INTEGER DEFAULT 50;
--- Multi-date events + provenance for the Ticketing Box Office sync (idempotent upsert).
+-- Multi-date events + provenance for the events sync (idempotent upsert):
+-- `source` names the ticketing site a row came from, '' = created by hand.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
