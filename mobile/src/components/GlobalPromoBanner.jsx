@@ -96,7 +96,11 @@ function PromoMarquee({ phrases }) {
 
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: theme.colors.primary }}>
-      <StatusBar style="light" backgroundColor={theme.colors.primary} />
+      {/* `style` only — never `backgroundColor`. That prop calls
+          Window.setStatusBarColor, deprecated in Android 15 and a no-op under
+          edge-to-edge, and Play flags it. The SafeAreaView above already paints
+          the status-bar area red, which is what the prop was doing anyway. */}
+      <StatusBar style="light" />
       <View
         accessibilityRole="text"
         accessibilityLabel={phrases.join('. ')}

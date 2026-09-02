@@ -113,6 +113,14 @@ Store-publishing requirements that are easy to break and hard to notice:
 - **The privacy policy covers the app, not just the website**, and is reachable from the account tab
   **signed out** ([mobile/app/legal.jsx](mobile/app/legal.jsx)). Anything new the app collects — push
   tokens, device info, a new sign-in method — belongs in that page in the same change.
+- **Android 15/16 readiness** (Play Console flagged both before Feb 2027): the app must not restrict
+  orientation — `orientation: "default"` in app.json, so the manifest emits
+  `screenOrientation="unspecified"`, because Android 16 ignores the restriction on foldables and
+  tablets anyway and a portrait-locked layout just letterboxes there. And it must not touch the
+  deprecated window-colour APIs: `edgeToEdgeEnabled: true`, and **never pass `backgroundColor` to
+  `<StatusBar>`** — that prop calls `Window.setStatusBarColor`, deprecated in Android 15, a no-op
+  under edge-to-edge, and enough for Play to flag the build. Tint the status-bar area by giving a
+  `SafeAreaView edges={['top']}` a background instead, the way GlobalPromoBanner does.
 - **OTA updates**: `expo-updates` with the `fingerprint` runtime policy and a channel per EAS profile.
   `npm run update` ships a JS-only fix without a store review; anything touching native code needs a
   real build, and fingerprint is what stops such an update from reaching a binary that can't run it.
