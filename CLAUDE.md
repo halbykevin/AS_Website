@@ -13,9 +13,11 @@ Website for **AS Company (Absolute Solutions SAL)** — market leader in telecom
 ## Architecture
 
 ```
-Browser ──► Vercel (React static site, this repo root)
-                │
-                └─► https://api.yourdomain.com  (Node/Express API in /server, on the VPS)
+Browser ──► Vercel (React static site, this repo root)          as.com.lb
+     │      Vercel (Next.js events platform, as_ticketing/)     ticketing.as.com.lb
+     │              └── no backend: reads the site API below
+     │
+     └─────► https://api.yourdomain.com  (Node/Express API in /server, on the VPS)
                           ├── PostgreSQL          (data)
                           ├── /uploads            (logo & event images on disk)
                           ├── /scrapes            (per-run scraper output, runtime-only)
@@ -27,6 +29,37 @@ Browser ──► Vercel (React static site, this repo root)
 - The two talk over HTTP; the frontend's API base is `VITE_API_URL`.
 
 > History: an earlier iteration used PocketBase — fully removed. Don't reintroduce PocketBase concepts.
+
+## AS Ticketing Hub (`as_ticketing/`)
+
+`ticketing.as.com.lb` — the events platform, a **third Vercel project on this repo**
+(root directory `as_ticketing`, dev port 5181). Next.js 15 + Tailwind.
+
+- **It has no backend.** Events, categories and settings all come from the marketing site's
+  API (`/api/events`, `/api/categories`, `/api/settings`) — the same one `as.com.lb` reads,
+  filled by the events sync. One admin, one database, two properties. The store is the
+  opposite case (products/orders/customers/wallet exist nowhere else, so it earns its own
+  API); ticketing does not, and a second copy of the sync would be two things to keep in step.
+- **Its URLs match the marketing site's on purpose**: `/events/<slug>` uses the same slugs,
+  because both read the same rows. That is what lets `as.com.lb/events` 301 across one-to-one
+  later instead of dumping every existing link on a homepage. `/` redirects to `/events`.
+- **`settings.ticketing_url` is the handover switch** (Site Settings → Events, the twin of
+  `store_url`). Empty = events stay on `as.com.lb/events`; set it and the marketing site's nav,
+  footer, banner + "Book now" CTA, category tiles, event cards, contact page and detail-page
+  back-links all point here instead. They move together because they all go through
+  [src/components/EventsLink.jsx](src/components/EventsLink.jsx) — ten call sites deciding
+  separately would eventually half-migrate.
+- `src/lib/events.js` is a **deliberate copy** of the marketing site's date helpers and
+  `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
+  visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
+  reservation, worded the same way.
+- **The chrome is light because the logo is.** The supplied artwork
+  (`as_ticketing/public/Logo/logo.png`) is a square stacked lockup on a white card, so a dark
+  header would frame it in a white box. The header also can't use the lockup as-is — at 34px
+  its wordmark would be four pixels tall — so it relays the same elements horizontally: the
+  ticket mark (cropped out of the original) plus "Ticketing Hub" as live text. The favicon is
+  the mark on a transparent square. Full detail in
+  [as_ticketing/README.md](as_ticketing/README.md).
 
 ## Scripts
 

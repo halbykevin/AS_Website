@@ -8,6 +8,7 @@ const PORTS = [
   [5174, 'vite — fallback'],
   [5175, 'vite — fallback'],
   [5180, 'next — as_store'],
+  [5181, 'next — as_ticketing'],
   [8080, 'express — site API (server/)'],
   [8081, 'express — store API (as_store/server/)'],
   [8082, 'expo/metro — mobile'],
