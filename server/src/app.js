@@ -74,6 +74,9 @@ const bannerJson = (r) => ({
 })
 const categoryJson = (r) => ({
   id: r.id, name: r.name, slug: r.slug, imageUrl: r.image_url, sort: r.sort, visible: r.visible,
+  // Non-null = the events sync hid this one because it was empty. The admin
+  // list shows it so a category that vanished on its own is explicable.
+  autoHiddenAt: r.auto_hidden_at || null,
 })
 const sectionJson = (r) => ({
   id: r.id, eyebrow: r.eyebrow, heading: r.heading, body: r.body, imageUrl: r.image_url,

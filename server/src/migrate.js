@@ -346,6 +346,13 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS banner_height NUMERIC(4,1) DEFAULT
 -- exact twin of store_url, and the switch that hands events over to
 -- ticketing.as.com.lb without a code change.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS ticketing_url TEXT DEFAULT '';
+-- Set when the events sync hides a category because nothing is filed under it
+-- any more. It is what makes a hide OURS: the stamp plus the visible flag tell
+-- the three states apart, the same way products.delisted_at does in the store.
+--   hidden + stamped  = the sync hid it     -> restore it when events return
+--   hidden + no stamp = a person hid it     -> never touch
+--   visible + stamped = a person un-hid it  -> never touch again
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS auto_hidden_at TIMESTAMPTZ;
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';

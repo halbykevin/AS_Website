@@ -133,6 +133,14 @@ export default function CategoriesAdmin() {
                     <p className="truncate text-sm text-as-charcoal/55">
                       /{r.slug}{r.visible === false ? ' · hidden' : ''}
                     </p>
+                    {/* Without this, a category that vanishes after a sync looks
+                        like the dashboard losing someone's setting. */}
+                    {r.autoHiddenAt && r.visible === false && (
+                      <p className="mt-0.5 text-xs text-amber-700">
+                        Hidden by the events sync — nothing is filed under it. Show it again and
+                        the sync will leave it alone from then on.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">

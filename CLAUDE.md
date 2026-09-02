@@ -449,6 +449,14 @@ scrapes **ticketingboxoffice.com**, **tickit.co** and **ihjoz.com** into one `ev
 - **Categories are the admin's.** The importer upserts by slug and never overwrites a name; the tile
   image is only filled when empty. Rename or re-picture a category at `/admin/categories` and the
   next sync leaves it alone.
+- **Empty categories hide themselves**, because a tile leading to "nothing here" is worse on both
+  properties than no tile. `categories.auto_hidden_at` is what makes a hide *ours* — the same
+  three-state trick as `products.delisted_at` in the store: **hidden + stamped** = the sync hid it
+  (restored, stamp cleared, the moment events return), **hidden + no stamp** = a person hid it
+  (never touched), **visible + stamped** = a person overrode us (never touched again). "Empty"
+  counts *every* event including hand-made ones, and like pruning it only runs on a complete run —
+  on a partial crawl a category looks empty merely because its source didn't answer. The admin list
+  says when a category was hidden this way, so one vanishing is never a mystery.
 - `--country Lebanon` (the default) keeps Tick'it — which also sells in the Gulf and Europe — to what
   AS Company's visitors can actually attend. Past events are dropped unless `--include-past`.
 

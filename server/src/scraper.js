@@ -215,6 +215,36 @@ async function upsertCategories(cats) {
   return new Map(rows.map((r) => [r.slug, r.id]))
 }
 
+// A category with nothing filed under it is a dead tile on both the website and
+// the ticketing platform, so a complete sync hides it — and un-hides it when
+// events come back. `auto_hidden_at` is what makes a hide OURS, and it is the
+// only thing standing between this and someone's manual decision:
+//
+//   hidden + stamped  = the sync hid it     -> restore when events return
+//   hidden + no stamp = a person hid it     -> never touch
+//   visible + stamped = a person un-hid it  -> never touch again
+//
+// "Empty" counts EVERY event, hand-made ones included — a category holding only
+// events an admin typed in must not disappear because no ticketing site
+// happened to use it.
+async function syncCategoryVisibility() {
+  const hidden = await query(
+    `UPDATE categories c SET visible = false, auto_hidden_at = now()
+      WHERE c.visible = true
+        AND c.auto_hidden_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.category_id = c.id)
+      RETURNING name`
+  )
+  const shown = await query(
+    `UPDATE categories c SET visible = true, auto_hidden_at = NULL
+      WHERE c.visible = false
+        AND c.auto_hidden_at IS NOT NULL
+        AND EXISTS (SELECT 1 FROM events e WHERE e.category_id = c.id)
+      RETURNING name`
+  )
+  return { hidden: hidden.rows.map((r) => r.name), shown: shown.rows.map((r) => r.name) }
+}
+
 async function ingestEvents(jsonPath, { prune = true } = {}) {
   const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
   const cats = Array.isArray(data.categories) ? data.categories : []
@@ -324,8 +354,15 @@ async function ingestEvents(jsonPath, { prune = true } = {}) {
     delisted += rowCount
   }
 
+  // Only when the run was complete: on a partial crawl a category looks empty
+  // simply because the site that fills it did not answer.
+  const categoryVisibility = prunable.length
+    ? await syncCategoryVisibility()
+    : { hidden: [], shown: [] }
+
   return {
     categories: cats.length,
+    categoryVisibility,
     events: events.length,
     created,
     updated,
@@ -401,7 +438,13 @@ function startEventsJob(opts) {
         `Imported: ${s.created} new, ${s.updated} updated ` +
         `(${s.events} events, ${s.categories} categories).\n` +
         `Cleared: ${s.removed} folded/duplicate/past, ${s.delisted} no longer listed` +
-        (s.complete ? '' : ' (partial run — nothing was pruned)') + '.\n'
+        (s.complete ? '' : ' (partial run — nothing was pruned)') + '.\n' +
+        (s.categoryVisibility?.hidden.length
+          ? `Hid ${s.categoryVisibility.hidden.length} empty categories: ` + `${s.categoryVisibility.hidden.join(', ')}.\n`
+          : '') +
+        (s.categoryVisibility?.shown.length
+          ? `Brought back: ${s.categoryVisibility.shown.join(', ')} (events again).\n`
+          : '')
       job.status = 'done'
     } catch (err) {
       job.status = 'error'

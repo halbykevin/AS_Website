@@ -120,7 +120,7 @@ export default function ScraperAdmin() {
             checked={prune}
             onChange={setPrune}
             label="Keep the events page in step with the sites"
-            description="Removes what the sites have taken down, what has already happened, and anything from a site you unticked. Skipped whenever a selected site fails to answer, so a site being down can never empty your events page."
+            description="Removes what the sites have taken down, what has already happened, and anything from a site you unticked, and hides categories left with no events. Skipped whenever a selected site fails to answer, so a site being down can never empty your events page."
           />
 
           <div className="flex items-center gap-3">
@@ -170,6 +170,12 @@ export default function ScraperAdmin() {
                   <Stat label="Nights merged into a run" value={s.runsMerged} />
                   <Stat label="Cross-listed, imported once" value={s.duplicates} />
                   <Stat label="Cleared (past / delisted)" value={s.removed + s.delisted} />
+                  {s.categoryVisibility?.hidden?.length > 0 && (
+                    <Stat
+                      label={`Empty categories hidden: ${s.categoryVisibility.hidden.join(', ')}`}
+                      value={s.categoryVisibility.hidden.length}
+                    />
+                  )}
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-black/10">
