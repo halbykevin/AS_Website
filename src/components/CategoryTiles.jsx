@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import { optimizedImage } from '../lib/api'
+import EventsLink from './EventsLink.jsx'
 
 // Responsive grid of event-category tiles (image + label), like a box-office
 // "browse by category" strip. Clicking a tile filters the Events page; the first
@@ -17,9 +17,9 @@ export default function CategoryTiles({ categories, activeSlug = '', includeAll 
         const active = (c.slug || '') === (activeSlug || '')
         const isAll = c.id === '__all__'
         return (
-          <Link
+          <EventsLink
             key={c.id}
-            to={c.slug ? `/events?category=${c.slug}` : '/events'}
+            to={c.slug ? `?category=${c.slug}` : ''}
             className={`group relative h-24 overflow-hidden rounded-xl ring-1 transition sm:h-28 ${
               active ? 'ring-2 ring-as-red' : 'ring-black/5 hover:ring-as-red/40'
             }`}
@@ -42,7 +42,7 @@ export default function CategoryTiles({ categories, activeSlug = '', includeAll 
             <span className="absolute inset-x-0 bottom-0 p-3 text-left text-sm font-bold uppercase tracking-wide text-white drop-shadow">
               {c.name}
             </span>
-          </Link>
+          </EventsLink>
         )
       })}
     </div>

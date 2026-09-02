@@ -4,6 +4,11 @@ import { useContent } from '../store/content.jsx'
 import { useScrollEl } from '../store/scroll.jsx'
 import { useLenis } from '../store/lenis.jsx'
 import BasketballButton from './predictor/BasketballButton.jsx'
+import EventsLink from './EventsLink.jsx'
+
+// A nav item pointing at the events listing (or a filtered view of it) — the
+// one item that has to follow settings.ticketingUrl off-site.
+const isEventsHref = (href) => href === '/events' || href.startsWith('/events?')
 import { optimizedImage } from '../lib/api'
 
 export default function Navbar() {
@@ -102,12 +107,9 @@ export default function Navbar() {
             >
               Store
             </a>
-            <Link
-              to="/events"
-              className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
-            >
+            <EventsLink className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md">
               Browse Events
-            </Link>
+            </EventsLink>
           </div>
           {nav.map((item) =>
             item.href.includes('#') ? (
@@ -119,6 +121,14 @@ export default function Navbar() {
               >
                 {item.label}
               </a>
+            ) : isEventsHref(item.href) ? (
+              <EventsLink
+                key={item.label}
+                to={item.href.slice('/events'.length)}
+                className="text-sm font-medium text-as-charcoal/70 transition hover:text-as-red"
+              >
+                {item.label}
+              </EventsLink>
             ) : (
               <Link
                 key={item.label}
@@ -161,12 +171,9 @@ export default function Navbar() {
             >
               Store
             </a>
-            <Link
-              to="/events"
-              className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
-            >
+            <EventsLink className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white">
               Browse Events
-            </Link>
+            </EventsLink>
             <div className="mt-2 flex flex-col gap-1">
               {nav.map((item) =>
                 item.href.includes('#') ? (
@@ -178,6 +185,14 @@ export default function Navbar() {
                   >
                     {item.label}
                   </a>
+                ) : isEventsHref(item.href) ? (
+                  <EventsLink
+                    key={item.label}
+                    to={item.href.slice('/events'.length)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-as-charcoal/80 transition hover:bg-as-red/5 hover:text-as-red"
+                  >
+                    {item.label}
+                  </EventsLink>
                 ) : (
                   <Link
                     key={item.label}

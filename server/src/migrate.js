@@ -341,6 +341,11 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS logo_size_desktop INTEGER DEFAULT 
 -- Homepage banner height: the shared aspect-ratio denominator (16 : N) for the
 -- three homepage strips. Higher = taller. NUMERIC so half-steps like 6.5 work.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS banner_height NUMERIC(4,1) DEFAULT 6;
+-- Where the events live. Empty = the /events pages on this site; set it to the
+-- ticketing platform's URL and every events link points there instead. The
+-- exact twin of store_url, and the switch that hands events over to
+-- ticketing.as.com.lb without a code change.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ticketing_url TEXT DEFAULT '';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS font_size TEXT DEFAULT 'md';
 ALTER TABLE story_panels ADD COLUMN IF NOT EXISTS accent2 TEXT DEFAULT '';

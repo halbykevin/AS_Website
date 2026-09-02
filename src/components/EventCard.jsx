@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
 import Icon from './Icon.jsx'
 import { optimizedImage } from '../lib/api'
+import EventsLink from './EventsLink.jsx'
 
 const statusStyles = {
   open: { label: 'Reserve now', className: 'bg-green-50 text-green-700 ring-green-600/20' },
@@ -81,8 +81,8 @@ export default function EventCard({ event }) {
     )
   }
   return (
-    <Link to={`/events/${event.id}`} className={cardCls}>
+    <EventsLink to={`/${event.id}`} className={cardCls}>
       {body}
-    </Link>
+    </EventsLink>
   )
 }

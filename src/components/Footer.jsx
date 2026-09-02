@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
+import EventsLink from './EventsLink.jsx'
 
 export default function Footer() {
   const { brand, contact } = useContent()
@@ -19,7 +20,7 @@ export default function Footer() {
           <div>
             <p className="text-sm font-bold uppercase tracking-wider text-as-charcoal">Explore</p>
             <ul className="mt-4 space-y-2.5 text-sm text-as-charcoal/65">
-              <li><Link to="/events" className="transition hover:text-as-red">Events</Link></li>
+              <li><EventsLink className="transition hover:text-as-red">Events</EventsLink></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">What We Do</Link></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">About</Link></li>
               <li><Link to="/contact" className="transition hover:text-as-red">Contact</Link></li>

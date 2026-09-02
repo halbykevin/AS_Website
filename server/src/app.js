@@ -56,6 +56,7 @@ const settingsJson = (r) => ({
   contactInstagram: r.contact_instagram, contactInstagramHandle: r.contact_instagram_handle,
   storeTitle: r.store_title, storeEyebrow: r.store_eyebrow,
   storeDescription: r.store_description, storeUrl: r.store_url,
+  ticketingUrl: r.ticketing_url || '',
   published: r.published,
 })
 const serviceJson = (r) => ({ id: r.id, title: r.title, description: r.description, icon: r.icon, sort: r.sort })
@@ -191,7 +192,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        contact_email=$19, contact_whatsapp=$20, contact_instagram=$21, contact_instagram_handle=$22,
        store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
        published=$27, whatsapp_number=$28, favicon_url=$29, logo_size=$30,
-       banner_height=$31, logo_size_desktop=$32, updated_at=now()
+       banner_height=$31, logo_size_desktop=$32, ticketing_url=$33, updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
@@ -207,6 +208,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       Number(b.logoSize) || 48,
       b.bannerHeight == null || b.bannerHeight === '' ? 6 : Number(b.bannerHeight),
       Number(b.logoSizeDesktop) || 72,
+      String(b.ticketingUrl || '').trim().replace(/\/+$/, ''),
     ]
   )
   res.json(settingsJson(rows[0]))

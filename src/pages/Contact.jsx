@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx'
 import { useContent } from '../store/content.jsx'
 import { sendContactMessage, whatsappContactUrl } from '../lib/api.js'
 import { contact as contactDefaults } from '../content/site.js'
+import EventsLink from '../components/EventsLink.jsx'
 
 // The public contact page: three one-tap channels (WhatsApp, Instagram, email)
 // and a message form that posts to /api/contact — the API stores the message and
@@ -118,9 +119,9 @@ export default function Contact() {
               <p className="text-sm font-bold text-as-charcoal">{brand.name}</p>
               <p className="mt-1 text-sm leading-relaxed text-as-charcoal/55">{brand.tagline}</p>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
-                <Link to="/events" className="text-as-red transition hover:text-as-red-light">
+                <EventsLink className="text-as-red transition hover:text-as-red-light">
                   Browse events →
-                </Link>
+                </EventsLink>
                 <Link to="/what-we-do" className="text-as-red transition hover:text-as-red-light">
                   What we do →
                 </Link>

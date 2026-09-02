@@ -1,5 +1,6 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import Icon from '../components/Icon.jsx'
+import EventsLink from '../components/EventsLink.jsx'
 import { formatDate } from '../components/EventCard.jsx'
 import { useContent } from '../store/content.jsx'
 
@@ -15,13 +16,10 @@ export default function EventDetail() {
         <p className="mt-4 text-as-charcoal/60">
           This event may have ended or moved.
         </p>
-        <Link
-          to="/events"
-          className="mt-8 inline-flex items-center gap-2 rounded-full bg-as-red px-6 py-3 text-sm font-semibold text-white transition hover:bg-as-red-light"
-        >
+        <EventsLink className="mt-8 inline-flex items-center gap-2 rounded-full bg-as-red px-6 py-3 text-sm font-semibold text-white transition hover:bg-as-red-light">
           <Icon name="arrow" className="h-4 w-4 rotate-180" />
           Back to events
-        </Link>
+        </EventsLink>
       </section>
     )
   }
@@ -33,13 +31,10 @@ export default function EventDetail() {
         <img src={event.image} alt={event.title} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 mx-auto max-w-5xl px-5 pb-6 sm:px-8">
-          <Link
-            to="/events"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 transition hover:text-white"
-          >
+          <EventsLink className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 transition hover:text-white">
             <Icon name="arrow" className="h-4 w-4 rotate-180" />
             All events
-          </Link>
+          </EventsLink>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
             {event.title}
           </h1>

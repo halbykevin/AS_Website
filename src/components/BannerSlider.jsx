@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { optimizedImage } from '../lib/api'
+import { useContent } from '../store/content.jsx'
 import BannerCta from './BannerCta'
+import EventsLink, { eventsHref } from './EventsLink.jsx'
 
-// Every banner sends visitors to the events listing page
-// (www.as.com.lb/events in production) rather than each banner's own link.
-const EVENTS_PATH = '/events'
+// Every banner sends visitors to the events listing, wherever that lives —
+// /events on this site today, the ticketing platform once settings.ticketingUrl
+// is set — rather than to each banner's own link.
 
 // Admin-managed hero banner carousel: full-bleed, a fixed cinematic aspect
 // ratio with the image cropped to fill. It carries the image only — no caption
@@ -19,6 +20,7 @@ const INTERVAL = 5000
 // `fill` makes the strip stretch to its parent's height (used inside the
 // desktop bento grid) instead of imposing its own 16:N aspect ratio.
 export default function BannerSlider({ banners, height, fill = false }) {
+  const { ticketingUrl } = useContent()
   const ratio = Number(height) > 0 ? Number(height) : 6
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -114,7 +116,7 @@ export default function BannerSlider({ banners, height, fill = false }) {
         {/* Same destination as the slides themselves, just an explicit prompt.
             A sibling of the drag container (not a child) so a swipe can never
             fire it. */}
-        <BannerCta href={EVENTS_PATH} label="Book now" />
+        <BannerCta href={eventsHref(ticketingUrl, '')} label="Book now" newTab={false} />
 
         {/* Arrows over the image */}
         {count > 1 && (
@@ -154,7 +156,7 @@ export default function BannerSlider({ banners, height, fill = false }) {
 // The whole slide links to the events page. Details live in the bar below.
 function Slide({ banner, eager }) {
   return (
-    <Link to={EVENTS_PATH} aria-label={banner.title || 'Browse events'} className="relative block h-full w-full shrink-0">
+    <EventsLink aria-label={banner.title || 'Browse events'} className="relative block h-full w-full shrink-0">
       <img
         src={optimizedImage(banner.image, { w: 1600 })}
         srcSet={[640, 1024, 1600]
@@ -170,7 +172,7 @@ function Slide({ banner, eager }) {
         loading={eager ? 'eager' : 'lazy'}
         fetchPriority={eager ? 'high' : 'auto'}
       />
-    </Link>
+    </EventsLink>
   )
 }
 

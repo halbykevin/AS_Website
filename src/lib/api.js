@@ -89,6 +89,9 @@ export const defaultContent = {
   predictor: null,
   published: false,
   bannerHeight: 6,
+  // Empty = events live on this site (/events). Set to the ticketing platform's
+  // origin and every events link points there instead — see EventsLink.jsx.
+  ticketingUrl: '',
 }
 
 const pick = (value, fallback) =>
@@ -104,6 +107,8 @@ function mergeSettings(s) {
     // Global WhatsApp number (international digits) used to build event/banner
     // "reserve" links — see whatsappBookingUrl().
     whatsappNumber: pick(s.whatsappNumber, ''),
+    // Where the events live (the ticketing platform), or '' to keep them here.
+    ticketingUrl: pick(s.ticketingUrl, ''),
     // Browser-tab icon (favicon); applied at runtime in ContentProvider.
     faviconUrl: pick(s.faviconUrl, ''),
     brand: {

@@ -24,6 +24,7 @@ const empty = {
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
   whatsappNumber: '',
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
+  ticketingUrl: '',
   published: false,
 }
 
@@ -56,6 +57,7 @@ export default function SettingsEditor() {
           whatsappNumber: s.whatsappNumber || '',
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
+          ticketingUrl: s.ticketingUrl || '',
           published: Boolean(s.published),
         })
       }
@@ -247,6 +249,12 @@ export default function SettingsEditor() {
           <Field label="Heading"><TextInput value={form.eventsHeading} onChange={set('eventsHeading')} placeholder="Upcoming Events" /></Field>
           <Field label="Intro" hint="Shown under the heading on the events page.">
             <TextArea value={form.eventsIntro} onChange={set('eventsIntro')} />
+          </Field>
+          <Field
+            label="Ticketing platform URL"
+            hint="Leave empty to keep events on this site. Fill it in and every events link — the nav, the footer, the banner, the category tiles, the event cards — points at the platform instead. No other change needed."
+          >
+            <TextInput value={form.ticketingUrl} onChange={set('ticketingUrl')} placeholder="https://ticketing.as.com.lb" />
           </Field>
         </div>
       </Card>
