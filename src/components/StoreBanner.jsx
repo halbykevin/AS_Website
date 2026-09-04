@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
-import BannerCta from './BannerCta'
 
 // The homepage's AS Store panel: a slideshow of real products from the store,
 // two or three at a time, and tapping any of them opens that product on
@@ -129,19 +128,19 @@ export default function StoreBanner({ banner, height, fill = false }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* A column — button row, cards, dots — rather than cards with the button
-          and dots floating over them. The cards fill the panel edge to edge, so
-          anything absolute lands on a product. */}
+      {/* A column — cards, then dots — rather than either floating over the
+          other. The cards fill the panel edge to edge, so anything absolute
+          lands on a product.
+
+          There is no panel-level "Visit store" button: every card already opens
+          the store, and the nav carries a Store link on both breakpoints — one
+          more red pill above the cards only cost them height. */}
       <div
         className={`flex w-full flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl shadow-black/10 ring-1 ring-black/[0.04] transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${
-          fill ? 'h-full' : 'h-[20rem] sm:h-[22rem]'
+          fill ? 'h-full' : 'h-[24rem] sm:h-[26rem]'
         }`}
         style={{ animationDelay: '-2.6s' }}
       >
-        <div className="flex shrink-0 items-center justify-end px-3 pt-3 sm:px-5 sm:pt-4">
-          <BannerCta href={storeHref} label="Visit store" inline />
-        </div>
-
         {/* The cards' viewport. min-h-0 is load-bearing: without it a flex child
             refuses to shrink below its content and the track overflows. */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -162,7 +161,7 @@ export default function StoreBanner({ banner, height, fill = false }) {
             {slides.map((slide, i) => (
               <div
                 key={i}
-                className="flex h-full w-full shrink-0 items-stretch gap-2.5 px-3 py-2 sm:gap-4 sm:px-5 sm:py-3"
+                className="flex h-full w-full shrink-0 items-stretch gap-2.5 p-3 sm:gap-4 sm:p-5"
               >
                 {slide.map((p) => (
                   <ProductCard key={p.id} product={p} storeHref={storeHref} />
