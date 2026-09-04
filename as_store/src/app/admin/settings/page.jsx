@@ -427,35 +427,40 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
-      {/* Homepage — New arrivals (the first block on the homepage) */}
+      {/* Homepage — the first row, plus how deep every row runs. Which
+          categories get a row is set per-category in /admin/categories. */}
       <Section
-        title="Homepage — New arrivals"
-        badge={form.homeNew.enabled ? <Badge tone="green">Shown</Badge> : <Badge tone="gray">Hidden</Badge>}
-        summary={`“${form.homeNew.heading || 'New in.'}” · ${
-          { newest: 'newest arrivals', featured: 'featured products', category: 'one category' }[
-            form.homeNew.source
-          ] || form.homeNew.source
-        } · ${form.homeNew.count} products`}
+        title="Homepage"
+        badge={form.homeNew.enabled ? <Badge tone="green">First row on</Badge> : <Badge tone="gray">First row off</Badge>}
+        summary={`${form.homeNew.count} products per row · first row: ${
+          form.homeNew.enabled
+            ? `“${form.homeNew.heading || 'New in'}” (${
+                { newest: 'newest', featured: 'featured', category: 'one category' }[form.homeNew.source] ||
+                form.homeNew.source
+              })`
+            : 'hidden'
+        }`}
       >
+        <p className="text-sm text-admin-text/50">
+          The homepage is the products themselves — one row per category, under a small title, and
+          nothing else. Which categories get a row (and in what order) is the “Show on homepage”
+          toggle and the Sort value on each category, in{' '}
+          <span className="font-medium text-admin-text/70">Categories</span>. This page sets the row
+          above them and how many products every row holds.
+        </p>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-admin-text">Show the section</span>
+          <span className="text-sm font-semibold text-admin-text">Show the first row</span>
           <Toggle
             checked={form.homeNew.enabled}
             onChange={(v) => setNested('homeNew', 'enabled', v)}
             label={form.homeNew.enabled ? 'Shown' : 'Hidden'}
           />
         </div>
-        <p className="text-sm text-admin-text/50">
-          The first section on the homepage — a strip of products under the nav.
-        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Eyebrow" hint="Small label above the heading.">
-            <Input value={form.homeNew.eyebrow} onChange={(e) => setNested('homeNew', 'eyebrow', e.target.value)} placeholder="Just landed" />
+          <Field label="First row title" hint="The small title above it, e.g. “New in”.">
+            <Input value={form.homeNew.heading} onChange={(e) => setNested('homeNew', 'heading', e.target.value)} placeholder="New in" />
           </Field>
-          <Field label="Heading">
-            <Input value={form.homeNew.heading} onChange={(e) => setNested('homeNew', 'heading', e.target.value)} placeholder="New in." />
-          </Field>
-          <Field label="Show products from" hint="Which products to feature.">
+          <Field label="First row shows" hint="Which products lead the page.">
             <Select
               value={form.homeNew.source}
               onChange={(e) => setNested('homeNew', 'source', e.target.value)}
@@ -480,11 +485,11 @@ export default function SettingsPage() {
               </Select>
             </Field>
           )}
-          <Field label="How many to show">
+          <Field label="Products per row" hint="Applies to every row on the homepage (2–24).">
             <Input
               type="number"
               min={2}
-              max={12}
+              max={24}
               value={form.homeNew.count}
               onChange={(e) => setNested('homeNew', 'count', Number(e.target.value) || 8)}
             />

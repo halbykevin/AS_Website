@@ -34,6 +34,11 @@ export function resolveColumns(cols, width = 0) {
 
 const price = p => Number(p.price) || 0;
 const onSale = p => Boolean(p.oldPrice) && Number(p.oldPrice) > price(p);
+// "Call for price" products arrive with price === null. Left alone they read as
+// $0 — bottom of the price range, first under "Low to High", a match for any
+// price filter. They have no price, so they take no part in price arithmetic and
+// sort last under every order. Mirrors noPrice() in the web catalogFilters.
+const noPrice = p => Boolean(p.callForPrice) || p.price == null;
 
 // Unique categories present in the list, with a product count, sorted by name.
 export function categoryFacets(products) {
@@ -64,7 +69,7 @@ export function brandFacets(products) {
 
 // Min/max price across the list (rounded to whole units).
 export function priceBounds(products) {
-  const prices = products.map(price);
+  const prices = products.filter(p => !noPrice(p)).map(price);
   if (!prices.length) return { min: 0, max: 0 };
   return { min: Math.floor(Math.min(...prices)), max: Math.ceil(Math.max(...prices)) };
 }
@@ -107,6 +112,7 @@ export function buildCatalogIndex(products = []) {
       cat: (p.categorySlug || '').trim(),
       brand: slugify(p.brand),
       price: value,
+      noPrice: noPrice(p),
       sale: onSale(p),
       name: sortKey(p.name),
       id: Number(p.id) || 0
@@ -118,6 +124,9 @@ export function buildCatalogIndex(products = []) {
 function matches(r, cat, brand, min, max, sale) {
   if (cat && r.cat !== cat) return false;
   if (brand && r.brand !== brand) return false;
+  // A product with no price cannot satisfy a price range — saying it does would
+  // put an unpriced item inside "under $500".
+  if ((min != null || max != null) && r.noPrice) return false;
   if (min != null && r.price < min) return false;
   if (max != null && r.price > max) return false;
   if (sale && !r.sale) return false;
@@ -132,18 +141,21 @@ export function queryCatalog(index = [], { cat = '', brand = '', min = null, max
   for (let i = 0; i < index.length; i++) {
     if (matches(index[i], cat, brand, min, max, sale)) hits.push(index[i]);
   }
+  // Unpriced products go last under every order (the API already returns them
+  // last, so 'featured' needs no pass of its own).
+  const last = (a, b) => a.noPrice - b.noPrice;
   switch (sort) {
     case 'price-asc':
-      hits.sort((a, b) => a.price - b.price);
+      hits.sort((a, b) => last(a, b) || a.price - b.price);
       break;
     case 'price-desc':
-      hits.sort((a, b) => b.price - a.price);
+      hits.sort((a, b) => last(a, b) || b.price - a.price);
       break;
     case 'newest':
-      hits.sort((a, b) => b.id - a.id);
+      hits.sort((a, b) => last(a, b) || b.id - a.id);
       break;
     case 'name':
-      hits.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      hits.sort((a, b) => last(a, b) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
       break;
     default:
       break; // 'featured' — already in API order
@@ -167,6 +179,7 @@ export function applyFilters(products, { cat = '', brand = '', min = null, max =
   return products.filter(p => {
     if (cat && p.categorySlug !== cat) return false;
     if (brand && slugify(p.brand) !== brand) return false;
+    if ((min != null || max != null) && noPrice(p)) return false;
     if (min != null && price(p) < min) return false;
     if (max != null && price(p) > max) return false;
     if (sale && !onSale(p)) return false;
@@ -176,17 +189,18 @@ export function applyFilters(products, { cat = '', brand = '', min = null, max =
 
 export function sortProducts(products, sort) {
   const arr = [...products];
+  const then = cmp => arr.sort((a, b) => noPrice(a) - noPrice(b) || cmp(a, b));
   switch (sort) {
     case 'price-asc':
-      return arr.sort((a, b) => price(a) - price(b));
+      return then((a, b) => price(a) - price(b));
     case 'price-desc':
-      return arr.sort((a, b) => price(b) - price(a));
+      return then((a, b) => price(b) - price(a));
     case 'newest':
-      return arr.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+      return then((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
     case 'name':
-      return arr.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      return then((a, b) => String(a.name).localeCompare(String(b.name)));
     default:
-      return arr; // 'featured' / unknown -> keep API order
+      return then(() => 0); // 'featured' / unknown -> API order, unpriced last
   }
 }
 

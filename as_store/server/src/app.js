@@ -229,6 +229,7 @@ const categoryJson = (r) => ({
   sort: r.sort,
   visible: r.visible,
   showInNav: r.show_in_nav,
+  showOnHome: r.show_on_home,
 });
 
 const brandJson = (r) => ({
@@ -2231,8 +2232,8 @@ app.post(
     if (!name) return res.status(400).json({ error: "name is required" });
     const slug = (b.slug || "").trim() || slugify(name);
     const { rows } = await query(
-      `INSERT INTO categories (name, slug, tagline, image_url, parent_id, sort, visible, show_in_nav)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      `INSERT INTO categories (name, slug, tagline, image_url, parent_id, sort, visible, show_in_nav, show_on_home)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [
         name,
         slug,
@@ -2242,6 +2243,7 @@ app.post(
         b.sort ?? 0,
         b.visible ?? true,
         b.showInNav ?? false,
+        b.showOnHome ?? false,
       ],
     );
     res.status(201).json(categoryJson(rows[0]));
@@ -2268,6 +2270,7 @@ app.put(
          sort        = COALESCE($6, sort),
          visible     = COALESCE($7, visible),
          show_in_nav = COALESCE($8, show_in_nav),
+         show_on_home = COALESCE($11, show_on_home),
          parent_id   = CASE WHEN $10 THEN $9 ELSE parent_id END
        WHERE id = $1 RETURNING *`,
       [
@@ -2281,6 +2284,7 @@ app.put(
         b.showInNav ?? null,
         b.parentId ?? null,
         setsParent,
+        b.showOnHome ?? null,
       ],
     );
     if (!rows[0]) return res.status(404).json({ error: "Not found" });
@@ -2343,9 +2347,22 @@ app.get(
     const tokens = req.query.search
       ? pushSearchWhere(req.query.search, where, params)
       : [];
+    // Browse order puts "call for price" products last. They carry no price, so
+    // wherever a shopper is just looking at what we sell (shop all, a category,
+    // the homepage rows, the app) a wall of "Call for price" cards at the top is
+    // the worst possible opening — the priced catalog goes first and these
+    // follow. A search is ranked by relevance instead: someone who typed
+    // "iPad Pro" wants the iPad, priced or not. The admin list keeps its own
+    // (sort, id) order — staff sort their catalog by hand and a reshuffle there
+    // would just hide products they are looking for.
+    const browseOrder = req.admin
+      ? "p.sort, p.id"
+      : req.query.sort === "newest"
+        ? "p.call_for_price, p.id DESC"
+        : "p.call_for_price, p.sort, p.id";
     const orderBy = tokens.length
       ? `${pushSearchRank(tokens, params)}, ${SEARCH_TIEBREAK}`
-      : "p.sort, p.id";
+      : browseOrder;
     // ?images=all returns every product photo instead of just the first —
     // what the Google Merchant feed needs for additional_image_link.
     const select = req.query.images === "all" ? LIST_SELECT_GALLERY : LIST_SELECT;

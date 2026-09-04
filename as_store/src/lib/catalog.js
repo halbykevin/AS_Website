@@ -60,6 +60,26 @@ export async function loadAllProducts() {
   }
 }
 
+// One homepage row's products. The homepage is a stack of these, so each row
+// asks for only what it shows rather than the whole catalog: `category` pulls a
+// category *and its subcategories* (the API resolves the parent), `featured` the
+// starred products, `sort: 'newest'` the newest first. Every row inherits the
+// API's browse order, which keeps "call for price" products at the end.
+export async function loadRowProducts({ category = '', featured = false, sort = '', limit = 24 } = {}) {
+  const qs = new URLSearchParams()
+  if (category) qs.set('category', category)
+  if (featured) qs.set('featured', '1')
+  if (sort) qs.set('sort', sort)
+  qs.set('limit', String(Math.max(1, Number(limit) || 24)))
+  try {
+    const res = await fetch(`${API}/api/products?${qs}`, STORE_CACHE)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 // Every visible product *with its full gallery* — what the Google Merchant feed
 // reads (app/google-merchant.xml). Separate from loadAllProducts() rather than a
 // flag on it because the two want different things: the storefront grids need

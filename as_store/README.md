@@ -45,6 +45,7 @@ src/
     products.js       # mock catalog + hero/showcase/bento content + async getProducts()
     queries.js        # React Query hook (useProducts)
   components/
+    home/HomeRow.jsx  # one homepage row: small category title + a rail of ProductTiles
     Nav.jsx           # slim translucent-dark nav; mobile full-screen menu
     Hero.jsx          # centered hero, staggered entrance
     PinnedShowcase.jsx# pinned scroll-zoom flagship (useScroll/useTransform)
@@ -55,6 +56,21 @@ src/
     Footer.jsx        # Apple-style light-gray footer
     Icon.jsx          # inline SVG icons
 ```
+
+## The homepage
+
+The homepage is the products themselves: one horizontal rail per category, each under a small
+title, between the nav and the footer. Nothing else — no hero, no marketing panels.
+
+- **Which categories get a row** is per category, in **Categories → Show on homepage**, and they
+  appear in that page's Sort order. A department pulls in its subcategories' products too. Tick
+  none and the homepage falls back to the first few categories, so it is never blank.
+- **The row above them** (newest arrivals, featured, or one category) and **how many products every
+  row holds** are in **Settings → Homepage**.
+- Rows are server-rendered from the live catalogue — the products are in the HTML, so they are
+  visible to Google and there is no spinner. Only the sideways scrolling is client-side.
+- A product with no photo is skipped rather than shown as an empty card, so a row asks the API for
+  more products than it shows.
 
 ## Daily Spin
 
@@ -87,8 +103,11 @@ price disappears from the storefront and the app, and a WhatsApp button takes it
   admin, so it is absent from the page, the app, the JSON and the data Google reads.
 - **These products can't be bought.** Add to Bag is replaced everywhere, and checkout refuses them
   even if one is still sitting in an old bag — the customer is told which item and why.
-- They also drop out of price filters and sort to the end of "Price: Low to High", because they have
-  no price to compare.
+- They also drop out of price filters, and **sort last everywhere you browse** — Shop all, a
+  category, the homepage rows, every sort option, and the app. They have no price, so left in place
+  they read as $0: first under "Price: Low to High" and a wall of "Call for price" cards at the top
+  of the catalogue. A *search* still ranks by relevance — someone who typed "iPad Pro" wants the
+  iPad, priced or not — and the admin's own product list keeps the order you sorted it into.
 
 ## AS Wallet
 

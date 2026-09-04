@@ -124,19 +124,25 @@ export function paginate(products, page, perPage = PAGE_SIZE) {
   }
 }
 
+// Unpriced products go last under EVERY sort, not only the price ones: they are
+// not the cheapest, not the newest worth leading with, and not an A. The API
+// orders them last for the same reason (see browseOrder in server/src/app.js) —
+// this keeps that true after the client re-sorts. Array.prototype.sort is
+// stable, so within each group the chosen order is untouched.
 export function sortProducts(products, sort) {
   const arr = [...products]
+  const then = (cmp) => arr.sort((a, b) => noPrice(a) - noPrice(b) || cmp(a, b))
   switch (sort) {
-    // Unpriced products go last in both directions — they are not "cheapest".
     case 'price-asc':
-      return arr.sort((a, b) => noPrice(a) - noPrice(b) || price(a) - price(b))
+      return then((a, b) => price(a) - price(b))
     case 'price-desc':
-      return arr.sort((a, b) => noPrice(a) - noPrice(b) || price(b) - price(a))
+      return then((a, b) => price(b) - price(a))
     case 'newest':
-      return arr.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
+      return then((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
     case 'name':
-      return arr.sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      return then((a, b) => String(a.name).localeCompare(String(b.name)))
     default:
-      return arr // 'featured' / unknown -> keep API order (sort, id)
+      // 'featured' / unknown -> keep API order (sort, id), unpriced last.
+      return then(() => 0)
   }
 }

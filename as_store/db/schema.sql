@@ -24,12 +24,15 @@ CREATE TABLE IF NOT EXISTS categories (
   sort        INTEGER DEFAULT 0,
   visible     BOOLEAN DEFAULT true,        -- shown publicly at all
   show_in_nav BOOLEAN DEFAULT false,       -- featured in the top navigation menu
+  show_on_home BOOLEAN DEFAULT false,      -- gets its own row of products on the homepage
   created_at  TIMESTAMPTZ DEFAULT now(),
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
 -- Backfill the nav flag on databases created before it existed.
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_in_nav BOOLEAN DEFAULT false;
+-- Backfill the homepage flag (which categories get a row on the homepage).
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_on_home BOOLEAN DEFAULT false;
 -- Backfill the parent link (subcategories) on older databases.
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);

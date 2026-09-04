@@ -11,7 +11,7 @@ import { adminApi } from '@/lib/adminApi'
 const slugify = (s) =>
   String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', parentId: null, sort: 0, visible: true, showInNav: false }
+const BLANK = { name: '', slug: '', tagline: '', imageUrl: '', parentId: null, sort: 0, visible: true, showInNav: false, showOnHome: false }
 
 // Flatten the flat category list into display order: each department followed by
 // its subcategories (depth 1). Categories whose parent is missing render as
@@ -123,6 +123,7 @@ export default function CategoriesPage() {
                 </div>
                 {depth === 0 && <Badge tone="gray">Department</Badge>}
                 {c.showInNav && <Badge tone="brand">In menu</Badge>}
+                {c.showOnHome && <Badge tone="brand">On homepage</Badge>}
                 {c.visible ? <Badge tone="green">Visible</Badge> : <Badge tone="gray">Hidden</Badge>}
                 <div className="flex items-center gap-1">
                   <button
@@ -217,6 +218,7 @@ function CategoryModal({ category, categories = [], onClose, onSaved }) {
       sort: Number(form.sort) || 0,
       visible: form.visible,
       showInNav: form.showInNav,
+      showOnHome: form.showOnHome,
     }
     try {
       if (editing) await adminApi.updateCategory(category.id, payload)
@@ -314,9 +316,15 @@ function CategoryModal({ category, categories = [], onClose, onSaved }) {
           <div className="pt-6">
             <Toggle checked={form.showInNav} onChange={(v) => set('showInNav', v)} label="Show in menu" />
           </div>
+          <div className="pt-6">
+            <Toggle checked={form.showOnHome} onChange={(v) => set('showOnHome', v)} label="Show on homepage" />
+          </div>
         </div>
         <p className="text-xs text-admin-text/45">
-          “Show in menu” features this category in the top navigation. Order follows the Sort value.
+          “Show in menu” features this category in the top navigation. “Show on homepage” gives it its
+          own row of products on the storefront homepage — a department also pulls in its
+          subcategories’ products. Both orders follow the Sort value. Until at least one category is
+          ticked, the homepage falls back to the first few categories.
         </p>
       </div>
     </Modal>
