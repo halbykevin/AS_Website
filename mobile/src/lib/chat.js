@@ -43,17 +43,34 @@ export async function askAssistant(history) {
   if (!messages.length) throw new Error('Say something first.');
 
   // A model call can be slow; it should not be able to hang the screen forever.
-  const res = await fetch(`${STORE_WEB_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
-    signal: AbortSignal.timeout(TIMEOUT_MS)
-  }).catch(err => {
-    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
-      throw new Error('That took too long. Try asking again.');
-    }
+  //
+  // AbortController + a timer, NOT AbortSignal.timeout(): React Native ships an
+  // AbortController polyfill but no `timeout` static (a 2022 addition to the web
+  // spec that never reached it), so calling it is "undefined is not a function"
+  // the moment you hit send. Anything newer than fetch itself has to be checked
+  // against Hermes before it goes in here.
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(`${STORE_WEB_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal
+    });
+  } catch {
+    // An abort we caused reads as a timeout; anything else is the network.
+    if (timedOut) throw new Error('That took too long. Try asking again.');
     throw new Error("Can't reach the assistant. Check your connection.");
-  });
+  } finally {
+    clearTimeout(timer);
+  }
 
   let data = null;
   try {
