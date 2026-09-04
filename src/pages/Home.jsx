@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useReducedMotion } from 'framer-motion'
 import BannerCta from '../components/BannerCta.jsx'
 import TicketingPanel from '../components/TicketingPanel.jsx'
-import HorizontalStory from '../components/HorizontalStory.jsx'
+import StoreBanner from '../components/StoreBanner.jsx'
 import { useContent } from '../store/content.jsx'
 
 // Smooth shadow + a gentle "clickable" breathing pulse (pauses on hover, off for
@@ -19,18 +19,20 @@ export function stripStyle(bannerHeight) {
 }
 
 // Homepage landing: three softly-rounded panels.
-//  • Mobile — stacked vertically, each at the admin-set 16:N aspect ratio.
+//  • Mobile — stacked vertically. The events and What We Do strips take the
+//    admin-set 16:N aspect ratio; the store slideshow sets its own (taller) one,
+//    because product cards don't fit in a letterbox.
 //  • Desktop (md+) — a bento grid so all three are visible at once: the Events
 //    banner takes the tall left column, with the Store slideshow and What We Do
 //    stacked on the right.
 export default function Home() {
-  const { story, services, bannerHeight } = useContent()
+  const { storeBanner, services, bannerHeight } = useContent()
 
   return (
     <>
       {/* Mobile: stacked strips (unchanged) */}
       <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5 md:hidden">
-        <HorizontalStory story={story} height={bannerHeight} />
+        <StoreBanner banner={storeBanner} height={bannerHeight} />
         <TicketingPanel height={bannerHeight} />
         <WhatWeDoSection services={services} height={bannerHeight} />
       </div>
@@ -41,7 +43,7 @@ export default function Home() {
         <div className="grid min-h-[26rem] flex-1 grid-cols-3 grid-rows-2 gap-5">
           {/* Store slideshow — tall spotlight on the left */}
           <div className="col-span-2 row-span-2 min-h-0">
-            <HorizontalStory story={story} height={bannerHeight} fill />
+            <StoreBanner banner={storeBanner} height={bannerHeight} fill />
           </div>
           {/* Events banner — top right */}
           <div className="min-h-0">

@@ -205,12 +205,38 @@ and [mobile/src/lib/callForPrice.js](mobile/src/lib/callForPrice.js).
   `code: 'call_for_price'`, naming the product. That is the real guard: the storefront hides Add to
   Bag, but a bag saved before the flag was set still arrives at checkout.
 - Price arithmetic must skip these: `productJsonLd` omits the Offer price (else Google keeps
-  advertising it), and `catalogFilters.js` + the API's `minPrice/maxPrice` exclude them from ranges
-  and sort them last — a null price otherwise reads as $0 and wins "Price: Low to High".
+  advertising it), and `catalogFilters.js` + the API's `minPrice/maxPrice` exclude them from ranges —
+  a null price otherwise reads as $0 and wins "Price: Low to High".
+- **They sort last everywhere you browse.** `browseOrder` in the store API (`p.call_for_price` first
+  in the ORDER BY) covers the shop, categories, the homepage rows and the app in one place, and
+  `sortProducts` in both `catalogFilters.js` (web **and** mobile) keeps it true after a client-side
+  re-sort. Two deliberate exceptions: a **search** ranks by relevance (someone who typed "iPad Pro"
+  wants the iPad, priced or not), and the **admin** list keeps its own `(sort, id)` order — staff
+  arrange their catalog by hand and a reshuffle there only hides what they are looking for.
 - Marking is manual: a toggle in the product editor and a bulk **Call for price / Show price** pair
   in the admin products list (`PUT /api/products/bulk/call-for-price`), so filtering to Apple →
   Laptops and flipping all of them is one click. Nothing is automatic — a brand rule would hide
   prices on scraper-imported products nobody has looked at yet.
+
+## AS Store homepage (store + admin)
+
+The storefront homepage is the products themselves — one horizontal rail per category under a small
+title, between the nav and the footer, and nothing else. The hero, marketing acts and scroll
+choreography that used to fill it are gone
+([src/app/(store)/page.jsx](as_store/src/app/(store)/page.jsx) +
+[home/HomeRow.jsx](as_store/src/components/home/HomeRow.jsx)).
+
+- **The admin picks the categories**: `categories.show_on_home` (a toggle in `/admin/categories`,
+  ordered by the same `sort` as the rest), the twin of `show_in_nav`. A department's row includes its
+  subcategories' products, because the API's `?category=` already resolves the parent. With nothing
+  ticked the page falls back to the first few categories — a fresh install still has a homepage.
+- **The first row** (newest / featured / one category) and **how many products every row holds** are
+  `settings.homeNew` in `/admin/settings` → Homepage.
+- **Each row asks for only what it shows** (`loadRowProducts` → `/api/products?category=&limit=`),
+  server-rendered — the homepage no longer pulls the whole 1,400-product catalog to slice eight
+  products off it. Products with no photo are skipped, so a row over-fetches to fill.
+- `?sort=newest` on `/api/products` exists for the "newest arrivals" row; every browse order already
+  puts "call for price" products last (see above).
 
 ## Catalog sync (store)
 
@@ -351,6 +377,11 @@ name/slug/image/sort/visible; events filter by them on the site),
 active, plus an optional `event_id` → the banner borrowed that event's image/title/link, resolved
 client-side in `lib/api.js`),
 `sections` (admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
+`store_banner` (single row, id=1: the homepage AS Store slideshow — enabled/`mode` `random|specific`/
+`per_slide`/`count`/`product_ids` JSONB. Settings only: the products themselves are read live from the
+AS Store API, never copied here),
+`story` + `story_panels` (**retained, no longer rendered** — the image slideshow the store banner
+replaced),
 `popup` (single row, id=1: a one-time announcement/ad popup —
 enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
 `delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
@@ -527,13 +558,13 @@ src/
   store/content.jsx        # ContentProvider + useContent()
   lib/flags.js              # country list + flagcdn.com flag URLs (national-team rounds)
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
-  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreShowcase, HorizontalStory, SitePopup
+  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, BannerCta, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
     components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
-    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreAdmin, StoryAdmin, PopupAdmin, PredictorAdmin, WheelAdmin, MessagesAdmin, ScraperAdmin
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreBannerAdmin, PopupAdmin, PredictorAdmin, WheelAdmin, MessagesAdmin, ScraperAdmin
 public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
 tailwind.config.js          # brand colors, Inter font, animations
 ```
@@ -541,12 +572,12 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Env
 
 - Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 
 Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store`, `/admin/story`, `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
 at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles
@@ -563,7 +594,29 @@ have competed with that. The `banners` table and `/admin/banners` are **retained
 rendered** (like `reservations`) — the page carries a warning saying so, and the slideshow can be
 restored by putting a carousel back in that panel.
 
-The homepage opens with an admin-managed **horizontal story** (`story` + `story_panels` tables → `components/HorizontalStory.jsx`, edited at `/admin/story`): a self-playing, fixed-height showcase whose panels auto-advance on a timer and travel horizontally in a loop (pauses on hover, clickable dots, typewriter heading on the active panel). Reduced-motion users get a static swipe carousel instead. Hidden until enabled with ≥1 visible panel. It is followed on the homepage by the events **TicketingPanel**, then the **Hero** (whose editable copy is the "Powering connection across Lebanon since 2008…" text), then the rest of the sections.
+The homepage's **store panel** ([components/StoreBanner.jsx](src/components/StoreBanner.jsx), edited at
+`/admin/store-banner`) is a **slideshow of real AS Store products** — two or three cards at a time,
+each opening that product on `store.as.com.lb`. The cards carry a brand, a name, a line of copy and
+the photo, and **never a price**: prices move (sales, the catalog sync, "call for price" lines), the
+store is the one place they are quoted, and a figure printed on the marketing site is a promise this
+site would then have to keep true.
+
+The products are **not copied into this site's database**. `store_banner` (singleton) holds only the
+choice — `mode` `random` (a fresh sample per visit) or `specific` (`product_ids`, in the admin's
+order) plus `per_slide` — and `GET /api/store-banner` fills it in from the AS Store's own API,
+server-to-server via **`STORE_API_URL`** (5-minute in-memory cache, last-good copy kept on failure;
+`http://127.0.0.1:10001` on the VPS, *not* 8081). Going through this API rather than letting the
+browser call the store keeps the site on one origin — no second base URL on Vercel, no cross-domain
+CORS entry on the store API. With no products resolvable the panel falls back to the AS Store logo,
+which is also what a wrong `STORE_API_URL` looks like — the API logs a warning naming the URL it
+tried. `/admin/store-banner` searches the live store catalog to pick products, so there is nothing to
+upload and a product renamed or hidden in the store is renamed or gone here too.
+
+> This replaced the admin-uploaded **image slideshow** (`story` + `story_panels` → `HorizontalStory.jsx`,
+> `/admin/story`). The component and its admin page are deleted and the site no longer fetches either
+> endpoint; the **tables and their `/api/story*` routes are retained** (like `banners` and
+> `reservations`) so the uploaded panels are still there if that idea ever comes back. `/admin/story`
+> now redirects to the new page so old bookmarks still work.
 
 ## Brand
 

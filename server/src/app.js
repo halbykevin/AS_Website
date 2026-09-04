@@ -95,6 +95,14 @@ const storeProductJson = (r) => ({
   id: r.id, name: r.name, imageUrl: r.image_url, linkUrl: r.link_url,
   sort: r.sort, visible: r.visible,
 })
+const storeBannerJson = (r) => ({
+  enabled: r.enabled !== false,
+  mode: r.mode === 'specific' ? 'specific' : 'random',
+  perSlide: Number(r.per_slide) || 3,
+  count: Number(r.count) || 12,
+  productIds: Array.isArray(r.product_ids) ? r.product_ids : [],
+})
+
 const storyJson = (r) => ({
   enabled: r.enabled, eyebrow: r.eyebrow, heading: r.heading,
   subheading: r.subheading, updatedAt: r.updated_at,
@@ -490,6 +498,144 @@ app.put('/api/store-products/:id', requireAuth, ah(async (req, res) => {
 app.delete('/api/store-products/:id', requireAuth, ah(async (req, res) => {
   await query('DELETE FROM store_products WHERE id=$1', [req.params.id])
   res.status(204).end()
+}))
+
+// ========================= AS Store banner =========================
+// The homepage's store panel is a slideshow of REAL AS Store products. Those
+// live in the store's own database behind its own API (same VPS, port 8081), so
+// this API keeps no copy of them: it reads the store's public catalog through
+// STORE_API_URL and holds the mapped-down result in memory for a few minutes.
+// A copy would be a second catalog to keep in step, and a banner is the last
+// place you want a product that was renamed, hidden or delisted last week.
+//
+// Going through this API rather than letting the browser call the store
+// directly keeps the website on one origin: no second base URL to configure on
+// Vercel, and no cross-domain CORS entry to remember on the store API the day
+// as.com.lb moves.
+const STORE_API = (process.env.STORE_API_URL || 'http://localhost:8081').replace(/\/$/, '')
+const CATALOG_TTL = 5 * 60 * 1000
+
+let catalogCache = { at: 0, rows: null, promise: null }
+
+// The banner card carries a brand, a name, a one-line teaser and a photo — and
+// deliberately NO price. The store is where prices are quoted; a price on the
+// marketing site is a promise this site would then have to keep true.
+const teaserOf = (p) => {
+  const body = String(p.description || '')
+    .split(/\n{2,}/)
+    .map((b) => b.trim())
+    .find((b) => b && !b.startsWith('#') && !b.startsWith('-') && !b.startsWith('*'))
+  const text = (body || p.tagline || '').replace(/[*_`]/g, '').trim()
+  return text.length > 140 ? `${text.slice(0, 137).trimEnd()}…` : text
+}
+
+const bannerProduct = (p) => ({
+  id: p.id,
+  slug: p.slug || '',
+  name: p.name || '',
+  brand: p.brand || '',
+  teaser: teaserOf(p),
+  image: p.image || '',
+})
+
+async function storeCatalog() {
+  const fresh = catalogCache.rows && Date.now() - catalogCache.at < CATALOG_TTL
+  if (fresh) return catalogCache.rows
+  // One in-flight refresh at a time — the homepage is the most-hit route on the
+  // site and a cold cache would otherwise fire a request per visitor.
+  if (catalogCache.promise) return catalogCache.promise
+  catalogCache.promise = (async () => {
+    try {
+      const r = await fetch(`${STORE_API}/api/products`, { signal: AbortSignal.timeout(8000) })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const list = await r.json()
+      // A card with no photo is a hole in the slideshow.
+      const rows = (Array.isArray(list) ? list : []).filter((p) => p.image).map(bannerProduct)
+      catalogCache = { at: Date.now(), rows, promise: null }
+      return rows
+    } catch (err) {
+      // Keep serving the last good copy: a store hiccup should not blank the
+      // homepage. With nothing cached the banner falls back to the AS Store
+      // logo — which is also what a wrong STORE_API_URL looks like from the
+      // outside, so say so here rather than failing silently.
+      console.warn(`[store-banner] could not read the AS Store catalog from ${STORE_API}: ${err.message}`)
+      catalogCache = { ...catalogCache, promise: null }
+      return catalogCache.rows || []
+    }
+  })()
+  return catalogCache.promise
+}
+
+app.get('/api/store-banner', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM store_banner WHERE id = 1')
+  const cfg = storeBannerJson(rows[0] || {})
+  if (!cfg.enabled) return res.json({ ...cfg, products: [] })
+
+  const catalog = await storeCatalog()
+  let products
+  if (cfg.mode === 'specific') {
+    // Exactly what the admin picked, in their order. A product they chose that
+    // the store has since hidden simply drops out — never silently replaced by
+    // another one, or the banner would stop being what they picked.
+    const byId = new Map(catalog.map((p) => [String(p.id), p]))
+    products = cfg.productIds.map((id) => byId.get(String(id))).filter(Boolean)
+  } else {
+    // A fresh sample per visit, so the homepage isn't the same four products
+    // every time someone comes back.
+    const pool = [...catalog]
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    products = pool.slice(0, cfg.count)
+  }
+  res.json({ ...cfg, products })
+}))
+
+app.put('/api/store-banner', requireAuth, ah(async (req, res) => {
+  const b = req.body || {}
+  const ids = Array.isArray(b.productIds)
+    ? [...new Set(b.productIds.map((v) => Number(v)).filter((n) => Number.isFinite(n)))].slice(0, 40)
+    : []
+  const { rows } = await query(
+    `UPDATE store_banner SET
+       enabled=$1, mode=$2, per_slide=$3, count=$4, product_ids=$5, updated_at=now()
+     WHERE id = 1 RETURNING *`,
+    [
+      b.enabled === undefined ? true : Boolean(b.enabled),
+      b.mode === 'specific' ? 'specific' : 'random',
+      Math.min(4, Math.max(1, Number(b.perSlide) || 3)),
+      Math.min(40, Math.max(1, Number(b.count) || 12)),
+      JSON.stringify(ids),
+    ]
+  )
+  res.json(storeBannerJson(rows[0]))
+}))
+
+// The admin's product picker: the store catalog, searchable. Filtered here from
+// the same cached copy the banner uses, so typing in the picker costs the store
+// API nothing.
+app.get('/api/store-banner/catalog', requireAuth, ah(async (req, res) => {
+  const catalog = await storeCatalog()
+  // ?ids= resolves the admin's saved picks back into products, in their order,
+  // whichever mode the banner is in — the picker has to show what was chosen
+  // even while the live banner is running in random mode.
+  if (req.query.ids !== undefined) {
+    const byId = new Map(catalog.map((p) => [String(p.id), p]))
+    const products = String(req.query.ids)
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+    return res.json({ total: products.length, products })
+  }
+  const q = String(req.query.search || '').trim().toLowerCase()
+  const list = q
+    ? catalog.filter((p) => `${p.name} ${p.brand}`.toLowerCase().includes(q))
+    : catalog
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60))
+  res.json({ total: list.length, products: list.slice(0, limit) })
 }))
 
 // ========================= Story (horizontal scroll) =========================

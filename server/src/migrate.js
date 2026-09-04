@@ -133,6 +133,23 @@ CREATE TABLE IF NOT EXISTS store_products (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- AS Store banner (the homepage store panel): a singleton row of settings only.
+-- The products themselves are NOT copied here — they are read live from the AS
+-- Store's own API (STORE_API_URL) so the banner can never advertise a product
+-- the store has renamed, repriced or stopped selling. mode = 'random' (a fresh
+-- sample of the catalog on every visit) or 'specific' (exactly the products in
+-- product_ids, in that order).
+CREATE TABLE IF NOT EXISTS store_banner (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN DEFAULT true,
+  mode TEXT DEFAULT 'random',
+  per_slide INTEGER DEFAULT 3,
+  count INTEGER DEFAULT 12,
+  product_ids JSONB DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT store_banner_singleton CHECK (id = 1)
+);
+
 -- Horizontal scroll-story: a singleton row of section copy + ordered panels
 -- (each a heading + image) shown in the pinned horizontal-scroll homepage hero.
 CREATE TABLE IF NOT EXISTS story (
@@ -439,6 +456,9 @@ INSERT INTO store_showcase (id, enabled, eyebrow, heading, subheading, visible_c
 VALUES (1, true, 'AS Store', 'A glimpse of the AS Store',
   'The latest tech, gadgets and accessories — launching soon.', 8)
 ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the singleton store-banner row exists (random mode, 3 across).
+INSERT INTO store_banner (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 -- Ensure the singleton story row exists (no panels yet, so it stays hidden).
 INSERT INTO story (id, enabled, eyebrow, heading, subheading)

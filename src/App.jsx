@@ -25,7 +25,7 @@ const WhatWeDoAdmin = lazy(() => import('./admin/pages/WhatWeDoAdmin.jsx'))
 const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
 const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
-const StoryAdmin = lazy(() => import('./admin/pages/StoryAdmin.jsx'))
+const StoreBannerAdmin = lazy(() => import('./admin/pages/StoreBannerAdmin.jsx'))
 const ScraperAdmin = lazy(() => import('./admin/pages/ScraperAdmin.jsx'))
 const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 const PredictorAdmin = lazy(() => import('./admin/pages/PredictorAdmin.jsx'))
@@ -79,7 +79,10 @@ export default function App() {
               <Route path="what-we-do" element={<WhatWeDoAdmin />} />
               <Route path="events" element={<EventsAdmin />} />
               <Route path="categories" element={<CategoriesAdmin />} />
-              <Route path="story" element={<StoryAdmin />} />
+              <Route path="store-banner" element={<StoreBannerAdmin />} />
+              {/* The store panel used to be an uploaded image slideshow edited
+                  here; keep the old path working for anyone's bookmark. */}
+              <Route path="story" element={<StoreBannerAdmin />} />
               <Route path="popup" element={<PopupAdmin />} />
               <Route path="predictor" element={<PredictorAdmin />} />
               <Route path="wheel" element={<WheelAdmin />} />

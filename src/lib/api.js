@@ -85,7 +85,9 @@ export const defaultContent = {
   sections: [],
   categories: [],
   popup: null,
-  story: null,
+  // The homepage's AS Store panel: settings + the products it is showing right
+  // now, resolved by the API from the store's own catalog (see StoreBanner).
+  storeBanner: null,
   predictor: null,
   published: false,
   bannerHeight: 6,
@@ -336,25 +338,26 @@ function mapStoreShowcase(meta, products) {
   }
 }
 
-export function mapStoryPanel(p) {
-  return {
-    id: p.id,
-    image: p.imageUrl || '',
-    visible: p.visible !== false,
-    focalX: p.focalX === undefined || p.focalX === null ? 50 : Number(p.focalX),
-    focalY: p.focalY === undefined || p.focalY === null ? 50 : Number(p.focalY),
-  }
-}
-
-// The homepage image slideshow: its ordered, visible panels. Every slide opens
-// the AS Store coming-soon page. Hidden (null) unless enabled with at least one
-// visible panel that has an image.
-function mapStory(meta, panels) {
-  const list = Array.isArray(panels)
-    ? panels.map(mapStoryPanel).filter((p) => p.visible && p.image)
+// The homepage store banner. The API has already resolved which products to
+// show (random sample or the admin's picks) — this only shapes them for the
+// card. No price field is mapped because the API never sends one: the banner
+// invites people into the store, it does not quote.
+export function mapStoreBanner(b) {
+  if (!b || b.enabled === false) return null
+  const products = Array.isArray(b.products)
+    ? b.products
+        .filter((p) => p.image)
+        .map((p) => ({
+          id: p.id,
+          slug: p.slug || '',
+          name: p.name || '',
+          brand: p.brand || '',
+          teaser: p.teaser || '',
+          image: p.image || '',
+        }))
     : []
-  if (!meta || meta.enabled === false || list.length === 0) return null
-  return { panels: list }
+  if (!products.length) return null
+  return { perSlide: Math.min(4, Math.max(1, Number(b.perSlide) || 3)), products }
 }
 
 export function mapSolution(s) {
@@ -488,7 +491,7 @@ export function whatsappContactUrl(number, fallbackLink, message) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storyMeta, storyPanels, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storeBanner, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
       await Promise.all([
         request('/api/settings'),
         request('/api/services'),
@@ -499,8 +502,7 @@ export async function loadSite() {
         request('/api/popup').catch(() => null),
         request('/api/store-showcase').catch(() => null),
         request('/api/store-products').catch(() => []),
-        request('/api/story').catch(() => null),
-        request('/api/story-panels').catch(() => []),
+        request('/api/store-banner').catch(() => null),
         request('/api/what-we-do').catch(() => null),
         request('/api/solutions').catch(() => []),
         request('/api/predictor').catch(() => null),
@@ -528,7 +530,7 @@ export async function loadSite() {
     content.categories = Array.isArray(categories) ? categories.map(mapCategory).filter((c) => c.visible) : []
     content.popup = mapPopup(popup)
     content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
-    content.story = mapStory(storyMeta, storyPanels)
+    content.storeBanner = mapStoreBanner(storeBanner)
     content.predictor = mapPredictor(predictorMeta, predictorMatches)
     content.whatWeDo = mapWhatWeDo(whatWeDoMeta)
     // Solutions from the DB (visible only); fall back to the static defaults so
@@ -585,17 +587,18 @@ export const adminApi = {
 
   getStoreShowcase: () => request('/api/store-showcase'),
   saveStoreShowcase: (data) => request('/api/store-showcase', { method: 'PUT', body: data, authed: true }),
+  getStoreBanner: () => request('/api/store-banner'),
+  saveStoreBanner: (data) => request('/api/store-banner', { method: 'PUT', body: data, authed: true }),
+  storeBannerCatalog: (search = '', limit = 60) =>
+    request(`/api/store-banner/catalog?search=${encodeURIComponent(search)}&limit=${limit}`, { authed: true }),
+  storeBannerProductsByIds: (ids = []) =>
+    request(`/api/store-banner/catalog?ids=${ids.join(',')}`, { authed: true }),
+
   listStoreProducts: () => request('/api/store-products'),
   createStoreProduct: (data) => request('/api/store-products', { method: 'POST', body: data, authed: true }),
   updateStoreProduct: (id, data) => request(`/api/store-products/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteStoreProduct: (id) => request(`/api/store-products/${id}`, { method: 'DELETE', authed: true }),
 
-  getStory: () => request('/api/story'),
-  saveStory: (data) => request('/api/story', { method: 'PUT', body: data, authed: true }),
-  listStoryPanels: () => request('/api/story-panels'),
-  createStoryPanel: (data) => request('/api/story-panels', { method: 'POST', body: data, authed: true }),
-  updateStoryPanel: (id, data) => request(`/api/story-panels/${id}`, { method: 'PUT', body: data, authed: true }),
-  deleteStoryPanel: (id) => request(`/api/story-panels/${id}`, { method: 'DELETE', authed: true }),
 
   getWhatWeDo: () => request('/api/what-we-do'),
   saveWhatWeDo: (data) => request('/api/what-we-do', { method: 'PUT', body: data, authed: true }),

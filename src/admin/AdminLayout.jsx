@@ -9,7 +9,7 @@ const links = [
   { to: '/admin/what-we-do', label: 'What We Do' },
   { to: '/admin/events', label: 'Events' },
   { to: '/admin/categories', label: 'Categories' },
-  { to: '/admin/story', label: 'Store Slideshow' },
+  { to: '/admin/store-banner', label: 'Store Slideshow' },
   { to: '/admin/popup', label: 'Popup' },
   { to: '/admin/predictor', label: 'Guess the Score' },
   { to: '/admin/wheel', label: 'Lucky Draw' },
