@@ -345,8 +345,15 @@ export default function SeatMap({ event, whatsappNumber }) {
                     <div className="mb-2 rounded-md bg-as-ink py-1 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-white/80">
                       Stage
                     </div>
+                    {/* Centred, not left-aligned. A theatre fans out — this
+                        hall runs 25 seats at the front to 47 at the back — and
+                        pinning every row to the left renders it as a staircase
+                        sliding to one side, with the two aisles smeared into
+                        diagonals. The box office centres each row (align=
+                        "Center" on every row's table) and so must we, or the
+                        drawing is not the room. */}
                     {rows.map((row) => (
-                      <div key={row.id} className="flex items-center" style={{ height: ROW }}>
+                      <div key={row.id} className="flex items-center justify-center" style={{ height: ROW }}>
                         <span
                           className="shrink-0 text-right text-[10px] font-semibold text-as-charcoal/40"
                           style={{ width: LABEL - 6, paddingRight: 6 }}

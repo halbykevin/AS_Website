@@ -40,10 +40,16 @@ function parseColor(style) {
 // zone-and-quantity choice when there is no seat grid to draw.
 function parseZones(html) {
   const byIndex = new Map()
-  const re = /ListofZones_ctl(\d+)_(\w+)"[^>]*?(?:value="([^"]*)")?[^>]*>([\s\S]{0,400}?)</gi
+  // The whole attribute blob, then `value` out of it — NOT an optional
+  // `(?:value="…")?` inside a lazy run, which never matches: the engine takes
+  // the shortest path and skips the optional group every time, so every hidden
+  // field read back as "" and `HiddenInStockServerSide !== '0'` was true for a
+  // sold-out zone as readily as an open one.
+  const re = /ListofZones_ctl(\d+)_(\w+)"([^>]*)>([\s\S]{0,400}?)</gi
   let m
   while ((m = re.exec(html))) {
-    const [, idx, field, value, text] = m
+    const [, idx, field, attrs, text] = m
+    const value = (attrs.match(/\bvalue="([^"]*)"/i) || [])[1]
     const rec = byIndex.get(idx) || {}
     rec[field] = (value ?? text ?? '').replace(/<[^>]*>/g, '').trim()
     byIndex.set(idx, rec)
