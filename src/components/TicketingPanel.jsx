@@ -1,4 +1,6 @@
-import EventsLink from './EventsLink.jsx'
+import EventsLink, { eventsHref } from './EventsLink.jsx'
+import BannerCta from './BannerCta.jsx'
+import { useContent } from '../store/content.jsx'
 
 // The events panel on the homepage: the AS Ticketing Hub logo, and nothing
 // else. Tapping it opens the ticketing platform (settings.ticketingUrl, or
@@ -14,6 +16,7 @@ import EventsLink from './EventsLink.jsx'
 // desktop bento cell's height instead of imposing its own ratio.
 export default function TicketingPanel({ height, fill = false }) {
   const ratio = Number(height) > 0 ? Number(height) : 6
+  const { ticketingUrl } = useContent()
 
   return (
     <section aria-label="Events" className={`relative w-full ${fill ? 'h-full' : ''}`}>
@@ -37,6 +40,12 @@ export default function TicketingPanel({ height, fill = false }) {
           fetchPriority="high"
         />
       </EventsLink>
+
+      {/* Says outright where the panel goes — the twin of the store banner's
+          "Visit store". A sibling of the panel link, never a child: an <a>
+          inside an <a> is invalid and the browser un-nests it. Same tab, like
+          every other events link (see EventsLink). */}
+      <BannerCta href={eventsHref(ticketingUrl)} label="View events" newTab={false} />
     </section>
   )
 }

@@ -119,9 +119,9 @@ export default function StoreBanner({ banner, height, fill = false }) {
   if (!count) return <StoreLogoPanel href={storeHref} height={height} fill={fill} />
 
   // Stacked on a phone this panel sets its OWN height instead of the shared
-  // 16:N strip the other two use: a letterbox that shallow has no room for a
-  // product card. `fill` (the desktop bento cell) still stretches to its parent.
-
+  // 16:N strip the other two use: a letterbox that shallow leaves a product card
+  // about eighty pixels to render a photo, a name and a button in. `fill` (the
+  // desktop bento cell) still stretches to its parent.
   return (
     <section
       aria-label="AS Store"
@@ -129,56 +129,65 @@ export default function StoreBanner({ banner, height, fill = false }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      {/* A column — button row, cards, dots — rather than cards with the button
+          and dots floating over them. The cards fill the panel edge to edge, so
+          anything absolute lands on a product. */}
       <div
-        className={`relative w-full overflow-hidden rounded-[28px] bg-white shadow-2xl shadow-black/10 ring-1 ring-black/[0.04] transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${
-          fill ? 'h-full' : 'aspect-[4/3] min-h-[17rem] sm:aspect-[16/7]'
+        className={`flex w-full flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl shadow-black/10 ring-1 ring-black/[0.04] transition-shadow duration-500 hover:shadow-black/20 motion-safe:animate-pulse-soft hover:[animation-play-state:paused] sm:rounded-[36px] ${
+          fill ? 'h-full' : 'h-[20rem] sm:h-[22rem]'
         }`}
         style={{ animationDelay: '-2.6s' }}
       >
-        <div
-          className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
-            dragging ? '' : 'transition-transform duration-700 ease-out'
-          }`}
-          style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={dragEnd}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={dragEnd}
-          onMouseLeave={() => dragging && dragEnd()}
-          onClickCapture={onClickCapture}
-        >
-          {slides.map((slide, i) => (
-            <div
-              key={i}
-              // pt clears the "Visit store" pill pinned to the panel's corner.
-              className="flex h-full w-full shrink-0 items-stretch gap-2.5 p-3 pt-12 sm:gap-4 sm:p-5 sm:pt-16"
-            >
-              {slide.map((p) => (
-                <ProductCard key={p.id} product={p} storeHref={storeHref} />
-              ))}
-              {/* Keep the last slide's cards the same width as every other
-                  slide's when the products don't divide evenly. */}
-              {Array.from({ length: cols - slide.length }).map((_, k) => (
-                <div key={`pad-${k}`} className="min-w-0 flex-1" aria-hidden />
-              ))}
-            </div>
-          ))}
+        <div className="flex shrink-0 items-center justify-end px-3 pt-3 sm:px-5 sm:pt-4">
+          <BannerCta href={storeHref} label="Visit store" inline />
         </div>
 
-        {/* Sibling of the drag container, never a child — a swipe must not fire it. */}
-        <BannerCta href={storeHref} label="Visit store" />
+        {/* The cards' viewport. min-h-0 is load-bearing: without it a flex child
+            refuses to shrink below its content and the track overflows. */}
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div
+            className={`flex h-full cursor-grab touch-pan-y select-none active:cursor-grabbing ${
+              dragging ? '' : 'transition-transform duration-700 ease-out'
+            }`}
+            style={{ transform: `translateX(calc(-${index * 100}% + ${drag}px))` }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={dragEnd}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={dragEnd}
+            onMouseLeave={() => dragging && dragEnd()}
+            onClickCapture={onClickCapture}
+          >
+            {slides.map((slide, i) => (
+              <div
+                key={i}
+                className="flex h-full w-full shrink-0 items-stretch gap-2.5 px-3 py-2 sm:gap-4 sm:px-5 sm:py-3"
+              >
+                {slide.map((p) => (
+                  <ProductCard key={p.id} product={p} storeHref={storeHref} />
+                ))}
+                {/* Keep the last slide's cards the same width as every other
+                    slide's when the products don't divide evenly. */}
+                {Array.from({ length: cols - slide.length }).map((_, k) => (
+                  <div key={`pad-${k}`} className="min-w-0 flex-1" aria-hidden />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop only: on a phone the arrows would sit on the cards they are
+              meant to reveal, and a swipe already does the job. */}
+          {count > 1 && (
+            <>
+              <Arrow dir="prev" onClick={() => go(index - 1)} />
+              <Arrow dir="next" onClick={() => go(index + 1)} />
+            </>
+          )}
+        </div>
 
         {count > 1 && (
-          <>
-            <Arrow dir="prev" onClick={() => go(index - 1)} />
-            <Arrow dir="next" onClick={() => go(index + 1)} />
-          </>
-        )}
-
-        {count > 1 && (
-          <div className="absolute bottom-2 left-1/2 z-20 flex max-w-[90%] -translate-x-1/2 flex-wrap items-center justify-center gap-0.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-0.5 px-3 pb-2">
             {slides.map((_, i) => (
               <button
                 key={i}
@@ -215,10 +224,10 @@ function ProductCard({ product, storeHref }) {
 
   const inner = (
     <>
-      <p className="truncate text-[9px] font-semibold uppercase tracking-wide text-as-red sm:text-[11px]">
+      <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-as-red sm:text-[11px]">
         {product.brand || 'AS Store'}
       </p>
-      <h3 className="mt-0.5 line-clamp-2 break-words text-[11px] font-semibold leading-snug text-as-charcoal sm:text-base">
+      <h3 className="mt-0.5 line-clamp-2 break-words text-xs font-semibold leading-snug text-as-charcoal sm:text-base">
         {product.name}
       </h3>
       {product.teaser && (
@@ -237,7 +246,7 @@ function ProductCard({ product, storeHref }) {
           className="h-full w-full select-none object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />
       </div>
-      <span className="mt-1.5 inline-flex w-full items-center justify-center truncate rounded-full bg-as-red px-2 py-1.5 text-[10px] font-semibold text-white transition group-hover:bg-as-red-dark sm:mt-3 sm:px-5 sm:py-2.5 sm:text-sm">
+      <span className="mt-2 inline-flex w-full items-center justify-center truncate rounded-full bg-as-red px-2 py-1.5 text-[11px] font-semibold text-white transition group-hover:bg-as-red-dark sm:mt-3 sm:px-5 sm:py-2.5 sm:text-sm">
         Shop now
       </span>
     </>
@@ -294,12 +303,12 @@ function Arrow({ dir, onClick }) {
       type="button"
       aria-label={prev ? 'Previous slide' : 'Next slide'}
       onClick={onClick}
-      className={`absolute top-1/2 z-20 -translate-y-1/2 p-1.5 text-as-charcoal/25 transition-opacity duration-300 hover:text-as-charcoal/80 sm:p-2 ${
-        prev ? 'left-0.5 sm:left-2' : 'right-0.5 sm:right-2'
+      className={`absolute top-1/2 z-20 hidden -translate-y-1/2 p-2 text-as-charcoal/25 transition-opacity duration-300 hover:text-as-charcoal/80 sm:block ${
+        prev ? 'left-1' : 'right-1'
       }`}
     >
       <svg
-        className={`h-5 w-5 sm:h-7 sm:w-7 ${prev ? 'rotate-180' : ''}`}
+        className={`h-7 w-7 ${prev ? 'rotate-180' : ''}`}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
