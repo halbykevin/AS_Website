@@ -472,7 +472,16 @@ npm run android    # open on Android
 npm run ios        # open on iOS (macOS)
 npm run web        # run in the browser
 npm run update     # publish a JS-only OTA update to the production channel
+
+npm run apk        # build + install a test APK on a phone (see scripts/apk.mjs)
+npm run aab        # build the Play Store bundle, download it, print the upload steps
+npm run aab -- --latest   # skip the build, fetch the newest finished bundle
 ```
+
+Releasing to Google Play: bump `expo.version` in `app.json` (the versionCode is
+remote and EAS auto-increments it), then `npm run aab` and upload the file it
+leaves in `mobile/build/`. A JS-only change does not need any of that — `npm run
+update` reaches the binaries already installed.
 
 ## Notes
 

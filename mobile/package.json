@@ -21,6 +21,8 @@
     "build:apk": "npx --yes eas-cli@latest build --platform android --profile preview",
     "build:apk:prod": "npx --yes eas-cli@latest build --platform android --profile production-apk",
     "build:aab": "npx --yes eas-cli@latest build --platform android --profile production",
+    "//aab": "Build the Play Store bundle AND download the .aab to mobile/build/, then print the upload steps. Same script as npm run apk, which cannot install a bundle and so stops at the file. Add -- --latest to grab the newest finished one instead of building.",
+    "aab": "node scripts/apk.mjs --profile production",
     "build:dev": "npx --yes eas-cli@latest build --platform android --profile development",
     "build:ios": "npx --yes eas-cli@latest build --platform ios --profile production",
     "build:all": "npx --yes eas-cli@latest build --platform all --profile production",

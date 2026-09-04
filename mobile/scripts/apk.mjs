@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 /**
- * Build an Android APK on EAS and get it onto a phone.
+ * Build an Android app on EAS and get it where it needs to go.
  *
  *   npm run apk                          # preview APK, attach to a running build if there is one
  *   npm run apk:prod                     # same, production-apk profile
  *   npm run apk:latest                   # skip the build, grab the newest finished APK
  *   npm run apk -- --force-new           # always start a fresh build
+ *   npm run aab                          # the Play Store bundle (production profile)
+ *   npm run aab -- --latest              # download the newest finished bundle
+ *
+ * An .aab (what the production profile builds) cannot be installed on a phone at
+ * all — it is what Play Console takes — so that path stops at the downloaded file
+ * and prints what to do with it. Otherwise:
  *
  * Ends with the .apk downloaded to mobile/build/ and, if adb is around, installed
  * on the connected phone. Without adb it serves the file over the local network
@@ -42,10 +48,11 @@ if (has('--help') || has('-h')) {
   console.log(
     [
       '',
-      'Build an Android APK on EAS and put it on your phone.',
+      'Build an Android APK on EAS and put it on your phone,',
+      'or a Play Store .aab with --profile production.',
       '',
       '  --profile <name>   eas.json build profile (default: preview)',
-      '  --latest           use the newest finished APK instead of building',
+      '  --latest           use the newest finished build instead of building',
       '  --force-new        start a build even if one is already running',
       '  --bluestacks       install into BlueStacks instead of a real phone',
       '  --no-install       skip adb, go straight to the download link',
@@ -171,10 +178,15 @@ if (build.status !== 'FINISHED') {
 
 // ------------------------------------------------------------------ download --
 const url = apkUrl(build)
-if (!url) die('The build finished but carries no APK artifact. Is this profile buildType: apk?')
+if (!url) die('The build finished but carries no downloadable artifact. Check it on expo.dev.')
+
+// The profile decides the shape (eas.json buildType), so read it off the
+// artifact rather than assuming: production is app-bundle, everything else apk.
+const isBundle = /\.aab(\?|$)/i.test(url)
+const ext = isBundle ? 'aab' : 'apk'
 
 mkdirSync(OUT_DIR, { recursive: true })
-const file = join(OUT_DIR, `as-company-${profile}-v${build.appVersion}-${build.appBuildVersion}.apk`)
+const file = join(OUT_DIR, `as-company-${profile}-v${build.appVersion}-${build.appBuildVersion}.${ext}`)
 
 // A finished build's artifact never changes, so a matching local copy is the
 // same bytes — no point pulling 90 MB again on every run.
@@ -186,13 +198,38 @@ const expected = Number(
 if (onDisk && onDisk === expected) {
   say(`\n  ok  Already downloaded: ${file}  (${fmtSize(onDisk)})`)
 } else {
-  say('\n  Downloading APK...')
+  say(`\n  Downloading ${ext.toUpperCase()}...`)
   const res = await fetch(url)
   if (!res.ok) die(`Download failed - ${res.status} ${res.statusText}`)
   await pipeline(Readable.fromWeb(res.body), createWriteStream(file))
   say(`  ok  ${file}  (${fmtSize(statSync(file).size)})`)
 }
 const size = statSync(file).size
+
+// ------------------------------------------------------ the Play bundle --
+// An .aab is not installable: Play builds the per-device APKs out of it. There
+// is nothing to adb-install and nothing to sideload, so the file itself is the
+// deliverable and the rest of this script does not apply.
+if (isBundle) {
+  say('')
+  say('  -- Upload to Google Play ------------------------------------')
+  say('')
+  say(`  Version ${build.appVersion} (versionCode ${build.appBuildVersion}) — ${fmtSize(size)}`)
+  say('')
+  say(`      ${file}`)
+  say('')
+  say('  1. play.google.com/console  >  AS Company')
+  say('  2. Testing > Internal testing (or Production) > Create new release')
+  say('  3. Upload that .aab, write the release notes, roll out.')
+  say('')
+  say('  The versionCode is remote and auto-incremented by EAS, so every build')
+  say('  is a fresh upload — Play refuses a code it has already seen.')
+  say('')
+  say(`  Also on expo.dev (link expires ${new Date(build.expirationDate).toDateString()}):`)
+  say(`  ${url}`)
+  say('')
+  process.exit(0)
+}
 
 // -------------------------------------------------------- onto the phone --
 const BLUESTACKS_DIRS = [
