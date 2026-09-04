@@ -95,6 +95,43 @@ can't read `settings.ticketing_url`), so if the setting is ever turned off, take
 the redirect out in the same change or the marketing site will link to an
 `/events` that redirects away.
 
+## Picking seats
+
+Events sold by **Ticketing Box Office** get a live seat map on their page: the
+real hall, the seats that are still free, priced — you tap the ones you want and
+send them to us on WhatsApp. Everything else (tickit, ihjoz, hand-made events)
+renders nothing extra and keeps the plain reserve button.
+
+**It is a request, never a booking, and the wording has to keep saying so.**
+Nothing on our side can hold a seat — only the box office's own system can. Two
+visitors can tap the same seat a second apart, and a seat can sell between the
+page loading and the message being sent. Staff confirm every request by hand and
+come back to the customer if a seat has gone. That is the deal the business
+chose, with eyes open; the UI says it under the button, and the API module says
+it at the top. Do not let either start implying a confirmed seat.
+
+- **Where it comes from**: `GET /api/events/:slug/seatmap` on the marketing
+  site's API ([server/src/seatmap.js](../server/src/seatmap.js)) — read that file
+  for how a box-office page is parsed. It is fetched **on demand** from the
+  browser, not stored: a map saved by the nightly sync would be hours stale,
+  which is a worse lie than "as of a minute ago". The API caches each hall for a
+  minute so a page that is being read by ten people costs one fetch.
+- **Two shapes, because the box office has two.** A hall with numbered seats
+  renders as the map; a hall sold by area (a standing gig, a gala, a class)
+  renders as a priced list of zones with a quantity stepper. Most events have
+  both — the map for the block the box office loaded, the zone list for the rest
+  — and a visitor can mix them in one request.
+- **A run's nights are separate halls.** Each night is its own page at the box
+  office with its own seats sold, so the night selector re-fetches and clears
+  whatever was picked: those seats were in a different room.
+- **The map fits first, then zooms.** You cannot choose a seat in a room you
+  can't see, so it opens scaled to the container and the +/− buttons zoom in for
+  tapping. The geometry is computed from the data (widest row × seat size)
+  rather than measured after a paint.
+- `SEATMAP_ENABLED=0` on the API turns the whole thing off — the kill switch for
+  the day the box office objects or redesigns, and every page falls back to the
+  reserve button on its own.
+
 ## Running it
 
 ```bash

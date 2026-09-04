@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
+import { seatmapRouter } from './seatmap.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
 import { imageResizer } from './images.js'
@@ -1184,6 +1185,9 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
 // ========================= Web scraper =========================
 // Admin-only: run the Python e-commerce scraper and download its output.
 app.use('/api/scrape', scraperRouter)
+// GET /api/events/:slug/seatmap — the live hall for a box-office event. Mounted
+// after the /api/events routes above so it can't shadow them.
+app.use('/api/events', seatmapRouter)
 
 // ========================= Errors =========================
 app.use((err, req, res, next) => {

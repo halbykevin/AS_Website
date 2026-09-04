@@ -11,6 +11,8 @@ import {
   metaDescription,
 } from '@/lib/seo'
 import EventCard from '@/components/EventCard'
+import SeatMap from '@/components/SeatMap'
+import { hasSeatmap } from '@/lib/seatmap'
 
 /**
  * Pre-render every event that exists at build time. These pages are the whole
@@ -184,6 +186,13 @@ export default async function EventPage({ params }) {
             <div className="mt-8 whitespace-pre-line text-[15px] leading-relaxed text-as-charcoal/75">
               {event.description}
             </div>
+          ) : null}
+
+          {/* The live hall, for the events whose box office publishes one. It
+              renders nothing for everything else (and for a finished event), so
+              the aside's plain reserve button stays the fallback everywhere. */}
+          {!past && hasSeatmap(event) ? (
+            <SeatMap event={event} whatsappNumber={settings.whatsappNumber} />
           ) : null}
         </div>
 

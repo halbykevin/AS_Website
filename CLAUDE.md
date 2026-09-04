@@ -53,6 +53,20 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
   visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
   reservation, worded the same way.
+- **Seat picking on the box office's events.** An event sold by Ticketing Box
+  Office gets a live seat map on its page: `GET /api/events/:slug/seatmap`
+  ([server/src/seatmap.js](server/src/seatmap.js)) reads that event's own page at
+  the partner — every seat is a plain `<input class="CellBtnClass">` carrying its
+  row, number, price, colour and whether it is still free — and the hub draws it
+  ([SeatMap.jsx](as_ticketing/src/components/SeatMap.jsx)). Pick seats (or a
+  quantity of a zone, for halls sold by area) → a pre-filled WhatsApp message.
+  **It is a request, not a booking, and every layer says so**: nothing we run can
+  hold a seat, so staff confirm each one by hand and go back to the customer if a
+  seat has gone. Fetched on demand and cached a minute — a map stored by the sync
+  would be hours stale, which is a worse lie than "as of a minute ago" — only
+  ever from a URL already on the event row (never one from the query string), and
+  `SEATMAP_ENABLED=0` turns it all off. Full reasoning in
+  [as_ticketing/README.md](as_ticketing/README.md).
 - **Search is a feature here, not a chore** — it is how someone finds an event they
   didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
   one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
@@ -572,7 +586,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Env
 
 - Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 
