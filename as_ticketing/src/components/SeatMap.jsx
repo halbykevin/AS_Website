@@ -38,6 +38,10 @@ const SEAT_GAP = 4
 const ROW = 26
 const LABEL = 34
 
+// rgb(190,190,190) — what the box office paints a sold seat, matched so a taken
+// seat still reads as a seat.
+const SOLD = '#bebebe'
+
 // How the partner's own drawing reacts to being picked from. It is injected
 // markup, so the states are set as `data-state` on the shapes in an effect and
 // styled here — Tailwind cannot reach inside a dangerouslySetInnerHTML.
@@ -647,7 +651,7 @@ function Seat({ seat, row, picked, disabled, onClick }) {
         aria-pressed={picked}
         className={`block rounded-[4px] transition ${
           sold
-            ? 'cursor-not-allowed bg-black/[0.08]'
+            ? 'cursor-not-allowed'
             : picked
               ? 'ring-2 ring-as-charcoal ring-offset-1'
               : disabled
@@ -657,7 +661,10 @@ function Seat({ seat, row, picked, disabled, onClick }) {
         style={{
           width: SEAT,
           height: SEAT,
-          background: sold ? undefined : seat.color || '#A41E22',
+          // The exact grey the box office paints a taken seat. A sold seat has
+          // to read as a seat that is taken, not as a hole in the row — the hall is
+          // only legible if every seat in it is drawn.
+          background: sold ? SOLD : seat.color || '#A41E22',
         }}
       />
     </span>
@@ -676,7 +683,7 @@ function Legend({ tiers = [], currency }) {
         </li>
       ))}
       <li className="inline-flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded-[3px] bg-black/[0.08]" />
+        <span className="h-3 w-3 rounded-[3px]" style={{ background: SOLD }} />
         sold
       </li>
     </ul>

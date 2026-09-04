@@ -89,7 +89,17 @@ function parseSeats(html) {
     // matching the room.
     const isGap = !price.amount || !/HoverSeat/i.test(cls)
     seats.push({
-      section: (attr(tag, 'data-section') || attr(tag, 'data-divisionname') || '').replace(/\s+/g, ' ').trim(),
+      // `data-divisionname` first, NOT `data-section`. They are different
+      // things and only one of them is a place: the division is the physical
+      // block ("LOUNGES", "Salle"), the section is that seat's ticket category
+      // ("LOUNGES / Including Dinner"), and the two disagree *within a single
+      // row* — the aisle cells in a lounge row are tagged with the division
+      // while the seats around them carry the category. Keying rows on the
+      // section therefore split every row in two, a seats half and an aisle
+      // half, and the aisle half was then dropped as an empty row: the gaps
+      // disappeared and the row lost a third of its width. It would equally
+      // split any row that spans two price categories.
+      section: (attr(tag, 'data-divisionname') || attr(tag, 'data-section') || '').replace(/\s+/g, ' ').trim(),
       row: (attr(tag, 'data-row') || '').replace(/\s+/g, ' ').trim(),
       num,
       price: price.amount,
