@@ -162,6 +162,10 @@ export const defaultWebsiteContent = {
   categories: [],
   popup: null,
   story: null,
+  // The home tab's store slideshow. Empty offline: its cards are live products
+  // read from the store, and there is nothing truthful to show without them —
+  // the panel falls back to the AS Store logo, exactly as the website's does.
+  storeBanner: { enabled: false, perSlide: 2, products: [] },
   predictor: null,
   published: false,
   whatsappNumber: ''

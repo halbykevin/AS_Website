@@ -7,6 +7,7 @@ import { WEBSITE_API_URL } from '@/src/config/env';
 import { defaultWebsiteContent } from '@/src/content/websiteDefaults';
 import { whatsappBookingUrl } from './whatsapp';
 import { eventDateLabel } from './format';
+import { mediaUrl } from './storeApi';
 
 const API = WEBSITE_API_URL;
 
@@ -110,6 +111,28 @@ function mergeSettings(s) {
   };
 }
 
+/**
+ * The homepage store slideshow.
+ *
+ * The site API has already resolved the admin's choice into real products by
+ * asking the store's own API, so this only fixes the photo host: the URL it
+ * returns points at whatever store the *site* server talks to, which in dev is
+ * a localhost this phone cannot reach.
+ *
+ * Prices are deliberately absent from this endpoint and must stay absent —
+ * they move, and the store is the one place they are quoted.
+ */
+function mapStoreBanner(b) {
+  const products = Array.isArray(b?.products) ? b.products : [];
+  return {
+    enabled: b?.enabled !== false && products.length > 0,
+    perSlide: Math.min(Math.max(Number(b?.perSlide) || 2, 1), 3),
+    products: products
+      .filter(p => p && p.slug)
+      .map(p => ({ id: p.id, slug: p.slug, name: p.name, brand: p.brand, teaser: p.teaser, image: mediaUrl(p.image) }))
+  };
+}
+
 function mapPredictor(meta, matches) {
   if (!meta || meta.enabled === false) return null;
   const list = Array.isArray(matches) ? matches.filter(m => m.visible !== false).map(m => ({ id: m.id, stage: m.stage || '', teamA: m.teamA || '', teamB: m.teamB || '', logoA: m.teamAFlag || '', logoB: m.teamBFlag || '', kickoff: m.kickoff || null })) : [];
@@ -135,7 +158,7 @@ function mapPredictor(meta, matches) {
 // or null when the API is unreachable (screens fall back to defaults).
 export async function loadWebsiteContent() {
   try {
-    const [settings, services, events, categories, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] = await Promise.all([req('/api/settings'), req('/api/services').catch(() => []), req('/api/events').catch(() => []), req('/api/categories').catch(() => []), req('/api/what-we-do').catch(() => null), req('/api/solutions').catch(() => []), req('/api/predictor').catch(() => null), req('/api/predictor-matches').catch(() => [])]);
+    const [settings, services, events, categories, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches, storeBanner] = await Promise.all([req('/api/settings'), req('/api/services').catch(() => []), req('/api/events').catch(() => []), req('/api/categories').catch(() => []), req('/api/what-we-do').catch(() => null), req('/api/solutions').catch(() => []), req('/api/predictor').catch(() => null), req('/api/predictor-matches').catch(() => []), req('/api/store-banner').catch(() => null)]);
 
     const content = settings ? mergeSettings(settings) : { ...defaultWebsiteContent };
 
@@ -157,6 +180,11 @@ export async function loadWebsiteContent() {
     const mappedSolutions = Array.isArray(solutionsList) ? solutionsList.map(mapSolution).filter(s => s.visible) : [];
     content.solutions = mappedSolutions.length ? mappedSolutions : defaultWebsiteContent.solutions;
     content.predictor = mapPredictor(predictorMeta, predictorMatches);
+    // The home tab's store slideshow. The same endpoint the website's homepage
+    // panel reads, so the admin picks the products once in /admin/store-banner
+    // and both surfaces show the same thing. Products come through already
+    // resolved from the store's own API; the app only rebases the photo host.
+    content.storeBanner = mapStoreBanner(storeBanner);
 
     return { content, events: mappedEvents };
   } catch {

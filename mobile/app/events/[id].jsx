@@ -6,6 +6,8 @@ import { eventDateLabel, isEventPast } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Icon, Button, Badge, Card, Divider, EmptyState } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
+import SeatMap from '@/src/components/events/SeatMap';
+import { hasSeatmap } from '@/src/lib/seatmap';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -14,8 +16,9 @@ export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
 export default function EventDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams();
-  const { events } = useContent();
+  const { events, content } = useContent();
   const event = (events || []).find(e => e.id === id);
+  const whatsappNumber = content?.whatsappNumber;
 
   if (!event) {
     return (
@@ -72,6 +75,12 @@ export default function EventDetailScreen() {
             </>
           ) : null}
         </Card>
+
+        {/* The hall, when the partner selling this event publishes one. Pick
+            your seats here and the WhatsApp message arrives with them in it,
+            instead of the generic "I'd like to reserve" the button below sends.
+            Renders nothing at all for an event with no hall — most of them. */}
+        {!past && hasSeatmap(event) ? <SeatMap event={event} whatsappNumber={whatsappNumber} /> : null}
 
         {/* Multi-day schedule */}
         {multiDay ? (

@@ -25,6 +25,9 @@ export const palette = {
   asAmber: '#F2A93B',
   asBg: '#EAEDED',
   asFog: '#F5F5F7',
+  // The blush the marketing site paints behind its What We Do panel — brand red
+  // at the strength you can put a whole panel on.
+  asBlush: '#FBE6E8',
   white: '#FFFFFF',
   black: '#000000'
 };
@@ -56,6 +59,7 @@ export const lightColors = {
   primary: palette.asRed,
   primaryDark: palette.asRedDark,
   primaryLight: palette.asRedLight,
+  primaryWash: palette.asBlush,
   accent: palette.asAmber,
 
   // Text

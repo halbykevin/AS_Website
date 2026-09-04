@@ -2,6 +2,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { Screen } from '@/src/ui';
 import ComingSoon from '@/src/components/ComingSoon';
 import CatalogScreen from '@/src/components/store/CatalogScreen';
+import useConfirmExit from '@/src/lib/useConfirmExit';
 
 // Shop is the products.
 //
@@ -20,6 +21,12 @@ export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
 
 export default function ShopScreen() {
   const { storeSettings } = useContent();
+
+  // Shop is where the app opens, so Shop is now the screen Android's back
+  // gesture would close the app from — the guard has to live here as well as on
+  // Home. It no-ops wherever there is still something to go back to, so having
+  // it on both is free. Above the early return so the hook order stays stable.
+  useConfirmExit();
 
   if (storeSettings && storeSettings.published === false) {
     return (
