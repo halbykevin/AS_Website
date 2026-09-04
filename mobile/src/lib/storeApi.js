@@ -51,6 +51,12 @@ function mapProduct(p) {
   };
 }
 
+// A product that arrived from somewhere other than this API — the assistant's
+// answers come through the storefront's /api/chat, which reads the catalog on
+// its own server. Same rows, so the same image rebasing has to happen or the
+// photos point at whatever host that server talks to (localhost, in dev).
+export const mapChatProduct = mapProduct;
+
 // The API returns categories with `imageUrl`; the tiles read `image`. Bridge the
 // field name and normalize the host in one place.
 function mapCategory(c) {

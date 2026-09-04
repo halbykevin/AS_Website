@@ -60,7 +60,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" search bag scrolled={s} announcement={storeSettings?.announcement} />}>
+    <Screen edges={['left', 'right']} statusBarStyle="light" contentStyle={{ paddingHorizontal: 0 }} refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={theme.colors.primary} />} header={s => <AppHeader brand="store" search assistant bag scrolled={s} announcement={storeSettings?.announcement} />}>
       {/* Every section below is independently contained. Home renders more
           remote, CMS-driven data than any other screen — six sections off three
           queries — so it is the most likely place for one bad record to take

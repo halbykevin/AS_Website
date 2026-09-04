@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import { selectCartCount } from '@/src/store/cartSlice';
@@ -11,6 +11,7 @@ import Text from '@/src/ui/Text';
 import Icon from '@/src/ui/Icon';
 import AnnouncementBar from './AnnouncementBar';
 import { useGlobalPromoVisible } from './GlobalPromoBanner';
+import { useCartTarget } from './FlyToCart';
 
 const LOGOS = {
   company: require('../../assets/as-logo.jpg'),
@@ -25,6 +26,7 @@ export default function AppHeader({
   showBack = false,
   onBack,
   search = false,
+  assistant = false,
   bag = false,
   bell = true,
   scrolled = false,
@@ -95,6 +97,14 @@ export default function AppHeader({
               <Icon name="search" size={22} color={fg} />
             </Pressable>
           ) : null}
+          {/* The shopping assistant — the app's answer to the website's chat
+              bubble. A header action rather than a floating button: a bubble on
+              a phone lands either on the tab bar or on a product tile. */}
+          {assistant ? (
+            <Pressable onPress={() => router.push('/assistant')} hitSlop={theme.layout.hitSlop} accessibilityRole="button" accessibilityLabel="Ask the assistant">
+              <Icon name="sparkles" size={22} color={fg} />
+            </Pressable>
+          ) : null}
           {bag ? <BagAction color={fg} /> : null}
         </View>
       </Animated.View>
@@ -116,12 +126,35 @@ function BellAction({ color }) {
 function BagAction({ color }) {
   const theme = useTheme();
   const count = useSelector(selectCartCount);
+  // Where an Add-to-Bag flight lands while this header is up.
+  //
+  // Without this it aimed at the tab bar's bag — which is right on a tab, and
+  // wrong the moment a screen is pushed OVER the tabs (a category, search): the
+  // tab bar isn't on screen, so the photo flew past the bottom edge to a bag
+  // nobody could see, while the only visible bag sat in this header doing
+  // nothing. Registrations are a stack, so this claims the spot while the
+  // header is mounted and hands it straight back on unmount — the same trick
+  // the product screen's bag button already used. See FlyToCart.
+  const ref = useCartTarget('header:bag', useIsFocused());
   return (
-    <Pressable onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop} accessibilityLabel="Bag">
+    <Pressable ref={ref} collapsable={false} onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop} accessibilityLabel="Bag">
       <Icon name="bag" size={22} color={color} />
       {count > 0 ? <Badge value={count} /> : null}
     </Pressable>
   );
+}
+
+// Is the screen this header belongs to the one on screen? A tab stays mounted
+// after you leave it, so mounting is not the answer — see useCartTarget.
+function useIsFocused() {
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, [])
+  );
+  return focused;
 }
 
 function Badge({ value }) {

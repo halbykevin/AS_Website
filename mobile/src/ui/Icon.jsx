@@ -52,6 +52,7 @@ const MAP = {
   chip: 'hardware-chip-outline',
   support: 'headset-outline',
   sparkles: 'sparkles-outline',
+  send: 'send',
   play: 'play-circle-outline',
   trophy: 'trophy-outline',
   basketball: 'basketball-outline',

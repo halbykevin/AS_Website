@@ -184,6 +184,41 @@ and this is the only thing between that and an undeliverable order.
   is never typed twice. Conditional on the column being empty and on no other account owning it — the
   number on file is what signs them in, and a delivery contact must not silently rewrite it.
 
+## The shopping assistant is one endpoint, two clients
+
+The AS Store's chat assistant lives in the storefront's own route,
+[as_store/src/app/api/chat/route.js](as_store/src/app/api/chat/route.js): the system
+prompt, three tools pointed at the real catalog, the tool-round budget, the per-IP
+rate limit and the model key, which never leaves that server. The website's
+`ChatWidget` and the app's [assistant screen](mobile/app/assistant.jsx) are both
+**clients of it** — the app POSTs to `<storeWebUrl>/api/chat` rather than the
+store API, because a port into Express would be a second prompt to keep in step
+and a second place to leak a key from. The route takes plain JSON with no cookies
+and no auth, and React Native's fetch has no browser origin, so a mobile client
+needs nothing the web has.
+
+- **Answers are grounded and the products are real rows.** The model returns
+  slugs its tools looked up; both clients render them with their own product tile
+  (live price, working Add to Bag), so a price on screen is never one the model
+  typed. In the app they pass through `mapChatProduct` to rebase the photo host.
+- The website hides the bubble when no key is configured (`aiConfigured()`, checked
+  server-side); the app can't know before asking, so it shows the route's own 503
+  wording instead.
+
+## The Shop tab is the catalog (mobile app)
+
+`/(tabs)/shop` renders [CatalogScreen](mobile/src/components/store/CatalogScreen.jsx) over the whole
+catalog: the product grid with the sort/filter toolbar, and nothing else. It used to be a menu — an
+"All products" card above a wall of category tiles — which made browsing a two-tap errand and gave
+the tab nothing to show but signposts.
+
+- **One component, two routes.** `/category/<slug>` is the same screen scoped to one department, so
+  the fiddly parts (the `getItemLayout` row arithmetic, the per-density cell styles, the prebuilt
+  filter index) exist once. The list heading is optional — the Shop tab hides it, because the nav bar
+  already says Shop and repeating it pushes the first row of products off the screen.
+- **Categories didn't disappear, they became a filter**: the category facet shows on the whole-catalog
+  view only (`showCategory`), and the home tab's `CategoryWall` still deep-links to `/category/<slug>`.
+
 ## Add-to-Bag flight (mobile app)
 
 The product photo arcs out of the card and lands on the bag icon
@@ -194,9 +229,15 @@ popping as the count rises. Reanimated only — no native dependency, so it ship
   inside a virtualized list and ends on the app's chrome, and nothing rendered inside either one can
   cross that boundary.
 - **The landing spot is registered, and registrations are a stack.** `useCartTarget()` on the tab
-  bar's bag, and again on the product screen's header bag — a screen pushed over the tabs covers the
-  tab bar, so it claims the target while it is up and hands it back on unmount. Each call gets its
-  own identity so two screens stack rather than overwrite.
+  bar's bag, and again on every `AppHeader` bag (Shop, a category, search) and the product screen's —
+  a screen pushed over the tabs covers the tab bar, so it claims the target while it is up and hands
+  it back. Each call gets its own identity so two screens stack rather than overwrite.
+- **Registered while *focused*, not while mounted.** The tab navigator keeps a tab alive once you
+  have visited it, so a bag that registered on mount would still hold the landing spot from a screen
+  you left three taps ago and the photo would fly to where that bag used to be. The header's bag
+  passes a focus flag (`useFocusEffect`); losing focus unregisters, regaining it re-registers on top.
+  Before the header registered at all, adding from a pushed screen sent the photo past the bottom
+  edge toward a tab bar that wasn't on screen.
 - **The flight is decoration only.** `dispatch(addItem(...))` runs first and unconditionally; leaving
   the screen mid-flight cannot lose the item, and reduced motion skips the animation entirely.
 - Source views need `collapsable={false}` — Android flattens layout-only views away, and a view that

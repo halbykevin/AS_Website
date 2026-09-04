@@ -100,13 +100,25 @@ export function FlyToCartProvider({ children }) {
 // land on. `name` is only for readability — each call gets its own identity, so
 // two screens with the same bag button stack instead of overwriting each other,
 // and the one underneath is still registered when the top one pops.
+//
+// `active` is how a screen says "my bag is on screen right now". Mounted is not
+// the same as visible: the tab navigator keeps a tab mounted once you have
+// visited it, so a bag button that registered on mount would still be holding
+// the landing spot from a screen you left three taps ago — and the photo would
+// fly to where that bag USED to be. Pass a focus flag and the target follows
+// what the eye can actually see.
 let targetSeq = 0;
-export function useCartTarget(name = 'cart') {
+export function useCartTarget(name = 'cart', active = true) {
   const ctx = useContext(Ctx);
   const ref = useRef(null);
   const id = useRef(null);
   if (id.current === null) id.current = `${name}#${++targetSeq}`;
-  useEffect(() => ctx?.registerTarget?.(id.current, ref), [ctx]);
+  useEffect(() => {
+    if (!active) return undefined;
+    // Re-registering also moves this target to the top of the stack, which is
+    // what makes the newly focused screen's bag win.
+    return ctx?.registerTarget?.(id.current, ref);
+  }, [ctx, active]);
   return ref;
 }
 

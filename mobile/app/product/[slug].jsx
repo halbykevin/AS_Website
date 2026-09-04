@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { useProduct } from '@/src/lib/queries';
 import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice';
@@ -324,9 +324,17 @@ function SpecRow({ label, value, stacked }) {
 function CartButton() {
   const theme = useTheme();
   const count = useSelector(selectCartCount);
-  // Claims the landing spot for as long as this screen is mounted; the tab bar's
-  // bag takes it back on unmount.
-  const ref = useCartTarget('product:bag');
+  // Claims the landing spot for as long as this screen is the one on screen —
+  // not merely mounted, since another screen can be pushed on top of it. The
+  // bag underneath takes it back the moment this one loses focus.
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, [])
+  );
+  const ref = useCartTarget('product:bag', focused);
   return (
     <Pressable ref={ref} collapsable={false} onPress={() => router.push('/bag')} hitSlop={theme.layout.hitSlop}>
       <Icon name="bag" size={22} />

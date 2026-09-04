@@ -71,12 +71,15 @@ stores review.
 app/                         # Expo Router (file-based) routes
   _layout.jsx                #   root: providers + Stack, and the ErrorBoundary export
   (tabs)/                    #   bottom tabs (store-first): Home (storefront) ·
-                             #   Shop (browse) · Bag (cart) · Events · Account
+                             #   Shop (the catalog itself) · Bag (cart) ·
+                             #   Events · Account
   company.jsx                #   the informative AS Company (website) page
   legal.jsx                  #   privacy policy + warranty/shipping/support links
   what-we-do/  events/       #   marketing detail screens
-  product/ category/         #   store screens
+  product/ category/         #   store screens (category = the Shop tab's
+                             #   CatalogScreen, scoped to one department)
   checkout  search  orders/  #   commerce flow
+  assistant.jsx              #   the AS Store shopping assistant (chat)
   account/ auth/             #   profile + OTP sign in / register
     delete.jsx               #   permanent account deletion (store requirement)
     wallet.jsx               #   AS Wallet — balance, how it works, history
@@ -169,6 +172,7 @@ nothing else changes.
 | Events + pre‑filled WhatsApp reservation        | Events tab, `events/[id]` → opens WhatsApp                             |
 | What We Do + solution pages                     | `what-we-do` + `what-we-do/[slug]`                                     |
 | Guess the Score predictor                       | `predictor` (3‑step: score → share → details)                          |
+| Shopping assistant (the site's chat bubble)     | `assistant` — sparkles button in the store header, same endpoint       |
 | Publish gate (Coming Soon)                      | Store tab respects `settings.published`                                |
 | — _(app only)_                                  | **Daily Spin** — `spin` + `account/rewards`, see below                 |
 | AS Wallet store credit                          | `account/wallet` — balance + history; spent at checkout (also on web)  |
@@ -320,6 +324,29 @@ customer out over a 401 from one of those is a bug that looks like a random
 logout.
 
 ---
+
+## The shopping assistant
+
+The sparkles button in the store header opens `app/assistant.jsx` — the same
+assistant as the website's chat bubble, and deliberately **a client of it**: it
+POSTs to `<store website>/api/chat`, the storefront route that owns the system
+prompt, the catalog tools, the tool-round budget, the rate limit and the API key.
+
+- **Not ported, called.** A second copy in the store API would mean two prompts
+  to keep in step and a second place to leak a key from. The route takes a plain
+  JSON body with no cookies and no auth, and React Native's fetch has no browser
+  origin, so there is nothing for a mobile client to be missing.
+- **Products come back as whole catalog rows**, so they render as real
+  `ProductTile`s — live price, working Add to Bag, the fly-to-bag animation. The
+  model never hands over a price to print; only slugs its tools looked up. They
+  go through `mapChatProduct` so the photos are rebased onto the API host the app
+  is pointed at.
+- **A screen, not a floating bubble.** On a phone a bubble lands either on the
+  tab bar or on a product tile, and this is the one feature that can use the
+  whole viewport.
+- If the storefront has no model key configured, the route answers 503 with its
+  own wording and the screen shows it. The button is not hidden — the app has no
+  way to know before asking.
 
 ## Publishing
 
