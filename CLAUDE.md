@@ -53,20 +53,39 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
   visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
   reservation, worded the same way.
-- **Seat picking on the box office's events.** An event sold by Ticketing Box
-  Office gets a live seat map on its page: `GET /api/events/:slug/seatmap`
-  ([server/src/seatmap.js](server/src/seatmap.js)) reads that event's own page at
-  the partner — every seat is a plain `<input class="CellBtnClass">` carrying its
-  row, number, price, colour and whether it is still free — and the hub draws it
-  ([SeatMap.jsx](as_ticketing/src/components/SeatMap.jsx)). Pick seats (or a
-  quantity of a zone, for halls sold by area) → a pre-filled WhatsApp message.
-  **It is a request, not a booking, and every layer says so**: nothing we run can
-  hold a seat, so staff confirm each one by hand and go back to the customer if a
-  seat has gone. Fetched on demand and cached a minute — a map stored by the sync
-  would be hours stale, which is a worse lie than "as of a minute ago" — only
-  ever from a URL already on the event row (never one from the query string), and
-  `SEATMAP_ENABLED=0` turns it all off. Full reasoning in
-  [as_ticketing/README.md](as_ticketing/README.md).
+- **Seat picking, on all three sources.** An event whose partner publishes a hall
+  gets a live seat map on its page: `GET /api/events/:slug/seatmap`
+  ([server/src/seatmap.js](server/src/seatmap.js)) routes to one reader per site
+  in [server/src/seatmap/](server/src/seatmap/) and the hub draws the answer
+  ([SeatMap.jsx](as_ticketing/src/components/SeatMap.jsx)). Pick seats, or a
+  quantity of a zone, or a table whole → a pre-filled WhatsApp message.
+  - **The three publish different things, and the panel stays honest about it.**
+    `tbo.js` rebuilds the hall as a grid (every seat is an `<input class=
+    "CellBtnClass">` in their page). `ihjoz.js` serves *their* SVG of the room:
+    tap a `seating="assigned"` block to load its numbered seats from
+    `/sections/<id>/map`, tap an `unassigned` one to take a zone or a table of
+    four whole. `tickit.js` serves their venue SVG plus zones from the JSON API
+    their own bundle calls — **Tick'it has no seats to pick** ("free seating
+    within your selected zone" is their own wording), so the zone is the choice
+    and inventing seat numbers there would be inventing a promise.
+  - **A partner's drawing is served, not redrawn**, because 82 tables called
+    V1…VII 25 mean nothing as a list and where they sit is the question being
+    asked. That puts third-party markup in our DOM, so
+    [seatmap/svg.js](server/src/seatmap/svg.js) reduces it to an **allow-list**
+    of shapes and attributes — no `<script>`, no `on*`, no `xlink:href`, no
+    `url()` in a style, no ids to collide with ours, only the `data-sid` that
+    addresses a block. Anything not named there is dropped, so a tag nobody has
+    seen cannot arrive and be trusted by accident.
+  - **It is a request, not a booking, and every layer says so**: nothing we run
+    can hold a seat, so staff confirm each one by hand and go back to the
+    customer if a seat has gone.
+  - Fetched on demand and cached a minute — a map stored by the sync would be
+    hours stale, which is a worse lie than "as of a minute ago" — only ever from
+    a URL already on the event row (never one from the query string). The night
+    is identified by **date and time**, because a run can play twice in one day
+    and each show is its own hall. `SEATMAP_ENABLED=0` turns it all off;
+    `SEATMAP_SOURCES=` keeps only the sources named. Full reasoning in
+    [as_ticketing/README.md](as_ticketing/README.md).
 - **Search is a feature here, not a chore** — it is how someone finds an event they
   didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
   one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
@@ -627,7 +646,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Env
 
 - Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 

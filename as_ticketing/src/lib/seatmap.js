@@ -11,15 +11,37 @@ import { formatDate } from './events.js'
 /** Where the live hall comes from — the marketing site's API, same as everything else. */
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
-export function seatmapUrl(slug, date) {
-  const q = date ? `?date=${encodeURIComponent(date)}` : ''
-  return `${API}/api/events/${encodeURIComponent(slug)}/seatmap${q}`
+/**
+ * `night` is the row out of `event.dates`, not just its date: a run can play
+ * twice in one day, each show its own hall with its own seats sold, and a date
+ * on its own would always fetch the earlier one.
+ */
+function nightQuery(night) {
+  const params = new URLSearchParams()
+  if (night?.date) params.set('date', night.date)
+  if (night?.time) params.set('time', night.time)
+  const q = params.toString()
+  return q ? `?${q}` : ''
 }
 
-/** Only box-office events have a hall we can read. Saves a request on the rest. */
+export function seatmapUrl(slug, night) {
+  return `${API}/api/events/${encodeURIComponent(slug)}/seatmap${nightQuery(night)}`
+}
+
+/** The seats inside one block of a map that has blocks (ihjoz). */
+export function seatmapSectionUrl(slug, sid, night) {
+  return `${API}/api/events/${encodeURIComponent(slug)}/seatmap/sections/${encodeURIComponent(sid)}${nightQuery(night)}`
+}
+
+// The three partners the sync pulls from all publish their hall to an anonymous
+// browser, and server/src/seatmap/ has a reader for each. Anything else — a
+// hand-made event, a fourth site — has no map, and asking would be a wasted
+// request on most of the calendar.
+const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co)$/i
+
 export function hasSeatmap(event) {
   const urls = [event?.ticketUrl, ...(event?.dates || []).map((d) => d?.url)].filter(Boolean)
-  return urls.some((u) => /(^|\.)ticketingboxoffice\.com$/i.test(hostOf(u)))
+  return urls.some((u) => SOURCES.test(hostOf(u)))
 }
 
 function hostOf(url) {

@@ -97,13 +97,25 @@ the redirect out in the same change or the marketing site will link to an
 
 ## Picking seats
 
-Events sold by **Ticketing Box Office** get a live seat map on their page: the
-real hall, the seats that are still free, priced — you tap the ones you want and
-send them to us on WhatsApp. Everything else (tickit, ihjoz, hand-made events)
-renders nothing extra and keeps the plain reserve button.
+An event that is sold with a hall behind it gets a live seat map on its page:
+the real room, what is still free, priced — you pick what you want and send it
+to us on WhatsApp. **All three sources the sync pulls from are read**, and each
+publishes something different to an anonymous browser, so the panel has to be
+able to be three shapes without becoming three components:
+
+| Source | What they publish | What the panel shows |
+|---|---|---|
+| ticketingboxoffice.com | every seat as an `<input>` in the event page | the whole hall as a grid we rebuild, plus their zone list |
+| ihjoz.com | an SVG of the room + a table of what is on sale in each block | their drawing; tap a **seated** block to open its numbered seats, tap a **table** to take it whole |
+| tickit.co | an SVG of the room + zones from their JSON API | their drawing and a priced zone list — see below |
+
+**Tick'it has no seat to pick, and that is their product, not a gap in ours.**
+Their own ticket note reads "free seating within your selected zone, allocated
+on a first-come, first-seated basis", so the zone *is* the choice. Inventing
+seat numbers to make the three look alike would be inventing a promise.
 
 **It is a request, never a booking, and the wording has to keep saying so.**
-Nothing on our side can hold a seat — only the box office's own system can. Two
+Nothing on our side can hold a seat — only the partner's own system can. Two
 visitors can tap the same seat a second apart, and a seat can sell between the
 page loading and the message being sent. Staff confirm every request by hand and
 come back to the customer if a seat has gone. That is the deal the business
@@ -111,26 +123,38 @@ chose, with eyes open; the UI says it under the button, and the API module says
 it at the top. Do not let either start implying a confirmed seat.
 
 - **Where it comes from**: `GET /api/events/:slug/seatmap` on the marketing
-  site's API ([server/src/seatmap.js](../server/src/seatmap.js)) — read that file
-  for how a box-office page is parsed. It is fetched **on demand** from the
-  browser, not stored: a map saved by the nightly sync would be hours stale,
-  which is a worse lie than "as of a minute ago". The API caches each hall for a
-  minute so a page that is being read by ten people costs one fetch.
-- **Two shapes, because the box office has two.** A hall with numbered seats
-  renders as the map; a hall sold by area (a standing gig, a gala, a class)
-  renders as a priced list of zones with a quantity stepper. Most events have
-  both — the map for the block the box office loaded, the zone list for the rest
-  — and a visitor can mix them in one request.
-- **A run's nights are separate halls.** Each night is its own page at the box
-  office with its own seats sold, so the night selector re-fetches and clears
+  site's API ([server/src/seatmap.js](../server/src/seatmap.js)), which routes to
+  one reader per partner in `server/src/seatmap/`. It is fetched **on demand**
+  from the browser, not stored: a map saved by the nightly sync would be hours
+  stale, which is a worse lie than "as of a minute ago". The API caches each hall
+  for a minute so a page being read by ten people costs one fetch.
+- **The partner's drawing is served, not redrawn** — for the two that have one.
+  A room of 82 numbered tables is meaningless as a list of names, and where V12
+  sits is the whole question being asked. That means third-party markup in our
+  DOM, so [server/src/seatmap/svg.js](../server/src/seatmap/svg.js) strips it to
+  an **allow-list** of shapes and attributes: no `<script>`, no `on*`, no
+  `xlink:href`, no `url()` in a style, no ids to collide with ours — only
+  `data-sid`, which is how a block is addressed. Interactivity is all ours.
+- **A block's seats are loaded when it is opened**, from
+  `…/seatmap/sections/:sid`. One ihjoz hall has six seated blocks; fetching all
+  of them with the map would be 200 KB for a map most visitors pick one zone
+  from.
+- **A run's nights are separate halls**, and a day can hold two of them — one
+  stand-up run plays 6pm and 9pm on the same Saturday, as two separate events at
+  the partner. So the night selector sends the date **and the time**, and clears
   whatever was picked: those seats were in a different room.
+- **Nothing renders until the answer arrives** — not even a skeleton. Most events
+  on all three sites have no hall at all (a club night sells one kind of ticket),
+  so a panel that says "Choose your seats" and then removes itself would promise
+  a seat picker to almost everyone who will never get one.
 - **The map fits first, then zooms.** You cannot choose a seat in a room you
   can't see, so it opens scaled to the container and the +/− buttons zoom in for
-  tapping. The geometry is computed from the data (widest row × seat size)
-  rather than measured after a paint.
+  tapping. The rebuilt grid's geometry is computed from the data (widest row ×
+  seat size) rather than measured after a paint.
 - `SEATMAP_ENABLED=0` on the API turns the whole thing off — the kill switch for
-  the day the box office objects or redesigns, and every page falls back to the
-  reserve button on its own.
+  the day a partner objects or redesigns, and every page falls back to the
+  reserve button on its own. `SEATMAP_SOURCES=tbo,ihjoz` turns off one source
+  without turning off the rest.
 
 ## Running it
 
