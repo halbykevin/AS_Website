@@ -36,6 +36,55 @@ It is a **308**, not the 307 `redirect()` gives by default — a permanent
 redirect is what hands the root domain's authority to `/events` and gets that
 URL indexed instead. A temporary one leaves the two competing indefinitely.
 
+## Searching
+
+Someone who arrives with a name in their head — an artist, a show, the venue
+they saw on a poster — should not have to work out which category it lives in.
+The search box is in the hero of `/events` and in the header on every page, and
+it suggests as you type.
+
+All of it is [`src/lib/search.js`](src/lib/search.js) plus
+[`EventSearch.jsx`](src/components/EventSearch.jsx).
+
+- **There is no search endpoint, on purpose.** The whole catalogue is ~70 rows
+  that every page already loads and `lib/api.js` already caches for five
+  minutes, so matching them in memory beats a query parameter on the marketing
+  site's API and a round trip per keystroke — and it keeps the "no backend of
+  its own" rule intact. If the catalogue ever reaches the thousands this is the
+  thing to revisit; nothing else changes when it does.
+- **One matcher, two callers.** The listing page filters the grid on the server
+  and the box ranks its suggestions on the client, both through `searchEvents()`
+  — so a suggestion and the results page it leads to can never disagree about
+  what matches, which is how a search box loses someone's trust in one tap.
+- **Every word has to land, and where it landed is the ranking.** "elissa forum"
+  is a request for one event, not for everything named Elissa plus everything at
+  the Forum. A hit in the title outweighs one in a venue, at the start of a
+  field outweighs one buried mid-word ("mel" → Melissa, not caramel), and a
+  whole word outweighs a prefix. Text is folded first: lowercase, accents
+  stripped (Béchara / Bechara), HTML removed, punctuation flattened. Arabic
+  script survives folding, so a title written in it stays searchable in it.
+- **The suggestions see less than the results page**, and that asymmetry is
+  deliberate. The client index carries titles, venues, cities and categories —
+  about 12 KB — while the server also searches the description, which is where a
+  supporting act's name usually is and often the only place it appears. So the
+  dropdown never says "nothing found": its last row is always *see all results*,
+  and pressing Enter is never a dead end.
+- **The index crosses the boundary once.** `getSearchIndex()` is wrapped in
+  React's `cache()`, so the header and the listing page share one array and the
+  RSC payload doesn't carry every event title twice.
+- **No thumbnails in the dropdown.** The image optimizer is off for this app, so
+  a 40px suggestion thumbnail would pull the box office's full-size poster —
+  six of them, changing on every keystroke. The rows are typographic instead:
+  the title in the reading weight with the typed letters marked in brand red,
+  the date and venue a step down in size and weight underneath.
+- **It works before the JavaScript does.** The box is a real
+  `<form action="/events" method="get">`, so Enter is a plain GET either way.
+  Arrow keys walk the list, Escape closes it, and the field mirrors `?q=` — a
+  shared link or the back button shows what is being searched.
+- **The category tabs keep the query.** With a search running they stop being
+  navigation and become a way to narrow it; dropping `q` on the tap meant to
+  refine it would silently throw the search away.
+
 ## SEO
 
 Search is how someone finds an event they don't yet know exists, so it is a
@@ -60,6 +109,12 @@ plus the `metadata` exports on each route.
   somebody searching "concerts in Lebanon" should land on the concerts tab. A
   `category` that matches nothing is noindexed instead — an empty page under a
   real-sounding URL is how a listing site accumulates thin content.
+- **A `?q=` search is `noindex, follow`, always.** The query space is infinite
+  and every results page is a rearrangement of pages Google already has. It
+  self-canonicalises rather than pointing at `/events`: a noindexed page
+  canonicalising to another one is how you talk Google into dropping the page it
+  points at. It emits no `ItemList` and no breadcrumb either — a second, weaker
+  description of pages it already has, under a URL it was told to ignore.
 - **Finished events keep their page**, marked ended and `noindex, follow`, and
   drop out of the listing and the sitemap. A 404 the morning after the show
   throws away every link the event earned and sends a searcher to an error

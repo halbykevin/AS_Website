@@ -3,7 +3,10 @@
 // and categories are managed once, at as.com.lb/admin, and the events sync
 // (three ticketing sites -> Postgres) keeps them current for both properties.
 
+import { cache } from 'react'
+
 import { isEventPast } from './events.js'
+import { searchIndex } from './search.js'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -52,6 +55,16 @@ export async function getEvent(slug) {
   const rows = await getAllEvents()
   return rows.find((e) => e.slug === slug) || null
 }
+
+/**
+ * The trimmed event list the search box matches against, built once per request.
+ *
+ * `cache()` matters here for more than the work it saves: the header and the
+ * listing page both ask for it, and sharing one array means the RSC payload
+ * carries the index once instead of embedding a second copy of every event
+ * title in the HTML.
+ */
+export const getSearchIndex = cache(async () => searchIndex(await getEvents()))
 
 /** Only the categories that actually have an upcoming event behind them. */
 export async function getCategories() {

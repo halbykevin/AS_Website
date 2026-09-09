@@ -1,8 +1,22 @@
 import Link from 'next/link'
 
-export default function CategoryFilter({ categories, active = '' }) {
+/**
+ * `query` is carried across the tabs on purpose: with a search running, the
+ * tabs stop being navigation and become a way to narrow it ("comedy, and the
+ * word I typed"). Dropping it would silently throw the search away on the tap
+ * meant to refine it. Without a search the hrefs are exactly the canonical
+ * /events?category=<slug> URLs the sitemap lists.
+ */
+export default function CategoryFilter({ categories, active = '', query = '' }) {
   if (!categories?.length) return null
-  const tabs = [{ slug: '', name: 'All events' }, ...categories]
+  const tabs = [{ slug: '', name: query ? 'All categories' : 'All events' }, ...categories]
+
+  const hrefFor = (slug) => {
+    const parts = []
+    if (slug) parts.push(`category=${encodeURIComponent(slug)}`)
+    if (query) parts.push(`q=${encodeURIComponent(query)}`)
+    return parts.length ? `/events?${parts.join('&')}` : '/events'
+  }
 
   return (
     <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
@@ -12,7 +26,7 @@ export default function CategoryFilter({ categories, active = '' }) {
           return (
             <Link
               key={c.slug || 'all'}
-              href={c.slug ? `/events?category=${c.slug}` : '/events'}
+              href={hrefFor(c.slug)}
               className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                 on
                   ? 'bg-as-red text-white shadow-sm'

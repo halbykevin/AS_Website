@@ -86,6 +86,22 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
     and each show is its own hall. `SEATMAP_ENABLED=0` turns it all off;
     `SEATMAP_SOURCES=` keeps only the sources named. Full reasoning in
     [as_ticketing/README.md](as_ticketing/README.md).
+- **You can search it.** A box in the `/events` hero and in the header on every
+  page, suggesting as you type: [as_ticketing/src/lib/search.js](as_ticketing/src/lib/search.js)
+  matches, [EventSearch.jsx](as_ticketing/src/components/EventSearch.jsx) draws.
+  There is no search endpoint — the catalogue is ~70 rows every page already
+  loads, so it is matched in memory, which keeps the "no backend of its own"
+  rule intact. **One matcher, two callers**: the listing filters the grid
+  server-side and the box ranks suggestions client-side through the same
+  `searchEvents()`, so a suggestion and the page it leads to can never disagree.
+  Every word must land somewhere (title beats venue, start-of-field beats
+  mid-word), text is folded first (case, accents, HTML, punctuation; Arabic
+  survives), and the client index deliberately sees less than the server —
+  titles/venues/cities/categories only, while the results page also searches
+  descriptions, where a support act's name usually hides. That is why the
+  dropdown never says "nothing found": its last row is always *see all results*.
+  A `?q=` page is `noindex, follow` with a self-canonical and no structured data
+  — an infinite query space rearranging pages Google already has.
 - **Search is a feature here, not a chore** — it is how someone finds an event they
   didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
   one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
