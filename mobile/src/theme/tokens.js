@@ -21,6 +21,12 @@ export const palette = {
   asInk: '#15181A',
   asInkSoft: '#222A2D',
   asInkLine: '#2C3236',
+  // The shopping assistant's green — the same `chat-green` the AS Store
+  // website paints its chat bubble with (as_store/tailwind.config.js).
+  // Deliberately off-brand: a red AI button on a red-accented store reads as
+  // decoration, this reads as a thing to press.
+  chatGreen: '#25D366',
+  chatGreenDark: '#1DA851',
   // Accents / backgrounds.
   asAmber: '#F2A93B',
   asBg: '#EAEDED',
@@ -61,6 +67,12 @@ export const lightColors = {
   primaryLight: palette.asRedLight,
   primaryWash: palette.asBlush,
   accent: palette.asAmber,
+  // The AI shopping assistant, wherever it is offered. Shared with the
+  // website's chat bubble on purpose — one feature, one colour, whichever
+  // screen a customer meets it on. The `OnLight` variant is the same green
+  // darkened for white chrome; the bright one is for the ink header.
+  assistant: palette.chatGreen,
+  assistantOnLight: palette.chatGreenDark,
 
   // Text
   text: palette.asInk,

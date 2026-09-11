@@ -99,10 +99,13 @@ export default function AppHeader({
           ) : null}
           {/* The shopping assistant — the app's answer to the website's chat
               bubble. A header action rather than a floating button: a bubble on
-              a phone lands either on the tab bar or on a product tile. */}
+              a phone lands either on the tab bar or on a product tile. It wears
+              the website bubble's green rather than the header's own colour, so
+              the AI reads as the same feature on both and as the one thing in
+              the bar that isn't plain navigation. */}
           {assistant ? (
             <Pressable onPress={() => router.push('/assistant')} hitSlop={theme.layout.hitSlop} accessibilityRole="button" accessibilityLabel="Ask the assistant">
-              <Icon name="sparkles" size={22} color={fg} />
+              <Icon name="sparkles" size={22} color={dark ? theme.colors.assistant : theme.colors.assistantOnLight} />
             </Pressable>
           ) : null}
           {bag ? <BagAction color={fg} /> : null}

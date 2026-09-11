@@ -344,6 +344,12 @@ prompt, the catalog tools, the tool-round budget, the rate limit and the API key
 - **A screen, not a floating bubble.** On a phone a bubble lands either on the
   tab bar or on a product tile, and this is the one feature that can use the
   whole viewport.
+- **The button is the website bubble's green** (`#25D366` — `theme.colors.assistant`,
+  the same `chat-green` as `as_store/tailwind.config.js`) rather than the header's
+  own white. One feature, one colour, whichever screen a customer meets it on —
+  and on a bar of plain white nav icons the green is what says this one is
+  different. `assistantOnLight` is the darkened twin for light chrome, since the
+  bright green on white is barely a contrast at all.
 - If the storefront has no model key configured, the route answers 503 with its
   own wording and the screen shows it. The button is not hidden — the app has no
   way to know before asking.
