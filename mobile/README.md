@@ -450,9 +450,15 @@ Notes worth knowing before you change any of it:
   Google Cloud → IAM → Service accounts, then granted access in Play Console →
   Users and permissions. Put it at `credentials/play-service-account.json`
   (`credentials/` is gitignored — this key can publish to your store listing) and
-  run `npm run submit:android`. The submit profile uploads to the **internal**
+  `npm run play` does the rest. The submit profile uploads to the **internal**
   track as a **draft**; promote to production from the Play Console once you've
-  checked the build.
+  checked the build. `npm run play` refuses to start a build until that file is
+  there and prints these steps — a key discovered missing after a 20-minute
+  build has cost 20 minutes and a build credit.
+- **The app's first upload has to be manual.** Google's Play Developer API
+  cannot create a brand-new app's first release, so if nothing has ever been
+  uploaded for `lb.com.as.company`, run `npm run aab` and drag that file into
+  the console once. Every release after it can come from `npm run play`.
 - **iOS submit config** — the `submit.production` block has no `ios` section. Add
   `appleId` / `ascAppId` / `appleTeamId`, or just run `eas submit --platform ios`
   and let it prompt.
@@ -480,14 +486,66 @@ npm run web        # run in the browser
 npm run update     # publish a JS-only OTA update to the production channel
 
 npm run apk        # build + install a test APK on a phone (see scripts/apk.mjs)
-npm run aab        # build the Play Store bundle, download it, print the upload steps
+npm run aab        # build the Play Store bundle, download it, open the folder
 npm run aab -- --latest   # skip the build, fetch the newest finished bundle
+
+npm run play         # build the bundle AND upload it to Play (internal, draft)
+npm run play:latest  # upload the newest finished bundle, no rebuild
+npm run play:live    # same, but the production track (still a draft)
 ```
 
-Releasing to Google Play: bump `expo.version` in `app.json` (the versionCode is
-remote and EAS auto-increments it), then `npm run aab` and upload the file it
-leaves in `mobile/build/`. A JS-only change does not need any of that — `npm run
-update` reaches the binaries already installed.
+From the repo root, `npm run app` is `npm run aab` and `npm run app:test` is
+`npm run apk` — both forward their flags (`npm run app -- --latest`).
+
+### Releasing to Google Play
+
+```bash
+# 1. bump the version people see (the versionCode is remote — EAS increments it)
+#    mobile/app.json  ->  expo.version
+# 2. one command, from the repo root or from mobile/
+npm run app            # == cd mobile && npm run aab
+# 3. it leaves the .aab in mobile/build/ and opens that folder. Drag it into
+#    play.google.com/console > AS Company > Create new release > roll out.
+```
+
+That is the whole manual route: **build on EAS → download → the folder opens
+with the file selected**, because the next thing you do with it is drag it into
+a browser and a path printed in a terminal is one more thing to go find.
+`--no-open` skips that, `--latest` skips the build and fetches the newest
+finished bundle (the artifact of a finished build never changes, so a matching
+local copy is not downloaded twice).
+
+`npm run app:test` is the same script for the *testing* APK — built, downloaded
+and pushed onto a connected phone over adb. An `.aab` cannot be installed on a
+phone at all; Play builds the per-device APKs out of it.
+
+#### Or let it upload too
+
+```bash
+npm run play           # build, download, and submit to Play
+npm run play:latest    # submit the newest finished bundle, no rebuild
+npm run play:live      # production track instead of internal (still a draft)
+```
+
+`npm run play` is `scripts/apk.mjs --profile production --submit`: the same build
+and download as `npm run aab`, with an `eas submit` leg on the end. Three things
+about it are deliberate:
+
+- **It uploads as a draft**, and to the internal track. Nothing this script does
+  can put a build in front of a customer — rolling out stays a decision someone
+  makes in the console, looking at the release. `npm run play:live` swaps the
+  track for `production` (the `live` submit profile in `eas.json`) and is still a
+  draft.
+- **It submits the build off EAS** (`eas submit --id <build>`), not the local
+  copy, so the 60 MB does not go back up your line. The download is still worth
+  having: it is what you archive, what you upload by hand if the API leg fails,
+  and what Play's internal app sharing takes.
+- **The credential check happens first**, before the build starts, because the
+  fix is a key out of two consoles and not something you want to discover 20
+  minutes in.
+
+A JS-only change needs none of this — `npm run update` reaches the binaries
+already installed. A native or dependency change needs the real build.
 
 ## Notes
 

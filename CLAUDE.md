@@ -134,6 +134,11 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
 Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
+`npm run app` (repo root) is the Android release: it builds the Play Store bundle on EAS,
+downloads it to `mobile/build/` and opens that folder to drag into Play Console
+(`npm run app:test` does the same with an installable test APK; `mobile`'s own `npm run play`
+adds the `eas submit` leg). See [mobile/scripts/apk.mjs](mobile/scripts/apk.mjs).
+
 `npm run kill` (repo root) stops every dev server across all the sub-projects at once —
 it clears whatever is listening on the project's ports (vite 5173-5175, next 5180, site API
 8080, store API 8081, expo 8082-8083) and their child processes. `npm run kill:dry` lists them

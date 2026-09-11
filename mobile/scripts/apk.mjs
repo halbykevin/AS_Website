@@ -8,10 +8,13 @@
  *   npm run apk -- --force-new           # always start a fresh build
  *   npm run aab                          # the Play Store bundle (production profile)
  *   npm run aab -- --latest              # download the newest finished bundle
+ *   npm run play                         # build the bundle AND upload it to Play
+ *   npm run play:latest                  # upload the newest finished bundle
  *
  * An .aab (what the production profile builds) cannot be installed on a phone at
  * all — it is what Play Console takes — so that path stops at the downloaded file
- * and prints what to do with it. Otherwise:
+ * and prints what to do with it, or hands it to Play itself with --submit.
+ * Otherwise:
  *
  * Ends with the .apk downloaded to mobile/build/ and, if adb is around, installed
  * on the connected phone. Without adb it serves the file over the local network
@@ -52,6 +55,11 @@ if (has('--help') || has('-h')) {
       'or a Play Store .aab with --profile production.',
       '',
       '  --profile <name>   eas.json build profile (default: preview)',
+      '  --submit           upload the finished bundle to Google Play',
+      '  --track <name>     which eas.json submit profile: production',
+      '                     (internal track, draft) or live (production',
+      '                     track, draft). Default: production',
+      '  --no-open          do not open the folder the bundle landed in',
       '  --latest           use the newest finished build instead of building',
       '  --force-new        start a build even if one is already running',
       '  --bluestacks       install into BlueStacks instead of a real phone',
@@ -65,6 +73,9 @@ if (has('--help') || has('-h')) {
 }
 
 const profile = opt('--profile', 'preview')
+const submit = has('--submit')
+const skipOpen = has('--no-open')
+const submitProfile = opt('--track', 'production')
 const port = Number(opt('--port', '8090'))
 const useLatest = has('--latest')
 const forceNew = has('--force-new')
@@ -118,8 +129,65 @@ const fmtAge = (iso) => {
   return h < 24 ? `${h}h ${mins % 60}m ago` : `${Math.floor(h / 24)}d ago`
 }
 
+// ------------------------------------------------- preflight: Play upload --
+// Everything --submit needs is checked *before* the build starts: a missing
+// service-account key found out 20 minutes later has cost 20 minutes and a
+// build credit, and the fix (a key out of two consoles) is not a 10-second one.
+const playTarget = (() => {
+  if (!submit) return null
+  if (profile !== 'production') {
+    die(
+      `--submit needs --profile production, which builds the .aab Play takes.\n` +
+        `    Google has refused plain APKs for new apps since 2021, so a ${profile}\n` +
+        `    build cannot be uploaded. Use: npm run play`,
+    )
+  }
+  let cfg
+  try {
+    cfg = JSON.parse(readFileSync(join(MOBILE_DIR, 'eas.json'), 'utf8'))
+  } catch (e) {
+    return die(`Could not read eas.json - ${e.message}`)
+  }
+  const target = cfg.submit?.[submitProfile]?.android
+  if (!target) {
+    return die(
+      `eas.json has no android submit profile called "${submitProfile}".\n` +
+        `    It has: ${Object.keys(cfg.submit || {}).join(', ') || '(none)'}`,
+    )
+  }
+  // eas.json spells the path relative to mobile/, usually with a ./ prefix that
+  // reads badly once it is pasted after another folder name.
+  const rel = (target.serviceAccountKeyPath || 'credentials/play-service-account.json').replace(/^\.\//, '')
+  // The key can publish to the live listing, so it is gitignored and lives only
+  // on the machine that releases. Say exactly where to get one.
+  if (!existsSync(join(MOBILE_DIR, rel))) {
+    say('  -- Google Play needs a service-account key ------------------')
+    say('')
+    say(`  There is nothing at  mobile/${rel}`)
+    say('')
+    say('  1. Play Console > Setup > API access > Create new service account')
+    say('  2. In Google Cloud (it links you there): create the account, then')
+    say('     Manage keys > Add key > Create new key > JSON - it downloads.')
+    say('  3. Back in Play Console > Users and permissions: give that account')
+    say('     access to AS Company with the Release manager role.')
+    say(`  4. Save the JSON as mobile/${rel}`)
+    say('     (credentials/ is gitignored - it can publish to your listing).')
+    say('')
+    say('  Until then, build the bundle and upload it by hand: npm run aab')
+    say('')
+    process.exit(1)
+  }
+  return target
+})()
+
+
 // ------------------------------------------------------ pick/start a build --
 say(`\nAS Company mobile - APK (${profile})\n`)
+
+if (playTarget) {
+  say(`  Then uploading to Google Play: ${playTarget.track} track, ${playTarget.releaseStatus || 'completed'} release.
+`)
+}
 
 const recent = listBuilds().filter((b) => b.buildProfile === profile)
 const running = recent.find((b) => !DONE[b.status])
@@ -212,15 +280,69 @@ const size = statSync(file).size
 // deliverable and the rest of this script does not apply.
 if (isBundle) {
   say('')
-  say('  -- Upload to Google Play ------------------------------------')
-  say('')
   say(`  Version ${build.appVersion} (versionCode ${build.appBuildVersion}) — ${fmtSize(size)}`)
-  say('')
   say(`      ${file}`)
+
+  // --submit hands it to Play from here. `--id` uploads the artifact EAS
+  // already has rather than pushing the 90 MB local copy back up your line;
+  // the download above is still worth having as the thing you can archive,
+  // sideload-test through Play's internal app sharing, or upload by hand if
+  // the API leg fails.
+  if (playTarget) {
+    say('')
+    say(`  -- Uploading to Google Play (${playTarget.track}) ------------------`)
+    say('')
+    const r = npx(
+      [...EAS, 'submit', '--platform', 'android', '--profile', submitProfile, '--id', build.id, '--non-interactive'],
+      { stdio: 'inherit' },
+    )
+    if (r.status !== 0) {
+      say('')
+      say('  x  The upload failed. The bundle itself is fine - it is on disk')
+      say('     and on expo.dev; only the Play leg did not go through.')
+      say('')
+      say('  Usually one of two things:')
+      say('   - the service account has no access to this app yet')
+      say('     (Play Console > Users and permissions > Release manager), or')
+      say("   - this is the app's very first upload. Google refuses the API for")
+      say('     that one: the first bundle has to go in through the console,')
+      say('     and every release after it can come from here.')
+      say('')
+      say('  By hand: play.google.com/console > AS Company > Testing >')
+      say('  Internal testing > Create new release > upload that .aab.')
+      say('')
+      process.exit(1)
+    }
+    say('')
+    say(`  ok  Uploaded as a ${playTarget.releaseStatus || 'completed'} release on the ${playTarget.track} track,`)
+    say('      so nothing reaches anyone until you roll it out:')
+    say('')
+    say('      play.google.com/console > AS Company > Releases overview >')
+    say('      open the draft, add the release notes, Review > Start rollout.')
+    say('')
+    process.exit(0)
+  }
+
+  // The next step is dragging this file into a browser, so put it in front of
+  // them: a 60 MB .aab in mobile/build/ is otherwise a path to go find.
+  // `/select,<path>` has to arrive as ONE argument, so this goes straight to
+  // spawnSync rather than through sh() — which joins and quotes for the shell.
+  // explorer.exe is a real executable, so it needs no shell, and it exits 1
+  // even on success: nothing here reads the result.
+  if (!skipOpen && !submit) {
+    if (isWin) spawnSync('explorer', [`/select,${file}`])
+    else if (process.platform === 'darwin') spawnSync('open', ['-R', file])
+  }
+
+  say('')
+  say('  -- Upload to Google Play ------------------------------------')
   say('')
   say('  1. play.google.com/console  >  AS Company')
   say('  2. Testing > Internal testing (or Production) > Create new release')
   say('  3. Upload that .aab, write the release notes, roll out.')
+  say('')
+  say('  Or let this script do it: npm run play  (needs the Play service')
+  say('  account key - it tells you where to get one).')
   say('')
   say('  The versionCode is remote and auto-incremented by EAS, so every build')
   say('  is a fresh upload — Play refuses a code it has already seen.')
