@@ -49,7 +49,12 @@ export function StorePanel({ banner }) {
 
   const [index, setIndex] = useState(0);
   const scrollRef = useRef(null);
-  const [boxWidth, setBoxWidth] = useState(0);
+  // Both axes, not just the width: a slide is sized to the box it sits in
+  // vertically too, because the cards inside it fill their height. Without a
+  // height to fill, the photo (flex: 1 in a column of no fixed height) resolves
+  // to nothing and the panel shows two captions floating in an empty card.
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  const boxWidth = box.width;
 
   useEffect(() => {
     if (slides.length < 2 || !boxWidth) return undefined;
@@ -68,6 +73,10 @@ export function StorePanel({ banner }) {
       label="AS Store"
       onPress={() => router.push('/shop')}
       cta="Visit store"
+      // Taller than its siblings when it is showing products: they hold a logo
+      // centred in the box, this one holds photographs with names under them,
+      // and 16/10 leaves those photos about a thumbnail tall on a phone.
+      ratio={slides.length ? 4 / 3 : undefined}
       style={{ backgroundColor: theme.colors.surface }}
     >
       {slides.length === 0 ? (
@@ -83,15 +92,25 @@ export function StorePanel({ banner }) {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onLayout={e => setBoxWidth(e.nativeEvent.layout.width)}
+            onLayout={e => setBox({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
             onMomentumScrollEnd={e => boxWidth && setIndex(Math.round(e.nativeEvent.contentOffset.x / boxWidth))}
-            style={{ flexGrow: 0 }}
+            // Fills the panel above the dots, so the slides have a height to be
+            // measured against instead of shrinking to their captions.
+            style={{ flex: 1 }}
           >
             {slides.map((slide, i) => (
-              <View key={i} style={[styles.slide, { width: boxWidth || width }]}>
+              <View key={i} style={[styles.slide, { width: boxWidth || width, height: box.height || undefined }]}>
                 {slide.map(p => (
                   <Pressable key={p.id} onPress={() => router.push(`/product/${p.slug}`)} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
-                    <RemoteImage uri={p.image} style={styles.cardImage} contentFit="contain" fallbackIcon="box" />
+                    <View style={styles.cardMedia}>
+                      <RemoteImage
+                        uri={p.image}
+                        style={styles.cardImage}
+                        contentFit="contain"
+                        fallbackIcon="box"
+                        fallbackBackground={theme.colors.productMedia}
+                      />
+                    </View>
                     {p.brand ? (
                       <Text variant="overline" color="primary" numberOfLines={1}>
                         {p.brand}
@@ -154,16 +173,19 @@ export function WhatWeDoPanel({ services }) {
 }
 
 /**
- * One panel: a tappable card with the same proportions as its two siblings, and
- * the destination said outright underneath rather than left to be guessed. The
- * website does the same — a panel that only *looks* tappable gets tapped less.
+ * One panel: a tappable card with the destination said outright underneath
+ * rather than left to be guessed. The website does the same — a panel that only
+ * *looks* tappable gets tapped less.
+ *
+ * `ratio` is the box it draws itself in. The two logo panels share the default;
+ * the store's is taller because it carries real content rather than a mark.
  */
-function Panel({ label, onPress, cta, style, children }) {
+function Panel({ label, onPress, cta, style, ratio = 16 / 10, children }) {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
     <View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${label} — ${cta}`} onPress={onPress} style={({ pressed }) => [styles.panel, style, pressed && { opacity: 0.95 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label} — ${cta}`} onPress={onPress} style={({ pressed }) => [styles.panel, { aspectRatio: ratio }, style, pressed && { opacity: 0.95 }]}>
         {children}
       </Pressable>
       <Pressable onPress={onPress} style={styles.cta} hitSlop={theme.layout.hitSlop}>
@@ -179,7 +201,7 @@ function Panel({ label, onPress, cta, style, children }) {
 const makeStyles = t => ({
   panel: {
     width: '100%',
-    aspectRatio: 16 / 10,
+    // aspectRatio comes from the `ratio` prop.
     borderRadius: t.radii['3xl'],
     overflow: 'hidden',
     borderWidth: 1,
@@ -191,9 +213,13 @@ const makeStyles = t => ({
   logoWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: t.spacing.xl },
   logo: { width: '62%', height: '62%' },
   hubLogo: { width: '70%', height: '78%' },
-  slide: { flexDirection: 'row', gap: t.spacing.md, padding: t.spacing.lg, alignItems: 'stretch' },
-  card: { flex: 1, gap: 4, justifyContent: 'flex-start' },
-  cardImage: { width: '100%', flex: 1, marginBottom: 6 },
+  slide: { flexDirection: 'row', gap: t.spacing.md, padding: t.spacing.md, alignItems: 'stretch' },
+  card: { flex: 1, gap: 2, justifyContent: 'flex-start' },
+  // The photo takes every pixel the captions leave. White behind it, like the
+  // product tiles: the photos arrive on white, so a tinted box would read as a
+  // white rectangle pasted into a grey one.
+  cardMedia: { flex: 1, minHeight: 64, borderRadius: t.radii.xl, overflow: 'hidden', backgroundColor: t.colors.productMedia, marginBottom: 6 },
+  cardImage: { width: '100%', height: '100%' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: t.spacing.md },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.colors.border },
   dotOn: { backgroundColor: t.colors.primary, width: 18 },
