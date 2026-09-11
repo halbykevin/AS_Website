@@ -6,8 +6,9 @@
  *   npm run apk:prod                     # same, production-apk profile
  *   npm run apk:latest                   # skip the build, grab the newest finished APK
  *   npm run apk -- --force-new           # always start a fresh build
- *   npm run aab                          # the Play Store bundle (production profile)
- *   npm run aab -- --latest              # download the newest finished bundle
+ *   npm run aab                          # the Play Store bundle: build, then its link
+ *   npm run aab -- --download            # ...and pull the file down here as well
+ *   npm run aab -- --latest              # the newest finished bundle's link
  *   npm run play                         # build the bundle AND upload it to Play
  *   npm run play:latest                  # upload the newest finished bundle
  *
@@ -55,6 +56,7 @@ if (has('--help') || has('-h')) {
       'or a Play Store .aab with --profile production.',
       '',
       '  --profile <name>   eas.json build profile (default: preview)',
+      '  --download         keep the .aab here too (bundles print a link)',
       '  --submit           upload the finished bundle to Google Play',
       '  --track <name>     which eas.json submit profile: production',
       '                     (internal track, draft) or live (production',
@@ -116,6 +118,18 @@ function easJson(args) {
     return die(`Could not parse the response from eas ${args[0]}.\n${out.slice(at, at + 400)}`)
   }
 }
+
+/**
+ * Put the artifact link where the browser can take it. Best-effort and silent:
+ * a machine without clip/pbcopy still gets the link printed, which is the part
+ * that matters.
+ */
+function copyLink(text) {
+  const cmd = isWin ? 'clip' : process.platform === 'darwin' ? 'pbcopy' : ''
+  if (!cmd) return false
+  return spawnSync(cmd, { input: text }).status === 0
+}
+
 
 const listBuilds = (limit = 15) =>
   easJson(['build:list', '--platform', 'android', '--limit', String(limit)])
@@ -185,8 +199,8 @@ const playTarget = (() => {
 say(`\nAS Company mobile - APK (${profile})\n`)
 
 if (playTarget) {
-  say(`  Then uploading to Google Play: ${playTarget.track} track, ${playTarget.releaseStatus || 'completed'} release.
-`)
+  say(`  Then uploading to Google Play: ${playTarget.track} track, ${playTarget.releaseStatus || 'completed'} release.`)
+  say('')
 }
 
 const recent = listBuilds().filter((b) => b.buildProfile === profile)
@@ -253,41 +267,48 @@ if (!url) die('The build finished but carries no downloadable artifact. Check it
 const isBundle = /\.aab(\?|$)/i.test(url)
 const ext = isBundle ? 'aab' : 'apk'
 
-mkdirSync(OUT_DIR, { recursive: true })
-const file = join(OUT_DIR, `as-company-${profile}-v${build.appVersion}-${build.appBuildVersion}.${ext}`)
+// An APK has to be on this machine to be installed on a phone. A bundle does
+// not: the thing you do with one is open EAS's link, let the browser fetch it,
+// and hand that file to Play Console — and --submit needs no local copy either,
+// since it submits the artifact by build id. So the 60 MB only comes down for a
+// bundle when --download asks for it.
+const wantDownload = !isBundle || has('--download')
 
-// A finished build's artifact never changes, so a matching local copy is the
-// same bytes — no point pulling 90 MB again on every run.
-const onDisk = existsSync(file) ? statSync(file).size : 0
-const expected = Number(
+let size = Number(
   (await fetch(url, { method: 'HEAD' }).catch(() => null))?.headers.get('content-length') || 0,
 )
+let file = ''
 
-if (onDisk && onDisk === expected) {
-  say(`\n  ok  Already downloaded: ${file}  (${fmtSize(onDisk)})`)
-} else {
-  say(`\n  Downloading ${ext.toUpperCase()}...`)
-  const res = await fetch(url)
-  if (!res.ok) die(`Download failed - ${res.status} ${res.statusText}`)
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(file))
-  say(`  ok  ${file}  (${fmtSize(statSync(file).size)})`)
+if (wantDownload) {
+  mkdirSync(OUT_DIR, { recursive: true })
+  file = join(OUT_DIR, `as-company-${profile}-v${build.appVersion}-${build.appBuildVersion}.${ext}`)
+
+  // A finished build's artifact never changes, so a matching local copy is the
+  // same bytes — no point pulling 90 MB again on every run.
+  const onDisk = existsSync(file) ? statSync(file).size : 0
+  if (onDisk && onDisk === size) {
+    say(`\n  ok  Already downloaded: ${file}  (${fmtSize(onDisk)})`)
+  } else {
+    say(`\n  Downloading ${ext.toUpperCase()}...`)
+    const res = await fetch(url)
+    if (!res.ok) die(`Download failed - ${res.status} ${res.statusText}`)
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(file))
+    say(`  ok  ${file}  (${fmtSize(statSync(file).size)})`)
+  }
+  size = statSync(file).size
 }
-const size = statSync(file).size
 
 // ------------------------------------------------------ the Play bundle --
 // An .aab is not installable: Play builds the per-device APKs out of it. There
 // is nothing to adb-install and nothing to sideload, so the file itself is the
 // deliverable and the rest of this script does not apply.
 if (isBundle) {
+  const expires = new Date(build.expirationDate).toDateString()
   say('')
   say(`  Version ${build.appVersion} (versionCode ${build.appBuildVersion}) — ${fmtSize(size)}`)
-  say(`      ${file}`)
 
-  // --submit hands it to Play from here. `--id` uploads the artifact EAS
-  // already has rather than pushing the 90 MB local copy back up your line;
-  // the download above is still worth having as the thing you can archive,
-  // sideload-test through Play's internal app sharing, or upload by hand if
-  // the API leg fails.
+  // --submit hands it to Play from here, by build id: the artifact goes from
+  // EAS to Google without passing through this machine at all.
   if (playTarget) {
     say('')
     say(`  -- Uploading to Google Play (${playTarget.track}) ------------------`)
@@ -298,8 +319,8 @@ if (isBundle) {
     )
     if (r.status !== 0) {
       say('')
-      say('  x  The upload failed. The bundle itself is fine - it is on disk')
-      say('     and on expo.dev; only the Play leg did not go through.')
+      say('  x  The upload failed. The bundle itself is fine - it is on')
+      say('     expo.dev at the link below; only the Play leg did not go.')
       say('')
       say('  Usually one of two things:')
       say('   - the service account has no access to this app yet')
@@ -308,8 +329,12 @@ if (isBundle) {
       say('     that one: the first bundle has to go in through the console,')
       say('     and every release after it can come from here.')
       say('')
-      say('  By hand: play.google.com/console > AS Company > Testing >')
-      say('  Internal testing > Create new release > upload that .aab.')
+      say(`  By hand - download it (link live until ${expires}):`)
+      say('')
+      say(`      ${url}`)
+      say('')
+      say('  then play.google.com/console > AS Company > Testing >')
+      say('  Internal testing > Create new release > upload it.')
       say('')
       process.exit(1)
     }
@@ -323,32 +348,41 @@ if (isBundle) {
     process.exit(0)
   }
 
-  // The next step is dragging this file into a browser, so put it in front of
-  // them: a 60 MB .aab in mobile/build/ is otherwise a path to go find.
-  // `/select,<path>` has to arrive as ONE argument, so this goes straight to
-  // spawnSync rather than through sh() — which joins and quotes for the shell.
-  // explorer.exe is a real executable, so it needs no shell, and it exits 1
-  // even on success: nothing here reads the result.
-  if (!skipOpen && !submit) {
-    if (isWin) spawnSync('explorer', [`/select,${file}`])
-    else if (process.platform === 'darwin') spawnSync('open', ['-R', file])
+  // The link, not the file. The .aab's next stop is a file picker in a browser,
+  // so the browser is the sensible thing to fetch it - it will do the 60 MB
+  // faster than this script and you are already there to upload it. --download
+  // keeps a local copy too, for an archive or a machine with no browser on it.
+  say('')
+  say('  -- Download it, then upload it to Play ----------------------')
+  say('')
+  say(`  The bundle (link is live until ${expires}):`)
+  say('')
+  say(`      ${url}`)
+  say('')
+  if (copyLink(url)) say('  ...and it is on your clipboard.')
+  say('')
+  say('  1. Open that link - the browser saves the .aab.')
+  say('  2. play.google.com/console  >  AS Company')
+  say('  3. Testing > Internal testing (or Production) > Create new release')
+  say('  4. Upload the .aab, write the release notes, roll out.')
+  say('')
+  if (file) {
+    // `/select,<path>` has to arrive as ONE argument, so this goes straight to
+    // spawnSync rather than through sh() - which joins and quotes for the
+    // shell. explorer.exe needs no shell and exits 1 even on success: nothing
+    // here reads the result.
+    say(`  A copy is on disk too: ${file}`)
+    say('')
+    if (!skipOpen) {
+      if (isWin) spawnSync('explorer', [`/select,${file}`])
+      else if (process.platform === 'darwin') spawnSync('open', ['-R', file])
+    }
   }
-
-  say('')
-  say('  -- Upload to Google Play ------------------------------------')
-  say('')
-  say('  1. play.google.com/console  >  AS Company')
-  say('  2. Testing > Internal testing (or Production) > Create new release')
-  say('  3. Upload that .aab, write the release notes, roll out.')
-  say('')
-  say('  Or let this script do it: npm run play  (needs the Play service')
-  say('  account key - it tells you where to get one).')
-  say('')
   say('  The versionCode is remote and auto-incremented by EAS, so every build')
   say('  is a fresh upload — Play refuses a code it has already seen.')
   say('')
-  say(`  Also on expo.dev (link expires ${new Date(build.expirationDate).toDateString()}):`)
-  say(`  ${url}`)
+  say('  Flags: --download keeps the file here as well, --submit uploads it')
+  say('  for you (needs the Play service-account key).')
   say('')
   process.exit(0)
 }

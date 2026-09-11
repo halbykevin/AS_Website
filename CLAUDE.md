@@ -135,9 +135,13 @@ Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
 `npm run app` (repo root) is the Android release: it builds the Play Store bundle on EAS,
-downloads it to `mobile/build/` and opens that folder to drag into Play Console
-(`npm run app:test` does the same with an installable test APK; `mobile`'s own `npm run play`
-adds the `eas submit` leg). See [mobile/scripts/apk.mjs](mobile/scripts/apk.mjs).
+waits, then prints (and copies) the expo.dev link to download the `.aab` from and upload to
+Play Console by hand — a browser fetches 60 MB faster than the script and is where the
+upload happens anyway. `--download` keeps a local copy in `mobile/build/` as well, `--latest`
+skips the build and prints the newest bundle's link. `npm run app:test` is the installable
+test APK (that one does download, and goes onto a connected phone); `mobile`'s own
+`npm run play` adds an `eas submit` leg for when the manual upload should stop.
+See [mobile/scripts/apk.mjs](mobile/scripts/apk.mjs).
 
 `npm run kill` (repo root) stops every dev server across all the sub-projects at once —
 it clears whatever is listening on the project's ports (vite 5173-5175, next 5180, site API

@@ -486,8 +486,9 @@ npm run web        # run in the browser
 npm run update     # publish a JS-only OTA update to the production channel
 
 npm run apk        # build + install a test APK on a phone (see scripts/apk.mjs)
-npm run aab        # build the Play Store bundle, download it, open the folder
-npm run aab -- --latest   # skip the build, fetch the newest finished bundle
+npm run aab        # build the Play Store bundle, print its download link
+npm run aab -- --download # ...and keep the file in mobile/build/ too
+npm run aab -- --latest   # skip the build, print the newest bundle's link
 
 npm run play         # build the bundle AND upload it to Play (internal, draft)
 npm run play:latest  # upload the newest finished bundle, no rebuild
@@ -504,20 +505,27 @@ From the repo root, `npm run app` is `npm run aab` and `npm run app:test` is
 #    mobile/app.json  ->  expo.version
 # 2. one command, from the repo root or from mobile/
 npm run app            # == cd mobile && npm run aab
-# 3. it leaves the .aab in mobile/build/ and opens that folder. Drag it into
-#    play.google.com/console > AS Company > Create new release > roll out.
+# 3. wait (~15 min). It prints the bundle's expo.dev link and copies it to the
+#    clipboard. Open it, the browser saves the .aab.
+# 4. play.google.com/console > AS Company > Create new release > upload > roll out.
 ```
 
-That is the whole manual route: **build on EAS → download → the folder opens
-with the file selected**, because the next thing you do with it is drag it into
-a browser and a path printed in a terminal is one more thing to go find.
-`--no-open` skips that, `--latest` skips the build and fetches the newest
-finished bundle (the artifact of a finished build never changes, so a matching
-local copy is not downloaded twice).
+**It gives you a link, not a file.** The `.aab`'s next stop is a file picker in
+a browser, so the browser is the sensible thing to fetch it — it does the 60 MB
+faster than this script will, and you are already sitting in front of it to do
+the upload. The link is EAS's own artifact URL and lives about a month; the
+script prints the expiry date next to it.
 
-`npm run app:test` is the same script for the *testing* APK — built, downloaded
-and pushed onto a connected phone over adb. An `.aab` cannot be installed on a
-phone at all; Play builds the per-device APKs out of it.
+- `--download` pulls the file into `mobile/build/` **as well**, and opens that
+  folder with it selected — for an archive copy, a machine with no browser, or
+  Play's internal app sharing. `--no-open` leaves the folder alone. A finished
+  build's artifact never changes, so a copy already on disk is not fetched twice.
+- `--latest` skips the build entirely and prints the newest finished bundle's
+  link. This is the one to use when a build finished and you closed the window.
+
+`npm run app:test` is the same script for the *testing* APK, which does download
+— it ends up installed on a connected phone over adb. An `.aab` cannot be
+installed on a phone at all; Play builds the per-device APKs out of it.
 
 #### Or let it upload too
 
@@ -536,10 +544,9 @@ about it are deliberate:
   makes in the console, looking at the release. `npm run play:live` swaps the
   track for `production` (the `live` submit profile in `eas.json`) and is still a
   draft.
-- **It submits the build off EAS** (`eas submit --id <build>`), not the local
-  copy, so the 60 MB does not go back up your line. The download is still worth
-  having: it is what you archive, what you upload by hand if the API leg fails,
-  and what Play's internal app sharing takes.
+- **It submits the build off EAS** (`eas submit --id <build>`), so the artifact
+  goes from EAS to Google without passing through this machine at all — no
+  download, and none of the 60 MB back up your line.
 - **The credential check happens first**, before the build starts, because the
   fix is a key out of two consoles and not something you want to discover 20
   minutes in.
