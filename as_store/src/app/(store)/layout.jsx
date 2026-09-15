@@ -7,6 +7,7 @@ import PublishGate from '@/components/PublishGate.jsx'
 import ComingSoon from '@/components/ComingSoon.jsx'
 import { loadSettings, callForPriceConfig } from '@/lib/site'
 import { CallForPriceProvider } from '@/lib/callForPrice'
+import { VatProvider } from '@/lib/vat'
 import { loadCategories } from '@/lib/catalog'
 import { aiConfigured } from '@/lib/ai'
 
@@ -40,11 +41,14 @@ export default async function StoreLayout({ children }) {
           grids, the rails and the nav's search dialog — so their copy is
           provided once around the whole tree rather than drilled to each. */}
       <CallForPriceProvider config={callForPriceConfig(settings)}>
+      {/* Same reasoning as above, for the other thing a price has to say: the
+          rate decides whether a "+ VAT" marker appears beside it. */}
+      <VatProvider vat={settings?.vat}>
       <div className="flex min-h-screen flex-col overflow-x-clip">
         <Nav settings={settings} categories={categories} />
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />
-        <CartDrawer whatsapp={settings?.contact?.whatsapp} vat={settings?.vat} />
+        <CartDrawer whatsapp={settings?.contact?.whatsapp} />
         <StorePopup />
         {/* No API key configured (e.g. the env var is missing on Vercel) means no
             bubble at all — better than offering an assistant that answers every
@@ -52,6 +56,7 @@ export default async function StoreLayout({ children }) {
             never reaches the browser. Hides itself during checkout too. */}
         {aiConfigured() && <ChatWidget />}
       </div>
+      </VatProvider>
       </CallForPriceProvider>
     </PublishGate>
   )

@@ -12,6 +12,7 @@ import { addItem } from '@/src/store/cartSlice';
 import { money, cleanDescription } from '@/src/lib/format';
 import { useStoreSettings } from '@/src/lib/queries';
 import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
+import { vatTag } from '@/src/lib/delivery';
 import { openUrl } from '@/src/lib/whatsapp';
 import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
@@ -74,6 +75,11 @@ function ProductTile({ product, fluid = false, width }) {
   const { data: settings } = useStoreSettings();
   const quoteOnly = isCallForPrice(product);
   const copy = callForPriceCopy(settings);
+  // Empty string at 0% VAT, and nothing to say on a product with no price on
+  // screen — in both cases the marker simply doesn't render. It shares the
+  // price's line rather than taking one of its own, which is what keeps
+  // productTileHeight (and the grid's getItemLayout) true.
+  const tag = vatTag(settings?.vat);
 
   const priceNum = Number(price) || 0;
   const oldPrice = product.oldPrice ? Number(product.oldPrice) : null;
@@ -147,15 +153,29 @@ function ProductTile({ product, fluid = false, width }) {
           </Text>
         ) : onSale ? (
           <View style={styles.priceRow}>
-            <Text variant="title" color="primary">
+            <Text variant="title" color="primary" numberOfLines={1} style={styles.priceFigure}>
               {money(priceNum)}
             </Text>
-            <Text variant="caption" faint style={styles.strike}>
+            <Text variant="caption" faint numberOfLines={1} style={[styles.strike, styles.priceFigure]}>
               {money(oldPrice)}
             </Text>
+            {tag ? (
+              <Text variant="caption" color="primary" numberOfLines={1}>
+                {tag}
+              </Text>
+            ) : null}
           </View>
         ) : (
-          <Text variant="title">From {money(priceNum)}</Text>
+          <View style={styles.priceRow}>
+            <Text variant="title" numberOfLines={1} style={styles.priceFigure}>
+              From {money(priceNum)}
+            </Text>
+            {tag ? (
+              <Text variant="caption" color="primary" numberOfLines={1}>
+                {tag}
+              </Text>
+            ) : null}
+          </View>
         )}
 
         {quoteOnly ? (
@@ -204,7 +224,12 @@ const makeStyles = t => ({
   footer: { marginTop: t.spacing.md },
   dots: { position: 'absolute', left: t.spacing.sm, bottom: t.spacing.sm, flexDirection: 'row', gap: 6 },
   dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  // A row, never a wrap: the tile's height is fixed and getItemLayout depends
+  // on this being one line. The figures refuse to shrink so the marker beside
+  // them is what gives way first at the tightest column densities — a clipped
+  // price would be a wrong price.
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.spacing.sm },
+  priceFigure: { flexShrink: 0 },
   strike: { textDecorationLine: 'line-through' }
 });
 

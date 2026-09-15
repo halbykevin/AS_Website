@@ -18,13 +18,15 @@ import {
 } from "@/store/cartSlice";
 import { selectCartOpen, closeCart } from "@/store/uiSlice";
 import { vatNote } from "@/lib/orders";
+import { useVat } from "@/lib/vat";
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`;
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081";
 
 // Slide-over shopping bag. Opens from the nav's bag icon, lists items with
 // quantity steppers, and checks out on-site at /checkout.
-export default function CartDrawer({ whatsapp, vat }) {
+export default function CartDrawer({ whatsapp }) {
+  const vat = useVat();
   const open = useSelector(selectCartOpen);
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
@@ -237,7 +239,7 @@ export default function CartDrawer({ whatsapp, vat }) {
                     {/* Delivery and VAT are priced on the checkout page, once
                         there is an address to price them against. */}
                     {vatNote(vat) && (
-                      <p className="mt-0.5 text-xs text-as-ink/45">
+                      <p className="mt-0.5 text-xs font-medium text-as-red">
                         {vatNote(vat)}
                       </p>
                     )}

@@ -61,7 +61,7 @@ export default function BagScreen() {
             {/* Delivery and VAT are priced at checkout, once there is an
                 address to price them against. */}
             {vatNote(storeSettings?.vat) ? (
-              <Text variant="caption" faint>
+              <Text variant="caption" color="primary">
                 {vatNote(storeSettings?.vat)}
               </Text>
             ) : null}

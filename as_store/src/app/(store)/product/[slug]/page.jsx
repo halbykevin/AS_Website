@@ -83,7 +83,7 @@ export default async function ProductPage({ params }) {
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumb)} />
       )}
 
-      <ProductDetail product={product} whatsapp={settings?.contact?.whatsapp} vat={settings?.vat} breadcrumb={trail} />
+      <ProductDetail product={product} whatsapp={settings?.contact?.whatsapp} breadcrumb={trail} />
 
       {related.length > 0 && (
         <section className="bg-white pb-24">

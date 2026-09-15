@@ -17,10 +17,18 @@ export function vatAmountFor(base, vat) {
   return Math.round((Number(base) || 0) * (Math.min(percent, 100) / 100) * 100) / 100;
 }
 
-// Mirror of vatNote() in as_store/src/lib/orders.js — the line shown under a
-// price outside the checkout, saying the figure is the goods alone. Empty at
-// 0%, so switching VAT off in Settings retires the wording with it. Keep the
-// two in step: someone who priced a product in the app checks out on the web.
+// Mirrors of vatNote()/vatTag() in as_store/src/lib/orders.js — what a price
+// outside the checkout says for itself: the sentence under a price on the
+// product screen and in the bag, and the compact marker beside a price on a
+// product card. Both empty at 0%, so switching VAT off in Settings retires the
+// wording with it. Keep the two packages in step: someone who priced a product
+// in the app checks out on the web.
 export const VAT_NOTE = 'VAT added at checkout';
 
-export const vatNote = vat => (Number(vat?.percent ?? 0) > 0 ? VAT_NOTE : '');
+export const VAT_TAG = '+ VAT';
+
+const charged = vat => Number(vat?.percent ?? 0) > 0;
+
+export const vatNote = vat => (charged(vat) ? VAT_NOTE : '');
+
+export const vatTag = vat => (charged(vat) ? VAT_TAG : '');

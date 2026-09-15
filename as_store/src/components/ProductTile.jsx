@@ -9,6 +9,13 @@ import { openCart } from '@/store/uiSlice'
 import { SITE_URL } from '@/lib/seo'
 import { productImage } from '@/lib/productImage'
 import { isCallForPrice, useCallForPrice, enquiryUrl } from '@/lib/callForPrice'
+import { vatTag } from '@/lib/orders'
+import { useVat } from '@/lib/vat'
+
+// Brand red and a size down so it reads as a qualifier on the price rather than
+// a second number. nowrap because it sits on the price's own line: allowed to
+// break, "+ VAT" would take a line of its own and push the card's footer.
+const VAT_TAG_CLASS = 'whitespace-nowrap text-[11px] font-semibold text-as-red sm:text-xs'
 
 // Clean Apple Store product card: name, tagline, centered image, colour dots,
 // "From $X", and an Add to Bag pill (wired to Redux). `fluid` fills its parent
@@ -33,6 +40,9 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
   // than no button.
   const cfp = useCallForPrice()
   const quoteOnly = isCallForPrice(product)
+  // Empty string at 0% VAT, and nothing to say on a product with no price on
+  // screen — in both cases the marker simply doesn't render.
+  const tag = vatTag(useVat())
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
 
@@ -110,9 +120,13 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
         <p className={`flex gap-2 text-sm sm:text-base ${S.price}`}>
           <span className="font-semibold text-as-red">${priceNum.toLocaleString()}</span>
           <span className="text-xs text-as-ink/40 line-through sm:text-sm">${oldPrice.toLocaleString()}</span>
+          {tag && <span className={VAT_TAG_CLASS}>{tag}</span>}
         </p>
       ) : (
-        <p className="text-sm font-medium text-as-ink sm:text-base">From ${priceNum.toLocaleString()}</p>
+        <p className="text-sm font-medium text-as-ink sm:text-base">
+          From ${priceNum.toLocaleString()}
+          {tag && <span className={`ml-1.5 ${VAT_TAG_CLASS}`}>{tag}</span>}
+        </p>
       )}
     </div>
   )

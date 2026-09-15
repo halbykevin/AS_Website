@@ -219,7 +219,7 @@ export default function ProductDetailScreen() {
         {!quoteOnly && vatNote(storeSettings?.vat) ? (
           // Pulled back out of the column's 16pt gap so it reads as part of the
           // price rather than as the next thing down the page.
-          <Text variant="caption" muted style={{ marginTop: -theme.spacing.sm }}>
+          <Text variant="caption" color="primary" style={{ marginTop: -theme.spacing.sm }}>
             {vatNote(storeSettings?.vat)}
           </Text>
         ) : null}

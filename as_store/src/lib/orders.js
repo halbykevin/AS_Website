@@ -53,18 +53,27 @@ export function vatAmountFor(base, vat) {
   return Math.round((Number(base) || 0) * (Math.min(percent, 100) / 100) * 100) / 100
 }
 
-// The one line every price outside the checkout carries: the figures on a
-// product page or in the bag are the goods alone, and VAT lands on the order
-// once there is a delivery address to tax it against.
+// What a price outside the checkout has to say for itself: the figures on a
+// product page, a card or in the bag are the goods alone, and VAT lands on the
+// order once there is a delivery address to tax it against.
 //
-// Empty at 0% on purpose — a warning about a tax nobody is charged is noise,
-// and tying it to the rate means switching VAT off in Settings retires the
-// wording with it instead of leaving a lie on every price. Mirrored in the app
-// by vatNote() in mobile/src/lib/delivery.js; the two must read the same, since
-// a customer who priced something in the app checks out on the web.
+// Both are empty at 0% on purpose — a warning about a tax nobody is charged is
+// noise, and tying the wording to the rate means switching VAT off in Settings
+// retires it everywhere instead of leaving a lie on every price. Mirrored in
+// the app by mobile/src/lib/delivery.js; the two must read the same, since a
+// customer who priced something in the app checks out on the web.
 export const VAT_NOTE = 'VAT added at checkout'
 
-export const vatNote = (vat) => (Number(vat?.percent ?? 0) > 0 ? VAT_NOTE : '')
+// The compact form, for a product card. A whole sentence under every tile in a
+// grid is noise, and beside the price it also costs no extra line — which is
+// what keeps the app's fixed-height card (and its getItemLayout) intact.
+export const VAT_TAG = '+ VAT'
+
+const charged = (vat) => Number(vat?.percent ?? 0) > 0
+
+export const vatNote = (vat) => (charged(vat) ? VAT_NOTE : '')
+
+export const vatTag = (vat) => (charged(vat) ? VAT_TAG : '')
 
 // What an order actually costs. Handles both a placed order (deliveryFee /
 // vatAmount on the record) and pre-checkout figures.
