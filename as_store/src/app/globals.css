@@ -71,6 +71,56 @@ body {
     @apply mx-auto w-full max-w-[1280px] px-6 sm:px-8;
   }
 
+  /* Horizontal product rail — the homepage rows and "related products".
+
+     The cards are measured FROM THE RAIL rather than given a fixed width, so a
+     whole number of them always fits. At a 300px card the desktop rail missed
+     four across by 44px (1216px of room, 1260px needed) and sliced the fourth
+     one down the middle, which reads as a broken layout rather than as a hint
+     that the row scrolls.
+
+     Below 640px the count is deliberately fractional: the ‹ › buttons are
+     hidden on phones, so the part-card peeking at the edge is the only thing
+     telling you there is more to swipe to.
+
+     The breakpoints are where a count stops looking right, not Tailwind's, and
+     they are chosen to keep the card near the ~300px it was designed at: three
+     across before 800px would squeeze it to 220 (iPad portrait, a real and
+     common width, gets two comfortable cards instead), and four across before
+     1120px would squeeze it to 240. */
+  .rail {
+    --rail-cards: 1.15;
+    --rail-gap: 1rem;
+    gap: var(--rail-gap);
+  }
+  .rail > * {
+    /* The basis (not a width) is what the flex layout actually measures, and
+       0 0 stops a short row from stretching its cards across the rail. */
+    flex: 0 0 calc((100% - (var(--rail-cards) - 1) * var(--rail-gap)) / var(--rail-cards));
+    scroll-snap-align: start;
+  }
+  @media (min-width: 480px) {
+    .rail {
+      --rail-cards: 1.6;
+    }
+  }
+  @media (min-width: 640px) {
+    .rail {
+      --rail-cards: 2;
+      --rail-gap: 1.25rem;
+    }
+  }
+  @media (min-width: 800px) {
+    .rail {
+      --rail-cards: 3;
+    }
+  }
+  @media (min-width: 1120px) {
+    .rail {
+      --rail-cards: 4;
+    }
+  }
+
   /* Inline accent link with a chevron — Apple's "Learn more ›" / "Buy ›". */
   .link-cta {
     @apply inline-flex items-center gap-1 text-[17px] font-medium text-as-red transition-colors hover:text-as-red-light;

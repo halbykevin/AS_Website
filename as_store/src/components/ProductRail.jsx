@@ -101,16 +101,15 @@ export default function ProductRail({ section = {} }) {
           onPointerUp={endDrag}
           onPointerLeave={endDrag}
           onClickCapture={onClickCapture}
-          className="no-scrollbar flex cursor-grab snap-x gap-5 overflow-x-auto px-0.5 py-1 pb-3 active:cursor-grabbing"
+          className="no-scrollbar rail flex cursor-grab snap-x overflow-x-auto px-0.5 py-1 pb-3 active:cursor-grabbing"
         >
+          {/* Skeletons and cards alike are sized by .rail, so the placeholders
+              occupy exactly the space the products will (see globals.css). */}
           {isLoading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-[450px] w-[280px] shrink-0 animate-pulse rounded-[28px] bg-as-fog sm:w-[300px]"
-                />
+                <div key={i} className="h-[360px] animate-pulse rounded-[28px] bg-as-fog sm:h-[450px]" />
               ))
-            : (data ?? []).map((p) => <ProductTile key={p.id} product={p} />)}
+            : (data ?? []).map((p) => <ProductTile key={p.id} product={p} fluid />)}
         </div>
       </div>
     </section>

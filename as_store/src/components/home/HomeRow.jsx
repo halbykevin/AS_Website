@@ -8,7 +8,11 @@ import ProductTile from '@/components/ProductTile.jsx'
 // One homepage row: a small category title and the products themselves, on a
 // horizontal rail. The rail (rather than a grid) is what lets the homepage be
 // several categories deep without turning into an endless scroll — each one
-// costs a single line, and the cards keep the size they were designed at.
+// costs a single line.
+//
+// The cards are sized by the `.rail` class in globals.css, which divides the
+// rail's own width so a whole number of them fits rather than leaving the last
+// one sliced in half.
 //
 // The products are passed in already loaded by the server component, so the row
 // is in the HTML: no spinner, no client fetch, and Google sees the products.
@@ -105,10 +109,12 @@ export default function HomeRow({ title, href, seeAllLabel = 'See all', products
           onPointerUp={endDrag}
           onPointerLeave={endDrag}
           onClickCapture={onClickCapture}
-          className="no-scrollbar flex cursor-grab snap-x gap-4 overflow-x-auto px-0.5 py-1 pb-3 active:cursor-grabbing sm:gap-5"
+          className="no-scrollbar rail flex cursor-grab snap-x overflow-x-auto px-0.5 py-1 pb-3 active:cursor-grabbing"
         >
+          {/* `fluid` hands the sizing to .rail, which measures the cards from
+              the rail's own width so a whole number fits (see globals.css). */}
           {products.map((p) => (
-            <ProductTile key={p.id} product={p} />
+            <ProductTile key={p.id} product={p} fluid />
           ))}
         </div>
       </div>
