@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { selectCartItems, selectCartTotal, removeItem, setQty, clearCart, MAX_QTY } from '@/src/store/cartSlice';
 import { useContent } from '@/src/content/ContentProvider';
 import { money } from '@/src/lib/format';
+import { vatNote } from '@/src/lib/delivery';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Icon, Divider, EmptyState } from '@/src/ui';
@@ -50,11 +51,20 @@ export default function BagScreen() {
             gap: theme.spacing.md
           }}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <Text variant="body" muted>
-              Subtotal
-            </Text>
-            <Text variant="h2">{money(total)}</Text>
+          <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text variant="body" muted>
+                Subtotal
+              </Text>
+              <Text variant="h2">{money(total)}</Text>
+            </View>
+            {/* Delivery and VAT are priced at checkout, once there is an
+                address to price them against. */}
+            {vatNote(storeSettings?.vat) ? (
+              <Text variant="caption" faint>
+                {vatNote(storeSettings?.vat)}
+              </Text>
+            ) : null}
           </View>
           <Button label="Checkout" size="lg" onPress={() => router.push('/checkout')} fullWidth />
         </View>

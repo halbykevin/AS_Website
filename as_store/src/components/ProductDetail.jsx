@@ -16,12 +16,13 @@ import { openCart } from '@/store/uiSlice'
 import { trackViewItem } from '@/lib/analytics'
 import { useWallet, creditFor } from '@/lib/wallet'
 import { isCallForPrice, useCallForPrice, enquiryUrl } from '@/lib/callForPrice'
+import { vatNote } from '@/lib/orders'
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`
 
 // Product detail: image gallery, name/brand/price (with sale), colour swatches,
 // quantity stepper, Add to Bag (opens the cart drawer), and description.
-export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
+export default function ProductDetail({ product, whatsapp, vat, breadcrumb = [] }) {
   const dispatch = useDispatch()
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : []
   const colors = Array.isArray(product.colors) ? product.colors : []
@@ -148,6 +149,12 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                 </>
               )}
             </div>
+
+            {/* The price above is the goods alone. Skipped for a quote-only
+                product: there is no figure on screen to qualify. */}
+            {!quoteOnly && vatNote(vat) && (
+              <p className="mt-1.5 text-sm text-as-ink/50">{vatNote(vat)}</p>
+            )}
 
             {/* No price, no wallet estimate — there is no figure to earn on. */}
             {!quoteOnly && <WalletLine amount={price * qty} />}

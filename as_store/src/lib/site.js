@@ -79,6 +79,7 @@ export async function loadSettings() {
       homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
       loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
       delivery: { ...defaultSettings.delivery, ...(s.delivery || {}) },
+      vat: { ...defaultSettings.vat, ...(s.vat || {}) },
       tracking: { ...defaultSettings.tracking, ...(s.tracking || {}) },
       callForPrice: { ...defaultSettings.callForPrice, ...(s.callForPrice || {}) },
       socials: s.socials || {},

@@ -6,6 +6,7 @@ import { useProduct } from '@/src/lib/queries';
 import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice';
 import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
+import { vatNote } from '@/src/lib/delivery';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Badge, Divider, Icon, Skeleton, EmptyState, Accordion, Markdown } from '@/src/ui';
@@ -212,6 +213,16 @@ export default function ProductDetailScreen() {
             <Text variant="h2">{money(priceNum)}</Text>
           )}
         </View>
+
+        {/* The price above is the goods alone. Skipped for a quote-only
+            product: there is no figure on screen to qualify. */}
+        {!quoteOnly && vatNote(storeSettings?.vat) ? (
+          // Pulled back out of the column's 16pt gap so it reads as part of the
+          // price rather than as the next thing down the page.
+          <Text variant="caption" muted style={{ marginTop: -theme.spacing.sm }}>
+            {vatNote(storeSettings?.vat)}
+          </Text>
+        ) : null}
 
         {/* No price, no points estimate — there is no figure to earn on. */}
         {quoteOnly ? (

@@ -44,7 +44,7 @@ export default async function StoreLayout({ children }) {
         <Nav settings={settings} categories={categories} />
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />
-        <CartDrawer whatsapp={settings?.contact?.whatsapp} />
+        <CartDrawer whatsapp={settings?.contact?.whatsapp} vat={settings?.vat} />
         <StorePopup />
         {/* No API key configured (e.g. the env var is missing on Vercel) means no
             bubble at all — better than offering an assistant that answers every

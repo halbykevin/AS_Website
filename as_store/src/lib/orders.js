@@ -53,6 +53,19 @@ export function vatAmountFor(base, vat) {
   return Math.round((Number(base) || 0) * (Math.min(percent, 100) / 100) * 100) / 100
 }
 
+// The one line every price outside the checkout carries: the figures on a
+// product page or in the bag are the goods alone, and VAT lands on the order
+// once there is a delivery address to tax it against.
+//
+// Empty at 0% on purpose — a warning about a tax nobody is charged is noise,
+// and tying it to the rate means switching VAT off in Settings retires the
+// wording with it instead of leaving a lie on every price. Mirrored in the app
+// by vatNote() in mobile/src/lib/delivery.js; the two must read the same, since
+// a customer who priced something in the app checks out on the web.
+export const VAT_NOTE = 'VAT added at checkout'
+
+export const vatNote = (vat) => (Number(vat?.percent ?? 0) > 0 ? VAT_NOTE : '')
+
 // What an order actually costs. Handles both a placed order (deliveryFee /
 // vatAmount on the record) and pre-checkout figures.
 export const orderTotal = (o) =>
