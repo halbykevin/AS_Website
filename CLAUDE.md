@@ -202,6 +202,13 @@ Store-publishing requirements that are easy to break and hard to notice:
   `<StatusBar>`** — that prop calls `Window.setStatusBarColor`, deprecated in Android 15, a no-op
   under edge-to-edge, and enough for Play to flag the build. Tint the status-bar area by giving a
   `SafeAreaView edges={['top']}` a background instead, the way GlobalPromoBanner does.
+- **R8 has to stay on.** `expo-build-properties` with `enableMinifyInReleaseBuilds` +
+  `enableShrinkResourcesInReleaseBuilds` in app.json: the Android template defaults
+  `minifyEnabled` to **false**, which is how bundle 20 (1.1.0) shipped at **1% obfuscation**
+  and got flagged by Play (fix by Feb 2027 — under 25% in any category "may impact your
+  visibility and publishing capabilities"). Because R8 renames classes and reflection breaks
+  only in release, a minified build must be walked by hand (`npm run apk:prod`) before upload
+  — the debug build you developed against will never show it.
 - **OTA updates**: `expo-updates` with the `fingerprint` runtime policy and a channel per EAS profile.
   `npm run update` ships a JS-only fix without a store review; anything touching native code needs a
   real build, and fingerprint is what stops such an update from reaching a binary that can't run it.

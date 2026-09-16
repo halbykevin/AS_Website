@@ -444,6 +444,44 @@ Notes worth knowing before you change any of it:
 - `reportError` in `errors.js` is the single funnel every layer already calls —
   if you ever wire up Sentry or similar, that's the one place it goes.
 
+### DEX optimization (R8)
+
+`expo-build-properties` turns R8 on for release builds. Without it the Android
+template's `minifyEnabled` defaults to **false** and the whole ~30 MB of DEX ships
+unobfuscated and unshrunk — which is what Play Console flagged on bundle 20 (1.1.0):
+*"DEX code optimization is below our threshold — Obfuscation (1%)"*, fix by
+**Feb 2027**, because a category under 25% "may impact your visibility and publishing
+capabilities".
+
+```jsonc
+["expo-build-properties", { "android": {
+  "enableMinifyInReleaseBuilds": true,          // minifyEnabled - obfuscate + shrink code
+  "enableShrinkResourcesInReleaseBuilds": true  // drop unreferenced resources
+}}]
+```
+
+- **`enableMinifyInReleaseBuilds`, not `enableProguardInReleaseBuilds`.** The old name
+  still works (the plugin maps it forward) but is deprecated, and the new one is the key
+  the SDK 54 template's `app/build.gradle` actually reads.
+- **It is a native change, so no OTA can carry it.** `npm run update` cannot ship this;
+  the fingerprint runtime version moves with it, which is exactly what stops an update
+  built after the change reaching a binary built before it.
+- **R8 renames classes, and reflection only breaks in release.** React Native and the
+  Expo modules ship their own consumer rules and the template already keeps Reanimated
+  and the turbomodules, so nothing here needed hand-written rules — but a minified build
+  has to be walked by hand before it goes up: `npm run apk:prod` (`production-apk`
+  extends `production`, so it minifies too). Sign in, check out, spin the wheel
+  (`react-native-svg`), add to bag (the Reanimated flight), open a notification, take an
+  update. Anything that does need a keep rule goes in the plugin's `extraProguardRules`,
+  which is appended to `proguard-rules.pro`.
+- **Crash reports stay readable.** AGP writes `mapping.txt` into the bundle's metadata,
+  so Play deobfuscates stack traces itself — there is nothing extra to upload.
+- Play reports *Obfuscation* and *Optimization* as separate percentages, and the template
+  passes `proguard-android.txt` rather than the `-optimize` variant. If the optimization
+  figure is still low after the next upload, that is the next lever. The
+  **R8 configuration → "Upgrade to AGP version 9.0"** note is not ours to act on: Expo
+  SDK 54 pins AGP 8.
+
 ### Still needed before you can submit
 
 - **Play service account** — a JSON key with the **Release manager** role, from
