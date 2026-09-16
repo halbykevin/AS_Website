@@ -1,0 +1,79 @@
+{
+  "fetchedAt": "2026-09-16",
+  "api": "https://store-api.as.com.lb",
+  "title": "Daily Spin",
+  "subtitle": "One free spin, every day.",
+  "cooldownHours": 24,
+  "slices": [
+    {
+      "label": "1% Off",
+      "type": "percent",
+      "color": "#A41E22"
+    },
+    {
+      "label": "2% Off",
+      "type": "percent",
+      "color": "#15181A"
+    },
+    {
+      "label": "Try your luck again",
+      "type": "none",
+      "color": "#0F766E"
+    },
+    {
+      "label": "3% Off",
+      "type": "percent",
+      "color": "#F2A93B"
+    },
+    {
+      "label": "4% Off",
+      "type": "percent",
+      "color": "#1D4ED8"
+    },
+    {
+      "label": "5% Off",
+      "type": "percent",
+      "color": "#7C3AED"
+    },
+    {
+      "label": "6% Off",
+      "type": "percent",
+      "color": "#B6B7B8"
+    },
+    {
+      "label": "7% Off",
+      "type": "percent",
+      "color": "#C53A3F"
+    },
+    {
+      "label": "8% Off",
+      "type": "percent",
+      "color": "#20214F"
+    },
+    {
+      "label": "9% Off",
+      "type": "percent",
+      "color": "#F75E25"
+    },
+    {
+      "label": "10% Off",
+      "type": "percent",
+      "color": "#D36E70"
+    },
+    {
+      "label": "Free format",
+      "type": "gift",
+      "color": "#898176"
+    },
+    {
+      "label": "free remote support",
+      "type": "gift",
+      "color": "#E6D690"
+    },
+    {
+      "label": "free version ticketing",
+      "type": "gift",
+      "color": "#025669"
+    }
+  ]
+}

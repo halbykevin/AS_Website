@@ -1,0 +1,71 @@
+{
+  "fetchedAt": "2026-09-16",
+  "api": "https://asapi.as.com.lb",
+  "total": 75,
+  "events": [
+    {
+      "title": "Wednesday 4 Comedy",
+      "date": "2026-09-16",
+      "time": "08:00 PM",
+      "venue": "Hidden Cellar",
+      "city": "Beirut",
+      "category": "Comedy"
+    },
+    {
+      "title": "Laugh it off",
+      "date": "2026-09-16",
+      "time": "09:00 PM",
+      "venue": "District 7 Beirut",
+      "city": "Beirut",
+      "category": "Comedy"
+    },
+    {
+      "title": "Open Mic Night",
+      "date": "2026-09-16",
+      "time": "06:00 PM",
+      "venue": "Hidden Cellar",
+      "city": "Beirut",
+      "category": "Comedy"
+    },
+    {
+      "title": "GUY MANOUKIAN",
+      "date": "2026-09-17",
+      "time": "08:30 PM",
+      "venue": "Saida",
+      "city": "",
+      "category": "Concerts"
+    },
+    {
+      "title": "AL WALID",
+      "date": "2026-09-18",
+      "time": "08:30 PM",
+      "venue": "Saida",
+      "city": "",
+      "category": "Concerts"
+    },
+    {
+      "title": "One Unforgettable Night with Carlos",
+      "date": "2026-09-18",
+      "time": "10:30 PM",
+      "venue": "Chaab Bouar Church Square",
+      "city": "Bouar",
+      "category": "Concerts"
+    },
+    {
+      "title": "The Savages",
+      "date": "2026-09-18",
+      "time": "09:00 PM",
+      "venue": "District 7 Beirut",
+      "city": "Beirut",
+      "category": "Comedy"
+    },
+    {
+      "title": "Kawkab Ruby - Warehouse Rooftop",
+      "date": "2026-09-18",
+      "time": "10:00 PM",
+      "venue": "Warehouse Beirut",
+      "city": "Matn",
+      "category": "Parties & Clubbing"
+    }
+  ]
+}

@@ -143,6 +143,10 @@ test APK (that one does download, and goes onto a connected phone); `mobile`'s o
 `npm run play` adds an `eas submit` leg for when the manual upload should stop.
 See [mobile/scripts/apk.mjs](mobile/scripts/apk.mjs).
 
+`npm run reel` (repo root) renders the mobile app's Instagram reel to
+`marketing/out/as-app-reel.mp4`; `npm run reel:studio` opens the Remotion editor to tune it.
+See [marketing/README.md](marketing/README.md).
+
 `npm run kill` (repo root) stops every dev server across all the sub-projects at once —
 it clears whatever is listening on the project's ports (vite 5173-5175, next 5180, site API
 8080, store API 8081, expo 8082-8083) and their child processes. `npm run kill:dry` lists them
@@ -210,6 +214,35 @@ Store-publishing requirements that are easy to break and hard to notice:
   New screens should keep the `ErrorBoundary` export; new data-driven sections should get a
   `<Boundary>`. All of it funnels through `reportError`, the one place to wire a reporting service.
   There is no crash *reporting* wired up today.
+
+## Marketing video (`marketing/`)
+
+A **Remotion** studio (its own npm package, JSX like the rest of the repo) that renders AS's
+social video. Today it holds one deliverable — `AppReel`, a ~26s **1080x1920** vertical reel for
+the mobile app — but it is a studio, not a one-off: another reel is a scene folder and a
+`<Composition>`, not another project. `npm run reel` / `npm run reel:studio` from the repo root;
+`npm run content` inside it. Full detail in [marketing/README.md](marketing/README.md).
+
+- **Nothing on screen is invented.** `scripts/fetch-content.mjs` snapshots real products (with
+  their photos), real upcoming events and the real 14-slice prize wheel from the two live APIs into
+  `src/data/`, and that snapshot is **committed** — a render has to produce the same frames twice,
+  and a video that shipped last week should still rebuild next month, neither of which is true if
+  scenes fetch at render time. Every number is derived, not typed: "1,200+ products" is the measured
+  count rounded *down*, the cashback figures come from the same `earn_percent` the app uses, and
+  `+ VAT` follows every price because VAT is added at checkout.
+- **The closing card cannot promise a store that isn't live.** `stores` in `src/config.js` is
+  `{ android: false, ios: false }` and the card therefore reads "Coming soon to Android & iOS" —
+  true while the Play listing is an internal draft and iOS has no APNs key. Flip a flag the day a
+  listing is public and the wording and buttons change themselves. The buttons are typed pills, not
+  the official Play/App Store badges, which are trademarked artwork with their own rules.
+- **`src/lib/wheel.js` is a third deliberate copy** of the spin geometry (app + store CMS being the
+  other two), for the same reason: the wheel in an advert must be the wheel in the app, down to
+  which slice sits under the pointer at rest. The app's chrome — tab bar, product tile, header — is
+  likewise rebuilt from `mobile/src/components/`, so **a navigation change in the app dates this
+  reel**; re-check it before a re-cut.
+- Event **poster artwork is deliberately not used** (it is the promoters', and an advert is not a
+  listing page) — the cards are drawn from the facts. Icons are originals rather than Ionicons
+  traced by eye, and WhatsApp is named in words rather than approximated as a mark.
 
 ## Checkout requires a mobile number (store + app + API)
 
@@ -643,6 +676,7 @@ vercel.json                # SPA rewrite (all paths -> index.html)
 WebScarping/               # Python scrapers, spawned by the API:
                            #   scrape.py + ecom_scraper/  (e-commerce products)
                            #   events_sync.py + event_sources/  (ticketing events → DB)
+marketing/                 # Remotion studio — the app's Instagram reel (npm run reel)
 server/                    # Express + Postgres API (deployed to the VPS)
   src/{index,app,db,auth,migrate,seed}.js
   src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output

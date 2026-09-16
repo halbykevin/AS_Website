@@ -1,0 +1,28 @@
+{
+  "name": "as-marketing-video",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Remotion video studio for AS Company marketing reels (Instagram / TikTok vertical).",
+  "scripts": {
+    "//studio": "Open the Remotion editor — scrub, tweak, preview every scene live.",
+    "studio": "remotion studio",
+    "dev": "remotion studio",
+    "//render": "Render the Instagram reel to marketing/out/as-app-reel.mp4 (1080x1920, H.264).",
+    "render": "remotion render AppReel out/as-app-reel.mp4",
+    "//render:hq": "Same reel at a higher bitrate, for re-encoding or archiving.",
+    "render:hq": "remotion render AppReel out/as-app-reel-hq.mp4 --crf=16",
+    "//cover": "The reel's cover image: frame 62, where the hook has fully stamped in.",
+    "cover": "remotion still AppReel out/as-app-reel-cover.png --frame=62",
+    "//content": "Re-pull real products, events and the live prize wheel from the APIs.",
+    "content": "node scripts/fetch-content.mjs",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.525",
+    "@remotion/google-fonts": "4.0.525",
+    "@remotion/shapes": "4.0.525",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.525"
+  }
+}

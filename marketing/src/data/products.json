@@ -1,0 +1,247 @@
+{
+  "fetchedAt": "2026-09-16",
+  "api": "https://store-api.as.com.lb",
+  "total": 1293,
+  "products": [
+    {
+      "id": 265,
+      "name": "HP ZBook Firefly G11, Ultra 7 165U, 512GB,...",
+      "fullName": "HP ZBook Firefly G11, Ultra 7 165U, 512GB, 16GB DDR5, 14.0, Intel Graphics, W11P, Silver *Like New*",
+      "brand": "HP",
+      "price": 853,
+      "oldPrice": null,
+      "category": "Laptops",
+      "image": "products/hp-265.webp"
+    },
+    {
+      "id": 291,
+      "name": "Surface Laptop 13-inch Copilot+ PC ,...",
+      "fullName": "Surface Laptop 13-inch Copilot+ PC , Snapdragon X Plus 8-Core,16GB,512GB SSD,Win11 H,Violet",
+      "brand": "Microsoft",
+      "price": 1100,
+      "oldPrice": null,
+      "category": "Laptops",
+      "image": "products/microsoft-291.webp"
+    },
+    {
+      "id": 24,
+      "name": "HP OMEN Max 16-ak000 Gaming Laptop",
+      "fullName": "HP OMEN Max 16-ak000 Gaming Laptop - AMD Ryzen 9 375HX, RTX 5080 16GB, 16GB DDR5, 1TB SSD, 16\" 2.5K WQXGA, Windows 11 Home",
+      "brand": "HP",
+      "price": 1980,
+      "oldPrice": null,
+      "category": "Laptops",
+      "image": "products/hp-24.webp"
+    },
+    {
+      "id": 27,
+      "name": "HP OmniBook 16t-af100 Laptop",
+      "fullName": "HP OmniBook 16t-af100 Laptop - Intel Core Ultra 7 255U, 16GB DDR5, 512GB SSD, 16\" WUXGA, Windows 11 Home",
+      "brand": "HP",
+      "price": 798,
+      "oldPrice": null,
+      "category": "Laptops",
+      "image": "products/hp-27.webp"
+    },
+    {
+      "id": 29,
+      "name": "HP OmniBook 16z-bc100 Laptop",
+      "fullName": "HP OmniBook 16z-bc100 Laptop - AMD Ryzen 5 8540U, 8GB DDR5, 512GB SSD, 16\" WUXGA, Windows 11 Home",
+      "brand": "HP",
+      "price": 550,
+      "oldPrice": null,
+      "category": "Laptops",
+      "image": "products/hp-29.webp"
+    },
+    {
+      "id": 1237,
+      "name": "Xiaomi Smart Band 10",
+      "fullName": "Xiaomi Smart Band 10 - Mystic Rose",
+      "brand": "Xiaomi",
+      "price": 60,
+      "oldPrice": null,
+      "category": "Wearable",
+      "image": "products/xiaomi-1237.webp"
+    },
+    {
+      "id": 1238,
+      "name": "Xiaomi Smart Band 10 Glacier",
+      "fullName": "Xiaomi Smart Band 10 Glacier - Silver",
+      "brand": "Xiaomi",
+      "price": 60,
+      "oldPrice": null,
+      "category": "Wearable",
+      "image": "products/xiaomi-1238.webp"
+    },
+    {
+      "id": 1236,
+      "name": "Whoop Peak 5.0 Health And Fitness Wearable",
+      "fullName": "Whoop Peak 5.0 Health And Fitness Wearable",
+      "brand": "Whoop",
+      "price": 303,
+      "oldPrice": null,
+      "category": "Wearable",
+      "image": "products/whoop-1236.webp"
+    },
+    {
+      "id": 1244,
+      "name": "Whoop One 5.0 Health & Fitness Tracker- 12...",
+      "fullName": "Whoop One 5.0 Health & Fitness Tracker- 12 Month Membership",
+      "brand": "Whoop",
+      "price": 259,
+      "oldPrice": null,
+      "category": "Wearable",
+      "image": "products/whoop-1244.webp"
+    },
+    {
+      "id": 949,
+      "name": "Samsung Radiant360 R1 Speaker",
+      "fullName": "Samsung Radiant360 R1 Speaker",
+      "brand": "Samsung",
+      "price": 200,
+      "oldPrice": null,
+      "category": "Speakers",
+      "image": "products/samsung-949.webp"
+    },
+    {
+      "id": 921,
+      "name": "JBL Flip 7 Sand Bluetooth Speaker",
+      "fullName": "JBL Flip 7 Sand Bluetooth Speaker - Waterproof Portable Wireless Speaker",
+      "brand": "JBL",
+      "price": 100,
+      "oldPrice": null,
+      "category": "Speakers",
+      "image": "products/jbl-921.webp"
+    },
+    {
+      "id": 922,
+      "name": "JBL Flip 7 Pink Wireless Bluetooth Speaker",
+      "fullName": "JBL Flip 7 Pink Wireless Bluetooth Speaker - Waterproof Portable",
+      "brand": "JBL",
+      "price": 100,
+      "oldPrice": null,
+      "category": "Speakers",
+      "image": "products/jbl-922.webp"
+    },
+    {
+      "id": 943,
+      "name": "JBL Xtreme 3 Portable Waterproof Speaker",
+      "fullName": "JBL Xtreme 3 Portable Waterproof Speaker - Blue",
+      "brand": "JBL",
+      "price": 262,
+      "oldPrice": null,
+      "category": "Speakers",
+      "image": "products/jbl-943.webp"
+    },
+    {
+      "id": 978,
+      "name": "Bose Quietcomfort Sc Wireless Headset With...",
+      "fullName": "Bose Quietcomfort Sc Wireless Headset With Noise Canceling",
+      "brand": "Bose",
+      "price": 230,
+      "oldPrice": null,
+      "category": "Headsets and Microphones",
+      "image": "products/bose-978.webp"
+    },
+    {
+      "id": 992,
+      "name": "Lenovo Wireless Stereo Headset",
+      "fullName": "Lenovo Wireless Stereo Headset - Black",
+      "brand": "Lenovo",
+      "price": 66,
+      "oldPrice": null,
+      "category": "Headsets and Microphones",
+      "image": "products/lenovo-992.webp"
+    },
+    {
+      "id": 977,
+      "name": "Logitech Pro Headset Wired H650E USB with...",
+      "fullName": "Logitech Pro Headset Wired H650E USB with Noise-Canceling",
+      "brand": "Logitech",
+      "price": 75,
+      "oldPrice": null,
+      "category": "Headsets and Microphones",
+      "image": "products/logitech-977.webp"
+    },
+    {
+      "id": 986,
+      "name": "Logitech G Yeti Orb Rgb Gaming Microphone",
+      "fullName": "Logitech G Yeti Orb Rgb Gaming Microphone - Lightsync - Black - Usb",
+      "brand": "Logitech",
+      "price": 72,
+      "oldPrice": null,
+      "category": "Headsets and Microphones",
+      "image": "products/logitech-986.webp"
+    },
+    {
+      "id": 1309,
+      "name": "Marvel's Spider-Man 2 for PS5",
+      "fullName": "Marvel's Spider-Man 2 for PS5",
+      "brand": "Sony",
+      "price": 60,
+      "oldPrice": null,
+      "category": "Gaming",
+      "image": "products/sony-1309.webp"
+    },
+    {
+      "id": 1312,
+      "name": "Sony PlayStation Backbone for PS Remote Play",
+      "fullName": "Sony PlayStation Backbone for PS Remote Play",
+      "brand": "Sony",
+      "price": 145,
+      "oldPrice": null,
+      "category": "Gaming",
+      "image": "products/sony-1312.webp"
+    },
+    {
+      "id": 1732,
+      "name": "PlayStation VR Bundle",
+      "fullName": "PlayStation VR Bundle",
+      "brand": "Sony",
+      "price": 550,
+      "oldPrice": null,
+      "category": "Gaming",
+      "image": "products/sony-1732.webp"
+    },
+    {
+      "id": 1733,
+      "name": "Sony PlayStation Pro Kit for PS5",
+      "fullName": "Sony PlayStation Pro Kit for PS5 - Essential Gaming Accessories Bundle",
+      "brand": "Sony",
+      "price": 125,
+      "oldPrice": null,
+      "category": "Gaming",
+      "image": "products/sony-1733.webp"
+    },
+    {
+      "id": 1088,
+      "name": "Anker MagGo 3-in-1 Wireless Charging Station...",
+      "fullName": "Anker MagGo 3-in-1 Wireless Charging Station 15W MagSafe",
+      "brand": "Anker",
+      "price": 130,
+      "oldPrice": null,
+      "category": "Phones & Tablets",
+      "image": "products/anker-1088.webp"
+    },
+    {
+      "id": 1087,
+      "name": "Anker Nano 75W USB-C Car Charger Fast...",
+      "fullName": "Anker Nano 75W USB-C Car Charger Fast Charging Compact Adapter",
+      "brand": "Anker",
+      "price": 45,
+      "oldPrice": null,
+      "category": "Phones & Tablets",
+      "image": "products/anker-1087.webp"
+    },
+    {
+      "id": 1171,
+      "name": "Apple Magic Keyboard for iPad Air 11-inch (M3)",
+      "fullName": "Apple Magic Keyboard for iPad Air 11-inch (M3) - White",
+      "brand": "Apple",
+      "price": 350,
+      "oldPrice": null,
+      "category": "Phones & Tablets",
+      "image": "products/apple-1171.webp"
+    }
+  ]
+}
