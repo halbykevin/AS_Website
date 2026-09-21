@@ -259,6 +259,51 @@ const salePrice = (base, pct) => Math.round(Number(base) * (100 - pct)) / 100;
 // SALE_JOIN is in scope.
 const EFFECTIVE_PRICE = `ROUND(p.price * (100 - COALESCE(sale.percent, 0)) / 100.0, 2)`;
 
+// The bag's default cap: at most 2 of any product per order, larger quantities
+// going through WhatsApp. A product can override it with `products.max_qty` —
+// a software licence someone buys 130 of has no reason to obey a rule written
+// for phones. Mirrored by MAX_QTY in both cart slices, which is why the API
+// resolves every product's real bounds into its JSON rather than leaving the
+// clients to apply a default they each hold a copy of.
+const MAX_ITEM_QTY = 2;
+
+// A per-product bound, or the fallback when the column is null/nonsense. Never
+// zero or negative — a cap of 0 would make a product that exists but can never
+// be bought, which is what `visible` is for. Numbers, not integers: a quantity
+// can be an amount here (see qty_step in db/exclusive.sql), and pg hands back
+// NUMERIC columns as strings.
+// pg returns NUMERIC as a string, so a column passed straight through would
+// reach the admin editor as "5.00" and be written back as the string it typed.
+const numOrNull = (v) => (v == null ? null : Number(v));
+
+const qtyBound = (v, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+// Put a requested quantity onto the product's own grid and inside its bounds.
+//
+// The step is applied FIRST and by flooring, never rounding: flooring is what
+// the bag has always done, and it also means a snapped quantity is never more
+// than what was asked for — rounding 7.5 up to 8 on a whole-unit product would
+// charge for a unit nobody chose. The divide is rounded to six places first
+// because 7.5 / 0.01 is 749.9999999999999 in binary floating point, which would
+// floor to 749 and quietly turn $7.50 into $7.49.
+//
+// This is the authority both cart slices and both quantity pickers mirror, and
+// the only one a hand-made request or a stale bag has to pass through.
+const snapQty = (q, row) => {
+  const step = qtyBound(row?.qty_step, 1);
+  const min = qtyBound(row?.min_qty, 1);
+  const max = qtyBound(row?.max_qty, MAX_ITEM_QTY);
+  const n = Number(q);
+  const wanted = Number.isFinite(n) && n > 0 ? n : min;
+  const snapped = Math.floor(Math.round((wanted / step) * 1e6) / 1e6) * step;
+  // Settled at two decimals, which is what the NUMERIC(10,2) column stores and
+  // what money is counted in.
+  return Math.round(Math.min(max, Math.max(min, snapped)) * 100) / 100;
+};
+
 // `admin` opens up the fields the storefront must not see. It defaults to false
 // so the safe shape is the one you get by forgetting: a "call for price"
 // product's price is stripped from every public response, which is the whole
@@ -275,6 +320,22 @@ const productJson = (r, admin = false) => {
     description: r.description || "",
     specs: Array.isArray(r.specs) ? r.specs : [],
     callForPrice: Boolean(r.call_for_price),
+    // Sold on its own terms: no VAT, no delivery, Whish only, no wallet, no
+    // vouchers, and bought on its own. See db/exclusive.sql.
+    exclusive: Boolean(r.exclusive),
+    // Resolved to real numbers for everyone but the admin, so no client has to
+    // carry its own copy of the default cap — and so raising it is a change
+    // here, not a release of the web store and the app.
+    //
+    // The admin gets the raw columns (null = "follow the default"), the same
+    // split as the price above: the editor writes back what it is shown, so
+    // handing it a resolved 2 would pin every product it touches to today's
+    // default and quietly opt it out of tomorrow's.
+    minQty: admin ? numOrNull(r.min_qty) : qtyBound(r.min_qty, 1),
+    maxQty: admin ? numOrNull(r.max_qty) : qtyBound(r.max_qty, MAX_ITEM_QTY),
+    // 1 = whole units. Anything smaller makes the quantity an amount: at $1 a
+    // licence, a step of 0.01 is what lets someone settling $7.50 type 7.5.
+    qtyStep: admin ? numOrNull(r.qty_step) : qtyBound(r.qty_step, 1),
     price: hidePrice ? null : pct ? salePrice(r.price, pct) : r.price,
     oldPrice: hidePrice ? null : pct ? Number(r.price) : r.old_price,
     salePercent: hidePrice ? null : pct || null,
@@ -500,7 +561,10 @@ const orderItemJson = (r) => ({
   productId: r.product_id,
   name: r.name || "",
   price: r.price,
-  qty: r.qty,
+  // NUMERIC since quantities can be amounts, and pg hands those back as
+  // strings — "7.50" would concatenate rather than add in every client that
+  // totals a bag, and print as "× 7.50" on the invoice.
+  qty: Number(r.qty),
   image: r.image || "",
 });
 
@@ -755,6 +819,13 @@ const PRODUCT_COLS = {
   // worked. It belongs here: this flag decides whether a product is sellable
   // and whether it may be offered to Google at all.
   callForPrice: "call_for_price",
+  // Sold on its own terms — see db/exclusive.sql for everything it switches
+  // off. Like callForPrice this decides whether and how a product may be sold
+  // at all, so it belongs on the product, not in Settings.
+  exclusive: "exclusive",
+  minQty: "min_qty",
+  maxQty: "max_qty",
+  qtyStep: "qty_step",
   gtin: "gtin",
   mpn: "mpn",
 };
@@ -1542,8 +1613,6 @@ app.delete(
   }),
 );
 
-const MAX_ITEM_QTY = 2;
-
 app.get("/api/payment/methods", (_req, res) =>
   res.json({ cod: true, whish: whishPaymentReady() }),
 );
@@ -1553,13 +1622,15 @@ app.post(
   optionalCustomer,
   ah(async (req, res) => {
     const b = req.body || {};
+    // Quantities are passed through as sent. Every rule about them — the floor,
+    // the ceiling, and whether halves are even allowed — is the product's own
+    // (`min_qty` / `max_qty` / `qty_step`) and cannot be applied until the rows
+    // are read below. Rounding here is what would silently turn an order for
+    // 130 licences into an order for 2, or $7.50 into $7.
     const cleaned = (Array.isArray(b.items) ? b.items : [])
       .map((i) => ({
         productId: Number(i.productId),
-        qty: Math.min(
-          MAX_ITEM_QTY,
-          Math.max(1, Math.floor(Number(i.qty) || 1)),
-        ),
+        qty: Number(i.qty),
       }))
       .filter((i) => i.productId);
     if (!cleaned.length)
@@ -1569,10 +1640,13 @@ app.post(
     const phone = (b.phone || "").trim();
     const address = (b.address || "").trim();
     const email = (b.email || "").trim();
-    if (!fullName || !phone || !address) {
+    // The address is checked further down instead, once the bag is known: an
+    // exclusive order is a licence, not a parcel, and there is nowhere for it
+    // to be delivered to. The mobile number is never optional — see below.
+    if (!fullName || !phone) {
       return res
         .status(400)
-        .json({ error: "Name, mobile number and address are required" });
+        .json({ error: "Name and mobile number are required" });
     }
 
     // A real, reachable mobile number is required on every order — signed in or
@@ -1618,7 +1692,8 @@ app.post(
 
     const ids = cleaned.map((i) => i.productId);
     const { rows: prods } = await query(
-      `SELECT p.id, p.name, p.price, p.call_for_price, sale.percent AS sale_percent,
+      `SELECT p.id, p.name, p.price, p.call_for_price,
+        p.exclusive, p.min_qty, p.max_qty, p.qty_step, sale.percent AS sale_percent,
         (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort, pi.id LIMIT 1) AS image
        FROM products p ${SALE_JOIN} WHERE p.id = ANY($1)`,
       [ids],
@@ -1643,6 +1718,40 @@ app.post(
         productIds: quoteOnly.map((p) => p.id),
       });
     }
+    // An exclusive product is bought on its own — see db/exclusive.sql. Every
+    // rule it opts out of is an order-level one (VAT on the subtotal, a
+    // delivery fee for the bag, credit earned on what was spent), so a mixed
+    // bag would mean pro-rating each of them across the lines and giving every
+    // figure on screen a second way to disagree with what is charged. Refusing
+    // the mix is both simpler and the only version we can state honestly.
+    // Compared against the rows that actually resolved, not against what was
+    // sent: an id for a product that no longer exists is dropped further down
+    // anyway, and counting it here would report a licence bought on its own as
+    // a mixed bag.
+    const resolvedRows = cleaned
+      .map((i) => byId.get(i.productId))
+      .filter(Boolean);
+    const exclusiveRows = resolvedRows.filter((p) => p.exclusive);
+    const exclusiveOrder = exclusiveRows.length > 0;
+    if (exclusiveOrder && exclusiveRows.length !== resolvedRows.length) {
+      return res.status(400).json({
+        error:
+          `${exclusiveRows[0].name} is bought on its own. Please check out ` +
+          `the rest of your bag separately.`,
+        code: "exclusive_alone",
+        productIds: exclusiveRows.map((p) => p.id),
+      });
+    }
+
+    // Nothing is being carried anywhere on an exclusive order, so demanding a
+    // street address for one would be asking for a detail with no use. Every
+    // other order still needs somewhere to go.
+    if (!address && !exclusiveOrder) {
+      return res
+        .status(400)
+        .json({ error: "A delivery address is required", code: "address" });
+    }
+
     const items = [];
     let subtotal = 0;
     for (const it of cleaned) {
@@ -1650,21 +1759,36 @@ app.post(
       if (!p) continue;
       const pct = Number(p.sale_percent) || 0;
       const price = pct ? salePrice(p.price, pct) : Number(p.price) || 0;
-      subtotal += price * it.qty;
+      // The product's own bounds and step, applied at last — see snapQty.
+      const qty = snapQty(it.qty, p);
+      subtotal += price * qty;
       items.push({
         productId: p.id,
         name: p.name,
         price,
-        qty: it.qty,
+        qty,
         image: p.image || "",
+        // Not stored — it only decides whether this line counts as "7.5 items"
+        // or as one, below.
+        step: qtyBound(p.qty_step, 1),
       });
     }
     if (!items.length)
       return res
         .status(400)
         .json({ error: "None of those items are available" });
+    // A fractional quantity can put a line total a fraction of a cent out
+    // (3.33 × 7.5), and every figure derived from the subtotal — VAT, the
+    // wallet basis, what Whish is asked to collect — has to agree with the
+    // NUMERIC(10,2) the order stores.
+    subtotal = Math.round(subtotal * 100) / 100;
 
-    const paymentMethod = b.paymentMethod === "whish" ? "whish" : "cod";
+    // Whish Pay only on an exclusive order: nothing is being carried to a door,
+    // so there is nobody to hand cash to. Forced rather than refused — both
+    // checkouts offer only Whish for these, so a 'cod' reaching here is a stale
+    // client, and the payment page is what it was trying to get to anyway.
+    const paymentMethod =
+      exclusiveOrder || b.paymentMethod === "whish" ? "whish" : "cod";
     if (paymentMethod === "whish" && !whishPaymentReady()) {
       return res
         .status(400)
@@ -1677,14 +1801,29 @@ app.post(
     const { rows: setRows } = await query(
       `SELECT delivery_fee, free_delivery_over, vat_percent FROM settings WHERE id = 1`,
     );
-    const deliveryFee = deliveryFeeFor(subtotal, setRows[0]);
-    const vatPercent = Number(setRows[0]?.vat_percent ?? 0);
+    // An exclusive order is priced against a settings row with the fee and the
+    // rate zeroed, rather than against a branch at each use. Both helpers and
+    // the VAT line further down read this one object, so there is no second
+    // place to forget: turn the exemption on here and it is on everywhere.
+    const pricing = exclusiveOrder
+      ? { delivery_fee: 0, free_delivery_over: 0, vat_percent: 0 }
+      : setRows[0];
+    const deliveryFee = deliveryFeeFor(subtotal, pricing);
+    const vatPercent = Number(pricing?.vat_percent ?? 0);
 
     // A Daily Spin reward. Claimed here — before the order exists — because the
     // atomic status flip inside redeemVoucher() is what stops the same code
     // being spent twice; anything that throws below must give it back.
+    // Nothing a voucher or the wallet can touch on an exclusive order: neither
+    // is claimed, so neither has to be given back. Ignored rather than refused,
+    // because no money has moved and refusing would turn a stale client into a
+    // sale that cannot be completed at all.
     let voucher = null;
-    if (b.voucherCode) {
+    if (b.voucherCode && exclusiveOrder) {
+      console.log(
+        `[orders] voucher ${b.voucherCode} ignored — exclusive items carry no discount`,
+      );
+    } else if (b.voucherCode) {
       try {
         voucher = await redeemVoucher({
           code: b.voucherCode,
@@ -1708,7 +1847,7 @@ app.post(
       Math.round((itemsDiscount + deliveryWaived) * 100) / 100;
     const vatAmount = vatAmountFor(
       subtotal - itemsDiscount + (deliveryFee - deliveryWaived),
-      setRows[0],
+      pricing,
     );
     const payable = subtotal + deliveryFee + vatAmount - discountAmount;
 
@@ -1721,7 +1860,8 @@ app.post(
     // specific figure — and what the server grants is what prices the order,
     // never the number the client asked for.
     let walletSpend = null;
-    const wantsWallet = b.useWallet === true || Number(b.walletAmount) > 0;
+    const wantsWallet =
+      !exclusiveOrder && (b.useWallet === true || Number(b.walletAmount) > 0);
     if (wantsWallet && customerId) {
       try {
         walletSpend = await spendFromWallet({
@@ -1751,8 +1891,8 @@ app.post(
     let orderId;
     try {
       const { rows } = await query(
-        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, wallet_amount, payment_method, payment_status, currency)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'USD') RETURNING id`,
+        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, wallet_amount, payment_method, payment_status, exclusive, currency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'USD') RETURNING id`,
         [
           customerId,
           settledByWallet ? "confirmed" : "pending",
@@ -1772,6 +1912,10 @@ app.post(
           walletAmount,
           storedMethod,
           settledByWallet ? "paid" : "unpaid",
+          // Snapshotted, not re-read later: the wallet reconciles an order's
+          // earnings on every status change, and looking the product's flag up
+          // then would rewrite this order's history the day someone clears it.
+          exclusiveOrder,
         ],
       );
       orderId = rows[0].id;
@@ -1809,7 +1953,9 @@ app.post(
         orderId,
         customerId,
         name: fullName,
-        itemCount: items.reduce((n, it) => n + it.qty, 0),
+        // A quantity that is really an amount ($7.50 of licence) is one thing
+        // in the bag, not seven and a half things.
+        itemCount: items.reduce((n, it) => n + (it.step < 1 ? 1 : it.qty), 0),
         total,
       },
       `order:${orderId}:created`,
@@ -2669,8 +2815,9 @@ app.post(
     const { rows } = await query(
       `INSERT INTO products
          (name, slug, tagline, description, specs, price, old_price, category_id, brand_id,
-          colors, stock, is_new, featured, visible, sort, call_for_price, gtin, mpn)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18)
+          colors, stock, is_new, featured, visible, sort, call_for_price, gtin, mpn,
+          exclusive, min_qty, max_qty, qty_step)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         name,
@@ -2691,6 +2838,12 @@ app.post(
         b.callForPrice ?? false,
         normalizeGtin(b.gtin),
         String(b.mpn ?? "").trim(),
+        b.exclusive ?? false,
+        // Null rather than a number, so a product that never asked for its own
+        // bounds keeps following the store default wherever that ends up.
+        b.minQty ?? null,
+        b.maxQty ?? null,
+        b.qtyStep ?? null,
       ],
     );
     if (Array.isArray(b.images)) {

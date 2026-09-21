@@ -17,7 +17,8 @@ const slugify = (s) =>
 const BLANK = {
   name: '', slug: '', tagline: '', description: '', price: '', oldPrice: '',
   categoryId: '', brandId: '', stock: '0', isNew: true, featured: false, visible: true,
-  callForPrice: false, gtin: '', mpn: '', colors: [], specs: [],
+  callForPrice: false, exclusive: false, minQty: '', maxQty: '', qtyStep: '',
+  gtin: '', mpn: '', colors: [], specs: [],
 }
 
 export default function ProductEditor({ id }) {
@@ -64,6 +65,13 @@ export default function ProductEditor({ id }) {
       brandId: p.brandId != null ? String(p.brandId) : '',
       stock: String(p.stock ?? 0), isNew: !!p.isNew, featured: !!p.featured,
       visible: p.visible !== false, callForPrice: !!p.callForPrice,
+      exclusive: !!p.exclusive,
+      // The API resolves these to real numbers (1 and the store's cap) before
+      // sending them, so the boxes always show what actually applies rather
+      // than an empty field that means "whatever the default is today".
+      minQty: p.minQty != null ? String(p.minQty) : '',
+      maxQty: p.maxQty != null ? String(p.maxQty) : '',
+      qtyStep: p.qtyStep != null ? String(p.qtyStep) : '',
       gtin: p.gtin || '', mpn: p.mpn || '',
       colors: Array.isArray(p.colors) ? p.colors : [],
       specs: Array.isArray(p.specs) ? p.specs.filter((r) => Array.isArray(r) && r.length >= 2) : [],
@@ -169,6 +177,12 @@ export default function ProductEditor({ id }) {
       featured: form.featured,
       visible: form.visible,
       callForPrice: form.callForPrice,
+      exclusive: form.exclusive,
+      // Blank means "follow the store default", which is a null column, not a
+      // zero — a cap of 0 would be a product nobody can buy.
+      minQty: form.minQty === '' ? null : Number(form.minQty) || null,
+      maxQty: form.maxQty === '' ? null : Number(form.maxQty) || null,
+      qtyStep: form.qtyStep === '' ? null : Number(form.qtyStep) || null,
       gtin: form.gtin.trim(),
       mpn: form.mpn.trim(),
       colors: form.colors,
@@ -264,6 +278,33 @@ export default function ProductEditor({ id }) {
                   : 'For products you may not advertise a price on. Set the wording once in Settings → Call for price.'}
               </p>
             </div>
+            {/* Beside "call for price" because it answers the same kind of
+                question — the terms this product is sold on — rather than what
+                it is. */}
+            <div className="col-span-2 rounded-xl border border-admin-line/15 p-4">
+              <Toggle
+                checked={form.exclusive}
+                onChange={(v) => set('exclusive', v)}
+                label="Exclusive — sold on its own terms"
+              />
+              <p className="mt-2 text-xs text-admin-text/50">
+                {form.exclusive
+                  ? 'No VAT, no delivery charge, no AS Wallet credit and no vouchers. Paid online with Whish Pay only, and bought on its own — the bag cannot mix it with other products. For licences and anything else that isn’t shipped.'
+                  : 'For products sold outside the store’s usual rules — a software licence, say, which has nothing to deliver and nothing to tax at the door.'}
+              </p>
+            </div>
+            <Field label="Minimum quantity" hint="Blank = 1.">
+              <Input type="number" min="0.01" step="0.01" value={form.minQty} onChange={(e) => set('minQty', e.target.value)} placeholder="1" />
+            </Field>
+            <Field label="Maximum quantity" hint="Blank = the store’s 2-per-order cap. Above 2 gives the shopper a box to type into instead of a +/− stepper.">
+              <Input type="number" min="0.01" step="0.01" value={form.maxQty} onChange={(e) => set('maxQty', e.target.value)} placeholder="2" />
+            </Field>
+            <Field
+              label="Quantity step"
+              hint="Blank = 1 (whole units). 0.01 lets the shopper enter decimals — use it when the quantity is really an amount, like a $1 licence someone buys 7.5 of."
+            >
+              <Input type="number" min="0.01" step="0.01" value={form.qtyStep} onChange={(e) => set('qtyStep', e.target.value)} placeholder="1" />
+            </Field>
             <Field label="Category">
               <Select value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
                 <option value="">— None —</option>

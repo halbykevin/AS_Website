@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useDispatch } from 'react-redux'
 import ShareMenu from './ShareMenu.jsx'
-import { addItem } from '@/store/cartSlice'
+import QtyDialog from './QtyDialog.jsx'
+import { addItem, isBulk, maxQtyOf, minQtyOf, stepOf } from '@/store/cartSlice'
 import { openCart } from '@/store/uiSlice'
 import { SITE_URL } from '@/lib/seo'
 import { productImage } from '@/lib/productImage'
@@ -41,8 +43,11 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
   const cfp = useCallForPrice()
   const quoteOnly = isCallForPrice(product)
   // Empty string at 0% VAT, and nothing to say on a product with no price on
-  // screen — in both cases the marker simply doesn't render.
-  const tag = vatTag(useVat())
+  // screen — in both cases the marker simply doesn't render. An exclusive
+  // product is never taxed whatever the rate is, so "+ VAT" beside its price
+  // would be a charge that never arrives.
+  const vat = useVat()
+  const tag = product.exclusive ? '' : vatTag(vat)
   const { id, name, tagline, price, image, colors = [], brand, slug } = product
   const href = slug ? `/product/${slug}` : '#'
 
@@ -63,8 +68,30 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
       .find((b) => b && !b.startsWith('#') && !b.startsWith('-') && !b.startsWith('*'))
       ?.replace(/[*_`]/g, '') || tagline || ''
 
-  const add = () => {
-    dispatch(addItem({ id, title: name, image, price: Number(price) || 0, slug }))
+  // Products that sell in quantity ask how many before they go in, rather than
+  // adding one and making the shopper find the bag to change it. Everything
+  // else keeps the single tap it always had — a dialog to confirm "1 of 2" is
+  // a step for nothing.
+  const bulk = isBulk(product)
+  const [asking, setAsking] = useState(false)
+
+  const add = (qty) => {
+    dispatch(
+      addItem({
+        id,
+        title: name,
+        image,
+        price: Number(price) || 0,
+        slug,
+        qty,
+        // The line has to carry these: the bag clamps against them and the
+        // checkout prices against them, neither of which re-reads the product.
+        exclusive: product.exclusive,
+        minQty: product.minQty,
+        maxQty: product.maxQty,
+        qtyStep: product.qtyStep,
+      }),
+    )
     dispatch(openCart())
   }
 
@@ -197,7 +224,10 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
               {cfp.button}
             </Link>
           ) : (
-            <button onClick={add} className="pill min-w-0 flex-1 px-3 text-sm sm:px-5 sm:text-base">
+            <button
+              onClick={() => (bulk ? setAsking(true) : add(1))}
+              className="pill min-w-0 flex-1 px-3 text-sm sm:px-5 sm:text-base"
+            >
               Add to Bag
             </button>
           )}
@@ -210,6 +240,18 @@ export default function ProductTile({ product, fluid = false, layout = 'card' })
           />
         </div>
       </div>
+
+      {bulk && (
+        <QtyDialog
+          open={asking}
+          product={product}
+          min={minQtyOf(product)}
+          max={maxQtyOf(product)}
+          step={stepOf(product)}
+          onAdd={add}
+          onClose={() => setAsking(false)}
+        />
+      )}
     </div>
   )
 }

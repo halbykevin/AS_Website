@@ -7,14 +7,20 @@ import { useSelector, useDispatch } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 import Icon from "./Icon.jsx";
 import MaxQtyNote from "./MaxQtyNote.jsx";
+import QtyField from "./QtyField.jsx";
 import {
   selectCartItems,
   selectCartTotal,
+  selectExclusiveOnly,
   removeItem,
   setQty,
   setItemSlug,
   clearCart,
-  MAX_QTY,
+  isBulk,
+  maxQtyOf,
+  minQtyOf,
+  stepOf,
+  formatQty,
 } from "@/store/cartSlice";
 import { selectCartOpen, closeCart } from "@/store/uiSlice";
 import { vatNote } from "@/lib/orders";
@@ -30,6 +36,9 @@ export default function CartDrawer({ whatsapp }) {
   const open = useSelector(selectCartOpen);
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
+  // A bag of exclusive items is never taxed, so the "VAT added at checkout"
+  // line under the subtotal would be describing a charge that never comes.
+  const exclusiveOnly = useSelector(selectExclusiveOnly);
   const dispatch = useDispatch();
   const router = useRouter();
   // Item whose + was clicked at the cap — shows the WhatsApp note under it.
@@ -176,6 +185,21 @@ export default function CartDrawer({ whatsapp }) {
                             {money(i.price)}
                           </p>
                           <div className="mt-2 flex items-center gap-3">
+                            {/* A line bought by the hundred gets the same
+                                typable box the product page offers — editing a
+                                quantity of 130 down to 120 must not mean ten
+                                taps on a 7-pixel arrow. */}
+                            {isBulk(i) ? (
+                              <QtyField
+                                value={i.qty}
+                                min={minQtyOf(i)}
+                                max={maxQtyOf(i)}
+                                step={stepOf(i)}
+                                onChange={(q) => dispatch(setQty({ id: i.id, qty: q }))}
+                                size="sm"
+                                label={`Quantity of ${i.title}`}
+                              />
+                            ) : (
                             <div className="flex items-center rounded-full border border-as-ink/15">
                               <button
                                 onClick={() => {
@@ -191,18 +215,18 @@ export default function CartDrawer({ whatsapp }) {
                                 <Icon name="minus" className="h-3.5 w-3.5" />
                               </button>
                               <span className="w-7 text-center text-sm font-medium text-as-ink">
-                                {i.qty}
+                                {formatQty(i.qty)}
                               </span>
                               <button
                                 onClick={() => {
-                                  if (i.qty >= MAX_QTY) setMaxHitId(i.id);
+                                  if (i.qty >= maxQtyOf(i)) setMaxHitId(i.id);
                                   else
                                     dispatch(
                                       setQty({ id: i.id, qty: i.qty + 1 }),
                                     );
                                 }}
                                 className={`flex h-7 w-7 items-center justify-center hover:text-as-ink ${
-                                  i.qty >= MAX_QTY
+                                  i.qty >= maxQtyOf(i)
                                     ? "text-as-ink/25"
                                     : "text-as-ink/60"
                                 }`}
@@ -211,6 +235,7 @@ export default function CartDrawer({ whatsapp }) {
                                 <Icon name="plus" className="h-3.5 w-3.5" />
                               </button>
                             </div>
+                            )}
                             <span className="ml-auto font-medium text-as-ink">
                               {money(Number(i.price) * i.qty)}
                             </span>
@@ -237,8 +262,9 @@ export default function CartDrawer({ whatsapp }) {
                       </span>
                     </div>
                     {/* Delivery and VAT are priced on the checkout page, once
-                        there is an address to price them against. */}
-                    {vatNote(vat) && (
+                        there is an address to price them against — unless the
+                        bag is exclusive, where neither is ever charged. */}
+                    {!exclusiveOnly && vatNote(vat) && (
                       <p className="mt-0.5 text-xs font-medium text-as-red">
                         {vatNote(vat)}
                       </p>

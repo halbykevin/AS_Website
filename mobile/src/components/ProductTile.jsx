@@ -8,7 +8,7 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { useTheme, useThemedStyles } from '@/src/theme';
-import { addItem } from '@/src/store/cartSlice';
+import { addItem, isBulk } from '@/src/store/cartSlice';
 import { money, cleanDescription } from '@/src/lib/format';
 import { useStoreSettings } from '@/src/lib/queries';
 import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
@@ -104,8 +104,31 @@ function ProductTile({ product, fluid = false, width }) {
   const open = () => slug && router.push(`/product/${slug}`);
   // The cart update comes first and unconditionally; the flight is decoration
   // that a reduced-motion setting or a missing bag icon simply skips.
+  //
+  // A product that sells in quantity opens instead of adding: the quantity is
+  // the decision being made, and the box to type it into lives on the product
+  // screen. Adding one and making them go and find the bag to fix it is the
+  // behaviour this whole change exists to remove.
   const add = () => {
-    dispatch(addItem({ id, title: name, image, price: priceNum, slug }));
+    if (isBulk(product)) {
+      open();
+      return;
+    }
+    dispatch(
+      addItem({
+        id,
+        title: name,
+        image,
+        price: priceNum,
+        slug,
+        // Carried on the line: the bag caps against these and checkout prices
+        // against them, without going back to the API for the product.
+        exclusive: product.exclusive,
+        minQty: product.minQty,
+        maxQty: product.maxQty,
+        qtyStep: product.qtyStep
+      })
+    );
     flyToCart({ uri: image, source: imageRef });
   };
 

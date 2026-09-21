@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { useProduct } from '@/src/lib/queries';
-import { addItem, selectCartItems, selectCartCount, MAX_QTY } from '@/src/store/cartSlice';
+import { addItem, selectCartItems, selectCartCount, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty } from '@/src/store/cartSlice';
 import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { vatNote } from '@/src/lib/delivery';
@@ -14,6 +14,7 @@ import RemoteImage from '@/src/components/RemoteImage';
 import ImageViewer from '@/src/components/ImageViewer';
 import { useCartTarget, useFlyToCart } from '@/src/components/FlyToCart';
 import WalletEarn from '@/src/components/WalletEarn';
+import QtyField, { ExclusiveTerms } from '@/src/components/QtyField';
 import { isCallForPrice, callForPriceCopy, enquiryUrl } from '@/src/lib/callForPrice';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
@@ -47,8 +48,20 @@ export default function ProductDetailScreen() {
   const galleryRef = useRef(null);
   const flyToCart = useFlyToCart();
 
+  // This product's own bounds, not the store's — a licence sold by the hundred
+  // is not capped by a rule written for phones. See cartSlice.
   const inCart = items.find(i => i.id === product?.id)?.qty || 0;
-  const atCap = inCart >= MAX_QTY;
+  const atCap = inCart >= maxQtyOf(product);
+  // A product that sells in quantity gets the number asked for up front, rather
+  // than one added and then edited in the bag.
+  const bulk = isBulk(product);
+  const [qty, setQty] = useState(1);
+  // Open at the product's floor once it has loaded. A minimum of 10 that starts
+  // at 1 is a control whose first − press does nothing and whose number is
+  // already invalid.
+  useEffect(() => {
+    if (product) setQty(minQtyOf(product));
+  }, [product?.id, product?.minQty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const images = useMemo(() => {
     if (!product) return [];
@@ -98,7 +111,23 @@ export default function ProductDetailScreen() {
   const add = () => {
     if (atCap) return;
     const image = product.image || images[0];
-    dispatch(addItem({ id: product.id, title: product.name, image, price: priceNum, slug: product.slug }));
+    dispatch(
+      addItem({
+        id: product.id,
+        title: product.name,
+        image,
+        price: priceNum,
+        slug: product.slug,
+        qty: bulk ? qty : 1,
+        // The bounds and the exemption travel with the line: the bag caps
+        // against them and checkout prices against them, neither of which goes
+        // back to the API for the product.
+        exclusive: product.exclusive,
+        minQty: product.minQty,
+        maxQty: product.maxQty,
+        qtyStep: product.qtyStep
+      })
+    );
     flyToCart({ uri: images[active] || image, source: galleryRef });
   };
 
@@ -109,7 +138,10 @@ export default function ProductDetailScreen() {
       edges={['top']}
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
-        <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
+        // A bulk product stacks: the quantity box and the running total on one
+        // line, Add to Bag full width underneath. Side by side they leave about
+        // 60pt for the button on a 320pt phone, which is not a button.
+        <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background, flexDirection: bulk && !quoteOnly ? 'column' : 'row', alignItems: bulk && !quoteOnly ? 'stretch' : 'center', gap: theme.spacing.md }}>
           {quoteOnly ? (
             <>
               <View style={{ flexShrink: 1 }}>
@@ -131,15 +163,39 @@ export default function ProductDetailScreen() {
             </>
           ) : (
             <>
-              <View>
-                <Text variant="caption" faint>
-                  {onSale ? 'Now' : 'Price'}
-                </Text>
-                <Text variant="h3" color={onSale ? 'primary' : 'text'}>
-                  {money(priceNum)}
-                </Text>
-              </View>
-              <Button label={atCap ? 'Max in bag' : 'Add to Bag'} icon={atCap ? 'check' : 'bag'} onPress={add} disabled={atCap} size="lg" style={{ flex: 1 }} />
+              {/* Where the quantity is typed, the bar shows what it comes to
+                  rather than the unit price: at $1 a licence the number in the
+                  box and the amount charged are the same figure, and spelling
+                  it out is what makes that legible before the bag. */}
+              {bulk ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md }}>
+                  <View style={{ gap: 4 }}>
+                    <QtyField value={qty} min={minQtyOf(product)} max={maxQtyOf(product)} step={stepOf(product)} onChange={setQty} size="sm" label={`Quantity of ${product.name}`} />
+                    {/* Stated up front so a typed 99,999 being clamped to the
+                        ceiling is never a surprise. */}
+                    <Text variant="caption" faint center>
+                      {minQtyOf(product) > 1 ? `${formatQty(minQtyOf(product))}–` : 'Up to '}
+                      {maxQtyOf(product).toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text variant="caption" faint>
+                      {formatQty(qty)} × {money(priceNum)}
+                    </Text>
+                    <Text variant="h3">{money(priceNum * qty)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View>
+                  <Text variant="caption" faint>
+                    {onSale ? 'Now' : 'Price'}
+                  </Text>
+                  <Text variant="h3" color={onSale ? 'primary' : 'text'}>
+                    {money(priceNum)}
+                  </Text>
+                </View>
+              )}
+              <Button label={atCap ? 'Max in bag' : 'Add to Bag'} icon={atCap ? 'check' : 'bag'} onPress={add} disabled={atCap} size="lg" style={bulk ? undefined : { flex: 1 }} />
             </>
           )}
         </View>
@@ -216,7 +272,7 @@ export default function ProductDetailScreen() {
 
         {/* The price above is the goods alone. Skipped for a quote-only
             product: there is no figure on screen to qualify. */}
-        {!quoteOnly && vatNote(storeSettings?.vat) ? (
+        {!quoteOnly && !product.exclusive && vatNote(storeSettings?.vat) ? (
           // Pulled back out of the column's 16pt gap so it reads as part of the
           // price rather than as the next thing down the page.
           <Text variant="caption" color="primary" style={{ marginTop: -theme.spacing.sm }}>
@@ -224,15 +280,20 @@ export default function ProductDetailScreen() {
           </Text>
         ) : null}
 
-        {/* No price, no points estimate — there is no figure to earn on. */}
+        {/* No price, no points estimate — there is no figure to earn on. An
+            exclusive product is outside the programme entirely, so an estimate
+            would promise credit that never arrives; what it gets instead is the
+            terms it is actually sold on. */}
         {quoteOnly ? (
           cfp.note ? (
             <Text variant="caption" muted>
               {cfp.note}
             </Text>
           ) : null
+        ) : product.exclusive ? (
+          <ExclusiveTerms />
         ) : (
-          <WalletEarn amount={priceNum} verb="Get" />
+          <WalletEarn amount={priceNum * (bulk ? qty : 1)} verb="Get" />
         )}
 
         {/* Colours */}
@@ -249,13 +310,17 @@ export default function ProductDetailScreen() {
           </View>
         ) : null}
 
-        {/* Stock */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Icon name={product.stock > 0 ? 'checkCircle' : 'info'} size={16} color={product.stock > 0 ? theme.colors.success : theme.colors.textFaint} />
-          <Text variant="caption" muted>
-            {product.stock > 0 ? 'In stock · Cash on delivery' : 'Made to order'}
-          </Text>
-        </View>
+        {/* Stock. The stock line names the payment method, so it cannot be
+            shown as-is on a product that refuses cash on delivery — the terms
+            block above has already said how this one is paid for. */}
+        {product.exclusive ? null : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name={product.stock > 0 ? 'checkCircle' : 'info'} size={16} color={product.stock > 0 ? theme.colors.success : theme.colors.textFaint} />
+            <Text variant="caption" muted>
+              {product.stock > 0 ? 'In stock · Cash on delivery' : 'Made to order'}
+            </Text>
+          </View>
+        )}
 
         <Divider />
 

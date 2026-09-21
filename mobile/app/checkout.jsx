@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
-import { selectCartItems, selectCartTotal, clearCart } from '@/src/store/cartSlice';
+import { selectCartItems, selectCartTotal, selectExclusiveOnly, selectHasExclusive, clearCart, formatQty } from '@/src/store/cartSlice';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { usePaymentMethods, useStoreSettings } from '@/src/lib/queries';
 import { PAYMENT_COD, PAYMENT_WHISH, openWhishCheckout, paymentReturnUrl } from '@/src/lib/payments';
@@ -32,14 +32,25 @@ export default function CheckoutScreen() {
   const dispatch = useDispatch();
   const qc = useQueryClient();
   const { data: settings } = useStoreSettings();
-  const deliveryFee = deliveryFeeFor(total, settings?.delivery);
+
+  // An exclusive bag is priced on its own terms (as_store/db/exclusive.sql):
+  // no VAT, no delivery, no wallet, no vouchers, Whish only. Read once and
+  // threaded through every figure below, so what this screen shows is what the
+  // server independently arrives at.
+  const exclusiveOnly = useSelector(selectExclusiveOnly);
+  const hasExclusive = useSelector(selectHasExclusive);
+  // Mixed bags are refused by the API. Caught here so the shopper is told
+  // before filling the form in, not after pressing the button.
+  const mixedBag = hasExclusive && !exclusiveOnly;
+
+  const deliveryFee = exclusiveOnly ? 0 : deliveryFeeFor(total, settings?.delivery);
 
   // Daily Spin rewards. The server decides what each one is worth against this
   // exact cart (`eligible` + `discount` come back with the list), so the summary
   // below only has to render its answer — and the order it later places is
   // re-priced server-side anyway.
   const [voucherCode, setVoucherCode] = useState('');
-  const { data: vouchers } = useVouchers(total, Boolean(customer) && items.length > 0);
+  const { data: vouchers } = useVouchers(total, Boolean(customer) && items.length > 0 && !exclusiveOnly);
   const usable = (Array.isArray(vouchers) ? vouchers : []).filter(v => v.eligible);
   const applied = usable.find(v => v.code === voucherCode) || null;
 
@@ -48,7 +59,7 @@ export default function CheckoutScreen() {
   const deliveryWaived = applied?.type === 'free_delivery' ? deliveryFee : 0;
   const itemsDiscount = applied ? applied.discount - deliveryWaived : 0;
   const discount = applied?.discount || 0;
-  const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), settings?.vat);
+  const vatAmount = exclusiveOnly ? 0 : vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), settings?.vat);
   // What is owed before the wallet. Store credit is a payment, not a discount,
   // so it comes off after VAT — the tax is on the goods whoever's money buys
   // them, and the server prices it exactly this way.
@@ -60,7 +71,7 @@ export default function CheckoutScreen() {
   const [useCredit, setUseCredit] = useState(false);
   const { data: wallet } = useWallet(Boolean(customer), payable);
   const walletBalance = Number(wallet?.balance || 0);
-  const walletSpendable = Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet));
+  const walletSpendable = exclusiveOnly ? 0 : Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet));
   const walletApplied = useCredit ? walletSpendable : 0;
   const grandTotal = Math.round((payable - walletApplied) * 100) / 100;
 
@@ -70,6 +81,14 @@ export default function CheckoutScreen() {
   useEffect(() => {
     if (useCredit && walletSpendable <= 0) setUseCredit(false);
   }, [useCredit, walletSpendable]);
+
+  // 'cod' is the default and its card isn't shown for an exclusive bag, so
+  // without this the screen would sit on a payment method nothing on it offers
+  // and the button would read "Place order" for an order about to open a
+  // payment page. The API forces Whish too; this keeps the button honest.
+  useEffect(() => {
+    if (exclusiveOnly) setPay(PAYMENT_WHISH);
+  }, [exclusiveOnly]);
 
   // A reward that stops applying (the bag shrank below its minimum, or it was
   // spent on another device) must not silently ride along on the order. Keyed on
@@ -126,8 +145,14 @@ export default function CheckoutScreen() {
   }
 
   const placeOrder = async () => {
-    if (!form.fullName.trim() || !form.phone.trim() || !form.address.trim()) {
-      setError('Name, mobile number and address are required.');
+    if (!form.fullName.trim() || !form.phone.trim() || (!exclusiveOnly && !form.address.trim())) {
+      setError(exclusiveOnly ? 'Name and mobile number are required.' : 'Name, mobile number and address are required.');
+      return;
+    }
+    // The API refuses this outright; saying so here saves a round trip and an
+    // error that would land after the whole form was filled in.
+    if (mixedBag) {
+      setError('One of these items is bought on its own. Please remove the rest of your bag and order it separately.');
       return;
     }
     // A number we can actually call, on every order. Signing in with Google or
@@ -200,10 +225,14 @@ export default function CheckoutScreen() {
             <Text variant="caption" muted>Subtotal</Text>
             <Text variant="caption" muted>{money(total)}</Text>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text variant="caption" muted>Delivery</Text>
-            <Text variant="caption" muted>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</Text>
-          </View>
+          {/* "Delivery — Free" on a licence invites the question of what is
+              being delivered. There is no delivery leg here at all. */}
+          {!exclusiveOnly && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" muted>Delivery</Text>
+              <Text variant="caption" muted>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</Text>
+            </View>
+          )}
           {discount > 0 && (
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text variant="caption" color="primary">Reward ({applied.code})</Text>
@@ -228,11 +257,13 @@ export default function CheckoutScreen() {
             </Text>
             <Text variant="h2">{money(grandTotal)}</Text>
           </View>
-          <Button label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'} loading={busy} onPress={placeOrder} size="lg" fullWidth />
+          <Button label={busy ? 'Please wait…' : payingOnline ? 'Continue to payment' : 'Place order'} loading={busy} disabled={mixedBag} onPress={placeOrder} size="lg" fullWidth />
           <Text variant="caption" faint center>
-            {Number(settings?.delivery?.fee) > 0 && Number(settings?.delivery?.freeOver) > 0
-              ? `Free delivery on orders over ${money(settings.delivery.freeOver)} · 12 months warranty`
-              : '12 months warranty'}
+            {exclusiveOnly
+              ? 'Paid securely with Whish Pay · no VAT, no delivery charge'
+              : Number(settings?.delivery?.fee) > 0 && Number(settings?.delivery?.freeOver) > 0
+                ? `Free delivery on orders over ${money(settings.delivery.freeOver)} · 12 months warranty`
+                : '12 months warranty'}
           </Text>
         </View>
       }
@@ -249,7 +280,7 @@ export default function CheckoutScreen() {
                 <RemoteImage uri={i.image} style={{ width: '100%', height: '100%' }} fallbackIcon="box" />
               </View>
               <Text variant="callout" style={{ flex: 1 }} numberOfLines={1}>
-                {i.title} × {i.qty}
+                {i.title} × {formatQty(i.qty)}
               </Text>
               <Text variant="callout" weight="semibold">
                 {money(i.price * i.qty)}
@@ -258,17 +289,29 @@ export default function CheckoutScreen() {
           ))}
         </Card>
 
+        {mixedBag ? (
+          <Card style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-start', borderColor: theme.colors.primary, borderWidth: 1 }}>
+            <Icon name="alert" size={20} color={theme.colors.primary} />
+            <Text variant="caption" color="primary" style={{ flex: 1 }}>
+              {items.find(i => i.exclusive)?.title} is bought on its own. Remove the other items from your bag and order them separately.
+            </Text>
+          </Card>
+        ) : null}
+
         {/* What this order earns. Deliberately here rather than in the sticky
             total bar: it is not a charge, and that stack reads like one. The
             basis is the items after any discount — the same one the server
-            credits on. */}
-        <WalletEarn amount={total - itemsDiscount - walletApplied} signedIn={Boolean(customer)} verb="You'll get" />
+            credits on. An exclusive order is outside the programme, so there
+            is nothing to promise. */}
+        {exclusiveOnly ? null : (
+          <WalletEarn amount={total - itemsDiscount - walletApplied} signedIn={Boolean(customer)} verb="You'll get" />
+        )}
 
         {/* AS Wallet. Only shown when there is a balance to spend — an empty
             wallet on the checkout screen is just a reminder of what you don't
             have. The switch is deliberate: credit is money, and money is never
             spent for someone. */}
-        {walletBalance > 0 ? (
+        {walletBalance > 0 && !exclusiveOnly ? (
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="h3">{wallet?.title || 'AS Wallet'}</Text>
             <Card
@@ -362,7 +405,7 @@ export default function CheckoutScreen() {
 
         {/* Delivery form */}
         <View style={{ gap: theme.spacing.md }}>
-          <Text variant="h3">Delivery details</Text>
+          <Text variant="h3">{exclusiveOnly ? 'Your details' : 'Delivery details'}</Text>
           {error ? (
             <Card style={{ backgroundColor: theme.colors.dangerBg }}>
               <Text variant="callout" color="danger">
@@ -382,7 +425,10 @@ export default function CheckoutScreen() {
           <Field label="City / area">
             <Input value={form.city} onChangeText={v => set('city', v)} />
           </Field>
-          <Field label="Address">
+          {/* Nothing is delivered on an exclusive order, so an address is a
+              detail with nowhere to go. The API drops the requirement for
+              exactly these orders. */}
+          <Field label={exclusiveOnly ? 'Address (optional)' : 'Address'}>
             <Input value={form.address} onChangeText={v => set('address', v)} placeholder="Street, building, floor…" />
           </Field>
           <Field label="Notes (optional)">
@@ -397,8 +443,26 @@ export default function CheckoutScreen() {
           </Card>
         </View>
 
-        {/* Payment */}
-        {whishAvailable ? (
+        {/* Payment. An exclusive order is Whish only — there is no parcel to
+            pay for at a door — so the choice collapses to a single statement
+            rather than a picker with one disabled half. */}
+        {exclusiveOnly ? (
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="h3">Payment</Text>
+            <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md, backgroundColor: theme.colors.surfaceAlt }}>
+              <Icon name="shield" size={22} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                  <Text variant="title">Pay now with</Text>
+                  <Image source={WHISH_LOGO} style={{ width: 62, height: 24 }} contentFit="contain" />
+                </View>
+                <Text variant="caption" muted style={{ marginTop: 2 }}>
+                  This order is paid online — there is nothing to pay on delivery. You'll finish in the Whish page, then come straight back here.
+                </Text>
+              </View>
+            </Card>
+          </View>
+        ) : whishAvailable ? (
           <View style={{ gap: theme.spacing.sm }}>
             <Text variant="h3">Payment</Text>
 

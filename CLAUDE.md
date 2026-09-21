@@ -327,6 +327,80 @@ popping as the count rises. Reanimated only — no native dependency, so it ship
 - Source views need `collapsable={false}` — Android flattens layout-only views away, and a view that
   no longer exists cannot be measured.
 
+## Exclusive items (store + app + admin)
+
+A product sold **on its own terms**, outside every store rule — `products.exclusive`, schema in
+[as_store/db/exclusive.sql](as_store/db/exclusive.sql). The first one is **RaiOne**, a software
+licence at **$1 each**, **$5 minimum**, **10,000 maximum**, in steps of **0.01** — so the quantity a
+customer types *is* the amount they pay: someone settling $130 enters 130, someone settling $7.50
+enters 7.5, and Whish collects exactly that.
+
+- **One flag, not four columns**, because the exemptions only make sense together: a licence has
+  nothing to deliver, nothing to tax at the door, and no cash for a driver to collect. `exclusive`
+  turns off **VAT**, the **delivery fee**, **cash on delivery** (Whish Pay only), **AS Wallet**
+  (earns none, spends none) and **Daily Spin vouchers**, and it replaces the 2-per-product bag cap
+  with `min_qty`/`max_qty`. All of it is enforced in `POST /api/orders`, which is the only place
+  both storefronts and the app pass through — the clients merely stop *offering* what the server
+  would refuse.
+- **It is bought on its own.** Mixing one into a bag of physical goods would mean pro-rating every
+  rule above across the lines — VAT on half the subtotal, delivery on the other half, credit earned
+  on part of it — and each of those is a way for the figure on screen to drift from the figure
+  charged. The API refuses the mix (`code: 'exclusive_alone'`, naming the product) and both
+  checkouts say so before the form is filled in.
+- **The order carries its own snapshot** (`orders.exclusive`), like the delivery fee and the VAT
+  rate: `syncOrderWallet` reconciles an order's earnings on every status change, and re-reading the
+  product's flag then would rewrite what an order earned the day someone clears it.
+- **Whish is forced, not demanded.** A `cod` reaching the API is a stale client — every checkout
+  offers only Whish for these — so the order is switched rather than refused; the payment page is
+  what it was trying to reach. Vouchers and `useWallet` arriving on one are **ignored and logged**:
+  nothing is claimed, so nothing has to be given back, and refusing would turn a stale client into a
+  sale that cannot complete at all.
+- **No address is required** for an exclusive order (there is nowhere to deliver to), which is why
+  that check moved below the bag read in `POST /api/orders`. The **mobile number is still mandatory**
+  — see *Checkout requires a mobile number*.
+- **`min_qty`/`max_qty`/`qty_step` are independent of the flag** and useful on any product: null
+  means "follow the store default" (`MAX_ITEM_QTY` = 2, step 1). The API **resolves them to real
+  numbers** for the storefront and the app so neither carries its own copy of the default — but
+  hands the **admin the raw columns**, the same `admin` split the price uses, because the editor
+  writes back what it is shown and a resolved `2` would pin every product it touched to today's
+  default.
+- **A step below 1 makes the quantity an amount, not a count.** That is a separate column from
+  `exclusive` on purpose: `exclusive` is about tax, delivery and payment, `qty_step` is about what a
+  quantity even means for this product, and an exclusive product sold in whole units is perfectly
+  reasonable. `order_items.qty` and both `products.min_qty`/`max_qty` are therefore `NUMERIC(10,2)`
+  — an INTEGER there would truncate 7.5 to 7 and charge fifty cents less than was agreed. **pg
+  returns NUMERIC as a string**, so `orderItemJson` coerces it: `"7.50"` concatenates rather than
+  adds in every client that totals a bag.
+- **`snapQty()` is the one authority on what a quantity becomes** — floor onto the product's grid,
+  then clamp, then settle at two decimals. It **floors, never rounds**, so a snapped quantity is
+  never more than what was asked for (7.5 of a whole-unit product is 7, not 8), and it divides
+  through a `1e6` round because `7.5 / 0.01` is `749.9999999999999` in binary floating point, which
+  would floor to 749 and quietly turn $7.50 into $7.49. Both cart slices and both quantity fields
+  mirror it to *show* a figure early; only the server decides one.
+- **A fractional line counts as one thing in the bag**, not seven and a half — the bag badge and the
+  order notification's `itemCount` count entries when the step is below 1.
+
+### The quantity picker
+
+Pressing **+** is fine over a range of 1–2, absurd over 1–10,000, and cannot reach 7.5 at all — so a
+product whose cap exceeds the store default **or whose step is below 1** (`isBulk()` in both cart
+slices) gets a **typed quantity box** instead:
+[as_store/src/components/QtyField.jsx](as_store/src/components/QtyField.jsx) and
+[mobile/src/components/QtyField.jsx](mobile/src/components/QtyField.jsx), on the product page, in
+the bag, and — on the web — in a [QtyDialog](as_store/src/components/QtyDialog.jsx) that opens from
+the tile's **Add to Bag** so the quantity is chosen *before* the item goes in rather than edited
+afterwards. (The app's tile opens the product screen instead, where the box already lives.)
+
+- The field **holds a raw string while focused** and commits clamped on blur: clamping each
+  keystroke turns "1" into the minimum before the "3" of "130" has been typed, and would eat the
+  "." of "7.5" the moment it was typed.
+- **The arrows still move in whole units** even at a step of 0.01 — nudging $7.50 a cent at a time
+  is not a nudge anyone wants — while the box accepts one decimal point and at most two decimals,
+  because the cent is the smallest thing money has.
+- A **running total** sits beside it (`130 × $1.00 = $130.00`), because where a licence costs $1 the
+  quantity and the amount are the same number and that should be legible before the bag, not after.
+- **Ordinary products are untouched** — one tap, straight to the bag, cap still 2.
+
 ## Call for price (store + app + admin)
 
 Per-product flag (`products.call_for_price`) that hides a price and offers a WhatsApp enquiry

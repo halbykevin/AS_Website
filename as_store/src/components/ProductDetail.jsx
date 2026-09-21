@@ -9,7 +9,8 @@ import MaxQtyNote from './MaxQtyNote.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import Breadcrumbs from './Breadcrumbs.jsx'
 import ShareMenu from './ShareMenu.jsx'
-import { addItem, MAX_QTY } from '@/store/cartSlice'
+import QtyField from './QtyField.jsx'
+import { addItem, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty } from '@/store/cartSlice'
 import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
@@ -29,19 +30,34 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : []
   const colors = Array.isArray(product.colors) ? product.colors : []
 
+  // This product's own quantity bounds, not the store's — see cartSlice. A
+  // product that sells in the hundreds gets a box to type into; everything else
+  // keeps the stepper, where a text field over a range of 1–2 is silly.
+  const minQty = minQtyOf(product)
+  const maxQty = maxQtyOf(product)
+  const qtyStep = stepOf(product)
+  const bulk = isBulk(product)
+
   const [active, setActive] = useState(0)
   const [color, setColor] = useState(0)
-  const [qty, setQty] = useState(1)
+  const [qty, setQty] = useState(minQty)
   const [maxHit, setMaxHit] = useState(false)
   const [viewerOpen, setViewerOpen] = useState(false)
 
   const inc = () => {
-    if (qty >= MAX_QTY) {
+    if (qty >= maxQty) {
       setMaxHit(true)
       return
     }
     setQty((q) => q + 1)
   }
+
+  // The floor can change under the component when a different product loads
+  // into the same mounted page, and a quantity of 1 on a product with a $5
+  // minimum is a number the server would silently correct.
+  useEffect(() => {
+    setQty(minQty)
+  }, [product.id, minQty])
 
   // Price-hidden product: the API sends no price for these, so there is nothing
   // to render and nothing to sell. The quantity stepper and Add to Bag go with
@@ -69,7 +85,23 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   }, [product.id, product.name, product.price, product.brand, product.category])
 
   const add = () => {
-    dispatch(addItem({ id: product.id, title: product.name, image: gallery[0] || '', price, qty, slug: product.slug }))
+    dispatch(
+      addItem({
+        id: product.id,
+        title: product.name,
+        image: gallery[0] || '',
+        price,
+        qty,
+        slug: product.slug,
+        // The bounds and the exemption travel with the line — the bag clamps
+        // against them and the checkout prices against them without going back
+        // to the API for the product.
+        exclusive: product.exclusive,
+        minQty: product.minQty,
+        maxQty: product.maxQty,
+        qtyStep: product.qtyStep,
+      }),
+    )
     dispatch(openCart())
   }
 
@@ -153,13 +185,22 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
             </div>
 
             {/* The price above is the goods alone. Skipped for a quote-only
-                product: there is no figure on screen to qualify. */}
-            {!quoteOnly && vatNote(vat) && (
+                product: there is no figure on screen to qualify — and for an
+                exclusive one, where the price IS the total and no VAT is ever
+                added to it. */}
+            {!quoteOnly && !product.exclusive && vatNote(vat) && (
               <p className="mt-1.5 text-sm font-medium text-as-red">{vatNote(vat)}</p>
             )}
 
-            {/* No price, no wallet estimate — there is no figure to earn on. */}
-            {!quoteOnly && <WalletLine amount={price * qty} />}
+            {/* No price, no wallet estimate — there is no figure to earn on.
+                An exclusive item is outside the programme entirely, so an
+                estimate here would promise credit that never arrives. */}
+            {!quoteOnly && !product.exclusive && <WalletLine amount={price * qty} />}
+
+            {/* What "sold on its own terms" costs the buyer in practice. Said
+                before the bag rather than sprung at checkout, because two of
+                the three are restrictions: card only, and on its own. */}
+            {product.exclusive && <ExclusiveTerms />}
             {quoteOnly && cfp.note && <p className="mt-3 text-sm text-as-ink/55">{cfp.note}</p>}
 
             {colors.length > 0 && (
@@ -182,7 +223,10 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
             )}
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              {!quoteOnly && (
+              {!quoteOnly && bulk && (
+                <QtyField value={qty} min={minQty} max={maxQty} step={qtyStep} onChange={setQty} size="md" />
+              )}
+              {!quoteOnly && !bulk && (
               <div className="flex items-center rounded-full border border-as-ink/15">
                 <button
                   onClick={() => {
@@ -199,7 +243,7 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                 <button
                   onClick={inc}
                   className={`flex h-11 w-11 items-center justify-center hover:text-as-ink ${
-                    qty >= MAX_QTY ? 'text-as-ink/25' : 'text-as-ink/60'
+                    qty >= maxQty ? 'text-as-ink/25' : 'text-as-ink/60'
                   }`}
                   aria-label="Increase quantity"
                 >
@@ -238,7 +282,34 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               />
             </div>
 
-            {!quoteOnly && maxHit && <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />}
+            {/* Where the quantity is typed rather than tapped, the arithmetic
+                belongs on screen: at $1 a licence the number in the box and the
+                amount charged are the same figure, and showing it spelled out
+                is what makes that legible before the bag, not after. */}
+            {!quoteOnly && bulk && qty > 1 && (
+              <p className="mt-3 text-sm text-as-ink/60">
+                {formatQty(qty)} × {money(price)} ={' '}
+                <strong className="font-semibold text-as-ink">{money(price * qty)}</strong>
+              </p>
+            )}
+
+            {/* The WhatsApp note is for the store's own 2-per-order cap, and is
+                raised by the stepper when + is pressed at the ceiling. A bulk
+                product has no stepper to press, and "order more on WhatsApp" is
+                the wrong answer for it anyway — it states its range instead, up
+                front, so a typed 99,999 being clamped is never a surprise. */}
+            {!quoteOnly && !bulk && maxHit && (
+              <MaxQtyNote whatsapp={whatsapp} product={product.name} className="mt-3" />
+            )}
+            {!quoteOnly && bulk && (
+              <p className="mt-3 text-sm text-as-ink/50">
+                {minQty > 1 ? `${formatQty(minQty)}–` : 'Up to '}
+                {maxQty.toLocaleString()} per order
+                {/* Only worth saying where it is not obvious: on a whole-unit
+                    product "in steps of 1" is noise. */}
+                {qtyStep < 1 ? ' · halves and decimals are fine' : ''}
+              </p>
+            )}
 
             {product.categorySlug && (
               <p className="mt-5 text-sm text-as-ink/50">
@@ -256,6 +327,28 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
         <ProductTabs description={product.description} specs={product.specs} />
       </div>
     </section>
+  )
+}
+
+// The three things an exclusive product does differently, stated plainly.
+// Deliberately not a marketing box: two of the lines are limits, and a customer
+// who finds out at the payment step that cash on delivery isn't offered has
+// been told too late.
+function ExclusiveTerms() {
+  const lines = [
+    ['globe', 'Paid online with Whish Pay — no cash on delivery'],
+    ['check', 'No VAT and no delivery charge — the price is the total'],
+    ['bag', 'Bought on its own, separately from other items'],
+  ]
+  return (
+    <ul className="mt-4 space-y-2 rounded-xl bg-as-fog px-4 py-3">
+      {lines.map(([icon, text]) => (
+        <li key={text} className="flex items-start gap-2.5 text-sm text-as-ink/70">
+          <Icon name={icon} className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
+          {text}
+        </li>
+      ))}
+    </ul>
   )
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
-import { selectCartItems, selectCartTotal, removeItem, setQty, clearCart, MAX_QTY } from '@/src/store/cartSlice';
+import { selectCartItems, selectCartTotal, selectExclusiveOnly, removeItem, setQty, clearCart, isBulk, maxQtyOf, minQtyOf, stepOf } from '@/src/store/cartSlice';
 import { useContent } from '@/src/content/ContentProvider';
 import { money } from '@/src/lib/format';
 import { vatNote } from '@/src/lib/delivery';
@@ -11,6 +11,7 @@ import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Icon, Divider, EmptyState } from '@/src/ui';
 import BrandBar from '@/src/components/BrandBar';
 import RemoteImage from '@/src/components/RemoteImage';
+import QtyField from '@/src/components/QtyField';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -21,6 +22,8 @@ export default function BagScreen() {
   const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
+  // An exclusive bag is never taxed and never delivered.
+  const exclusiveOnly = useSelector(selectExclusiveOnly);
   const { storeSettings } = useContent();
   const [maxHitId, setMaxHitId] = useState(null);
 
@@ -59,8 +62,10 @@ export default function BagScreen() {
               <Text variant="h2">{money(total)}</Text>
             </View>
             {/* Delivery and VAT are priced at checkout, once there is an
-                address to price them against. */}
-            {vatNote(storeSettings?.vat) ? (
+                address to price them against — unless the bag is exclusive,
+                where neither is ever charged and the note would describe a
+                line that never appears. */}
+            {!exclusiveOnly && vatNote(storeSettings?.vat) ? (
               <Text variant="caption" color="primary">
                 {vatNote(storeSettings?.vat)}
               </Text>
@@ -104,18 +109,33 @@ export default function BagScreen() {
                 </Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
-                  <Stepper
-                    qty={item.qty}
-                    onDec={() => {
-                      dispatch(setQty({ id: item.id, qty: item.qty - 1 }));
-                      if (maxHitId === item.id) setMaxHitId(null);
-                    }}
-                    onInc={() => {
-                      if (item.qty >= MAX_QTY) setMaxHitId(item.id);
-                      else dispatch(setQty({ id: item.id, qty: item.qty + 1 }));
-                    }}
-                    atCap={item.qty >= MAX_QTY}
-                  />
+                  {/* A line bought by the hundred gets the typable box the
+                      product screen offers — editing 130 down to 120 must not
+                      mean ten taps on a small arrow. */}
+                  {isBulk(item) ? (
+                    <QtyField
+                      value={item.qty}
+                      min={minQtyOf(item)}
+                      max={maxQtyOf(item)}
+                      step={stepOf(item)}
+                      onChange={q => dispatch(setQty({ id: item.id, qty: q }))}
+                      size="sm"
+                      label={`Quantity of ${item.title}`}
+                    />
+                  ) : (
+                    <Stepper
+                      qty={item.qty}
+                      onDec={() => {
+                        dispatch(setQty({ id: item.id, qty: item.qty - 1 }));
+                        if (maxHitId === item.id) setMaxHitId(null);
+                      }}
+                      onInc={() => {
+                        if (item.qty >= maxQtyOf(item)) setMaxHitId(item.id);
+                        else dispatch(setQty({ id: item.id, qty: item.qty + 1 }));
+                      }}
+                      atCap={item.qty >= maxQtyOf(item)}
+                    />
+                  )}
                   <Text variant="title">{money(item.price * item.qty)}</Text>
                 </View>
 
@@ -123,7 +143,7 @@ export default function BagScreen() {
                   <Pressable onPress={() => openUrl(whatsappChatUrl(storeSettings?.contact?.whatsapp, `Hi, I'd like to order more of: ${item.title}`))} style={{ marginTop: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Icon name="whatsapp" size={14} color={theme.colors.primary} />
                     <Text variant="caption" color="primary" style={{ flex: 1 }}>
-                      Max {MAX_QTY} per item — need more? Order the rest on WhatsApp.
+                      Max {maxQtyOf(item)} per item — need more? Order the rest on WhatsApp.
                     </Text>
                   </Pressable>
                 ) : null}

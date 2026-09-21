@@ -106,6 +106,12 @@ export async function loadWalletSettings(db = { query }) {
 // it, $50 of credit spent would hand back another $2.50, for ever. Rounded down
 // to the cent, so we never credit money that wasn't paid.
 export const walletEarnFor = (order, settings) => {
+  // An exclusive order is outside the programme entirely (db/exclusive.sql):
+  // it paid no VAT and no delivery, it could spend neither credit nor a
+  // voucher, and it mints no credit either. Read from the order's own snapshot
+  // rather than the product's flag, so what an order earned cannot change
+  // under it months later.
+  if (order.exclusive) return 0
   const subtotal = Number(order.subtotal) || 0
   const discount =
     order.voucher_type === 'free_delivery' ? 0 : Number(order.discount_amount) || 0
@@ -135,7 +141,7 @@ export async function syncOrderWallet(orderId, opts = {}) {
 
     const { rows } = await client.query(
       `SELECT o.id, o.customer_id, o.status, o.subtotal, o.discount_amount, o.wallet_amount,
-              v.type AS voucher_type
+              o.exclusive, v.type AS voucher_type
          FROM orders o LEFT JOIN vouchers v ON v.id = o.voucher_id
         WHERE o.id = $1`,
       [id],
@@ -197,7 +203,8 @@ async function pendingCredit(customerId, settings) {
   if (!settings.enabled) return 0
   const qualifying = QUALIFYING[settings.awardOn] || QUALIFYING.delivered
   const { rows } = await query(
-    `SELECT o.id, o.subtotal, o.discount_amount, o.wallet_amount, v.type AS voucher_type
+    `SELECT o.id, o.subtotal, o.discount_amount, o.wallet_amount, o.exclusive,
+            v.type AS voucher_type
        FROM orders o LEFT JOIN vouchers v ON v.id = o.voucher_id
       WHERE o.customer_id = $1
         AND o.status <> 'cancelled'

@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { useAccount, accountApi } from '@/src/lib/account';
-import { clearCart } from '@/src/store/cartSlice';
+import { clearCart, formatQty } from '@/src/store/cartSlice';
 import { isAwaitingPayment, openWhishCheckout, pollPayment, PAYMENT_WHISH, paymentLabel } from '@/src/lib/payments';
 import { money, orderTotal, formatDateTime, ORDER_STATUS_LABEL } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
@@ -207,7 +207,7 @@ export default function OrderDetailScreen() {
                       {it.name}
                     </Text>
                     <Text variant="caption" muted>
-                      {money(it.price)} × {it.qty}
+                      {money(it.price)} × {formatQty(it.qty)}
                     </Text>
                   </View>
                   <Text variant="callout" weight="semibold">

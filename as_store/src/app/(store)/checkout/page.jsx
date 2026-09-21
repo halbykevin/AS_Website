@@ -5,7 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSelector, useDispatch } from 'react-redux'
-import { selectCartItems, selectCartTotal, clearCart } from '@/store/cartSlice'
+import {
+  selectCartItems,
+  selectCartTotal,
+  selectExclusiveOnly,
+  selectHasExclusive,
+  clearCart,
+  formatQty,
+} from '@/store/cartSlice'
 import Icon from '@/components/Icon.jsx'
 import { useAccount, accountApi } from '@/lib/account'
 import { Field, inputCls } from '@/components/AccountUI.jsx'
@@ -22,6 +29,16 @@ export default function CheckoutPage() {
   const total = useSelector(selectCartTotal)
   const dispatch = useDispatch()
   const qc = useQueryClient()
+
+  // An exclusive bag is priced on its own terms (db/exclusive.sql): no VAT, no
+  // delivery, no wallet, no vouchers, Whish only. Read once here and threaded
+  // through the figures below, so the summary this page shows is the one the
+  // server independently arrives at.
+  const exclusiveOnly = useSelector(selectExclusiveOnly)
+  const hasExclusive = useSelector(selectHasExclusive)
+  // Mixed bags are refused by the API. Caught here first so the shopper is told
+  // before filling in a form, rather than by an error after pressing Place order.
+  const mixedBag = hasExclusive && !exclusiveOnly
 
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', address: '', city: '', notes: '', saveAddress: true })
   // Focused when the number is missing or malformed, so the error names a field
@@ -54,7 +71,7 @@ export default function CheckoutPage() {
     }
   }, [])
 
-  const deliveryFee = deliveryFeeFor(total, delivery)
+  const deliveryFee = exclusiveOnly ? 0 : deliveryFeeFor(total, delivery)
 
   // Rewards on this account — Daily Spin wins and staff grants.
   // The server prices each one against this exact cart (`eligible` + `discount`
@@ -63,7 +80,7 @@ export default function CheckoutPage() {
   const [voucherCode, setVoucherCode] = useState('')
   const [rewards, setRewards] = useState([])
   useEffect(() => {
-    if (!customer || !items.length) {
+    if (!customer || !items.length || exclusiveOnly) {
       setRewards([])
       return undefined
     }
@@ -75,7 +92,7 @@ export default function CheckoutPage() {
     return () => {
       alive = false
     }
-  }, [customer, items.length, total])
+  }, [customer, items.length, total, exclusiveOnly])
 
   const usable = rewards.filter((v) => v.eligible)
   const applied = usable.find((v) => v.code === voucherCode) || null
@@ -86,7 +103,9 @@ export default function CheckoutPage() {
   const itemsDiscount = applied ? applied.discount - deliveryWaived : 0
   const discount = applied?.discount || 0
   // Delivery is part of the taxable amount — same base the API uses.
-  const vatAmount = vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), vat)
+  const vatAmount = exclusiveOnly
+    ? 0
+    : vatAmountFor(total - itemsDiscount + (deliveryFee - deliveryWaived), vat)
   // What is owed before the wallet. Store credit is a payment, not a discount,
   // so it comes off after VAT — the tax is on the goods whoever's money buys
   // them, and the server prices it exactly this way.
@@ -106,7 +125,9 @@ export default function CheckoutPage() {
   const [useCredit, setUseCredit] = useState(false)
   const { data: wallet } = useWallet(payable)
   const walletBalance = Number(wallet?.balance || 0)
-  const walletSpendable = Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet))
+  const walletSpendable = exclusiveOnly
+    ? 0
+    : Number(wallet?.spendable ?? spendableOn(payable, walletBalance, wallet))
   const walletApplied = useCredit ? walletSpendable : 0
   const grandTotal = Math.round((payable - walletApplied) * 100) / 100
 
@@ -116,10 +137,19 @@ export default function CheckoutPage() {
     if (useCredit && walletSpendable <= 0) setUseCredit(false)
   }, [useCredit, walletSpendable])
 
+  // 'cod' is the default and its radio isn't rendered for an exclusive bag, so
+  // without this the page would sit on a payment method nothing on screen shows
+  // and the submit button would read "Place order" for an order that is about
+  // to open a payment page. The API forces Whish too; this keeps the button
+  // honest about what pressing it does.
+  useEffect(() => {
+    if (exclusiveOnly) setPay('whish')
+  }, [exclusiveOnly])
+
   // What this order gives back. Same basis the server credits on — the items,
   // after any item discount, and after whatever the wallet itself is paying,
   // which earns nothing — so the promise made here is the one kept.
-  const credit = creditFor(total - itemsDiscount - walletApplied, wallet)
+  const credit = exclusiveOnly ? 0 : creditFor(total - itemsDiscount - walletApplied, wallet)
   const walletAfter = Math.round((walletBalance - walletApplied + credit) * 100) / 100
 
   // Reaching this page IS beginning checkout — reported once per visit, and
@@ -200,6 +230,12 @@ export default function CheckoutPage() {
       phoneRef.current?.focus()
       return
     }
+    // The API refuses this outright; saying so here saves a round trip and an
+    // error that would arrive after the form was filled in.
+    if (mixedBag) {
+      setError('One of these items is bought on its own. Please remove the rest of your bag and order it separately.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -252,7 +288,9 @@ export default function CheckoutPage() {
         <form onSubmit={placeOrder} className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_380px]">
           {/* Delivery details */}
           <div className="rounded-2xl border border-as-ink/10 p-6">
-            <h2 className="text-lg font-semibold text-as-ink">Delivery details</h2>
+            <h2 className="text-lg font-semibold text-as-ink">
+              {exclusiveOnly ? 'Your details' : 'Delivery details'}
+            </h2>
 
             {savedAddresses.length > 0 && (
               <div className="mt-4">
@@ -293,6 +331,12 @@ export default function CheckoutPage() {
             )}
 
             <div className="mt-4 space-y-4">
+              {mixedBag && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {items.find((i) => i.exclusive)?.title} is bought on its own. Remove the other
+                  items from your bag and order them separately.
+                </p>
+              )}
               {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
               <Field label="Full name">
                 <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className={inputCls} required />
@@ -318,8 +362,17 @@ export default function CheckoutPage() {
                 <Field label="City / area">
                   <input value={form.city} onChange={(e) => set('city', e.target.value)} className={inputCls} />
                 </Field>
-                <Field label="Address">
-                  <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputCls} required placeholder="Street, building, floor…" />
+                {/* Nothing is being delivered on an exclusive order, so an
+                    address is a detail with nowhere to go. The API drops the
+                    requirement for exactly these orders. */}
+                <Field label={exclusiveOnly ? 'Address (optional)' : 'Address'}>
+                  <input
+                    value={form.address}
+                    onChange={(e) => set('address', e.target.value)}
+                    className={inputCls}
+                    required={!exclusiveOnly}
+                    placeholder="Street, building, floor…"
+                  />
                 </Field>
               </div>
               <Field label="Notes (optional)">
@@ -415,6 +468,11 @@ export default function CheckoutPage() {
             <div className="mt-6">
               <p className="mb-2 text-sm font-medium text-as-ink/70">Payment</p>
               <div className="grid grid-cols-1 gap-2">
+                {/* Cash on delivery is not offered on an exclusive order —
+                    there is no delivery to pay at. The option is removed rather
+                    than disabled: a greyed-out radio invites the question of
+                    what would un-grey it, and nothing would. */}
+                {!exclusiveOnly && (
                 <label
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
                     pay === 'cod' ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
@@ -426,6 +484,7 @@ export default function CheckoutPage() {
                     <span className="mt-0.5 block text-sm text-as-ink/55">Pay in cash when your order arrives. We’ll confirm it shortly after you place it.</span>
                   </span>
                 </label>
+                )}
                 <label
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
                     pay === 'whish' ? 'border-as-red ring-1 ring-as-red' : 'border-as-ink/15 hover:border-as-ink/30'
@@ -457,7 +516,7 @@ export default function CheckoutPage() {
                       <img src={i.image} alt={i.title} className="h-full w-full object-cover" />
                     )}
                     <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-as-ink px-1 text-[11px] font-bold text-white">
-                      {i.qty}
+                      {formatQty(i.qty)}
                     </span>
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm text-as-ink">{i.title}</span>
@@ -470,10 +529,14 @@ export default function CheckoutPage() {
                 <span>Subtotal</span>
                 <span>{money(total)}</span>
               </div>
-              <div className="flex items-center justify-between text-as-ink/60">
-                <span>Delivery</span>
-                <span>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</span>
-              </div>
+              {/* "Delivery — Free" on a licence invites the question of what
+                  is being delivered. There is no delivery leg at all here. */}
+              {!exclusiveOnly && (
+                <div className="flex items-center justify-between text-as-ink/60">
+                  <span>Delivery</span>
+                  <span>{deliveryFee > 0 ? money(deliveryFee) : 'Free'}</span>
+                </div>
+              )}
               {vatAmount > 0 && (
                 <div className="flex items-center justify-between text-as-ink/60">
                   <span>VAT ({Number(vat.percent)}%)</span>
@@ -516,13 +579,15 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <button type="submit" disabled={busy} className="pill mt-5 w-full justify-center">
+            <button type="submit" disabled={busy || mixedBag} className="pill mt-5 w-full justify-center disabled:opacity-50">
               {busy ? 'Please wait…' : pay === 'whish' ? 'Continue to payment' : 'Place order'}
             </button>
             <p className="mt-3 text-center text-xs text-as-ink/45">
-              {Number(delivery?.fee) > 0 && Number(delivery?.freeOver) > 0
-                ? `Free delivery on orders over ${money(delivery.freeOver)} · 12 months warranty`
-                : '12 months warranty'}
+              {exclusiveOnly
+                ? 'Paid securely with Whish Pay · no VAT, no delivery charge'
+                : Number(delivery?.fee) > 0 && Number(delivery?.freeOver) > 0
+                  ? `Free delivery on orders over ${money(delivery.freeOver)} · 12 months warranty`
+                  : '12 months warranty'}
             </p>
           </div>
         </form>

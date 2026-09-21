@@ -8,6 +8,7 @@ import { useToast } from '@/components/admin/toast.jsx'
 import { useSelection } from '@/components/admin/useSelection.js'
 import { adminApi } from '@/lib/adminApi'
 import { ORDER_STATUSES, statusMeta, money, orderDate, orderTotal, paymentLabel } from '@/lib/orders'
+import { formatQty } from '@/store/cartSlice'
 
 export default function OrdersAdmin() {
   const qc = useQueryClient()
@@ -200,7 +201,7 @@ function OrderModal({ id, onClose }) {
                     )}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm text-admin-text">{it.name}</span>
-                  <span className="text-sm text-admin-text/60">×{it.qty}</span>
+                  <span className="text-sm text-admin-text/60">×{formatQty(it.qty)}</span>
                   <span className="text-sm font-medium text-admin-text">{money(Number(it.price) * it.qty)}</span>
                 </li>
               ))}

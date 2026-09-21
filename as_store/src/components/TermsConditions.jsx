@@ -26,7 +26,10 @@ const UPDATED = 'August 26, 2026'
 
 const DELIVERY_ESTIMATE = '2–5 days'
 
-// Mirrors MAX_QTY in store/cartSlice.js — the cap the bag actually enforces.
+// Mirrors MAX_QTY in store/cartSlice.js — the cap the bag enforces on a product
+// that does not carry one of its own. Some do: a licence sold by the hundred
+// sets its own ceiling, which is why the clause below says "unless the product
+// says otherwise" rather than stating a flat rule the bag no longer applies.
 const MAX_QTY = 2
 
 function Section({ n, title, children }) {
@@ -122,7 +125,15 @@ export default function TermsConditions({ settings }) {
           </p>
           <p>
             The bag allows up to <strong className="font-semibold text-as-ink">{MAX_QTY}</strong> of any one
-            product per order. For larger quantities, message us and we will arrange it directly.
+            product per order, unless that product states a limit of its own on its page. For larger
+            quantities, message us and we will arrange it directly.
+          </p>
+          <p>
+            A few products are sold on their own terms — software licences, for example — and say so
+            on their page. These carry no VAT and no delivery charge, are paid for online with Whish
+            Pay rather than cash on delivery, earn no{' '}
+            <span className="whitespace-nowrap">AS Wallet</span> credit, take no vouchers, and are
+            ordered on their own rather than alongside other items.
           </p>
           <p>
             Every price, delivery charge and tax amount on an order is calculated by our server from

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDispatch } from 'react-redux'
 import Icon from '@/components/Icon.jsx'
-import { clearCart } from '@/store/cartSlice'
+import { clearCart, formatQty } from '@/store/cartSlice'
 import { useAccount, accountApi } from '@/lib/account'
 import { statusMeta, statusClasses, money, orderDate, orderTotal, paymentLabel } from '@/lib/orders'
 import { trackPurchase } from '@/lib/analytics'
@@ -249,7 +249,7 @@ export default function OrderPage({ params }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-as-ink">{it.name}</p>
-                    <p className="text-sm text-as-ink/50">Qty {it.qty} · {money(it.price)}</p>
+                    <p className="text-sm text-as-ink/50">Qty {formatQty(it.qty)} · {money(it.price)}</p>
                   </div>
                   <span className="font-medium text-as-ink">{money(Number(it.price) * it.qty)}</span>
                 </li>
