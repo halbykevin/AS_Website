@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { useProduct } from '@/src/lib/queries';
-import { addItem, selectCartItems, selectCartCount, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty } from '@/src/store/cartSlice';
+import { addItem, selectCartItems, selectCartCount, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty, qtyLabelOf } from '@/src/store/cartSlice';
 import { money, normalizeSpecs, cleanDescription } from '@/src/lib/format';
 import { openUrl, whatsappChatUrl } from '@/src/lib/whatsapp';
 import { vatNote } from '@/src/lib/delivery';
@@ -170,7 +170,14 @@ export default function ProductDetailScreen() {
               {bulk ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md }}>
                   <View style={{ gap: 4 }}>
-                    <QtyField value={qty} min={minQtyOf(product)} max={maxQtyOf(product)} step={stepOf(product)} onChange={setQty} size="sm" label={`Quantity of ${product.name}`} />
+                    {/* What the box is asking for, said above it rather than
+                        left to be inferred from the total beside it — at $1 a
+                        licence the number typed is the dollars being settled.
+                        Same helper, same word, as the website's field. */}
+                    <Text variant="caption" muted center>
+                      {qtyLabelOf(product)}
+                    </Text>
+                    <QtyField value={qty} min={minQtyOf(product)} max={maxQtyOf(product)} step={stepOf(product)} onChange={setQty} size="sm" label={`${qtyLabelOf(product)} of ${product.name}`} />
                     {/* Stated up front so a typed 99,999 being clamped to the
                         ceiling is never a surprise. */}
                     <Text variant="caption" faint center>

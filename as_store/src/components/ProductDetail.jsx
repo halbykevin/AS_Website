@@ -10,7 +10,7 @@ import ImageLightbox from './ImageLightbox.jsx'
 import Breadcrumbs from './Breadcrumbs.jsx'
 import ShareMenu from './ShareMenu.jsx'
 import QtyField from './QtyField.jsx'
-import { addItem, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty } from '@/store/cartSlice'
+import { addItem, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty, qtyLabelOf } from '@/store/cartSlice'
 import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
 import { openCart } from '@/store/uiSlice'
@@ -37,6 +37,7 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   const maxQty = maxQtyOf(product)
   const qtyStep = stepOf(product)
   const bulk = isBulk(product)
+  const qtyLabel = qtyLabelOf(product)
 
   const [active, setActive] = useState(0)
   const [color, setColor] = useState(0)
@@ -222,9 +223,30 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               </div>
             )}
 
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            {/* items-end, not items-center: the typed box below carries a label
+                above it, and centring would float Add to Bag against the middle
+                of the pair rather than sitting on the same line as the box. */}
+            <div className="mt-8 flex flex-wrap items-end gap-4">
               {!quoteOnly && bulk && (
-                <QtyField value={qty} min={minQty} max={maxQty} step={qtyStep} onChange={setQty} size="md" />
+                <div>
+                  {/* The one thing the field is for, said above it. A stepper
+                      over 1–2 needs no label; a box that takes 5–10,000 — and
+                      where at $1 a licence the number typed is the dollars
+                      being settled — very much does. */}
+                  <label htmlFor="product-qty" className="mb-1.5 block text-sm font-medium text-as-ink/70">
+                    {qtyLabel}
+                  </label>
+                  <QtyField
+                    id="product-qty"
+                    value={qty}
+                    min={minQty}
+                    max={maxQty}
+                    step={qtyStep}
+                    onChange={setQty}
+                    size="md"
+                    label={qtyLabel}
+                  />
+                </div>
               )}
               {!quoteOnly && !bulk && (
               <div className="flex items-center rounded-full border border-as-ink/15">

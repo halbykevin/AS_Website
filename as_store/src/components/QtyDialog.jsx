@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon.jsx'
 import QtyField from './QtyField.jsx'
 import { money } from '@/lib/orders'
-import { formatQty } from '@/store/cartSlice'
+import { formatQty, qtyLabelOf } from '@/store/cartSlice'
 
 // "How many?" — asked once, at the moment of adding, for a product that sells
 // in quantity.
@@ -43,6 +43,9 @@ export default function QtyDialog({ open, product, min = 1, max = 99, step = 1, 
 
   if (!product) return null
   const price = Number(product.price) || 0
+  // Read off the same product row the product page reads, so the dialog and the
+  // page cannot label the same field differently.
+  const qtyLabel = qtyLabelOf({ ...product, qtyStep: step })
 
   return (
     <AnimatePresence>
@@ -79,8 +82,25 @@ export default function QtyDialog({ open, product, min = 1, max = 99, step = 1, 
               {max.toLocaleString()} per order
             </p>
 
-            <div className="mt-6 flex items-center justify-between gap-4">
-              <QtyField value={qty} min={min} max={max} step={step} onChange={setQty} size="md" />
+            <div className="mt-6 flex items-end justify-between gap-4">
+              <div>
+                {/* Same word as the product page's field, from the same helper:
+                    the two are the same box and must not disagree about what
+                    they are asking for. */}
+                <label htmlFor="dialog-qty" className="mb-1.5 block text-sm font-medium text-as-ink/70">
+                  {qtyLabel}
+                </label>
+                <QtyField
+                  id="dialog-qty"
+                  value={qty}
+                  min={min}
+                  max={max}
+                  step={step}
+                  onChange={setQty}
+                  size="md"
+                  label={qtyLabel}
+                />
+              </div>
               <div className="text-right">
                 <p className="text-xs text-as-ink/45">Total</p>
                 <p className="text-xl font-semibold text-as-ink">{money(price * qty)}</p>

@@ -409,6 +409,13 @@ afterwards. (The app's tile opens the product screen instead, where the box alre
   because the cent is the smallest thing money has.
 - A **running total** sits beside it (`130 × $1.00 = $130.00`), because where a licence costs $1 the
   quantity and the amount are the same number and that should be legible before the bag, not after.
+- **The box says what it is asking for.** `qtyLabelOf()` (in both cart slices, worded identically)
+  puts **Amount ($)** above a field whose step is below 1 on a $1 product — where the number typed
+  *is* the dollars — **Amount** on any other fractional product, and **Quantity** on a whole-unit
+  bulk one. A stepper over 1–2 needs no label; a box that takes 5–10,000 does, and leaving it to be
+  inferred from the total underneath leaves the one thing the field is for unsaid. It renders on the
+  product page, in the web's QtyDialog and above the app's footer box — the same word everywhere the
+  same box appears.
 - **Ordinary products are untouched** — one tap, straight to the bag, cap still 2.
 
 ## Call for price (store + app + admin)

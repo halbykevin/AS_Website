@@ -24,6 +24,7 @@ export default function QtyField({
   onChange,
   size = 'md',
   label = 'Quantity',
+  id,
   className = '',
 }) {
   const [draft, setDraft] = useState(null)
@@ -69,6 +70,7 @@ export default function QtyField({
         <Icon name="minus" className={S.icon} />
       </button>
       <input
+        id={id}
         type="text"
         inputMode={fractional ? 'decimal' : 'numeric'}
         pattern={fractional ? '[0-9.]*' : '[0-9]*'}

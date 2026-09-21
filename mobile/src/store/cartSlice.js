@@ -31,6 +31,12 @@ export const stepOf = item => bound(item?.qtyStep, 1);
 // picker), or it takes halves, which no stepper can reach.
 export const isBulk = item => maxQtyOf(item) > MAX_QTY || stepOf(item) < 1;
 
+// What the box is actually asking for, in a word. A step below 1 means the
+// number typed is an amount of the product rather than a count of boxes, and at
+// $1 a licence it IS the dollars being settled. Mirrors qtyLabelOf in the web
+// slice: the same field must be worded the same on both.
+export const qtyLabelOf = item => (stepOf(item) < 1 ? (Number(item?.price) === 1 ? 'Amount ($)' : 'Amount') : 'Quantity');
+
 // Mirrors snapQty() in as_store/server/src/app.js, which is the authority —
 // same floor-onto-the-grid, same 1e6 guard against 7.5 / 0.01 landing on
 // 749.9999999999999, same settle at two decimals.

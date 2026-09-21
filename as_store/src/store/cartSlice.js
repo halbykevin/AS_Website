@@ -30,6 +30,16 @@ export const stepOf = (item) => bound(item?.qtyStep, 1)
 // stepper can reach.
 export const isBulk = (item) => maxQtyOf(item) > MAX_QTY || stepOf(item) < 1
 
+// What the box is actually asking for, in a word.
+//
+// A stepper over 1–2 needs no label — nobody wonders what it counts. A typed
+// box over 5–10,000 does: where the step is below 1 the number is not a count
+// of boxes to ship but an amount of the product, and at $1 a licence it IS the
+// dollars being settled. Leaving that to be inferred from the running total
+// underneath is leaving the one thing the field is for unsaid.
+export const qtyLabelOf = (item) =>
+  stepOf(item) < 1 ? (Number(item?.price) === 1 ? 'Amount ($)' : 'Amount') : 'Quantity'
+
 // Mirrors snapQty() in as_store/server/src/app.js, which is the authority —
 // same floor-onto-the-grid, same 1e6 guard against 7.5 / 0.01 landing on
 // 749.9999999999999, same settle at two decimals. This exists so the bag can
