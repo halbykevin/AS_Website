@@ -33,17 +33,15 @@ Values here are taken from the real app and the live sites, not invented.
    build it rather than lean on Sign in with Apple.)* Set `REVIEW_EMAIL` and
    `REVIEW_CODE` in the store API's `.env` and that address signs in with that
    fixed code, with nothing sent anywhere. See §7.
-3. **APNs key.** Push notifications are in the app (`expo-notifications`); only
-   `google-services.json` (Android/FCM) exists in the repo. Upload an APNs key
-   to EAS (`npx eas-cli@latest credentials`) or the first notification on iOS
-   silently never arrives.
+3. ~~APNs key~~ — **done 2026-09-21.** Key `J2AYTZVG37` created in the portal and
+   uploaded to EAS; iOS push works from this build on.
 4. **iPad screenshots.** *(Decided: keep iPad support.)* `supportsTablet: true`
    stays, so App Store Connect requires iPad 13" screenshots — and the screens
    need to be genuinely looked at on an iPad first. A phone layout stretched to
    13 inches is a Guideline 4.0 rejection.
-5. **There is no iOS build yet.** The `ios` submit target is now in `eas.json`;
-   §9 has the two commands. Building does **not** need a Mac — EAS builds on its
-   own macOS workers and `eas submit` uploads for you.
+5. ~~No iOS build~~ — **done 2026-09-21.** Build **4** (version 1.1.1,
+   `40eee5ec`) built on EAS and submitted to App Store Connect. Signed with
+   hand-made credentials, no Apple login — see §9.
 
 ---
 
@@ -323,9 +321,8 @@ and upload no documentation.
 
 ## 9. Building and uploading
 
-`eas.json` already carries the iOS submit target (`submit.production.ios.ascAppId`
-= `6813355139`). The Apple ID and team come from the EAS login at submit time, so
-there is nothing else to configure. From `mobile/`:
+`eas.json` carries the iOS submit target (`submit.production.ios.ascAppId` =
+`6813355139`). From `mobile/`:
 
 ```bash
 npx --yes eas-cli@latest build --platform ios --profile production
@@ -333,11 +330,63 @@ npx --yes eas-cli@latest submit --platform ios --profile production
 ```
 
 Always through `npx` — the global `eas-cli` is below the floor `eas.json` pins.
-EAS will offer to create the distribution certificate and provisioning profile
-for you; let it, and it keeps them for the next build.
+
+**Answer "no" when it offers to log in to your Apple account.** Every credential
+already lives on the EAS server (see below) and an Apple login here cannot
+succeed anyway — the 2FA code goes to a phone this account cannot read.
 
 The build takes ~20 minutes, then App Store Connect needs another ~15 to process
 it before it appears under **Build** on this page.
+
+### The credentials, and why they were made by hand
+
+`royaraygy@gmail.com` has two-factor authentication on a trusted phone number
+that receives nothing, and no Apple device to show the code on. So `eas-cli`
+can never log in to Apple, and every credential EAS would normally generate for
+itself was created in the browser — where the session is already trusted — and
+uploaded to EAS instead. **Nothing needs to be repeated for a normal rebuild**;
+EAS reuses all of it.
+
+| Credential | Value | Where it lives |
+|---|---|---|
+| Apple Team | `K85Z6HH5FB` — **Individual** account, "Roy Araygy" | — |
+| APNs push key | `J2AYTZVG37` | EAS + `mobile/credentials/` |
+| App Store Connect API key | `6CDFXV8MTN`, issuer `9020fa3e-2f6a-40e3-a95c-ccd4d0329ea6` | EAS ("EAS Submit") + `mobile/credentials/` |
+| Distribution certificate | serial `5500AC871D39C8E7877EE92C5537461E`, **expires 2027-09-21** | EAS + `mobile/credentials/distribution.p12` |
+| Provisioning profile | `5d8c769e-8b02-4f95-b31f-3209b97bd8a2`, **expires 2027-09-21** | EAS + `mobile/credentials/` |
+
+`mobile/credentials/` is git-ignored and excluded from build uploads. The `.p12`
+password is not written down here — keep it in a password manager.
+
+**To recreate the certificate** (it expires, or the key is lost) — no Mac and no
+Apple login needed, just the browser session and OpenSSL, which ships with Git
+Bash:
+
+```bash
+cd mobile/credentials
+MSYS_NO_PATHCONV=1 openssl req -new -newkey rsa:2048 -nodes   -keyout ios_distribution.key -out ios_distribution.csr   -subj "/emailAddress=royaraygy@gmail.com/CN=AS Company/C=LB"
+```
+
+Upload the `.csr` at developer.apple.com → Certificates → **+** → **Apple
+Distribution**, download the `.cer`, then:
+
+```bash
+openssl x509 -in distribution.cer -inform DER -out distribution.pem -outform PEM
+openssl pkcs12 -export -legacy -inkey ios_distribution.key -in distribution.pem   -out distribution.p12 -passout pass:<choose-one>
+```
+
+Then a new provisioning profile (Profiles → + → App Store Connect → the App ID →
+that certificate), and upload both at expo.dev → the project → Credentials →
+`lb.com.as.store` → Build credentials → App Store.
+
+> **Keep `ios_distribution.key`.** Apple keeps no copy of your half of the pair;
+> without it the certificate it hands back is unusable.
+
+> The App ID `lb.com.as.store` must have **Sign in with Apple** and **Push
+> Notifications** ticked *before* a profile is generated — a profile only carries
+> entitlements the App ID had at that moment. Verify a downloaded profile with
+> `openssl smime -inform DER -verify -noverify -in <file>.mobileprovision` and
+> look for `com.apple.developer.applesignin` and `aps-environment: production`.
 
 ---
 
