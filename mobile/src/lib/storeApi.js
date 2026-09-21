@@ -167,6 +167,36 @@ export async function loadProducts({ category, featured, search, limit } = {}) {
   }
 }
 
+// Autocomplete: the top-ranked products plus the categories and brands whose
+// names match, in ONE round trip — the same /api/search/suggest the website's
+// search dialog calls, so both are ranked by the same relevance rules. Three
+// requests per keystroke is a phone's battery, which is why the endpoint
+// answers all three at once.
+//
+// An older API 404s it; falling back to the plain product list means an app
+// release can never get ahead of the server it happens to be talking to.
+export async function loadSuggestions(q, { limit = 6 } = {}) {
+  const term = String(q || '').trim();
+  if (!term) return { query: '', products: [], categories: [], brands: [], total: 0 };
+  try {
+    const data = await req(`/api/search/suggest?q=${encodeURIComponent(term)}&limit=${limit}`);
+    const products = Array.isArray(data?.products) ? data.products.map(mapProduct) : [];
+    return {
+      query: term,
+      products,
+      categories: Array.isArray(data?.categories) ? data.categories.map(mapCategory) : [],
+      // Brand rows carry an `imageUrl` too, so the same bridge does for both.
+      brands: Array.isArray(data?.brands) ? data.brands.map(mapCategory) : [],
+      total: Number(data?.total) || products.length
+    };
+  } catch (err) {
+    if (err?.status !== 404) throw err;
+    // Already mapped by loadProducts — nothing to rebase twice.
+    const rows = await loadProducts({ search: term, limit });
+    return { query: term, products: rows, categories: [], brands: [], total: rows.length };
+  }
+}
+
 // Single product by slug (full image gallery). null when missing.
 export async function loadProduct(slug) {
   try {

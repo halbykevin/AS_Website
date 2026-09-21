@@ -6,6 +6,7 @@ const MAP = {
   bagFilled: 'bag-handle',
   cart: 'cart-outline',
   search: 'search',
+  history: 'time-outline',
   user: 'person-circle-outline',
   heart: 'heart-outline',
   star: 'star',

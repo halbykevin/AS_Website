@@ -9,6 +9,7 @@ import ComingSoon from '@/src/components/ComingSoon';
 import Boundary from '@/src/components/Boundary';
 import SpinBanner from '@/src/components/spin/SpinBanner';
 import { StorePanel, EventsPanel, WhatWeDoPanel } from '@/src/components/home/HomePanels';
+import HomeSearch from '@/src/components/home/HomeSearch';
 import useConfirmExit from '@/src/lib/useConfirmExit';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
@@ -53,7 +54,18 @@ export default function HomeScreen() {
       statusBarStyle="light"
       contentStyle={{ paddingHorizontal: 0 }}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-      header={s => <AppHeader brand="company" title="AS Company" bell scrolled={s} />}
+      header={s => (
+        // Search sits in the fixed header, not in the scroll: it is the fastest
+        // way to anything in a ~1,400-product catalogue, and a box you have to
+        // scroll back up to find is one nobody uses. Its suggestion panel opens
+        // in here too — see HomeSearch.
+        <>
+          <AppHeader brand="company" title="AS Company" bell scrolled={s} />
+          <Boundary name="home:search" fallback={null}>
+            <HomeSearch />
+          </Boundary>
+        </>
+      )}
     >
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.lg }}>
         <View style={{ gap: 4 }}>

@@ -6,8 +6,9 @@
 // AsyncStorage (see AppProviders) so a relaunch paints immediately.
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { loadProducts, loadProduct, loadCategories, loadBrands, loadStoreSettings } from './storeApi';
+import { loadProducts, loadProduct, loadCategories, loadBrands, loadStoreSettings, loadSuggestions } from './storeApi';
 import { accountApi } from './account';
+import { MIN_QUERY, normalizeQuery } from './search';
 
 export function useProducts(filters = {}) {
   const key = ['products', filters.category || 'all', filters.featured || 0, filters.search || '', filters.limit || 0];
@@ -15,6 +16,22 @@ export function useProducts(filters = {}) {
     queryKey: key,
     queryFn: () => loadProducts(filters),
     placeholderData: keepPreviousData
+  });
+}
+
+// Type-ahead suggestions. The query cache is what makes backspacing instant —
+// a term typed a moment ago repaints from memory instead of going back to the
+// API — and `keepPreviousData` is what stops the panel flashing empty between
+// one keystroke's results and the next. Pass a DEBOUNCED term: every distinct
+// one is its own key, and therefore its own request.
+export function useSuggestions(term, limit = 6) {
+  const q = normalizeQuery(term);
+  return useQuery({
+    queryKey: ['suggest', q.toLowerCase(), limit],
+    queryFn: () => loadSuggestions(q, { limit }),
+    enabled: q.length >= MIN_QUERY,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000
   });
 }
 

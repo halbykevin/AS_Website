@@ -47,6 +47,8 @@ export const KEYS = {
   cart: 'as_store_cart',
   pushToken: 'as_push_token',
   pushPromptSeen: 'as_push_prompt_seen',
+  // The last few things searched for, newest first — see lib/search.js.
+  recentSearches: 'as_store_recent_searches',
   // {v: popup version, t: dismissed-at} — drives the popup's once/daily rules.
   popupSeen: 'as_store_popup_seen'
 };

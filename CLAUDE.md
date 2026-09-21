@@ -303,6 +303,34 @@ the tab nothing to show but signposts.
 - **Categories didn't disappear, they became a filter**: the category facet shows on the whole-catalog
   view only (`showCategory`), and the home tab's `CategoryWall` still deep-links to `/category/<slug>`.
 
+## Search on the home screen (mobile app)
+
+The app's front door opens with a search box that suggests as you type
+([mobile/src/components/home/HomeSearch.jsx](mobile/src/components/home/HomeSearch.jsx)). Before it,
+the only way in was the magnifier in the Shop tab's header — three taps from launch, for a catalogue
+of ~1,400 products nobody browses for something they can already name.
+
+- **One endpoint, two clients.** It calls `GET /api/search/suggest` — the same one the website's
+  search dialog calls — which returns the ranked products **plus** the matching categories and
+  brands in one round trip. Three requests per keystroke is a phone's battery, and two clients
+  ranking the same catalogue by two sets of rules would be two answers to one question. The app's
+  [lib/search.js](mobile/src/lib/search.js) is a deliberate copy of the store's (same `MIN_QUERY`,
+  same tokenizer, same six remembered searches); only the plumbing differs — recents live in
+  AsyncStorage, and caching is React Query's (`useSuggestions`), whose `keepPreviousData` is what
+  stops the panel blanking between one keystroke's results and the next.
+- **The bar and its panel live in the screen's fixed header, not in the scroll.** A dropdown
+  absolutely positioned over the body is clipped on Android, and one that scrolls away with the
+  content is not a dropdown — so the panel is a laid-out block the home content makes room for,
+  capped at 42% of the screen (≤360pt) so the keyboard and it can never meet.
+- **It does not close on blur.** Closing there would unmount the row that the tap causing the blur
+  was headed for. It closes on Cancel, on opening a result, and on Android's back — which
+  `HomeSearch` claims while the panel is up, ahead of Home's "leave the app?" guard
+  ([useConfirmExit](mobile/src/lib/useConfirmExit.js)).
+- A brand has no addressable page in the app (the shop's brand filter isn't a route), so a brand
+  suggestion **runs as a search** instead; `/search` takes `?q=` and starts on the results with the
+  keyboard down. Price-hidden products show their "call for price" label — `money(null)` would print
+  `$0` and undo the flag.
+
 ## Add-to-Bag flight (mobile app)
 
 The product photo arcs out of the card and lands on the bag icon

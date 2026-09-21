@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { loadProducts } from '@/src/lib/storeApi';
+import { pushRecent } from '@/src/lib/search';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Icon, EmptyState, Skeleton } from '@/src/ui';
 import { Input } from '@/src/ui/Input';
@@ -13,7 +14,13 @@ export { ScreenBoundary as ErrorBoundary } from '@/src/components/Boundary';
 
 export default function SearchScreen() {
   const theme = useTheme();
-  const [term, setTerm] = useState('');
+  // Arriving with a query — from the home box's "see all", a suggested brand or
+  // a remembered search — starts on the results rather than on an empty field.
+  // The keyboard stays down in that case: it would cover the answers that were
+  // just asked for.
+  const { q } = useLocalSearchParams();
+  const initial = typeof q === 'string' ? q : '';
+  const [term, setTerm] = useState(initial);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -68,7 +75,15 @@ export default function SearchScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.layout.screenPadding, paddingVertical: theme.spacing.sm }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, paddingHorizontal: theme.spacing.lg }}>
           <Icon name="search" size={18} color={theme.colors.textFaint} />
-          <Input value={term} onChangeText={setTerm} placeholder="Search products…" autoFocus returnKeyType="search" style={{ flex: 1, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }} />
+          <Input
+            value={term}
+            onChangeText={setTerm}
+            onSubmitEditing={() => pushRecent(term)}
+            placeholder="Search products…"
+            autoFocus={!initial}
+            returnKeyType="search"
+            style={{ flex: 1, borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 }}
+          />
           {term ? (
             <Pressable onPress={() => setTerm('')} hitSlop={theme.layout.hitSlop}>
               <Icon name="close" size={18} color={theme.colors.textFaint} />
