@@ -84,8 +84,13 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT false;
 --
 -- `visible = false` makes it unlisted rather than hidden: the shop grid, search,
 -- the category pages, the sitemap and the Google Merchant feed all filter on
--- that column, while GET /api/products/:slug deliberately does not — so
--- /product/RaiOne works for anyone holding the link and for nobody else.
+-- that column, while GET /api/products/:slug deliberately does not.
+--
+-- The API alone is NOT enough, though: loadProduct() in src/lib/catalog.js 404s
+-- every hidden product (that is how the catalog sync retires one) and had to be
+-- excepted for exclusive products, or this row would have a working API
+-- response and a dead page. See the note there.
+--
 -- Flipping Visible on in the admin puts it in the catalogue like any product.
 --
 -- ON CONFLICT DO NOTHING: after the first run this row belongs to the admin.

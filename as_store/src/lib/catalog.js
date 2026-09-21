@@ -158,7 +158,16 @@ export async function loadProduct(slug) {
     const res = await fetch(`${API}/api/products/${encodeURIComponent(slug)}`, STORE_CACHE)
     if (!res.ok) return null
     const product = await res.json()
-    return product?.visible === false ? null : product
+    // A hidden product has no page — that is what hiding means, and it is how
+    // the catalog sync retires something the shop stopped selling.
+    //
+    // An exclusive product is the one deliberate exception. `visible = false`
+    // is how it stays out of the grid, out of search, out of the sitemap and
+    // out of the Merchant feed, while the whole point of it is that someone
+    // holding the link can buy it. Without this line "unlisted" would just mean
+    // "gone", and the API serving the row would make no difference: this is the
+    // only thing standing between an exclusive link and a 404.
+    return product?.visible === false && !product?.exclusive ? null : product
   } catch {
     return null
   }

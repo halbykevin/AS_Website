@@ -28,6 +28,13 @@ export async function generateMetadata({ params }) {
     title: product.name,
     description,
     alternates: { canonical: url },
+    // An unlisted product is reachable by its link and by nothing else: it is
+    // out of the shop grid, out of search, out of the sitemap and out of the
+    // Merchant feed. A shared link can still be crawled, though, so say so
+    // explicitly rather than relying on absence — "exclusive" means the people
+    // holding the link, not the people who found it on Google. `follow` so the
+    // ordinary links on the page are still worth something.
+    ...(product.visible === false ? { robots: { index: false, follow: true } } : null),
     openGraph: {
       type: 'website',
       title: `${product.name} — AS Store`,
@@ -78,7 +85,12 @@ export default async function ProductPage({ params }) {
   return (
     <>
       {/* Product rich-result schema (price/availability) + breadcrumb trail */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(productJsonLd(product))} />
+      {/* No Product markup for an unlisted one: the page is noindex and the
+          product is deliberately out of the Merchant feed, so handing Google an
+          Offer for it would be feeding the one channel it was kept out of. */}
+      {product.visible !== false && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(productJsonLd(product))} />
+      )}
       {breadcrumb && (
         <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumb)} />
       )}

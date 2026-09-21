@@ -379,6 +379,16 @@ enters 7.5, and Whish collects exactly that.
   mirror it to *show* a figure early; only the server decides one.
 - **A fractional line counts as one thing in the bag**, not seven and a half — the bag badge and the
   order notification's `itemCount` count entries when the step is below 1.
+- **Unlisted is a real behaviour, not just an absent row.** RaiOne ships `visible = false`, which
+  keeps it out of the grid, search, the category pages, the sitemap and the Merchant feed — but
+  `loadProduct()` in [as_store/src/lib/catalog.js](as_store/src/lib/catalog.js) 404s every hidden
+  product on purpose (that is how the catalog sync retires one), so **an exclusive product is
+  explicitly excepted there**. That one line is the whole difference between an exclusive link and a
+  404; the API serving the row is not enough, because the page never reaches it. The page is then
+  `noindex, follow` and drops its `Product` markup — a shared link can still be crawled, and feeding
+  Google an Offer for a product deliberately kept out of the Merchant feed would undo the point of
+  keeping it out. **Its slug is case-sensitive** (`WHERE p.slug = $1`), so `/product/RaiOne` works
+  and `/product/raione` does not.
 
 ### The quantity picker
 
