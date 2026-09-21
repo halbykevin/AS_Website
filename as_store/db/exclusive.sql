@@ -90,9 +90,17 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS exclusive BOOLEAN DEFAULT false;
 --
 -- ON CONFLICT DO NOTHING: after the first run this row belongs to the admin.
 -- Re-running a migration must never reset a price or a cap someone has changed.
-INSERT INTO products (name, slug, tagline, description, price, stock,
+-- `stock` is deliberately left at the column default. It is not an inventory
+-- system: the column exists but is not maintained anywhere in this catalogue
+-- (every other row sits at 0), nothing decrements it on an order, and checkout
+-- does not consult it — see the note above availability() in
+-- as_store/src/lib/merchant.js. A licence has nothing to count anyway. An
+-- earlier version of this file seeded 10,000 here, which made RaiOne the only
+-- row in the shop carrying a number that looked like a limit it could run out
+-- of, and was the one figure on the product that meant nothing.
+INSERT INTO products (name, slug, tagline, description, price,
                       visible, exclusive, min_qty, max_qty, qty_step, is_new, featured)
-VALUES ('RaiOne', 'RaiOne', 'License Software', 'License Software', 1, 10000,
+VALUES ('RaiOne', 'RaiOne', 'License Software', 'License Software', 1,
         false, true, 5, 10000, 0.01, false, false)
 ON CONFLICT (slug) DO NOTHING;
 
@@ -104,3 +112,10 @@ ON CONFLICT (slug) DO NOTHING;
 UPDATE products
    SET min_qty = 5, qty_step = 0.01
  WHERE slug = 'RaiOne' AND min_qty = 1 AND max_qty = 10000 AND qty_step IS NULL;
+
+-- Same story for the stock figure that earlier version seeded: cleared only
+-- where it is still exactly the number this file wrote, so a real count someone
+-- has since typed is never wiped.
+UPDATE products
+   SET stock = 0
+ WHERE slug = 'RaiOne' AND stock = 10000;
