@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAccount, accountApi } from '@/src/lib/account';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
-import { AuthShell, CodeForm, ChannelToggle, GoogleButton } from '@/src/components/auth';
+import { AuthShell, CodeForm, ChannelToggle, GoogleButton, AppleButton } from '@/src/components/auth';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const params = useLocalSearchParams();
   const next = params.next || '/account';
 
-  const [methods, setMethods] = useState({ google: false, otpChannels: ['email'] });
+  const [methods, setMethods] = useState({ google: false, apple: false, otpChannels: ['email'] });
   const [channel, setChannel] = useState('email');
   const [step, setStep] = useState('choose'); // choose | identify | code
   const [identifier, setIdentifier] = useState('');
@@ -33,7 +33,13 @@ export default function LoginScreen() {
   useEffect(() => {
     accountApi
       .authMethods()
-      .then(r => setMethods({ google: Boolean(r.google), otpChannels: r.otpChannels?.length ? r.otpChannels : ['email'] }))
+      .then(r =>
+        setMethods({
+          google: Boolean(r.google),
+          apple: r.apple !== false, // older servers don't report it; the button hides itself off-iOS anyway
+          otpChannels: r.otpChannels?.length ? r.otpChannels : ['email']
+        })
+      )
       .catch(() => {});
   }, []);
 
@@ -72,8 +78,13 @@ export default function LoginScreen() {
   };
 
   const isWhatsapp = channel === 'whatsapp';
+  // Name only the buttons this device will actually show: Apple never renders
+  // off iOS, and Google is there only while the server has credentials for it.
+  const social = [Platform.OS === 'ios' && methods.apple ? 'Apple' : null, methods.google ? 'Google' : null]
+    .filter(Boolean)
+    .join(' or ');
   const subtitle = {
-    choose: 'Use your Google account, or we’ll send you a one-time code.',
+    choose: social ? `Continue with ${social}, or we’ll send you a one-time code.` : 'We’ll send you a one-time code — no password to remember.',
     identify: isWhatsapp ? 'We’ll send a 6-digit code to your WhatsApp.' : 'We’ll email you a 6-digit code — no password to remember.',
     code: `We sent a 6-digit code to ${identifier}.`
   }[step];
@@ -114,6 +125,17 @@ export default function LoginScreen() {
 
           {step === 'choose' ? (
             <View style={{ gap: theme.spacing.md }}>
+              {/* Apple first: Guideline 4.8 wants it at least as prominent as
+                  the other social sign-in, and it renders nothing off iOS. */}
+              {methods.apple ? (
+                <AppleButton
+                  onDone={async () => {
+                    await refresh();
+                    router.replace(next);
+                  }}
+                  onError={setError}
+                />
+              ) : null}
               {methods.google ? (
                 <GoogleButton
                   next={next}

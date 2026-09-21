@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme, useThemedStyles } from '@/src/theme';
 import { useAccount } from '@/src/lib/account';
 import { signInWithGoogle } from '@/src/lib/googleAuth';
+import { isAppleAuthAvailable, signInWithApple } from '@/src/lib/appleAuth';
 import Text from '@/src/ui/Text';
 import Button from '@/src/ui/Button';
 import Icon from '@/src/ui/Icon';
@@ -65,6 +67,61 @@ export function ChannelToggle({ channels, value, onChange }) {
         );
       })}
     </View>
+  );
+}
+
+// Apple's own button, not one of ours. Guideline 4.8 and the Human Interface
+// Guidelines both treat the mark, the wording and the proportions as fixed —
+// a hand-drawn lookalike is a rejection — so this renders the native control
+// and only sizes it to sit in the same stack as our pills.
+//
+// It hides itself where the sign-in cannot complete (Android, iOS 12 and
+// earlier) rather than offering a button that would fail.
+// Whether this device can complete an Apple sign-in. Exported because callers
+// often have to hide something beside the button — a divider, a caption — and
+// two separate platform guesses would eventually disagree with each other.
+export function useAppleAuthAvailable() {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    isAppleAuthAvailable().then(ok => alive && setAvailable(ok));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return available;
+}
+
+export function AppleButton({ onDone, onError }) {
+  const { adoptToken } = useAccount();
+  const available = useAppleAuthAvailable();
+  const [busy, setBusy] = useState(false);
+
+  if (!available) return null;
+
+  const open = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await signInWithApple();
+      if (!result) return; // dismissed the sheet — stay on the sign-in screen
+      await adoptToken(result.token);
+      onDone?.({ next: null });
+    } catch (e) {
+      onError?.(e.message || 'Apple sign-in failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AppleAuthentication.AppleAuthenticationButton
+      buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+      cornerRadius={24}
+      style={{ width: '100%', height: 48, opacity: busy ? 0.6 : 1 }}
+      onPress={open}
+    />
   );
 }
 

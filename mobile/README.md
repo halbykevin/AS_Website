@@ -309,6 +309,53 @@ GoogleButton  → openAuthSessionAsync(
 
 Email and WhatsApp one‑time codes still work out of the box against the same API.
 
+### Sign in with Apple (iOS)
+
+Required, not optional: App Store Review Guideline **4.8** says an app offering a
+social login must also offer one that lets the customer keep their email address
+private, and Google sign-in is what triggers it. So the button sits **above**
+Google on both auth screens — 4.8 also asks for equal prominence — and it is
+Apple's own native control (`AppleAuthenticationButton`), because the mark, the
+wording and the proportions are fixed and a lookalike is a rejection.
+
+- **Nothing like the Google round-trip.** iOS presents the sheet, hands back an
+  identity token, and the app POSTs it to `/api/account/apple`. No browser, no
+  deep link, no one-time code.
+- **The server verifies the signature**, unlike Google's id_token — that one
+  arrives from Google's own endpoint over TLS, this one arrives from whoever can
+  reach the API. [`apple.js`](../as_store/server/src/apple.js) checks it against
+  Apple's published keys and pins the issuer and the bundle id, with a per-attempt
+  nonce against replay. `test/apple.test.js` covers each way that can be attacked.
+- **Recognition is by `customers.apple_sub`, never by email.** Apple sends the
+  name and email on the *first* authorization only, and Hide My Email gives a
+  relay address that was never the customer's anywhere else. The email is used
+  the one time it arrives, so an Apple sign-in lands on the account the customer
+  already had here rather than starting a second one.
+- **Deleting an account revokes the grant** — Apple requires it of an app that
+  offers both. It needs a Sign in with Apple key (`APPLE_TEAM_ID` / `APPLE_KEY_ID`
+  / `APPLE_PRIVATE_KEY`); without one, sign-in and deletion both still work and
+  only the message to Apple is skipped.
+- Lives in [`src/lib/appleAuth.js`](src/lib/appleAuth.js) + `AppleButton` /
+  `useAppleAuthAvailable` in [`src/components/auth.jsx`](src/components/auth.jsx).
+  The button renders nothing off iOS, and the hook exists so a caption or divider
+  beside it can't disagree about whether it is there.
+
+### The App Review demo account
+
+App Store and Play reviewers must be able to sign in, and our sign-in posts a code
+to an inbox or a WhatsApp number they do not have. `REVIEW_EMAIL` + `REVIEW_CODE`
+on the store API make **one** address accept **one** fixed code, with nothing sent
+and the request rate limit skipped so a reviewer cannot lock themselves out.
+
+The code is **exactly six digits, enforced** — the app's code field strips
+anything else and caps at six on a number-pad keyboard, so a longer code is one a
+reviewer cannot type and the server refuses to enable the account rather than let
+that turn into a rejection. Six digits skip the per-code attempt cap, so the path
+carries its own: ten wrong codes from one IP, then fifteen minutes. It only ever
+matches the email channel, the comparison is constant-time, and the server logs a
+warning at boot while it is live — **unset both once the app is approved.** Lives
+in [`otp.js`](../as_store/server/src/otp.js) with the two OTP routes in `app.js`.
+
 ### Sessions expire; the app notices
 
 Customer tokens last 30 days, but they can stop working sooner — the account was

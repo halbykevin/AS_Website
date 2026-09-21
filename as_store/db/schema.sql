@@ -342,6 +342,17 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_login_at     TIMESTAMPTZ;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_login_method TEXT;
 CREATE INDEX IF NOT EXISTS idx_customers_signup_method ON customers(signup_method);
 
+-- Sign in with Apple. `apple_sub` is Apple's stable per-app identifier and the
+-- only thing every sign-in carries — the email and name arrive on the first
+-- authorization and never again, and a Hide My Email address is not the one the
+-- customer had before, so the email cannot be what recognises them. The refresh
+-- token is kept solely to tell Apple to revoke the grant when the account is
+-- deleted; it is empty unless revocation credentials are configured.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS apple_sub           TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS apple_refresh_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_apple_sub
+  ON customers(apple_sub) WHERE apple_sub IS NOT NULL AND apple_sub <> '';
+
 DROP TRIGGER IF EXISTS trg_customers_updated ON customers;
 CREATE TRIGGER trg_customers_updated
   BEFORE UPDATE ON customers

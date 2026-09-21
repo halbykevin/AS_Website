@@ -20,6 +20,11 @@ import {
   generateOtp,
   hashOtp,
   otpDevEcho,
+  isReviewIdentifier,
+  reviewCodeMatches,
+  reviewAttemptsExhausted,
+  noteReviewFailure,
+  clearReviewFailures,
   OTP_TTL_MINUTES,
   OTP_MAX_ATTEMPTS,
   OTP_REQUEST_CAP,
@@ -36,6 +41,12 @@ import {
   whatsappRouter,
 } from "./whatsapp.js";
 import { beginGoogleAuth, finishGoogleAuth, googleEnabled } from "./google.js";
+import {
+  appleEnabled,
+  appleRefreshToken,
+  revokeAppleToken,
+  verifyAppleIdentityToken,
+} from "./apple.js";
 import { scraperRouter } from "./scraper.js";
 import {
   whishEnabled,
@@ -870,19 +881,29 @@ const missingChannel = (c) =>
 
 // How a customer reached us. 'unknown' is reserved for accounts that predate
 // this tracking — it is never assigned to a new row.
-const SIGNUP_METHODS = ["google", "whatsapp", "email", "checkout", "unknown"];
+const SIGNUP_METHODS = [
+  "google",
+  "apple",
+  "whatsapp",
+  "email",
+  "checkout",
+  "unknown",
+];
 const signupMethodOf = (v) =>
   SIGNUP_METHODS.includes(v) ? v : /* unrecognized */ "unknown";
 
 // Record one sign-in. Analytics must never break a login, so failures are
 // logged and swallowed; callers do not await the result.
+// The caller's address, behind nginx. One definition, because the sign-in
+// attempt cap and the login log must agree on who "the same caller" is.
+const clientIp = (req) =>
+  String(
+    req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() || req?.ip || "",
+  ).slice(0, 60);
+
 async function recordLogin(customerId, method, req, { isSignup = false } = {}) {
   try {
-    const ip = String(
-      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-        req?.ip ||
-        "",
-    ).slice(0, 60);
+    const ip = clientIp(req);
     const agent = String(req?.headers?.["user-agent"] || "").slice(0, 300);
     await query(
       `INSERT INTO customer_logins (customer_id, method, is_signup, ip, user_agent)
@@ -980,7 +1001,11 @@ async function fillProfile(customer, profile) {
 }
 
 app.get("/api/account/auth/methods", (_req, res) =>
-  res.json({ google: googleEnabled(), otpChannels: otpChannels() }),
+  res.json({
+    google: googleEnabled(),
+    apple: appleEnabled(),
+    otpChannels: otpChannels(),
+  }),
 );
 
 app.get(
@@ -1038,6 +1063,114 @@ app.post(
     res.json({
       token: signCustomerToken(result.customer),
       next: result.next,
+    });
+  }),
+);
+
+// --- Sign in with Apple ------------------------------------------------------
+// Unlike Google's, this flow is native: the phone gets the identity token from
+// iOS and posts it here, so there is no browser round-trip and no one-time code
+// to exchange. `apple.js` is what makes that safe.
+//
+// Recognition is by `apple_sub`, never by email: Apple sends the email on the
+// first authorization only, and a customer using Hide My Email gives us a relay
+// address that was never theirs anywhere else. The email is still used the one
+// time we get it, so that an Apple sign-in lands on the account the customer
+// already had here instead of quietly starting a second one.
+async function claimAppleSub(customer, sub) {
+  if (customer.apple_sub === sub) return customer;
+  try {
+    const { rows } = await query(
+      `UPDATE customers SET apple_sub = $2
+        WHERE id = $1 AND (apple_sub IS NULL OR apple_sub = '')
+        RETURNING *`,
+      [customer.id, sub],
+    );
+    return rows[0] || customer;
+  } catch (e) {
+    if (e?.code !== "23505") throw e;
+    // Another row already holds this Apple account. Leave both alone rather
+    // than merge on a guess — the customer is signed in either way.
+    console.warn(
+      `[apple] identifier already on another account — customer #${customer.id} left unlinked`,
+    );
+    return customer;
+  }
+}
+
+async function findOrCreateCustomerByApple(sub, { email, name } = {}) {
+  const { rows: bySub } = await query(
+    `SELECT * FROM customers WHERE apple_sub = $1`,
+    [sub],
+  );
+  if (bySub[0]) return { customer: bySub[0], created: false };
+
+  if (email) {
+    const { customer, created } = await findOrCreateCustomerByEmail(
+      email,
+      { name },
+      "apple",
+    );
+    return { customer: await claimAppleSub(customer, sub), created };
+  }
+
+  // No email to match on: a returning customer whose first authorization we
+  // never saw, or one who revoked and re-granted. A fresh account is the only
+  // honest option — inventing a match would hand someone else's orders over.
+  const { rows: made } = await query(
+    `INSERT INTO customers (name, apple_sub, signup_method)
+     VALUES ($1,$2,'apple') RETURNING *`,
+    [String(name || "").trim(), sub],
+  );
+  return { customer: made[0], created: true };
+}
+
+app.post(
+  "/api/account/apple",
+  ah(async (req, res) => {
+    if (!appleEnabled())
+      return res
+        .status(503)
+        .json({ error: "Apple sign-in is not available right now" });
+
+    let identity;
+    try {
+      identity = await verifyAppleIdentityToken(
+        req.body?.identityToken,
+        req.body?.nonce,
+      );
+    } catch (e) {
+      console.error("[apple] sign-in failed:", e?.message || e);
+      return res.status(401).json({
+        error: e?.message || "Apple sign-in could not be verified",
+      });
+    }
+
+    const name = String(req.body?.name || "").trim();
+    const { customer, created } = await findOrCreateCustomerByApple(
+      identity.sub,
+      { email: identity.emailVerified ? identity.email : "", name },
+    );
+    const row = name ? await fillProfile(customer, { name }) : customer;
+
+    // The authorization code is single-use and only arrives here, so this is
+    // the one chance to obtain the refresh token that account deletion revokes.
+    // A failure is logged inside apple.js and costs the customer nothing.
+    const refresh = await appleRefreshToken(req.body?.code);
+    if (refresh) {
+      await query(`UPDATE customers SET apple_refresh_token = $2 WHERE id = $1`, [
+        row.id,
+        refresh,
+      ]);
+    }
+
+    recordLogin(row.id, "apple", req, { isSignup: created });
+    res.json({
+      token: signCustomerToken(row),
+      customer: customerJson(row),
+      linkChannel: otpChannels().includes(missingChannel(row))
+        ? missingChannel(row)
+        : null,
     });
   }),
 );
@@ -1114,6 +1247,20 @@ app.post(
         .status(400)
         .json({ error: "WhatsApp sign-in isn’t available right now" });
     }
+
+    // The App Review account: nothing is generated and nothing is sent — the
+    // code is the fixed one in the environment. Answered before the rate limit
+    // so a reviewer retrying cannot lock themselves out of their own demo
+    // account. See `reviewAccountEnabled` in otp.js for how narrow this is.
+    if (isReviewIdentifier(target.channel, target.identifier)) {
+      console.log("[review] sign-in code requested for the review account");
+      return res.json({
+        ok: true,
+        channel: target.channel,
+        identifier: target.identifier,
+      });
+    }
+
     if (await otpRateLimited(target.identifier)) {
       return res.status(429).json({
         error: "Too many codes requested — try again in a few minutes",
@@ -1148,8 +1295,26 @@ app.post(
         .status(400)
         .json({ error: "Identifier and code are required" });
 
-    const error = await consumeOtp(target, code);
-    if (error) return res.status(400).json({ error });
+    // The review account's code never entered the database, so it is checked
+    // against the environment instead — and carries its own attempt cap, since
+    // skipping consumeOtp skips that one. Everyone else goes through consumeOtp,
+    // attempt cap and all.
+    if (isReviewIdentifier(target.channel, target.identifier)) {
+      const ip = clientIp(req);
+      if (reviewAttemptsExhausted(ip)) {
+        return res
+          .status(429)
+          .json({ error: "Too many attempts — try again in a few minutes" });
+      }
+      if (!reviewCodeMatches(code)) {
+        noteReviewFailure(ip);
+        return res.status(400).json({ error: "Incorrect code" });
+      }
+      clearReviewFailures(ip);
+    } else {
+      const error = await consumeOtp(target, code);
+      if (error) return res.status(400).json({ error });
+    }
 
     const { customer, created } =
       target.channel === "whatsapp"
@@ -1340,6 +1505,18 @@ app.delete(
         code: "orders_in_flight",
         orderIds: inFlight.map((o) => o.id),
       });
+    }
+
+    // Tell Apple before we delete the row that holds the token. Apple requires
+    // an app that deletes accounts to revoke the Sign in with Apple grant too,
+    // so the customer stops seeing us under their Apple ID. Best effort: the
+    // deletion is the promise we made, and it goes ahead either way.
+    const { rows: appleRows } = await query(
+      `SELECT apple_refresh_token FROM customers WHERE id = $1`,
+      [req.customerId],
+    );
+    if (appleRows[0]?.apple_refresh_token) {
+      await revokeAppleToken(appleRows[0].apple_refresh_token);
     }
 
     const deleted = await withTransaction(async (client) => {
@@ -2194,6 +2371,15 @@ app.delete(
          (SELECT count(*) FROM customer_logins WHERE customer_id = $1)::int AS logins`,
       [id],
     );
+    // Same Apple courtesy as a self-service deletion: withdraw the grant so the
+    // customer isn't left with an app in their Apple ID that no longer exists.
+    const { rows: appleRows } = await query(
+      `SELECT apple_refresh_token FROM customers WHERE id = $1`,
+      [id],
+    );
+    if (appleRows[0]?.apple_refresh_token) {
+      await revokeAppleToken(appleRows[0].apple_refresh_token);
+    }
     const { rows } = await query(
       `DELETE FROM customers WHERE id = $1 RETURNING id, name, mobile, email`,
       [id],

@@ -49,8 +49,12 @@ export default function PrivacyPolicy({ settings }) {
             <strong className="font-semibold text-as-ink">Information you provide.</strong> When you place an
             order or create an account, we collect your full name, mobile number, email address (optional),
             delivery address, and any notes you add to your order. If you sign in with Google, we receive your
-            name and email address from Google — never your Google password. If you enter one of our games or
-            prize draws, we keep the entry you submitted along with the name and mobile number you gave.
+            name and email address from Google — never your Google password. If you sign in with Apple, we
+            receive an identifier for your Apple account, and your name and email address the first time only;
+            choosing <strong className="font-semibold text-as-ink">Hide My Email</strong> means we never see
+            your real address, only the forwarding one Apple gives us — and neither ever includes your Apple
+            password. If you enter one of our games or prize draws, we keep the entry you submitted along with
+            the name and mobile number you gave.
           </p>
           <p>
             <strong className="font-semibold text-as-ink">Information collected automatically.</strong> On the
@@ -64,8 +68,11 @@ export default function PrivacyPolicy({ settings }) {
             the platform (Android or iOS), the app version, and your language setting, so we can send you order
             updates and — if you have not turned them off — occasional offers. A push token identifies a device
             installation, not you personally, and it stops working when you turn notifications off or uninstall
-            the app. The app does not use advertising identifiers and does not track you across other companies'
-            apps or websites.
+            the app. To decide which offers are worth sending you rather than sending everyone everything, we
+            may use what you have ordered before and the city on your orders — so an offer on something you buy
+            reaches you and one on something you don't, doesn't. We also record whether a notification was
+            opened, which tells us whether a message was worth sending at all. The app does not use advertising
+            identifiers and does not track you across other companies' apps or websites.
           </p>
         </Section>
 
@@ -145,7 +152,9 @@ export default function PrivacyPolicy({ settings }) {
             Deleting your account permanently removes your name, mobile number, email address, saved delivery
             addresses, sign-in history, notification settings and push tokens, rewards and prize-draw entries,
             any unused vouchers, and your AS Wallet balance and its history. It cannot be undone, and it stops
-            all notifications to your devices — and wallet credit, once deleted, cannot be given back.
+            all notifications to your devices — and wallet credit, once deleted, cannot be given back. If you
+            signed in with Apple, we also ask Apple to withdraw this app's access to your Apple account, so the
+            deletion reaches their side too.
           </p>
           <p>
             We keep the record of orders you already placed — the items, amounts, and dates — because Lebanese

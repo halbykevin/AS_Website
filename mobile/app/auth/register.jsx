@@ -6,7 +6,7 @@ import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Button, Card } from '@/src/ui';
 import { Field, Input } from '@/src/ui/Input';
-import { AuthShell, CodeForm } from '@/src/components/auth';
+import { AuthShell, CodeForm, AppleButton, useAppleAuthAvailable } from '@/src/components/auth';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
 // the error reach the root boundary, so navigation stays alive around it.
@@ -21,6 +21,7 @@ export default function RegisterScreen() {
   const params = useLocalSearchParams();
   const next = params.next || '/account';
 
+  const appleAvailable = useAppleAuthAvailable();
   const [step, setStep] = useState('form'); // form | code
   const [form, setForm] = useState({ name: '', email: '', mobile: '', address: '' });
   const [code, setCode] = useState('');
@@ -107,6 +108,21 @@ export default function RegisterScreen() {
 
           {step === 'form' ? (
             <View style={{ gap: theme.spacing.md }}>
+              {/* Creating an account counts as setting one up under Guideline
+                  4.8, so Apple belongs here too — and it spares the customer the
+                  form entirely. Renders nothing off iOS. */}
+              <AppleButton
+                onDone={async () => {
+                  await refresh();
+                  router.replace(next);
+                }}
+                onError={setError}
+              />
+              {appleAvailable ? (
+                <Text variant="callout" faint style={{ textAlign: 'center' }}>
+                  or sign up with your email
+                </Text>
+              ) : null}
               <Field label="Full name">
                 <Input value={form.name} onChangeText={v => set('name', v)} autoCapitalize="words" placeholder="Your name" />
               </Field>

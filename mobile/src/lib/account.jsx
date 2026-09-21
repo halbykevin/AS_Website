@@ -55,6 +55,10 @@ export const googleSignInUrl = (next = '/', appReturn = '') =>
 export const accountApi = {
   authMethods: () => req('/api/account/auth/methods'),
   exchangeGoogleCode: code => req('/api/account/google/mobile-exchange', { method: 'POST', body: { code } }),
+  // Sign in with Apple is native, so there is no browser round-trip: the phone
+  // posts the identity token iOS issued and gets a session straight back.
+  // See `src/lib/appleAuth.js`.
+  appleSignIn: payload => req('/api/account/apple', { method: 'POST', body: payload }),
   requestOtp: (channel, identifier) => req('/api/account/otp/request', { method: 'POST', body: { channel, identifier } }),
   verifyOtp: (channel, identifier, code, profile) => req('/api/account/otp/verify', { method: 'POST', body: { channel, identifier, code, profile } }),
   requestLink: (channel, identifier) => req('/api/account/link/request', { method: 'POST', auth: true, body: { channel, identifier } }),

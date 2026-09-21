@@ -26,7 +26,11 @@ const GOES = [
   'Your rewards and Daily Spin history',
   'Your AS Wallet balance and history',
   'Your notifications and notification settings',
-  'Your ability to sign in with this account'
+  'Your ability to sign in with this account',
+  // Apple asks an app offering Sign in with Apple to revoke the grant on
+  // deletion; the API does, so the screen says so. Harmless on Android, where
+  // this line simply never applies to the customer reading it.
+  'This app’s access to your Apple account, if you signed in with Apple'
 ];
 
 export default function DeleteAccountScreen() {

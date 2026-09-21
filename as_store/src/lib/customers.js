@@ -8,6 +8,7 @@
 // tracking, whose history was never recorded. It is never assigned to new rows.
 export const SIGNUP_METHODS = [
   { value: 'google', label: 'Google', short: 'Google', tone: 'red', icon: 'globe' },
+  { value: 'apple', label: 'Apple', short: 'Apple', tone: 'gray', icon: 'apple' },
   { value: 'whatsapp', label: 'WhatsApp code', short: 'WhatsApp', tone: 'green', icon: 'whatsapp' },
   { value: 'email', label: 'Email code', short: 'Email', tone: 'amber', icon: 'mail' },
   { value: 'checkout', label: 'Guest checkout', short: 'Checkout', tone: 'brand', icon: 'bag' },

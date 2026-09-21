@@ -20,7 +20,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "lb.com.as.company",
+      "bundleIdentifier": "lb.com.as.store",
+      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -60,6 +61,7 @@
         }
       ],
       "expo-secure-store",
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {
