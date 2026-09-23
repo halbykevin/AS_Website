@@ -1,7 +1,7 @@
 // Shared presentational bits for the account/auth pages.
 
 import Icon from "@/components/Icon.jsx";
-import { googleSignInUrl } from "@/lib/account";
+import { appleSignInUrl, googleSignInUrl } from "@/lib/account";
 
 export const inputCls =
   "w-full rounded-xl border border-as-ink/15 bg-white px-4 py-3 text-[15px] text-as-ink outline-none transition placeholder:text-as-ink/35 focus:border-as-red";
@@ -77,20 +77,16 @@ function AppleMark() {
   );
 }
 
-// DESIGN ONLY — deliberately not rendered anywhere yet.
-//
-// Sign in with Apple is Apple's service: Apple authenticates the user and can
-// hide their address behind a private relay. A button wearing this mark must
-// actually do that, so it stays off until the real flow exists (an apple.js
-// mirroring google.js, plus a Services ID / Team ID / Key ID / .p8 key from an
-// Apple Developer account). Wiring it to our email codes instead would tell the
-// customer Apple vouched for them when it didn't.
-//
-// To switch it on: build the flow, then render this from the login page's
-// method list the way GoogleButton is.
-export function AppleButton({ href = "#", label = "Continue with Apple" }) {
+// Sign in with Apple — a full-page trip to Apple and back, like Google's. Only
+// rendered when the API reports `appleWeb`, because a button wearing Apple's
+// mark has to actually be Apple's sign-in. The label must stay one of Apple's
+// three wordings: Sign in / Sign up / Continue with Apple.
+export function AppleButton({
+  next = "/account",
+  label = "Continue with Apple",
+}) {
   return (
-    <a href={href} className={`${choiceCls} font-medium`}>
+    <a href={appleSignInUrl(next)} className={`${choiceCls} font-medium`}>
       <AppleMark />
       {label}
     </a>

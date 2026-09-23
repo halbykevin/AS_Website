@@ -8,7 +8,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount, accountApi, AFTER_SIGN_IN } from '@/lib/account'
-import { AuthShell, CodeForm, Field, GoogleButton, OrDivider, inputCls } from '@/components/AccountUI.jsx'
+import { AppleButton, AuthShell, CodeForm, Field, GoogleButton, OrDivider, inputCls } from '@/components/AccountUI.jsx'
 
 const RESEND_SECONDS = 30
 const EMPTY = { name: '', email: '', mobile: '', address: '' }
@@ -19,6 +19,7 @@ function RegisterInner() {
   const next = useSearchParams().get('next') || AFTER_SIGN_IN
 
   const [google, setGoogle] = useState(false)
+  const [apple, setApple] = useState(false)
   const [step, setStep] = useState('details') // details | code
   const [form, setForm] = useState(EMPTY)
   const [code, setCode] = useState('')
@@ -32,7 +33,10 @@ function RegisterInner() {
   useEffect(() => {
     accountApi
       .authMethods()
-      .then((r) => setGoogle(Boolean(r.google)))
+      .then((r) => {
+        setGoogle(Boolean(r.google))
+        setApple(Boolean(r.appleWeb))
+      })
       .catch(() => {})
   }, [])
 
@@ -113,9 +117,12 @@ function RegisterInner() {
 
       {step === 'details' && (
         <div className="space-y-5">
-          {google && (
+          {(google || apple) && (
             <>
-              <GoogleButton next={next} label="Sign up with Google" />
+              <div className="space-y-3">
+                {google && <GoogleButton next={next} label="Sign up with Google" />}
+                {apple && <AppleButton next={next} label="Sign up with Apple" />}
+              </div>
               <OrDivider />
             </>
           )}

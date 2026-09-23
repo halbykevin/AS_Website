@@ -111,6 +111,42 @@ instead of exposing a customer session in the redirect URL. The app exchanges it
 with `POST /api/account/google/mobile-exchange`. Run `npm run migrate` before
 deploying this flow so the `mobile_auth_codes` table exists.
 
+## Sign in with Apple on the website
+
+The app signs in with Apple natively (`POST /api/account/apple`, see
+[mobile/README.md](../../mobile/README.md)); the storefront does it as a full-page
+trip like Google's: `GET /api/account/apple/start?next=` → Apple →
+`POST /api/account/apple/callback` → `store.as.com.lb/auth/apple#token=…`. Both
+paths end in the same `completeAppleSignIn`, so one Apple account is one
+customer whichever door it came through — Apple's `sub` is per developer team,
+not per client.
+
+- **The website is its own Apple client.** A browser's token is issued to a
+  **Services ID** (`APPLE_SERVICES_ID`), not the app's bundle id, and the
+  callback only accepts tokens for that audience. Until it is set,
+  `/api/account/auth/methods` reports `appleWeb: false` and the storefront shows
+  no Apple button; the app reads `apple`, which is unaffected.
+- **Apple comes back with a cross-site form POST** (`response_mode=form_post`,
+  required once a name or email is asked for), so the state cookie is
+  `SameSite=None; Secure` rather than Google's `Lax`, and every redirect out of
+  the callback is a **303**. The cookie proves a pairing, not a secret: the signed
+  state, this browser's cookie and the nonce Apple signed into the token must all
+  agree, which is what stops a forged callback signing a victim's browser into
+  someone else's account. `test/apple-web.test.js` covers each attack.
+- **The name arrives once, unsigned**, in a `user` field beside the token. It is
+  used to fill a blank name; the email is only ever taken from the signed token.
+- **Revocation needs the right client.** Apple revokes a token only for the client
+  it was issued to, so `customers.apple_refresh_client` records it (NULL = the
+  app) and deletion passes it back. Account merges carry the Apple link and token
+  onto the surviving row.
+- **Portal setup** (developer.apple.com, team `K85Z6HH5FB`): Identifiers → **+** →
+  Services IDs → e.g. `lb.com.as.store.web` → enable Sign in with Apple →
+  Configure → Primary App ID `lb.com.as.store`, Domains `store-api.as.com.lb`,
+  Return URL `https://store-api.as.com.lb/api/account/apple/callback`. Then set
+  `APPLE_SERVICES_ID` in the VPS `.env` and restart. If the revocation key is set,
+  the same `.p8` signs for both clients because the Services ID is grouped under
+  the App ID that key was made for — no second key.
+
 ## Catalog import
 
 The admin **Import products** page spawns `as_store/scraper/scrape.py` and ingests its

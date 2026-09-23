@@ -251,6 +251,25 @@ the mobile app — but it is a studio, not a one-off: another reel is a scene fo
   listing page) — the cards are drawn from the facts. Icons are originals rather than Ionicons
   traced by eye, and WhatsApp is named in words rather than approximated as a mark.
 
+## Sign in with Apple (store + app + API)
+
+Two front doors, one account. The iOS app signs in natively (`POST /api/account/apple`); the
+storefront does a full-page trip like Google's (`/api/account/apple/start` → Apple →
+`POST /api/account/apple/callback` → `/auth/apple`). Both end in `completeAppleSignIn` in
+[as_store/server/src/app.js](as_store/server/src/app.js), recognising the customer by
+`customers.apple_sub` (Apple's `sub` is per developer team, so the app and the website see the
+same one). Verification lives in [apple.js](as_store/server/src/apple.js); full detail in
+[as_store/server/README.md](as_store/server/README.md).
+
+- **The website is a separate Apple client** — a Services ID (`APPLE_SERVICES_ID`), not the
+  app's bundle id. Unset, `auth/methods` reports `appleWeb: false` and no web button shows.
+  The app reads `apple`, a separate flag, so nothing web-side can hide the app's button.
+- **Apple returns with a cross-site POST**, so the web state cookie must stay
+  `SameSite=None; Secure` (a Lax one never comes back) and callback redirects must be 303.
+- **A refresh token is revoked by the client that got it** — `apple_refresh_client` (NULL =
+  the app) travels with `apple_refresh_token`, including through account merges. Anything
+  that moves or copies one must move both.
+
 ## Checkout requires a mobile number (store + app + API)
 
 Every order carries a number someone can actually be called on, whatever the sign-in was. Google and

@@ -24,7 +24,7 @@ export const safeNext = (value) => {
   return n.startsWith('/') && !n.startsWith('//') ? n : '/'
 }
 
-function readCookie(req, name) {
+export function readCookie(req, name) {
   for (const part of String(req.headers.cookie || '').split(';')) {
     const [k, ...rest] = part.trim().split('=')
     if (k === name) return decodeURIComponent(rest.join('='))

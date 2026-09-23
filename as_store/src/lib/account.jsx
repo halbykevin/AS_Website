@@ -41,6 +41,10 @@ export const AFTER_SIGN_IN = '/'
 export const googleSignInUrl = (next = AFTER_SIGN_IN) =>
   `${API}/api/account/google/start?next=${encodeURIComponent(next)}`
 
+// Apple's is the same kind of trip, landing on /auth/apple.
+export const appleSignInUrl = (next = AFTER_SIGN_IN) =>
+  `${API}/api/account/apple/start?next=${encodeURIComponent(next)}`
+
 export const accountApi = {
   // Which sign-in methods the API can actually complete right now.
   authMethods: () => req('/api/account/auth/methods'),
@@ -132,8 +136,8 @@ export function AccountProvider({ children }) {
     return { customer, linkChannel: offer }
   }, [])
 
-  // Adopt a token minted elsewhere — Google hands ours back through the URL when
-  // it returns the shopper to /auth/google.
+  // Adopt a token minted elsewhere — Google and Apple hand ours back through the
+  // URL when they return the shopper to /auth/google or /auth/apple.
   const adoptToken = useCallback(async (token) => {
     setToken(token)
     const me = await accountApi.me()

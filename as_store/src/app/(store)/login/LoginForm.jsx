@@ -8,11 +8,12 @@ import { AppleButton, AuthShell, CodeForm, EmailButton, Field, GoogleButton, inp
 
 const RESEND_SECONDS = 30
 
-// Apple's button is designed and ready (see AppleButton) but has no flow behind
-// it yet, so it stays off: a live button carrying Apple's mark has to actually
-// be Sign in with Apple. Turn this on only together with the real integration —
-// it should then follow the API's method list, like Google's does.
-const APPLE_READY = false
+// Errors on the way back from Google or Apple land here as ?error=<provider>.
+// Closing Apple's page is not one — that comes back with no error at all.
+const RETURN_ERRORS = {
+  google: 'Google sign-in didn’t complete. Please try again.',
+  apple: 'Apple sign-in didn’t complete. Please try again.',
+}
 
 function LoginInner({ loginButton }) {
   const { loginWithOtp } = useAccount()
@@ -20,15 +21,16 @@ function LoginInner({ loginButton }) {
   const params = useSearchParams()
   const next = params.get('next') || AFTER_SIGN_IN
 
-  // Google only appears once the API says it's configured, so a dead button is
-  // never offered. Errors on the way back from Google land here as ?error=google.
+  // Google and Apple only appear once the API says they're configured, so a
+  // dead button is never offered.
   const [google, setGoogle] = useState(false)
+  const [apple, setApple] = useState(false)
   // The page opens as a choice of methods; the email field only appears once
   // that's the method you picked.
   const [step, setStep] = useState('choose') // choose | email | code
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
-  const [error, setError] = useState(params.get('error') === 'google' ? 'Google sign-in didn’t complete. Please try again.' : '')
+  const [error, setError] = useState(RETURN_ERRORS[params.get('error')] || '')
   const [busy, setBusy] = useState(false)
   const [cooldown, setCooldown] = useState(0)
   const codeRef = useRef(null)
@@ -36,7 +38,10 @@ function LoginInner({ loginButton }) {
   useEffect(() => {
     accountApi
       .authMethods()
-      .then((r) => setGoogle(Boolean(r.google)))
+      .then((r) => {
+        setGoogle(Boolean(r.google))
+        setApple(Boolean(r.appleWeb))
+      })
       .catch(() => {}) // offline: email code still works
   }, [])
 
@@ -76,8 +81,12 @@ function LoginInner({ loginButton }) {
     }
   }
 
+  // Names only the accounts actually on offer.
+  const social = [google && 'Google', apple && 'Apple'].filter(Boolean).join(' or ')
   const subtitle = {
-    choose: 'Use your Google account, or we’ll email you a one-time code.',
+    choose: social
+      ? `Use your ${social} account, or we’ll email you a one-time code.`
+      : 'We’ll email you a one-time code — no password to remember.',
     email: 'We’ll email you a 6-digit code — no password to remember.',
     code: `We emailed a 6-digit code to ${email}.`,
   }[step]
@@ -114,7 +123,7 @@ function LoginInner({ loginButton }) {
       {step === 'choose' && (
         <div className="space-y-3">
           {google && <GoogleButton next={next} />}
-          {APPLE_READY && <AppleButton />}
+          {apple && <AppleButton next={next} />}
           <EmailButton
             onClick={() => setStep('email')}
             label={loginButton?.label}

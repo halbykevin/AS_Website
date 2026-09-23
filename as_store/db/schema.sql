@@ -350,6 +350,10 @@ CREATE INDEX IF NOT EXISTS idx_customers_signup_method ON customers(signup_metho
 -- deleted; it is empty unless revocation credentials are configured.
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS apple_sub           TEXT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS apple_refresh_token TEXT;
+-- Which Apple client issued that token: the website's Services ID, or NULL for
+-- the app. Apple only revokes a token at the request of the client that holds
+-- it, so a web sign-in's token revoked as the app would silently stay granted.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS apple_refresh_client TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_apple_sub
   ON customers(apple_sub) WHERE apple_sub IS NOT NULL AND apple_sub <> '';
 

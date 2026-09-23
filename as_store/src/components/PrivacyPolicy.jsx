@@ -153,8 +153,8 @@ export default function PrivacyPolicy({ settings }) {
             addresses, sign-in history, notification settings and push tokens, rewards and prize-draw entries,
             any unused vouchers, and your AS Wallet balance and its history. It cannot be undone, and it stops
             all notifications to your devices — and wallet credit, once deleted, cannot be given back. If you
-            signed in with Apple, we also ask Apple to withdraw this app's access to your Apple account, so the
-            deletion reaches their side too.
+            signed in with Apple, on the website or in the app, we also ask Apple to withdraw AS Store's access
+            to your Apple account, so the deletion reaches their side too.
           </p>
           <p>
             We keep the record of orders you already placed — the items, amounts, and dates — because Lebanese

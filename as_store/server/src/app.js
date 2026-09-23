@@ -43,7 +43,10 @@ import {
 import { beginGoogleAuth, finishGoogleAuth, googleEnabled } from "./google.js";
 import {
   appleEnabled,
+  appleWebEnabled,
   appleRefreshToken,
+  beginAppleWebAuth,
+  finishAppleWebAuth,
   revokeAppleToken,
   verifyAppleIdentityToken,
 } from "./apple.js";
@@ -1074,7 +1077,10 @@ async function fillProfile(customer, profile) {
 app.get("/api/account/auth/methods", (_req, res) =>
   res.json({
     google: googleEnabled(),
+    // The app's native sign-in, and the website's redirect — separate because
+    // the website's needs a Services ID the app has no use for.
     apple: appleEnabled(),
+    appleWeb: appleWebEnabled(),
     otpChannels: otpChannels(),
   }),
 );
@@ -1196,6 +1202,32 @@ async function findOrCreateCustomerByApple(sub, { email, name } = {}) {
   return { customer: made[0], created: true };
 }
 
+// Both front doors — the app's native sheet and the website's redirect — end
+// here, so an Apple account is recognised the same way whichever it came
+// through. `exchange` is the one-time authorization code plus the client it was
+// issued to: it only arrives at sign-in, so this is the one chance to obtain
+// the refresh token that account deletion revokes. A failure there is logged
+// inside apple.js and costs the customer nothing.
+async function completeAppleSignIn(identity, { name = "", exchange = {} }, req) {
+  const { customer, created } = await findOrCreateCustomerByApple(
+    identity.sub,
+    { email: identity.emailVerified ? identity.email : "", name },
+  );
+  const row = name ? await fillProfile(customer, { name }) : customer;
+
+  const refresh = await appleRefreshToken(exchange.code, exchange);
+  if (refresh) {
+    await query(
+      `UPDATE customers SET apple_refresh_token = $2, apple_refresh_client = $3
+        WHERE id = $1`,
+      [row.id, refresh, exchange.clientId || null],
+    );
+  }
+
+  recordLogin(row.id, "apple", req, { isSignup: created });
+  return row;
+}
+
 app.post(
   "/api/account/apple",
   ah(async (req, res) => {
@@ -1217,25 +1249,14 @@ app.post(
       });
     }
 
-    const name = String(req.body?.name || "").trim();
-    const { customer, created } = await findOrCreateCustomerByApple(
-      identity.sub,
-      { email: identity.emailVerified ? identity.email : "", name },
+    const row = await completeAppleSignIn(
+      identity,
+      {
+        name: String(req.body?.name || "").trim(),
+        exchange: { code: req.body?.code },
+      },
+      req,
     );
-    const row = name ? await fillProfile(customer, { name }) : customer;
-
-    // The authorization code is single-use and only arrives here, so this is
-    // the one chance to obtain the refresh token that account deletion revokes.
-    // A failure is logged inside apple.js and costs the customer nothing.
-    const refresh = await appleRefreshToken(req.body?.code);
-    if (refresh) {
-      await query(`UPDATE customers SET apple_refresh_token = $2 WHERE id = $1`, [
-        row.id,
-        refresh,
-      ]);
-    }
-
-    recordLogin(row.id, "apple", req, { isSignup: created });
     res.json({
       token: signCustomerToken(row),
       customer: customerJson(row),
@@ -1243,6 +1264,50 @@ app.post(
         ? missingChannel(row)
         : null,
     });
+  }),
+);
+
+// The website's Apple sign-in: a full-page trip like Google's (browser → here →
+// Apple → back here → the storefront's /auth/apple), with the session handed
+// over in the URL fragment the same way. Apple returns with a form POST rather
+// than a GET, which is why the callback parses a urlencoded body and why every
+// redirect out of it is a 303 — that is the status that turns the POST into a
+// GET, where a plain 302 is allowed to repeat it.
+app.get("/api/account/apple/start", (req, res) => {
+  if (!appleWebEnabled())
+    return res.redirect(`${STORE_URL}/login?error=apple`);
+  res.redirect(beginAppleWebAuth(res, req.query.next));
+});
+
+app.post(
+  "/api/account/apple/callback",
+  express.urlencoded({ extended: false, limit: "64kb" }),
+  ah(async (req, res) => {
+    let result;
+    try {
+      result = await finishAppleWebAuth(req, res);
+    } catch (e) {
+      // Closing Apple's page goes back to the sign-in choice as it was, with
+      // no error: the shopper changed their mind, nothing failed.
+      if (!e.cancelled)
+        console.error("[apple] web sign-in failed:", e?.message || e);
+      const back = new URLSearchParams();
+      if (!e.cancelled) back.set("error", "apple");
+      if (e.next && e.next !== "/") back.set("next", e.next);
+      const qs = back.toString();
+      return res.redirect(303, `${STORE_URL}/login${qs ? `?${qs}` : ""}`);
+    }
+
+    const row = await completeAppleSignIn(
+      result,
+      { name: result.name, exchange: result.exchange },
+      req,
+    );
+    const params = new URLSearchParams({
+      token: signCustomerToken(row),
+      next: result.next,
+    });
+    res.redirect(303, `${STORE_URL}/auth/apple#${params}`);
   }),
 );
 
@@ -1284,6 +1349,10 @@ async function linkIdentifier(customerId, target) {
       [keep.id, drop.id],
     );
     await client.query(`DELETE FROM customers WHERE id = $1`, [drop.id]);
+    // The Apple link moves with the survivor — otherwise the next Apple sign-in
+    // would not recognise the merged account. The token and the client that
+    // issued it travel as a pair, and only onto a row with no Apple link of its
+    // own (every right-hand side here reads the row as it was before the SET).
     const { rows } = await client.query(
       `UPDATE customers SET
          name      = COALESCE(NULLIF(name, ''), $2),
@@ -1291,7 +1360,12 @@ async function linkIdentifier(customerId, target) {
          email     = COALESCE(email, $4),
          phone     = COALESCE(NULLIF(phone, ''), $5),
          address   = COALESCE(NULLIF(address, ''), $6),
-         addresses = COALESCE(NULLIF(addresses, '[]'::jsonb), $7::jsonb)
+         addresses = COALESCE(NULLIF(addresses, '[]'::jsonb), $7::jsonb),
+         apple_refresh_token  = CASE WHEN NULLIF(apple_sub, '') IS NULL
+                                     THEN $9 ELSE apple_refresh_token END,
+         apple_refresh_client = CASE WHEN NULLIF(apple_sub, '') IS NULL
+                                     THEN $10 ELSE apple_refresh_client END,
+         apple_sub = COALESCE(NULLIF(apple_sub, ''), $8)
        WHERE id = $1 RETURNING *`,
       [
         keep.id,
@@ -1301,6 +1375,9 @@ async function linkIdentifier(customerId, target) {
         drop.phone || "",
         drop.address || "",
         JSON.stringify(drop.addresses || []),
+        drop.apple_sub || null,
+        drop.apple_refresh_token || null,
+        drop.apple_refresh_client || null,
       ],
     );
     return { customer: rows[0] };
@@ -1583,11 +1660,14 @@ app.delete(
     // so the customer stops seeing us under their Apple ID. Best effort: the
     // deletion is the promise we made, and it goes ahead either way.
     const { rows: appleRows } = await query(
-      `SELECT apple_refresh_token FROM customers WHERE id = $1`,
+      `SELECT apple_refresh_token, apple_refresh_client FROM customers WHERE id = $1`,
       [req.customerId],
     );
     if (appleRows[0]?.apple_refresh_token) {
-      await revokeAppleToken(appleRows[0].apple_refresh_token);
+      await revokeAppleToken(
+        appleRows[0].apple_refresh_token,
+        appleRows[0].apple_refresh_client,
+      );
     }
 
     const deleted = await withTransaction(async (client) => {
@@ -2520,11 +2600,14 @@ app.delete(
     // Same Apple courtesy as a self-service deletion: withdraw the grant so the
     // customer isn't left with an app in their Apple ID that no longer exists.
     const { rows: appleRows } = await query(
-      `SELECT apple_refresh_token FROM customers WHERE id = $1`,
+      `SELECT apple_refresh_token, apple_refresh_client FROM customers WHERE id = $1`,
       [id],
     );
     if (appleRows[0]?.apple_refresh_token) {
-      await revokeAppleToken(appleRows[0].apple_refresh_token);
+      await revokeAppleToken(
+        appleRows[0].apple_refresh_token,
+        appleRows[0].apple_refresh_client,
+      );
     }
     const { rows } = await query(
       `DELETE FROM customers WHERE id = $1 RETURNING id, name, mobile, email`,
