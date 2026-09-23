@@ -4,6 +4,7 @@ import { useReducedMotion } from 'framer-motion'
 import BannerCta from '../components/BannerCta.jsx'
 import TicketingPanel from '../components/TicketingPanel.jsx'
 import StoreBanner from '../components/StoreBanner.jsx'
+import StoreSearch from '../components/StoreSearch.jsx'
 import { useContent } from '../store/content.jsx'
 
 // Smooth shadow + a gentle "clickable" breathing pulse (pauses on hover, off for
@@ -30,8 +31,20 @@ export default function Home() {
 
   return (
     <>
+      {/* The store search, first thing under the nav as on the app's home
+          screen. One instance for both layouts; its top padding plus theirs
+          makes the same gap the panels keep between themselves.
+
+          Its dropdown hangs over the panels, so the two layouts below are each
+          a stacking layer of their own (`relative z-0`): the panels' CTA pills
+          are z-30 themselves, and without that floor they paint over the
+          suggestions. */}
+      <div className="relative z-10 px-2 pt-3 sm:px-4 sm:pt-5">
+        <StoreSearch className="md:mx-auto md:max-w-2xl" />
+      </div>
+
       {/* Mobile: stacked strips (unchanged) */}
-      <div className="space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5 md:hidden">
+      <div className="relative z-0 space-y-3 px-2 py-3 sm:space-y-5 sm:px-4 sm:py-5 md:hidden">
         <StoreBanner banner={storeBanner} height={bannerHeight} />
         <TicketingPanel height={bannerHeight} />
         <WhatWeDoSection services={services} height={bannerHeight} />
@@ -39,7 +52,7 @@ export default function Home() {
 
       {/* Desktop: bento grid — all three panels in one view, filling the space
           between the nav and the footer so there's no dead white band below. */}
-      <div className="hidden px-4 py-5 md:flex md:flex-1 md:flex-col">
+      <div className="relative z-0 hidden px-4 py-5 md:flex md:flex-1 md:flex-col">
         <div className="grid min-h-[26rem] flex-1 grid-cols-3 grid-rows-2 gap-5">
           {/* Store slideshow — tall spotlight on the left */}
           <div className="col-span-2 row-span-2 min-h-0">

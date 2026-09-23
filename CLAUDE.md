@@ -836,7 +836,7 @@ src/
   store/content.jsx        # ContentProvider + useContent()
   lib/flags.js              # country list + flagcdn.com flag URLs (national-team rounds)
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
-  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, BannerCta, SitePopup
+  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, StoreSearch, BannerCta, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
   admin/
@@ -889,6 +889,25 @@ CORS entry on the store API. With no products resolvable the panel falls back to
 which is also what a wrong `STORE_API_URL` looks like — the API logs a warning naming the URL it
 tried. `/admin/store-banner` searches the live store catalog to pick products, so there is nothing to
 upload and a product renamed or hidden in the store is renamed or gone here too.
+
+The homepage opens with an **AS Store search box** ([components/StoreSearch.jsx](src/components/StoreSearch.jsx)
++ [lib/storeSearch.js](src/lib/storeSearch.js)), the website's twin of the app's home-screen search:
+recent searches and the store's departments before you type, then products, categories and brands
+suggested as you type, every result opening on `store.as.com.lb` in a new tab.
+
+- **One ranking, three clients.** It asks this API's `GET /api/store-search?q=`, which relays to the
+  store's own `/api/search/suggest` (the endpoint the app and the store's search dialog call) over
+  `STORE_API_URL`, for the banner's one-origin reason; `/api/store-search/categories` feeds the idle
+  panel. `lib/storeSearch.js` is a **deliberate copy** of the store's and the app's `search.js`
+  (same `MIN_QUERY`, tokenizer, six recents) — keep the three in step.
+- **No prices, on purpose** — the banner's rule. The relay maps products down to
+  id/slug/name/brand/category/image before they leave the server, so a price never reaches this
+  site at all. A brand opens the store's `/shop?brand=` filter (the app has no brand page and runs
+  a search instead).
+- The two homepage layouts under it are `relative z-0` stacking layers: the panels' CTA pills are
+  `z-30`, and without that floor they paint over the dropdown. The list carries
+  `data-lenis-prevent` so it scrolls itself rather than the page. It renders nothing while
+  `settings.storeUrl` isn't an http(s) address.
 
 > This replaced the admin-uploaded **image slideshow** (`story` + `story_panels` → `HorizontalStory.jsx`,
 > `/admin/story`). The component and its admin page are deleted and the site no longer fetches either

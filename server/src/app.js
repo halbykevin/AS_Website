@@ -639,6 +639,98 @@ app.get('/api/store-banner/catalog', requireAuth, ah(async (req, res) => {
   res.json({ total: list.length, products: list.slice(0, limit) })
 }))
 
+// ========================= AS Store search =========================
+// The homepage search box (StoreSearch.jsx) searches the AS Store's catalogue
+// through the store's own /api/search/suggest — the endpoint the app's home
+// screen and the store's search dialog already call, so one query is ranked the
+// same way on all three. Relayed through this API for the banner's reason: the
+// website stays on one origin.
+//
+// Mapped down on the way through, and deliberately WITHOUT prices — the rule
+// the banner follows (see bannerProduct). The app and the store quote prices
+// because they sell; this site points at the place that does, and a figure
+// shown here is one it would then have to keep true.
+const SUGGEST_TTL = 60 * 1000
+const SUGGEST_MAX = 300
+const suggestCache = new Map()
+let popularCache = { at: 0, rows: null }
+
+const searchProduct = (p) => ({
+  id: p.id,
+  slug: p.slug || '',
+  name: p.name || '',
+  brand: p.brand || '',
+  category: p.category || '',
+  image: p.image || '',
+})
+
+const searchFacet = (f) => ({
+  id: f.id,
+  slug: f.slug || '',
+  name: f.name || '',
+  image: f.imageUrl || '',
+  productCount: Number(f.productCount) || 0,
+})
+
+async function fromStore(path) {
+  const r = await fetch(`${STORE_API}${path}`, { signal: AbortSignal.timeout(5000) })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
+}
+
+const EMPTY_SEARCH = { query: '', products: [], categories: [], brands: [], total: 0 }
+
+app.get('/api/store-search', ah(async (req, res) => {
+  const q = String(req.query.q || '').trim().replace(/\s+/g, ' ').slice(0, 100)
+  const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 12)
+  // Same floor as every client's MIN_QUERY: one letter matches half the catalogue.
+  if (q.length < 2) return res.json({ ...EMPTY_SEARCH, query: q })
+
+  // A minute of memory per query: backspacing, and the handful of words most
+  // visitors type, cost the store nothing twice.
+  const key = `${limit}:${q.toLowerCase()}`
+  const hit = suggestCache.get(key)
+  if (hit && Date.now() - hit.at < SUGGEST_TTL) return res.json(hit.body)
+
+  try {
+    const data = await fromStore(`/api/search/suggest?q=${encodeURIComponent(q)}&limit=${limit}`)
+    const list = (v) => (Array.isArray(v) ? v : [])
+    const body = {
+      query: q,
+      total: Number(data?.total) || 0,
+      products: list(data?.products).map(searchProduct),
+      categories: list(data?.categories).map(searchFacet),
+      brands: list(data?.brands).map(searchFacet),
+    }
+    suggestCache.delete(key) // re-insert so the Map's order stays oldest-first
+    suggestCache.set(key, { at: Date.now(), body })
+    if (suggestCache.size > SUGGEST_MAX) suggestCache.delete(suggestCache.keys().next().value)
+    res.json(body)
+  } catch (err) {
+    console.warn(`[store-search] could not search the AS Store at ${STORE_API}: ${err.message}`)
+    res.status(502).json({ error: 'Store search is unavailable right now' })
+  }
+}))
+
+// What the box offers before anything is typed: the store's top-level
+// departments, as the app's home search does. Cached like the banner's
+// catalogue, keeping the last good copy through a store hiccup.
+app.get('/api/store-search/categories', ah(async (req, res) => {
+  if (popularCache.rows && Date.now() - popularCache.at < CATALOG_TTL) return res.json(popularCache.rows)
+  try {
+    const all = await fromStore('/api/categories')
+    const rows = (Array.isArray(all) ? all : [])
+      .filter((c) => c.visible !== false && !c.parentId)
+      .slice(0, 6)
+      .map(searchFacet)
+    popularCache = { at: Date.now(), rows }
+    res.json(rows)
+  } catch (err) {
+    console.warn(`[store-search] could not read AS Store categories from ${STORE_API}: ${err.message}`)
+    res.json(popularCache.rows || [])
+  }
+}))
+
 // ========================= Story (horizontal scroll) =========================
 // Public read; admin edits the singleton section row + manages the panels.
 app.get('/api/story', ah(async (req, res) => {

@@ -8,7 +8,7 @@ import { flagUrl } from './flags.js'
 // the site still renders if the backend is unreachable.
 // ---------------------------------------------------------------------------
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '')
+export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '')
 const TOKEN_KEY = 'as_admin_token'
 const EMAIL_KEY = 'as_admin_email'
 
