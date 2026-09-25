@@ -218,27 +218,43 @@ added in both places in the same change.
 
 Answer the questionnaire honestly; the answers that matter here:
 
-- Violence, sexual content, profanity, alcohol/tobacco/drugs, horror,
-  **gambling**, medical/treatment info → **None**. (The Daily Spin is free, costs
-  nothing to enter and pays out store credit — it is not gambling and it is not a
-  loot box, since nothing chance-based is ever purchased.)
+- **Profanity or crude humor, horror/fear themes, alcohol/tobacco/drug
+  references → Infrequent**, not None. The Events tab shows the partners'
+  listings word for word, and a scan of the live feed on 2026-09-25 (74 events)
+  found them: a stand-up night called "Shits and Giggles", "Open Bar — Regular
+  Spirits" and beer prizes in 16 descriptions, 17 Parties & Clubbing nights,
+  "The Haunted Building" and a Halloween edition. A reviewer who opens Events
+  sees that, and a questionnaire saying None is another 2.3.6.
+- Violence, sexual content, **gambling**, medical/treatment info → **None**.
+  (The Daily Spin is free, costs nothing to enter and pays out store credit — it
+  is not gambling and it is not a loot box, since nothing chance-based is ever
+  purchased.)
 - **Contests / sweepstakes → Yes, infrequent/mild.** The Daily Spin and Guess the
   Score are contests. Declare them — this typically lands the app at 12+/13+.
 - Unrestricted web access → **No** (the app opens only our own pages, Whish and
   WhatsApp).
 - User-generated content / user-to-user chat → **No** (the assistant is a bot,
   and nothing a customer writes is shown to another customer).
+- Social Media → **No**; Social Media Disabled for Under 13 → **No** (only
+  meaningful when Social Media is Yes); Messaging and Chat → **No** (WhatsApp
+  opens outside the app and reaches staff, not other users); Advertising →
+  **No** (the app promotes AS's own products and events; no ad SDK, nobody
+  pays for placement — revisit if a promoter ever does).
+  Answering Yes to UGC or Social Media also obliges Guideline 1.2's report /
+  block / filter tools, which the app does not have — a second rejection.
+- **In-App Controls → Parental Controls: None, Age Assurance: None.** The app
+  has neither — no parental PIN, no content filter, no age check. Build 4
+  (1.1.1) was rejected on 2026-09-24 under **Guideline 2.3.6** because these
+  were left ticked; Apple looks for the feature and rejects when it isn't there.
 
 Make sure the spin's rules stay visible in the app — Apple expects a contest's
 terms to be readable where it is offered.
 
-> **App Information currently reports "Global rating of 17+ with regional
-> exceptions" for operating systems earlier than version 26.** That is far
-> higher than this app warrants and normally comes from answering the
-> gambling/contest questions at their strongest setting. Reopen the
-> questionnaire and check: the Daily Spin is a free contest, not gambling and
-> not a loot box. 17+ costs you discoverability and rules the app out of Family
-> Sharing categories for nothing.
+> **Resolved 2026-09-25: the calculated rating is now 13+.** It had read 17+
+> because Unrestricted Web Access, User-Generated Content and Social Media were
+> all answered Yes. Override: **Not Applicable**; Age Suitability URL: blank;
+> Korea's GRAC number: blank (games only). The Afghanistan exclusion follows
+> from the Entertainment secondary category and is harmless for a Lebanese shop.
 
 ---
 
