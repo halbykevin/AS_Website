@@ -1,0 +1,8 @@
+# Managed by ASDesk (deploy/remote/provision.sh).
+[Unit]
+Description=ASDesk database backup
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=@BASE@/bin/asdesk-backup nightly

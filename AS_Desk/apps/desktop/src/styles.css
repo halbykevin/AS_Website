@@ -1,0 +1,199 @@
+/* Accent: the ASDesk brand red (as on the website). --ok is the green for healthy status only. */
+/* System fonts keep the installed app fully offline and avoid remote font requests. */
+@import url('./type.css');
+:root{
+  --bg:#f4f5f7;--surface:#fff;--raised:#f9fafb;--border:#e2e5e9;--text:#16202a;--muted:#6b7682;--faint:#9aa3ad;
+  --accent:#e20114;--accent-hover:#bd0011;--accent-soft:#fde6e8;--ok:#12805c;--danger:#c23b2a;--danger-soft:#fdecea;--warn:#b7832f;
+  --chrome:#fff;--hover:#eef0f3;
+  font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;font-size:13px;color:var(--text);background:var(--bg);font-synthesis:none;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111418;--surface:#181c21;--raised:#1d2228;--border:#2a3038;--text:#e6eaee;--muted:#8d97a2;--faint:#5f6973;
+  --accent:#e20114;--accent-hover:#f5212f;--accent-soft:#3b1418;--ok:#23a785;--danger:#ef6b5b;--danger-soft:#3a1d1a;--warn:#d9a54c;
+  --chrome:#15191d;--hover:#232930;color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;overflow:hidden;background:var(--bg);user-select:none}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:disabled{cursor:default;opacity:.45}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,p{margin:0}
+.muted{color:var(--muted);line-height:1.5}
+
+/* Window chrome: the window is frameless; the title bar, toolbar and sharing panel move it (App.tsx). */
+.window-controls{display:flex;align-self:stretch;margin-left:auto}
+.window-controls button{width:46px;display:grid;place-items:center;color:var(--muted)}
+.window-controls button:hover{background:var(--hover);color:var(--text)}
+.window-controls .close:hover{background:#c42b1c;color:#fff}
+
+.shell{height:100%;display:flex;flex-direction:column}
+.titlebar{height:36px;flex:none;display:flex;align-items:center;background:var(--chrome);border-bottom:1px solid var(--border)}
+.app-name{display:flex;align-items:center;gap:9px;padding-left:12px;font-size:12px;font-weight:600}
+.logo{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#fff;overflow:hidden}
+.logo-img{width:17px;height:17px;object-fit:contain}
+
+.error{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 8px 8px 14px;background:var(--danger-soft);color:var(--danger);font-size:12px;border-bottom:1px solid var(--border)}
+.error button{display:grid;place-items:center;width:24px;height:24px;border-radius:4px}
+.error button:hover{background:#0000000f}
+
+/* Home */
+.home{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;align-content:center;overflow:auto}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.id-row{display:flex;align-items:center;gap:8px;min-height:44px}
+.device-id{font-family:'Cascadia Mono',Consolas,monospace;font-size:28px;font-weight:600;letter-spacing:1px;white-space:nowrap;user-select:text}
+.icon-button{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;color:var(--muted);margin-left:auto;flex:none}
+.icon-button:hover:not(:disabled){background:var(--hover);color:var(--text)}
+.panel .muted{font-size:12px}
+.connect{display:flex;gap:8px}
+input:not([type=checkbox]){width:100%;min-width:0;height:36px;border:1px solid var(--border);border-radius:6px;background:var(--raised);padding:0 11px;font-size:13px;user-select:text}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input::placeholder{color:var(--faint)}
+#remote-id{font-family:'Cascadia Mono',Consolas,monospace;font-size:17px;letter-spacing:2px;height:44px}
+.primary,.secondary,.danger{height:36px;padding:0 16px;border-radius:6px;font-weight:600;font-size:12px;flex:none}
+.connect .primary{height:44px}
+.primary{background:var(--accent);color:#fff}
+.primary:hover:not(:disabled){background:var(--accent-hover)}
+.secondary{border:1px solid var(--border);background:var(--surface)}
+.secondary:hover:not(:disabled){background:var(--hover)}
+.danger{border:1px solid var(--danger);color:var(--danger);background:transparent}
+.danger:hover{background:var(--danger-soft)}
+.wide{width:100%;margin-top:16px}
+.options{font-size:12px;color:var(--muted)}
+.options summary{cursor:pointer;width:max-content}
+.check{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text)}
+.check input{accent-color:var(--accent);margin:0}
+
+.recent{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.recent ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
+.recent li{position:relative}
+.recent-connect{width:100%;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);text-align:left}
+.recent-connect:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.recent-id{font-family:'Cascadia Mono',Consolas,monospace;font-size:15px;font-weight:600;letter-spacing:.5px}
+.recent-time{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+/* A named computer: the name leads, the ID moves to the second line. */
+.recent-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;line-height:20px}
+.recent-id-small{font-family:'Cascadia Mono',Consolas,monospace;letter-spacing:.3px}
+/* Rename and remove, side by side in the corner (clear of a 9-digit ID); shown on hover or keyboard focus. */
+.recent-actions{position:absolute;top:6px;right:6px;display:flex;flex-direction:row-reverse;gap:2px;opacity:0;transition:opacity .12s}
+.recent li:hover .recent-actions,.recent-actions:focus-within{opacity:1}
+.recent li:hover .recent-name,.recent li:focus-within .recent-name{padding-right:50px}
+.recent-actions button{display:grid;place-items:center;width:22px;height:22px;border-radius:4px;color:var(--muted)}
+.recent-actions button:hover{background:var(--hover);color:var(--text)}
+/* Inline rename: same footprint as the card, so the grid does not shift. */
+.recent-rename{display:flex;flex-direction:column;gap:4px;padding:6px 8px 8px;border:1px solid var(--accent);border-radius:8px;background:var(--surface);box-shadow:0 0 0 3px var(--accent-soft)}
+.recent-rename input:not([type=checkbox]){height:28px;padding:0 6px;border-color:transparent;background:var(--raised);font-size:14px;font-weight:600;box-shadow:none}
+.recent-rename .recent-time{padding-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.setup{flex:1;min-height:0;overflow:auto;width:100%;max-width:400px;margin:0 auto;padding:28px 16px;display:flex;flex-direction:column;justify-content:center}
+.setup h1{font-size:20px;font-weight:600;margin-bottom:6px}
+.setup label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+
+.statusbar{height:28px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;border-top:1px solid var(--border);background:var(--chrome);font-size:11px;color:var(--muted)}
+.status{display:flex;align-items:center;gap:6px}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.status-offline i,.status-setup i{background:var(--warn)}
+.status-connecting i{background:var(--faint)}
+.statusbar-meta{display:flex;gap:12px;min-width:0;overflow:hidden;white-space:nowrap}
+
+/* Dialogs */
+.modal-backdrop{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:16px;background:#0b111780;backdrop-filter:blur(3px)}
+.modal{width:100%;max-width:460px;max-height:100%;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 20px 60px #0000004d}
+.modal h2{font-size:16px;font-weight:600}
+.modal .muted{margin:8px 0 14px;font-size:12px}
+.modal-head{display:flex;align-items:center;justify-content:space-between}
+.countdown{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.permissions{display:grid;grid-template-columns:1fr 1fr;margin-top:6px}
+.modal-error{margin:12px 0 0;padding:9px 12px;border-radius:6px;background:var(--danger-soft);color:var(--danger);font-size:12px;line-height:1.45;text-align:left}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.spinner{display:block;width:26px;height:26px;border:3px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Session (controlling computer): one compact toolbar, the remote screen fills the rest. */
+.session{height:100%;display:flex;flex-direction:column;background:#0a0c0f;color:#e6eaee;position:relative}
+.toolbar{height:36px;flex:none;display:flex;align-items:center;gap:12px;padding-left:12px;background:#15191d;border-bottom:1px solid #262c33;font-size:12px}
+.toolbar-peer{display:flex;align-items:center;gap:9px;min-width:0}
+.toolbar-peer strong{font-family:'Cascadia Mono',Consolas,monospace;font-weight:600;letter-spacing:.5px;white-space:nowrap}
+.session-stats{color:#8d97a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.transfer-chip{margin-right:8px;padding:2px 8px;border-radius:10px;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;background:#1f2a37;color:#9fb0c0}
+.transfer-chip.done{background:#12351f;color:#67d68a}
+.transfer-chip.failed{background:#3a1d1d;color:#f0a2a2}
+.toolbar-actions{display:flex;align-items:center;gap:2px;margin-left:auto}
+.tool{display:grid;place-items:center;width:32px;height:28px;border-radius:5px;color:#c3cad1}
+.tool:hover:not(:disabled){background:#262c33;color:#fff}
+.tool-danger{height:26px;padding:0 12px;margin-left:6px;border-radius:5px;background:#c23b2a;color:#fff;font-size:12px;font-weight:600}
+.tool-danger:hover{background:#d9493a}
+/* Window controls always sit at the right edge; session actions, when shown, sit just before them. */
+.session .window-controls{margin-left:auto}
+.session .toolbar-actions + .window-controls{margin-left:4px}
+.session .window-controls button{color:#aab3bc}
+.session .window-controls button:hover{background:#262c33;color:#fff}
+.session .window-controls .close:hover{background:#c42b1c}
+.session .error{background:#3a1d1a;color:#ffb4a9;border-color:#262c33}
+.viewer{flex:1;min-height:0;position:relative;overflow:hidden;outline:none;cursor:default}
+.viewer:focus-visible{box-shadow:inset 0 0 0 1px #e2011466}
+.viewer.fit video{display:block;width:100%;height:100%;object-fit:contain}
+.viewer.actual{display:flex;overflow:auto}
+.viewer.actual video{display:block;flex:none;margin:auto}
+.viewer-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#8d97a2;font-size:12px}
+.viewer-loading .spinner{border-color:#e2011433;border-top-color:#e20114}
+/* Workspace (several sessions): the tab bar is the title bar; Home plus a tab per computer. */
+.workspace .toolbar{padding-left:0;gap:8px}
+.tabs{display:flex;align-items:stretch;align-self:stretch;min-width:0;flex:0 1 auto;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none} /* scrollbar-width needs Chromium 121; the Windows 7 edition has 109 */
+.tab{display:flex;align-items:center;flex:none;padding-right:4px;border-right:1px solid #262c33;color:#aab3bc}
+.tab.active,.home-tab.active{background:#0a0c0f;color:#fff;box-shadow:inset 0 2px 0 #e20114}
+.home-tab{display:grid;place-items:center;flex:none;width:42px;border-right:1px solid #262c33;color:#aab3bc}
+.new-tab{display:grid;place-items:center;flex:none;width:34px;border-right:1px solid #262c33;color:#aab3bc}
+.new-tab:hover{background:#232930;color:#fff}
+.home-tab:hover,.tab:hover{color:#fff}
+.tab-main{display:flex;align-items:center;gap:8px;height:100%;padding:0 6px 0 12px;font:600 12px 'Cascadia Mono',Consolas,monospace;letter-spacing:.3px;color:inherit;white-space:nowrap}
+.tab-label{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.tab-close,.tab-popout{display:grid;place-items:center;width:22px;height:22px;border-radius:4px;color:#8d97a2}
+.tab-close:hover,.tab-popout:hover{background:#262c33;color:#fff}
+/* A tab being dragged out of the tab bar (it opens in its own window where it is dropped). */
+.tab.tearing{opacity:.45;cursor:grabbing}
+/* A popped-out session's window: its own title bar with the session's controls. */
+.popout .toolbar{padding-left:10px}
+.popout-name{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;font:600 12px 'Cascadia Mono',Consolas,monospace;letter-spacing:.3px;white-space:nowrap}
+.tab.waiting .tab-main{color:#8d97a2}
+.spinner.tiny{width:12px;height:12px;border-width:2px}
+.workspace-body{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.viewer[hidden]{display:none!important}
+/* Split view: a responsive tile per session. Columns wrap by width; rows share the height. */
+.workspace-body.grid{display:grid;gap:8px;padding:8px;overflow:auto;align-content:stretch;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));grid-auto-rows:minmax(220px,1fr)}
+.workspace-body.grid .viewer{border:1px solid #262c33;border-radius:8px;background:#000}
+.workspace-body.grid .viewer.focused{border-color:#e20114;box-shadow:0 0 0 1px #e20114}
+.tile-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:8px;height:26px;padding:0 4px 0 8px;color:#cfd6dc;font-size:12px;background:linear-gradient(#000c,#0000);opacity:0;transition:opacity .12s;z-index:2}
+.viewer.tiled:hover .tile-bar,.viewer.tiled.focused .tile-bar{opacity:1}
+.tile-id{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile-actions{display:flex;gap:2px;flex:none}
+.tile-btn{display:grid;place-items:center;width:24px;height:20px;border-radius:4px;color:#cfd6dc}
+.tile-btn:hover{background:#ffffff26;color:#fff}
+.workspace-home,.waiting-pane{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
+.waiting-pane{display:grid;place-items:center;padding:16px}
+.waiting-card{width:100%;max-width:360px;text-align:center;align-items:center}
+.waiting-card h2{font-size:16px;font-weight:600}
+.recent-time .live-dot{width:7px;height:7px}
+
+/* Full screen: the toolbar hides above the top edge and slides in when the pointer reaches it. */
+.session.is-fullscreen .toolbar{position:absolute;z-index:5;top:0;left:50%;transform:translate(-50%,calc(-100% + 4px));padding-right:6px;border:1px solid #262c33;border-top:0;border-radius:0 0 8px 8px;box-shadow:0 8px 24px #0006;transition:transform .15s ease-out}
+.session.is-fullscreen .toolbar:hover,.session.is-fullscreen .toolbar:focus-within{transform:translate(-50%,0)}
+
+/* Computer being shared: the window is normally hidden; opened from the tray it shows this card. */
+.live-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.live-dot.on{background:#23a785;animation:pulse 1.6s ease-in-out infinite}
+.sharing-card .live-dot.on{background:#d9822b}
+@keyframes pulse{50%{opacity:.35}}
+.sharing{flex:1;min-height:0;display:grid;place-items:center;padding:16px}
+.sharing-card{width:100%;max-width:440px;border-top:3px solid #d9822b}
+.sharing-title{display:flex;align-items:center;gap:9px;font-size:15px}
+.sharing-title strong{font-weight:600}
+.peer-id{font-family:'Cascadia Mono',Consolas,monospace;font-weight:600;color:var(--text)}
+.sharing-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font-size:11px}
+kbd{font:10px 'Cascadia Mono',Consolas,monospace;padding:2px 4px;border:1px solid var(--border);border-radius:3px;background:var(--raised)}
+
+@media (max-width:640px){.home{grid-template-columns:1fr;align-content:start}}
+@media (prefers-reduced-motion:reduce){.live-dot.on{animation:none}.session.is-fullscreen .toolbar{transition:none}}

@@ -1,0 +1,55 @@
+[package]
+name = "company-remote"
+version = "0.6.2"
+description = "Attended remote desktop for your company"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+serde_json = "1"
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = "0.22"
+ed25519-dalek = "2"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+getrandom = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-manual-roots", "json"] }
+# TLS for every server connection (src/tls.rs): rustls on ring, Mozilla roots plus the Windows stores.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
+webpki-roots = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+tokio = { version = "1", features = ["macros", "sync", "time"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+uuid = { version = "1", features = ["v4"] }
+webview2-com = "0.38"
+windows-core = "0.61"
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation", "Win32_System_LibraryLoader", "Win32_Graphics_Gdi", "Win32_Security_Cryptography", "Win32_System_DataExchange",
+  "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Registry", "Win32_System_RemoteDesktop",
+  "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi",
+  # Full-access control (elevation.rs): named-pipe IPC to the SYSTEM helper, client verification, desktop switching,
+  # and the LocalSystem service that launches the helper into the interactive session.
+  "Win32_System_Pipes", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_StationsAndDesktops",
+  "Win32_Security", "Win32_Security_Authorization", "Win32_System_Services",
+] }
+
+# Size first: the installer is the product's first impression.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+# Windows 7 builds (x86_64/i686-win7-windows-msvc): ctor 0.8.0 only knows Windows as vendor "pc".
+# See vendor/ctor/ASDESK-PATCH.md. Identical to crates.io for every other target.
+[patch.crates-io]
+ctor = { path = "vendor/ctor" }

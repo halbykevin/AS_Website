@@ -1,0 +1,92 @@
+{
+  "product": "ASDesk",
+  "latest": {
+    "version": "0.7.2",
+    "publishedAt": "2026-09-27",
+    "installers": [
+      {
+        "edition": "standard",
+        "arch": "x64",
+        "version": "0.7.2",
+        "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.2-x64-Setup.exe",
+        "size": 2459339,
+        "sha256": "e86f2ae48913795d66502a78a0a5e67eb53dffbd4714debb1b1fc12ee47cb48e"
+      },
+      {
+        "edition": "legacy",
+        "arch": "x64",
+        "version": "0.7.1",
+        "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x64-Setup.exe",
+        "size": 156630251,
+        "sha256": "ec13abe4f6cbbd3743013e6264a0149eaae6fee12a328c6193a795f3c75295cc"
+      },
+      {
+        "edition": "legacy",
+        "arch": "x86",
+        "version": "0.7.1",
+        "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x86-Setup.exe",
+        "size": 142964335,
+        "sha256": "67a5acaad0f1b3ab65dbf0aad1e9274b3cb8da07fe09c4bbfbc4367324554166"
+      }
+    ]
+  },
+  "releases": [
+    {
+      "version": "0.7.2",
+      "publishedAt": "2026-09-27",
+      "installers": [
+        {
+          "edition": "standard",
+          "arch": "x64",
+          "version": "0.7.2",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.2-x64-Setup.exe",
+          "size": 2459339,
+          "sha256": "e86f2ae48913795d66502a78a0a5e67eb53dffbd4714debb1b1fc12ee47cb48e"
+        },
+        {
+          "edition": "legacy",
+          "arch": "x64",
+          "version": "0.7.1",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x64-Setup.exe",
+          "size": 156630251,
+          "sha256": "ec13abe4f6cbbd3743013e6264a0149eaae6fee12a328c6193a795f3c75295cc"
+        },
+        {
+          "edition": "legacy",
+          "arch": "x86",
+          "version": "0.7.1",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x86-Setup.exe",
+          "size": 142964335,
+          "sha256": "67a5acaad0f1b3ab65dbf0aad1e9274b3cb8da07fe09c4bbfbc4367324554166"
+        }
+      ]
+    },
+    {
+      "version": "0.7.1",
+      "publishedAt": "2026-09-27",
+      "installers": [
+        {
+          "edition": "standard",
+          "arch": "x64",
+          "version": "0.7.1",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-x64-Setup.exe",
+          "size": 2454975
+        },
+        {
+          "edition": "legacy",
+          "arch": "x64",
+          "version": "0.7.1",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x64-Setup.exe",
+          "size": 156630251
+        },
+        {
+          "edition": "legacy",
+          "arch": "x86",
+          "version": "0.7.1",
+          "url": "https://asdesk-api.raiapp.dev/downloads/ASDesk-0.7.1-win7-x86-Setup.exe",
+          "size": 142964335
+        }
+      ]
+    }
+  ]
+}

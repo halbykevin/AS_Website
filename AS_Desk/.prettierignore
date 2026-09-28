@@ -1,0 +1,17 @@
+# Prettier also honours .gitignore, so build output (dist/, target/, release/, .cache/, ...) is
+# already skipped. This file only adds what is tracked but must not be reformatted.
+
+# Lockfiles are machine-written
+package-lock.json
+**/package-lock.json
+
+# Tauri generated schemas and Rust build output
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/target*/
+
+# Minified / vendored files
+*.min.js
+*.min.css
+
+# Tool configuration
+.claude/

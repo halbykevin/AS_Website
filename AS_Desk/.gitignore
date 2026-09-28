@@ -1,0 +1,29 @@
+node_modules/
+.tools/
+.env
+.env.*
+!.env.example
+.local/
+release/
+release-test/
+coverage/
+dist/
+target/
+*.log
+.deploy-out/
+deploy/.env.vps
+deploy/.env.vps.*
+!deploy/.env.vps.example
+deploy/.known_hosts.*
+
+# Tauri: generated capability schemas
+apps/desktop/src-tauri/gen/
+
+# Windows 7 edition (tools/desktop.mjs --win7): the downloaded WebView2 runtime (about 400 MB), its
+# extracted copy, and the per-build installer include
+.cache/
+apps/desktop/src-tauri/Microsoft.WebView2.FixedVersionRuntime.*/
+apps/desktop/src-tauri/windows/edition.nsh
+apps/desktop/src-tauri/target-*/
+apps/website/public/downloads/
+.vercel/
