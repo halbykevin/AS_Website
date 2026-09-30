@@ -87,6 +87,34 @@ export default function OrderPage({ params }) {
     }
   }, [state, order, trackToken])
 
+  // A paid AS-Punch licence renewal is reported to the licence server as the
+  // payment lands, and usually reads "applied" by the time this page opens. If
+  // that report is still in flight (or being retried), look again a few times.
+  const renewalPolledRef = useRef(false)
+  useEffect(() => {
+    if (state !== 'ready' || order?.paymentStatus !== 'paid') return
+    if (order?.licenseRenewal?.status !== 'pending' || renewalPolledRef.current) return
+    renewalPolledRef.current = true
+    let cancelled = false
+    let tries = 0
+    const tick = async () => {
+      tries += 1
+      try {
+        const fresh = customer ? await accountApi.getOrder(order.id) : await accountApi.trackOrder(order.id, trackToken)
+        if (cancelled) return
+        setOrder(fresh)
+        if (fresh.licenseRenewal?.status !== 'pending') return
+      } catch {
+        /* keep trying */
+      }
+      if (!cancelled && tries < 5) setTimeout(tick, 3000)
+    }
+    setTimeout(tick, 2000)
+    return () => {
+      cancelled = true
+    }
+  }, [state, order, customer, trackToken])
+
   // Empty the bag only once payment is confirmed (the checkout deferred this for
   // online orders so an abandoned payment doesn't lose the cart).
   useEffect(() => {
@@ -195,6 +223,8 @@ export default function OrderPage({ params }) {
           )
         )}
 
+        {order.paymentStatus === 'paid' && order.licenseRenewal && <LicenseRenewalStatus renewal={order.licenseRenewal} />}
+
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-semibold tracking-apple text-as-ink">Order #{order.id}</h1>
@@ -297,7 +327,7 @@ export default function OrderPage({ params }) {
 
           {/* Delivery */}
           <div className="h-fit rounded-2xl border border-as-ink/10 p-6">
-            <h2 className="text-lg font-semibold text-as-ink">Delivery</h2>
+            <h2 className="text-lg font-semibold text-as-ink">{order.licenseRenewal ? 'Your details' : 'Delivery'}</h2>
             <div className="mt-3 space-y-1 text-sm text-as-ink/70">
               <p className="font-medium text-as-ink">{order.fullName}</p>
               {order.phone && <p>{order.phone}</p>}
@@ -309,5 +339,46 @@ export default function OrderPage({ params }) {
         </div>
       </div>
     </section>
+  )
+}
+
+// Where a paid AS-Punch licence renewal stands (server/src/licenseRenewal.js).
+function LicenseRenewalStatus({ renewal }) {
+  const until = renewal.newExpiresAt ? orderDate(renewal.newExpiresAt) : ''
+  const who = renewal.companyName ? `${renewal.companyName}'s AS-Punch licence` : 'Your AS-Punch licence'
+  if (renewal.status === 'applied') {
+    return (
+      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800">
+        <Icon name="refresh" className="h-6 w-6" />
+        <div>
+          <p className="font-semibold">Licence renewed{until ? ` until ${until}` : ''}</p>
+          <p className="text-sm text-emerald-700/80">
+            {who} has been extended. Your AS-Punch system picks it up within a few minutes.
+          </p>
+        </div>
+      </div>
+    )
+  }
+  if (renewal.status === 'refused') {
+    return (
+      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-red-50 p-4 text-red-800">
+        <Icon name="refresh" className="h-6 w-6" />
+        <div>
+          <p className="font-semibold">Payment received — licence not renewed automatically</p>
+          <p className="text-sm text-red-700/80">
+            We couldn’t apply this payment to {who.charAt(0).toLowerCase() + who.slice(1)}. Our team has been alerted and will sort it out with you.
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-2xl bg-blue-50 p-4 text-blue-800">
+      <Icon name="refresh" className="h-6 w-6 animate-spin [animation-duration:2s]" />
+      <div>
+        <p className="font-semibold">Renewing your licence…</p>
+        <p className="text-sm text-blue-700/80">This usually takes a few seconds. You don’t need to stay on this page.</p>
+      </div>
+    </div>
   )
 }

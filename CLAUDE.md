@@ -438,6 +438,33 @@ enters 7.5, and Whish collects exactly that.
   keeping it out. **Its slug is case-sensitive** (`WHERE p.slug = $1`), so `/product/RaiOne` works
   and `/product/raione` does not.
 
+### AS-Punch licence renewal (`/product/RaiOne?renewal=<code>`)
+
+An AS-Punch installation's **Renew now** button opens RaiOne with a code issued by the AS-Punch
+licence server ([server/src/licenseRenewal.js](as_store/server/src/licenseRenewal.js),
+[LicenseRenewalBox.jsx](as_store/src/components/LicenseRenewalBox.jsx)). The page then shows that
+business's monthly amount in a **disabled** field instead of the typed amount and Add to Bag, takes
+name + mobile, and goes straight to Whish — it never touches the bag.
+
+- **The amount is never the browser's.** `POST /api/orders` with `licenseRenewal` resolves the code
+  against the licence server again and prices a single line (price = amount, qty 1) from that
+  answer; the sent quantity is ignored. Only an exclusive product can carry a renewal, so every
+  exemption above (no VAT, delivery, cash, wallet, vouchers) applies. A code that is paid, lapsed,
+  superseded by a price change, or unknown is refused with a sentence the customer can act on.
+- **Paid means reported, and reported means retried.** `markWhishPaid` calls
+  `queueLicenseRenewal`, which reports the payment (HMAC-signed with
+  `LICENSE_SERVER_BILLING_SECRET`) before the customer's order page loads. If the licence server is
+  down the order stays `license_renewal_status = 'pending'` and a worker re-sends it with backoff
+  capped at an hour — indefinitely, because it is money already taken. The notification outbox was
+  not used for this: it gives up after four tries. The licence server is idempotent on the order id.
+- **Without a code RaiOne is exactly what it was** — typed amount, $5 minimum. The RaiOne Systems
+  desktop app sends its customers to this page to pay, so it must stay open.
+- The code is read in the browser (`window.location.search`), and an exclusive product's buy box
+  renders nothing until it has been, so the editable amount never flashes before the fixed one.
+- Unset `LICENSE_SERVER_URL` / `LICENSE_SERVER_BILLING_SECRET` = renewal links say "unavailable";
+  ordinary orders are unaffected. Schema: [db/license_renewal.sql](as_store/db/license_renewal.sql)
+  (columns on `orders`, applied last by `migrate.js`).
+
 ### The quantity picker
 
 Pressing **+** is fine over a range of 1–2, absurd over 1–10,000, and cannot reach 7.5 at all — so a
