@@ -818,8 +818,11 @@ PerplexityBot…) don't run JavaScript — they used to receive an empty `<div i
   `contact.html` (served extensionless by `cleanUrls` in [vercel.json](vercel.json)); `spa.html`,
   the plain shell every other URL rewrites to (admin, unknown paths); and `sitemap.xml`,
   `robots.txt`, `llms.txt`, **generated** from the same content — there are no hand-kept copies
-  in `public/` any more. `vercel.json` pins `buildCommand` because Vercel's Vite preset would
-  otherwise run bare `vite build` and skip all of this.
+  in `public/` any more. The as-website project already runs `npm run build` into `dist/` by
+  default. **Never put build settings (`buildCommand`, `outputDirectory`…) in the root
+  `vercel.json`**: the as-store and as_ticketing builds read it too — on 2026-09-30 an
+  `outputDirectory: "dist"` there failed both Next.js deploys ("output directory dist was not
+  found at as_store/dist").
 - **Content comes from the live API at build time** (`VITE_API_URL`). If it can't be reached the
   **build fails on purpose** — Vercel keeps the previous, pre-rendered deployment instead of
   shipping empty shells. `PRERENDER_ALLOW_FALLBACK=1` ships the plain SPA anyway.
@@ -905,7 +908,7 @@ hours questions simply disappear when the store admin has none to state.
 ## Structure
 
 ```
-vercel.json                # build command, cleanUrls, /events 301s, fallback rewrite -> spa.html
+vercel.json                # cleanUrls, /events 301s, fallback rewrite -> spa.html (no build settings — see above)
 scripts/prerender.mjs      # build step: public routes -> static HTML + sitemap/robots/llms.txt
 WebScarping/               # Python scrapers, spawned by the API:
                            #   scrape.py + ecom_scraper/  (e-commerce products)
