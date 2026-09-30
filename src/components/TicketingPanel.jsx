@@ -37,7 +37,7 @@ export default function TicketingPanel({ height, fill = false }) {
           // constrains it. Cap both so it never touches the rounded corners.
           className="max-h-[72%] w-auto max-w-[62%] object-contain transition-transform duration-500 group-hover:scale-[1.03]"
           // It is the largest thing above the fold on the homepage.
-          fetchPriority="high"
+          fetchpriority="high"
         />
       </EventsLink>
 

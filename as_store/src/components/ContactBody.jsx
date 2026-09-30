@@ -1,5 +1,6 @@
 import ContactForm from "./ContactForm.jsx";
 import Icon from "./Icon.jsx";
+import { hoursLines } from "@/lib/hours";
 
 // Shared contact block: heading + email form + WhatsApp button + contact
 // details. Rendered by both /contact and /pages/support. `settings` supplies
@@ -11,6 +12,7 @@ export default function ContactBody({
   subtitle,
 }) {
   const contact = settings?.contact || {};
+  const hours = hoursLines(settings?.hours);
   const waDigits = String(contact.whatsapp || "").replace(/\D/g, "");
   const waHref = waDigits
     ? `https://wa.me/${waDigits}?text=${encodeURIComponent("Hi AS Store! I'd like to ask about ")}`
@@ -60,7 +62,7 @@ export default function ContactBody({
             )}
           </div>
 
-          {(contact.email || contact.phone || contact.address) && (
+          {(contact.email || contact.phone || contact.address || hours.length > 0) && (
             <div className="space-y-4 rounded-[28px] border border-as-ink/10 bg-white p-6 sm:p-8">
               {contact.phone && (
                 <ContactRow label="Phone">
@@ -84,6 +86,15 @@ export default function ContactBody({
               )}
               {contact.address && (
                 <ContactRow label="Address">{contact.address}</ContactRow>
+              )}
+              {hours.length > 0 && (
+                <ContactRow label="Opening hours">
+                  {hours.map((h) => (
+                    <span key={h.label} className="block">
+                      {h.label}: {h.value}
+                    </span>
+                  ))}
+                </ContactRow>
               )}
             </div>
           )}

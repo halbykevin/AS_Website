@@ -384,6 +384,9 @@ const settingsJson = (r) => ({
     whatsapp: r.contact_whatsapp || "",
     address: r.contact_address || "",
   },
+  // The shop's week: { mon: ["09:00","17:00"] | null, ... sun }. null when no
+  // day is set at all, so a client can tell "never configured" from "closed".
+  hours: openingHours(r.opening_hours),
   socials: r.socials || {},
   // Copy for price-hidden products. Which products use it is the per-product
   // `callForPrice` flag; this is only what they say.
@@ -453,6 +456,52 @@ const tagValue = (v, kind, field) => {
     throw err;
   }
   return s;
+};
+
+// ---- Opening hours ----
+// The shop's week as stored in settings.opening_hours: one key per day, each
+// ["HH:MM","HH:MM"] (open, close) or null for closed. Read leniently — a
+// malformed day reads as closed rather than breaking the settings response —
+// and written strictly (openingHoursValue), so the admin is told what is wrong.
+const HOURS_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const validSpan = (v) =>
+  Array.isArray(v) && v.length === 2 && HHMM.test(v[0]) && HHMM.test(v[1]) && v[0] < v[1];
+
+function openingHours(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  let any = false;
+  for (const d of HOURS_DAYS) {
+    out[d] = validSpan(raw[d]) ? [raw[d][0], raw[d][1]] : null;
+    if (out[d]) any = true;
+  }
+  return any ? out : null;
+}
+
+// Settings input: undefined leaves the column alone; anything else must be a
+// complete, valid week or the save is refused with the day that is wrong.
+const openingHoursValue = (v) => {
+  if (v === undefined) return null;
+  const fail = (msg) => {
+    const err = new Error(msg);
+    err.status = 400;
+    throw err;
+  };
+  if (!v || typeof v !== "object") fail("Opening hours must list every day of the week.");
+  const out = {};
+  for (const d of HOURS_DAYS) {
+    const span = v[d];
+    if (span === null || span === undefined) {
+      out[d] = null;
+      continue;
+    }
+    if (!validSpan(span)) {
+      fail(`Opening hours for ${d}: use HH:MM times with the closing time after the opening time.`);
+    }
+    out[d] = [span[0], span[1]];
+  }
+  return JSON.stringify(out);
 };
 
 // Settings money input: undefined/blank leaves the column alone (COALESCE), a
@@ -3321,7 +3370,8 @@ app.put(
          call_for_price_button     = COALESCE($35, call_for_price_button),
          call_for_price_note       = COALESCE($36, call_for_price_note),
          call_for_price_message    = COALESCE($37, call_for_price_message),
-         call_for_price_url        = COALESCE($38, call_for_price_url)
+         call_for_price_url        = COALESCE($38, call_for_price_url),
+         opening_hours             = COALESCE($39::jsonb, opening_hours)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -3371,6 +3421,7 @@ app.put(
         b.callForPrice?.note ?? null,
         b.callForPrice?.message ?? null,
         b.callForPrice?.url ?? null,
+        openingHoursValue(b.hours),
       ],
     );
     res.json(settingsJson(rows[0]));

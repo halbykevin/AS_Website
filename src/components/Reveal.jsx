@@ -1,4 +1,5 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { useReducedMotion } from '../lib/motion.js'
 
 // Fades + slides its children in the first time they scroll into view, on any
 // scroll (Framer Motion's whileInView uses IntersectionObserver, so it fires on

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useReducedMotion } from 'framer-motion'
+import { useReducedMotion } from '../lib/motion.js'
 import BannerCta from '../components/BannerCta.jsx'
 import TicketingPanel from '../components/TicketingPanel.jsx'
 import StoreBanner from '../components/StoreBanner.jsx'
@@ -27,10 +27,19 @@ export function stripStyle(bannerHeight) {
 //    banner takes the tall left column, with the Store slideshow and What We Do
 //    stacked on the right.
 export default function Home() {
-  const { storeBanner, services, bannerHeight } = useContent()
+  const { brand, storeBanner, services, bannerHeight } = useContent()
 
   return (
     <>
+      {/* The page's heading. The homepage is three visual panels with no
+          headline of their own, which left it without an <h1> — the one thing
+          a screen reader, a search engine and an answer engine all read first
+          to learn what a page is. Visually hidden rather than added to the
+          design. */}
+      <h1 className="sr-only">
+        {brand.name} ({brand.legalName}) — {brand.tagline}
+      </h1>
+
       {/* The store search, first thing under the nav as on the app's home
           screen. One instance for both layouts; its top padding plus theirs
           makes the same gap the panels keep between themselves.
@@ -105,7 +114,13 @@ function WhatWeDoSection({ services, height, fill = false }) {
 
           {words.length > 0 && (
             <p className="mt-3 text-sm font-bold uppercase tracking-[0.22em] text-as-red sm:mt-4 sm:text-lg">
-              <Typewriter words={words} reduce={reduce} />
+              {/* The typewriter shows one word at a time and starts empty, so
+                  the list itself is stated once for anything that reads rather
+                  than watches (screen readers, crawlers). */}
+              <span className="sr-only">{words.join(', ')}</span>
+              <span aria-hidden="true">
+                <Typewriter words={words} reduce={reduce} />
+              </span>
             </p>
           )}
         </div>

@@ -164,7 +164,7 @@ export default function StoreBanner({ banner, height, fill = false }) {
                 className="flex h-full w-full shrink-0 items-stretch gap-2.5 p-3 sm:gap-4 sm:p-5"
               >
                 {slide.map((p) => (
-                  <ProductCard key={p.id} product={p} storeHref={storeHref} />
+                  <ProductCard key={p.id} product={p} storeHref={storeHref} eager={i === 0} />
                 ))}
                 {/* Keep the last slide's cards the same width as every other
                     slide's when the products don't divide evenly. */}
@@ -211,7 +211,10 @@ export default function StoreBanner({ banner, height, fill = false }) {
 
 // One product: brand, name, teaser, photo and a red pill — the AS Store card,
 // minus the price and the bag. The whole card is the link.
-function ProductCard({ product, storeHref }) {
+// `eager` marks the first slide: its photos are the largest thing above the
+// fold, so they load with the page (the HTML arrives pre-rendered) rather than
+// waiting for a lazy-load check. Later slides stay lazy until they are shown.
+function ProductCard({ product, storeHref, eager = false }) {
   const external = /^https?:\/\//i.test(storeHref)
   const href = external
     ? product.slug
@@ -240,7 +243,9 @@ function ProductCard({ product, storeHref }) {
         <img
           src={product.image}
           alt={product.name}
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
+          fetchpriority={eager ? 'high' : undefined}
+          decoding="async"
           draggable={false}
           className="h-full w-full select-none object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />

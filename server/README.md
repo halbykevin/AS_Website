@@ -167,6 +167,16 @@ In **ISPmanager → Sites**, create `api.yourdomain.com` as a **reverse proxy** 
 
 ### 6. Connect the website (Vercel)
 In the Vercel project, set env var **`VITE_API_URL=https://api.yourdomain.com`** and redeploy.
+The website's build pre-renders its public pages from this API, so it must be reachable from
+Vercel's build machines (a build with the API down fails and the previous deployment stays live).
+
+### 7. Rebuild the website when content changes (optional, recommended)
+Pre-rendered pages carry the content they were built with. In the marketing-site Vercel project,
+create a Deploy Hook (Settings → Git → Deploy Hooks, branch `main`) and put its URL in this
+server's `.env` as **`SITE_REBUILD_HOOK_URL`**. Admin saves to settings, services, What We Do,
+solutions, the store slideshow, the popup or the predictor then trigger a rebuild 120 s after the
+last edit (`SITE_REBUILD_DELAY_SECONDS`), plus one a day (`SITE_REBUILD_EVERY_HOURS`, `0` = off)
+for the store products the homepage shows. See `src/rebuild.js`.
 
 ---
 

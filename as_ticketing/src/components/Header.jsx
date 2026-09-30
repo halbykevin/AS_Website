@@ -19,6 +19,12 @@ export default async function Header() {
             >
               All events
             </Link>
+            <Link
+              href="/faq"
+              className="hidden text-sm font-medium text-as-charcoal/70 transition hover:text-as-red sm:inline"
+            >
+              FAQ
+            </Link>
             <a
               href="https://www.as.com.lb"
               className="hidden text-sm font-medium text-as-charcoal/70 transition hover:text-as-red sm:inline"

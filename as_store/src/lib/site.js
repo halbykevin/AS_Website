@@ -4,6 +4,7 @@
 // storefront never breaks.
 
 import { STORE_CACHE } from './catalog'
+import { normalizeHours } from './hours'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
@@ -14,6 +15,9 @@ export const defaultSettings = {
   published: true,
   announcement: { enabled: true, text: 'Free delivery on orders over $100 · 12 months warranty' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
+  // The shop's opening hours (settings.opening_hours). null in the offline
+  // fallback: better to say nothing about hours than to state a stale week.
+  hours: null,
   socials: {},
   showcaseBg: '#000000',
   navLogoSize: 20,
@@ -76,6 +80,7 @@ export async function loadSettings() {
       ...s,
       announcement: { ...defaultSettings.announcement, ...(s.announcement || {}) },
       contact: { ...defaultSettings.contact, ...(s.contact || {}) },
+      hours: normalizeHours(s.hours),
       homeNew: { ...defaultSettings.homeNew, ...(s.homeNew || {}) },
       loginButton: { ...defaultSettings.loginButton, ...(s.loginButton || {}) },
       delivery: { ...defaultSettings.delivery, ...(s.delivery || {}) },
@@ -96,6 +101,21 @@ export async function loadSettings() {
 // because anything loaded through STORE_CACHE can be served from a prerendered
 // page for hours — which silently kept a switched-off popup alive on the
 // homepage. Keep it out of the cached SSR payload.
+
+// The AS Wallet rules, as a signed-out visitor gets them (the same endpoint the
+// account pages call; without a session it answers with the rules and a zero
+// balance). Only `enabled`, `earnPercent` and `awardOn` are read — by the FAQ,
+// which mentions the wallet only while it is switched on.
+export async function loadWalletRules() {
+  try {
+    const res = await fetch(`${API}/api/wallet?total=0`, STORE_CACHE)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const w = await res.json()
+    return { enabled: Boolean(w.enabled), earnPercent: Number(w.earnPercent) || 0, awardOn: w.awardOn || 'delivered' }
+  } catch {
+    return { enabled: false, earnPercent: 0, awardOn: 'delivered' }
+  }
+}
 
 export async function loadPage(slug) {
   try {

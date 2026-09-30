@@ -176,6 +176,25 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_note    TEXT DEFAUL
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_message TEXT DEFAULT 'Hi AS Store, I''d like a price for {product} — {url}';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS call_for_price_url     TEXT DEFAULT '';
 
+-- --- The shop: opening hours -----------------------------------------------
+-- The physical shop's week, beside its address (contact_address). One key per
+-- day, mon..sun: ["HH:MM","HH:MM"] when open, null when closed. Edited at
+-- /admin/settings -> Opening hours; the storefront's FAQ, contact page, footer
+-- and LocalBusiness markup read it, and so do as.com.lb and the ticketing hub
+-- (through the site API's /api/shop), so the shop has one set of hours
+-- everywhere it is described.
+--
+-- The default is the week the owner confirmed on 2026-09-30, so the existing
+-- row starts with the real hours rather than an empty week.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS opening_hours JSONB DEFAULT
+  '{"mon":["09:00","17:00"],"tue":["09:00","17:00"],"wed":["09:00","17:00"],"thu":["09:00","17:00"],"fri":["09:00","17:00"],"sat":["09:00","14:00"],"sun":null}'::jsonb;
+
+-- 2026-09-30: the owner gave the shop's full address. This refines the town-only
+-- value it replaces and nothing else — an address typed in the admin since then
+-- is never touched, so re-running the migration is a no-op.
+UPDATE settings SET contact_address = 'Kferhata, Zgharta, North Lebanon'
+ WHERE id = 1 AND contact_address = 'Zgharta, Lebanon';
+
 -- --- Content pages ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pages (
   id         SERIAL PRIMARY KEY,

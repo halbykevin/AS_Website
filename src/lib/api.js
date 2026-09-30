@@ -1,6 +1,7 @@
 import * as defaults from '../content/site.js'
 import { events as defaultEvents } from '../data/events.js'
 import { flagUrl } from './flags.js'
+import { normalizeHours } from './hours.js'
 
 // ---------------------------------------------------------------------------
 // Frontend data layer — talks to the AS Company API (Express + PostgreSQL).
@@ -89,6 +90,10 @@ export const defaultContent = {
   // now, resolved by the API from the store's own catalog (see StoreBanner).
   storeBanner: null,
   predictor: null,
+  // The physical shop — address, phone, opening hours — as the AS Store admin
+  // states them, relayed by /api/shop. null until known: the FAQ, contact page
+  // and markup then leave the address and hours out rather than guess.
+  shop: null,
   published: false,
   bannerHeight: 6,
   // Empty = events live on this site (/events). Set to the ticketing platform's
@@ -357,7 +362,13 @@ export function mapStoreBanner(b) {
         }))
     : []
   if (!products.length) return null
-  return { perSlide: Math.min(4, Math.max(1, Number(b.perSlide) || 3)), products }
+  return {
+    perSlide: Math.min(4, Math.max(1, Number(b.perSlide) || 3)),
+    // 'random' re-samples on every call; the content provider needs to know
+    // that to keep a pre-rendered slide steady (see keepFirstSlide).
+    mode: b.mode === 'specific' ? 'specific' : 'random',
+    products,
+  }
 }
 
 export function mapSolution(s) {
@@ -396,6 +407,21 @@ function mapWhatWeDo(meta) {
     divisionsIntro: pick(meta.divisionsIntro, d.divisionsIntro),
     divisions: Array.isArray(meta.divisions) && meta.divisions.length ? meta.divisions : d.divisions,
   }
+}
+
+// The shop from /api/shop. null when the store has no address and no hours to
+// state, so every consumer can test one value.
+export function mapShop(s) {
+  if (!s || typeof s !== 'object') return null
+  const shop = {
+    name: s.name || 'AS Store',
+    address: String(s.address || '').trim(),
+    phone: String(s.phone || '').trim(),
+    whatsapp: String(s.whatsapp || '').trim(),
+    email: String(s.email || '').trim(),
+    hours: normalizeHours(s.hours),
+  }
+  return shop.address || shop.hours ? shop : null
 }
 
 export function mapPopup(p) {
@@ -491,7 +517,7 @@ export function whatsappContactUrl(number, fallbackLink, message) {
 
 export async function loadSite() {
   try {
-    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storeBanner, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches] =
+    const [settings, services, events, banners, sections, categories, popup, storeMeta, storeProducts, storeBanner, whatWeDoMeta, solutionsList, predictorMeta, predictorMatches, shop] =
       await Promise.all([
         request('/api/settings'),
         request('/api/services'),
@@ -507,6 +533,7 @@ export async function loadSite() {
         request('/api/solutions').catch(() => []),
         request('/api/predictor').catch(() => null),
         request('/api/predictor-matches').catch(() => []),
+        request('/api/shop').catch(() => null),
       ])
     const content = settings ? mergeSettings(settings) : { ...defaultContent }
     if (Array.isArray(services) && services.length) {
@@ -532,6 +559,7 @@ export async function loadSite() {
     content.storeShowcase = mapStoreShowcase(storeMeta, storeProducts)
     content.storeBanner = mapStoreBanner(storeBanner)
     content.predictor = mapPredictor(predictorMeta, predictorMatches)
+    content.shop = mapShop(shop)
     content.whatWeDo = mapWhatWeDo(whatWeDoMeta)
     // Solutions from the DB (visible only); fall back to the static defaults so
     // the What We Do page still has content if the table is empty / API is down.

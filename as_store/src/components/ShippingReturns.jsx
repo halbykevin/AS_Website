@@ -27,8 +27,9 @@ import { RETURN_DAYS } from '@/lib/returnPolicy'
 
 const UPDATED = 'August 26, 2026'
 
-// Owner-confirmed, and not derivable from anything in the database.
-const DELIVERY_ESTIMATE = '2–5 days'
+// Owner-confirmed, and not derivable from anything in the database. Exported
+// for /llms.txt (app/llms.txt/route.js), which states the same estimate.
+export const DELIVERY_ESTIMATE = '2–5 days'
 
 function Section({ id, title, children }) {
   return (

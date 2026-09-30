@@ -6,6 +6,7 @@ import Layout from './components/Layout.jsx'
 import ComingSoon from './pages/ComingSoon.jsx'
 import SiteSkeleton from './components/SiteSkeleton.jsx'
 import RequireAuth from './admin/RequireAuth.jsx'
+import RouteHead from './components/RouteHead.jsx'
 
 // Public pages — split so the homepage doesn't ship the events/detail code up front.
 const Home = lazy(() => import('./pages/Home.jsx'))
@@ -15,6 +16,7 @@ const StoreComingSoon = lazy(() => import('./pages/StoreComingSoon.jsx'))
 const WhatWeDo = lazy(() => import('./pages/WhatWeDo.jsx'))
 const SolutionDetail = lazy(() => import('./pages/SolutionDetail.jsx'))
 const Contact = lazy(() => import('./pages/Contact.jsx'))
+const Faq = lazy(() => import('./pages/Faq.jsx'))
 
 // Admin area — split so public visitors never download the dashboard bundle.
 const AdminLogin = lazy(() => import('./admin/Login.jsx'))
@@ -50,6 +52,7 @@ function PublicSite() {
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/store" element={<StoreComingSoon />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/faq" element={<Faq />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -57,43 +60,55 @@ function PublicSite() {
   )
 }
 
-export default function App() {
+// The route table without a router, so the build can render it inside a
+// StaticRouter (src/entry-server.jsx) and the browser inside a BrowserRouter.
+export function AppRoutes() {
   return (
-    <ContentProvider>
-      <BrowserRouter>
-        <Suspense fallback={<SiteSkeleton />}>
-          <Routes>
-            {/* Admin area — always reachable (not behind the publish gate) */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route
-              path="/admin"
-              element={
-                <RequireAuth>
-                  <AdminLayout />
-                </RequireAuth>
-              }
-            >
-              <Route index element={<SettingsEditor />} />
-              <Route path="banners" element={<BannersAdmin />} />
-              <Route path="services" element={<ServicesAdmin />} />
-              <Route path="what-we-do" element={<WhatWeDoAdmin />} />
-              <Route path="events" element={<EventsAdmin />} />
-              <Route path="categories" element={<CategoriesAdmin />} />
-              <Route path="store-banner" element={<StoreBannerAdmin />} />
-              {/* The store panel used to be an uploaded image slideshow edited
-                  here; keep the old path working for anyone's bookmark. */}
-              <Route path="story" element={<StoreBannerAdmin />} />
-              <Route path="popup" element={<PopupAdmin />} />
-              <Route path="predictor" element={<PredictorAdmin />} />
-              <Route path="wheel" element={<WheelAdmin />} />
-              <Route path="messages" element={<MessagesAdmin />} />
-              <Route path="scraper" element={<ScraperAdmin />} />
-            </Route>
+    <>
+      <RouteHead />
+      <Suspense fallback={<SiteSkeleton />}>
+        <Routes>
+          {/* Admin area — always reachable (not behind the publish gate) */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <AdminLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<SettingsEditor />} />
+            <Route path="banners" element={<BannersAdmin />} />
+            <Route path="services" element={<ServicesAdmin />} />
+            <Route path="what-we-do" element={<WhatWeDoAdmin />} />
+            <Route path="events" element={<EventsAdmin />} />
+            <Route path="categories" element={<CategoriesAdmin />} />
+            <Route path="store-banner" element={<StoreBannerAdmin />} />
+            {/* The store panel used to be an uploaded image slideshow edited
+                here; keep the old path working for anyone's bookmark. */}
+            <Route path="story" element={<StoreBannerAdmin />} />
+            <Route path="popup" element={<PopupAdmin />} />
+            <Route path="predictor" element={<PredictorAdmin />} />
+            <Route path="wheel" element={<WheelAdmin />} />
+            <Route path="messages" element={<MessagesAdmin />} />
+            <Route path="scraper" element={<ScraperAdmin />} />
+          </Route>
 
-            {/* Public website */}
-            <Route path="/*" element={<PublicSite />} />
-          </Routes>
-        </Suspense>
+          {/* Public website */}
+          <Route path="/*" element={<PublicSite />} />
+        </Routes>
+      </Suspense>
+    </>
+  )
+}
+
+// `initialData` is the content a pre-rendered page was built from (main.jsx).
+export default function App({ initialData = null }) {
+  return (
+    <ContentProvider initialData={initialData}>
+      <BrowserRouter>
+        <AppRoutes />
       </BrowserRouter>
     </ContentProvider>
   )

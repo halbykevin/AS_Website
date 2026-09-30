@@ -11,6 +11,7 @@ import { seatmapRouter } from './seatmap.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
 import { imageResizer } from './images.js'
+import { rebuildOnContentChange } from './rebuild.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'))
@@ -27,6 +28,8 @@ app.set('trust proxy', 1)
 const origins = (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim())
 app.use(cors({ origin: origins.includes('*') ? true : origins }))
 app.use(express.json({ limit: '1mb' }))
+// Admin edits to pre-rendered content ask Vercel to rebuild as.com.lb.
+app.use(rebuildOnContentChange)
 // Resize/re-encode on the fly when ?w=/?format=/?q= are present, then fall
 // through to the untouched originals. Cached variants live in UPLOAD_DIR/.cache.
 app.use('/uploads', imageResizer(UPLOAD_DIR))
@@ -566,6 +569,64 @@ async function storeCatalog() {
   })()
   return catalogCache.promise
 }
+
+// ---- The shop: where it is and when it is open ----
+// The physical AS shop's address, phone and opening hours are kept once, in the
+// AS Store's settings (store admin -> Settings -> Contact / Opening hours), and
+// this relays them: as.com.lb (its FAQ, contact page, footer and LocalBusiness
+// markup) and the ticketing hub read the shop from here, so a change of hours
+// is made in one place and is true everywhere. Same one-origin reasoning, same
+// cache-and-keep-last-good behaviour as the catalog above.
+const SHOP_TTL = 5 * 60 * 1000
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+const SHOP_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+let shopCache = { at: 0, value: null, promise: null }
+
+const shopHours = (h) => {
+  if (!h || typeof h !== 'object') return null
+  const out = {}
+  let any = false
+  for (const d of SHOP_DAYS) {
+    const v = h[d]
+    out[d] = Array.isArray(v) && HHMM_RE.test(v[0]) && HHMM_RE.test(v[1]) && v[0] < v[1] ? [v[0], v[1]] : null
+    if (out[d]) any = true
+  }
+  return any ? out : null
+}
+
+async function storeShop() {
+  if (shopCache.value && Date.now() - shopCache.at < SHOP_TTL) return shopCache.value
+  if (shopCache.promise) return shopCache.promise
+  shopCache.promise = (async () => {
+    try {
+      const r = await fetch(`${STORE_API}/api/settings`, { signal: AbortSignal.timeout(5000) })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const s = await r.json()
+      const c = s.contact || {}
+      const value = {
+        name: s.storeName || 'AS Store',
+        address: String(c.address || '').trim(),
+        phone: String(c.phone || '').trim(),
+        whatsapp: String(c.whatsapp || '').trim(),
+        email: String(c.email || '').trim(),
+        hours: shopHours(s.hours),
+      }
+      shopCache = { at: Date.now(), value, promise: null }
+      return value
+    } catch (err) {
+      console.warn(`[shop] could not read the AS Store settings from ${STORE_API}: ${err.message}`)
+      shopCache = { ...shopCache, promise: null }
+      return shopCache.value
+    }
+  })()
+  return shopCache.promise
+}
+
+// 200 with nulls when the store is unreachable and nothing is cached: the
+// pages then simply leave the address and hours out rather than failing.
+app.get('/api/shop', ah(async (req, res) => {
+  res.json((await storeShop()) || { name: 'AS Store', address: '', phone: '', whatsapp: '', email: '', hours: null })
+}))
 
 app.get('/api/store-banner', ah(async (req, res) => {
   const { rows } = await query('SELECT * FROM store_banner WHERE id = 1')
