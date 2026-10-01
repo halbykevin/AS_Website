@@ -843,7 +843,10 @@ PerplexityBot…) don't run JavaScript — they used to receive an empty `<div i
 
 - **What it writes into `dist/`**: `index.html`, `what-we-do.html`, `what-we-do/<slug>.html`,
   `contact.html` (served extensionless by `cleanUrls` in [vercel.json](vercel.json)); `spa.html`,
-  the plain shell every other URL rewrites to (admin, unknown paths); and `sitemap.xml`,
+  the plain shell every other URL rewrites to (admin, unknown paths). The rewrite destination is
+  **`/spa`, not `/spa.html`**: under `cleanUrls` the file only exists at its extensionless path,
+  and `/spa.html` 404'd `/admin` and every other non-prerendered URL from 2026-09-30 to 10-01.
+  Also generated: `sitemap.xml`,
   `robots.txt`, `llms.txt`, **generated** from the same content — there are no hand-kept copies
   in `public/` any more. The as-website project already runs `npm run build` into `dist/` by
   default. **Never put build settings (`buildCommand`, `outputDirectory`…) in the root
@@ -935,7 +938,7 @@ hours questions simply disappear when the store admin has none to state.
 ## Structure
 
 ```
-vercel.json                # cleanUrls, /events 301s, fallback rewrite -> spa.html (no build settings — see above)
+vercel.json                # cleanUrls, /events 301s, fallback rewrite -> /spa (no build settings — see above)
 scripts/prerender.mjs      # build step: public routes -> static HTML + sitemap/robots/llms.txt
 WebScarping/               # Python scrapers, spawned by the API:
                            #   scrape.py + ecom_scraper/  (e-commerce products)
