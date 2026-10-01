@@ -441,6 +441,21 @@ Implemented on 2026-09-18 (Guideline 4.8, blocker 1). Full reasoning in
 Two deploys, in this order: **`npm run deploy:store`** (the route and the column
 — the app's button 404s until it is up), then the iOS build.
 
+**The rule: every screen that shows Google shows Apple above it.** Build 4
+(1.1.1) was rejected on 2026-09-30 under **Guideline 4.8** on an iPad Air: the
+signed-out Account tab offered *Continue with Google* right on the card, while
+Apple was one tap further in, behind *Sign in*. Reviewers judge the screen in
+front of them, so having Apple on the next screen didn't count. Fixed in
+`mobile/app/(tabs)/account.jsx`. Today Google appears on the Account tab and
+`auth/login.jsx` only, and both now show Apple first. A new place that offers
+Google needs the `AppleButton` too. It renders nothing off iOS, so Android is
+unaffected.
+
+This fix is JS-only, but an OTA update is **not** how it reaches the reviewer:
+`fallbackToCacheTimeout` is 0, so a fresh install's first launch runs the bundle
+built into the binary. Ship it as a new build (build 5) and pick that build on
+the version page.
+
 **Optional portal step — revocation.** Apple asks an app that deletes accounts to
 also withdraw the Sign in with Apple grant. That needs a key:
 

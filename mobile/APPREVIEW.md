@@ -222,7 +222,7 @@ AS Company is the app of Absolute Solutions SAL, an electronics retailer and eve
 
 NO ACCOUNT NEEDED to browse the catalogue, search, read events or use the shopping assistant. An account is needed only to order, to use AS Wallet or to spin the daily wheel.
 
-SIGNING IN: Account tab > Sign in. Methods: Sign in with Apple, Google, or a one-time 6-digit code by email or WhatsApp. For review, use the demo account above: choose "Continue with email", enter that address, tap "Send code", then type the fixed code from the Password field. Nothing is sent anywhere for that address and the code never expires. Sign in with Apple with your own Apple ID also works.
+SIGNING IN: the Account tab offers Sign in with Apple and Google directly, Apple first; its Sign in button adds a one-time 6-digit code by email or WhatsApp. For review, use the demo account above: choose "Continue with email", enter that address, tap "Send code", then type the fixed code from the Password field. Nothing is sent anywhere for that address and the code never expires. Sign in with Apple with your own Apple ID also works.
 
 REGISTRATION: Account tab > Sign in > Create account (name, email, 6-digit code).
 

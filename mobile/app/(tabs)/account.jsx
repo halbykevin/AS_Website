@@ -8,7 +8,7 @@ import { money } from '@/src/lib/format';
 import { useContent } from '@/src/content/ContentProvider';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Button, Card, Icon, Divider } from '@/src/ui';
-import { GoogleButton } from '@/src/components/auth';
+import { AppleButton, GoogleButton } from '@/src/components/auth';
 import BrandBar from '@/src/components/BrandBar';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
@@ -29,13 +29,14 @@ export default function AccountScreen() {
   // screen; a paused wallet still shows credit that was earned.
   const { data: wallet } = useWallet(Boolean(customer));
   const walletOn = Boolean(wallet?.enabled || Number(wallet?.balance) > 0);
-  const [google, setGoogle] = useState(false);
+  const [methods, setMethods] = useState({ google: false, apple: false });
   const [error, setError] = useState('');
 
   useEffect(() => {
     accountApi
       .authMethods()
-      .then(r => setGoogle(Boolean(r.google)))
+      // Same reading as login.jsx: older servers don't report `apple`.
+      .then(r => setMethods({ google: Boolean(r.google), apple: r.apple !== false }))
       .catch(() => {});
   }, []);
 
@@ -63,7 +64,12 @@ export default function AccountScreen() {
             {!loading ? (
               <View style={{ gap: theme.spacing.sm, alignSelf: 'stretch', marginTop: theme.spacing.sm }}>
                 <Button label="Sign in" onPress={() => router.push('/auth/login')} fullWidth />
-                {google ? <GoogleButton next="/account" onDone={() => refresh()} onError={setError} /> : null}
+                {/* Every screen that offers Google offers Apple above it.
+                    Guideline 4.8 is judged screen by screen — build 4 was
+                    rejected for Google here with Apple a tap further in.
+                    Renders nothing off iOS. */}
+                {methods.apple ? <AppleButton onDone={() => refresh()} onError={setError} /> : null}
+                {methods.google ? <GoogleButton next="/account" onDone={() => refresh()} onError={setError} /> : null}
                 <Button label="Create an account" variant="ghost" onPress={() => router.push('/auth/register')} fullWidth />
               </View>
             ) : null}
