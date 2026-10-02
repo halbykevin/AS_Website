@@ -18,6 +18,12 @@
   --warn: #b7832f;
   --chrome: #fff;
   --hover: #eef0f3;
+  --glow-a: rgba(226, 1, 20, 0.04);
+  --glow-b: rgba(59, 130, 246, 0.03);
+  --glow-c: rgba(139, 92, 246, 0.02);
+  --dot-color: rgba(0, 0, 0, 0.045);
+  --panel-glass: rgba(255, 255, 255, 0.72);
+  --panel-glow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 24px rgba(0, 0, 0, 0.05);
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   color: var(--text);
@@ -43,6 +49,12 @@
     --warn: #d9a54c;
     --chrome: #15191d;
     --hover: #232930;
+    --glow-a: rgba(226, 1, 20, 0.08);
+    --glow-b: rgba(56, 130, 246, 0.06);
+    --glow-c: rgba(139, 92, 246, 0.045);
+    --dot-color: rgba(255, 255, 255, 0.03);
+    --panel-glass: rgba(24, 28, 33, 0.6);
+    --panel-glow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.2);
     color-scheme: dark;
   }
 }
@@ -177,6 +189,13 @@ p {
   padding: 16px;
   align-content: center;
   overflow: auto;
+  background:
+    radial-gradient(circle, var(--dot-color) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 60% at 8% 35%, var(--glow-a), transparent),
+    radial-gradient(ellipse 60% 55% at 92% 15%, var(--glow-b), transparent),
+    radial-gradient(ellipse 55% 45% at 45% 95%, var(--glow-c), transparent),
+    var(--bg);
+  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
 }
 .panel {
   background: var(--surface);
@@ -226,6 +245,17 @@ p {
 .panel .muted {
   font-size: 12px;
 }
+/* Glass-effect panels on the home screen */
+.home .panel {
+  background: var(--panel-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--panel-glow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.home .panel:hover {
+  border-color: rgba(226, 1, 20, 0.18);
+}
 .connect {
   display: flex;
   gap: 8px;
@@ -267,6 +297,11 @@ input::placeholder {
 }
 .connect .primary {
   height: 44px;
+  box-shadow: 0 2px 12px rgba(226, 1, 20, 0.25);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.connect .primary:hover:not(:disabled) {
+  box-shadow: 0 4px 20px rgba(226, 1, 20, 0.35);
 }
 .primary {
   background: var(--accent);
@@ -368,12 +403,16 @@ input::placeholder {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--panel-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .recent-connect:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: 0 4px 16px rgba(226, 1, 20, 0.12);
 }
 .recent-id {
   font-family: "Cascadia Mono", Consolas, monospace;
@@ -674,6 +713,37 @@ input::placeholder {
 .tool:hover:not(:disabled) {
   background: #262c33;
   color: #fff;
+}
+.tool-disconnect {
+  color: #e5534b;
+  margin-left: 4px;
+}
+.tool-disconnect:hover:not(:disabled) {
+  background: #c23b2a;
+  color: #fff;
+}
+.tool.active.warn {
+  background: rgba(229, 83, 75, 0.15);
+  color: #f55;
+}
+.tool.active.warn:hover:not(:disabled) {
+  background: rgba(229, 83, 75, 0.25);
+  color: #ff7b73;
+}
+.toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background: #2e353d;
+  margin: 0 4px;
+  flex: none;
+}
+.session-stats.compact {
+  font-size: 11px;
+  min-width: 0;
+  padding: 0 2px;
+}
+.viewer.input-disabled {
+  cursor: not-allowed;
 }
 .tool-danger {
   height: 26px;

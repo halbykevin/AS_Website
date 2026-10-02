@@ -37,6 +37,14 @@ const PopoutIcon = icon("M10 5H5v14h14v-5M14 4h6v6M20 4l-8 8", 12);
 const DockIcon = icon("M10 5H5v14h14v-5M20 4l-8 8M12 7v5h5");
 const HistoryIcon = icon("M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4M12 8v4l3 2", 14);
 const RenameIcon = icon("M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4", 13);
+const InputOnIcon = icon("M4 6h16v12H4zM9 17v3M15 17v3M7 20h10", 14);
+const InputOffIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 6h16v12H4zM9 17v3M15 17v3M7 20h10" />
+    <line x1="3" y1="3" x2="21" y2="21" stroke="#f55" strokeWidth="2.2" />
+  </svg>
+);
+const DisconnectIcon = icon("M18.36 5.64a9 9 0 1 1-12.73 0M12 2v10", 12);
 
 const relative = new Intl.RelativeTimeFormat(undefined, {
   numeric: "auto",
@@ -164,8 +172,7 @@ function TransferChip({ status }: { status: TransferStatus }) {
     </span>
   );
 }
-const statsLine = (session: ActiveSession, stats?: Stats) => (stats ? `${stats.path} · ${stats.rtt} ms · ${stats.fps} fps` : session.phase === "connected" ? "Connected" : "Connecting");
-const statsTitle = (session: ActiveSession, stats?: Stats) => (stats ? `${stats.codec || "Video"} · ${stats.bitrate.toFixed(1)} Mbps · ${session.permissions.join(", ")}` : undefined);
+const statsTitle = (_session: ActiveSession, stats?: Stats) => (stats ? `${stats.path} · ${stats.rtt} ms · ${stats.fps} fps · ${stats.codec || "Video"} · ${stats.bitrate.toFixed(1)} Mbps` : undefined);
 
 /** A session shown in its own window. The window is only a surface: this page draws into its document
  * (see popOut), so the session's connection, input and state never move. */
@@ -179,16 +186,22 @@ const POPOUT = "session-";
 
 /** One remote screen with its own video, scaling and input. Sessions in background tabs stay
  * mounted (their connection is kept) and the other computer pauses their video until shown. */
-function SessionView({ session, media, stream, visible, focused, tiled, label, scale, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
+function SessionView({ session, media, stream, visible, focused, tiled, label, scale, inputDisabled: noInput, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; inputDisabled?: boolean; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const viewer = useRef<HTMLDivElement>(null);
   const lastMove = useRef(0);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const element = video.current;
-    if (!element || element.srcObject === (stream ?? null)) return;
-    element.srcObject = stream ?? null;
-    if (stream) void element.play().catch(() => undefined);
+    if (!element) return;
+    const target = stream ?? null;
+    if (element.srcObject === target) return;
+    element.srcObject = target;
+    if (!stream) return;
+    let cancelled = false;
+    const tryPlay = () => { if (cancelled || element.srcObject !== stream) return; void element.play().catch(() => { if (!cancelled) setTimeout(tryPlay, 500); }); };
+    tryPlay();
+    return () => { cancelled = true; };
   }, [stream]);
   // Hiding a session releases anything held down there; the focused one gets the keyboard.
   useEffect(() => {
@@ -207,7 +220,7 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
     report();
     return () => observer.disconnect();
   }, [media, visible, scale]);
-  const send = (event: InputEvent) => media?.send(event);
+  const send = (event: InputEvent) => { if (!noInput) media?.send(event); };
   function point(event: React.MouseEvent): { x: number; y: number } | undefined {
     const element = video.current;
     if (!element?.videoWidth) return;
@@ -225,7 +238,7 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
   const button = (e: React.MouseEvent) => (e.button === 2 ? "right" : e.button === 1 ? "middle" : "left");
   return (
     <div
-      className={`viewer ${scale} ${tiled ? "tiled" : ""} ${focused ? "focused" : ""}`}
+      className={`viewer ${scale} ${tiled ? "tiled" : ""} ${focused ? "focused" : ""} ${noInput ? "input-disabled" : ""}`}
       ref={viewer}
       tabIndex={visible ? 0 : -1}
       hidden={!visible}
@@ -243,7 +256,7 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
         send({ type: "key", code: e.code, down: false });
       }}
       onMouseMove={e => {
-        if (performance.now() - lastMove.current < 20) return;
+        if (performance.now() - lastMove.current < 8) return;
         const position = point(e);
         if (position) {
           lastMove.current = performance.now();
@@ -354,6 +367,7 @@ function App() {
   // The selected tab: HOME, or the ID of a computer being controlled (or waiting to be).
   const [tab, setTab] = useState(HOME);
   const [scales, setScales] = useState<Record<string, "fit" | "actual">>({});
+  const [inputDisabled, setInputDisabled] = useState<Record<string, boolean>>({});
   // Focus view (one session at a time) or grid/split view (all at once). Remembered per viewer.
   const [layout, setLayout] = useState<"focus" | "grid">(() => {
     try {
@@ -673,9 +687,20 @@ function App() {
             </span>
             <div className="toolbar-actions">
               {transfer && <TransferChip status={transfer} />}
-              <span className="session-stats" title={statsTitle(s, sessionStats)}>
-                {statsLine(s, sessionStats)}
+              <span className="session-stats compact" title={statsTitle(s, sessionStats)}>
+                {sessionStats ? `${sessionStats.rtt}ms` : ""}
               </span>
+              <div className="toolbar-separator" />
+              <button
+                className={`tool ${inputDisabled[s.sessionId] ? "active warn" : ""}`}
+                disabled={s.phase !== "connected"}
+                aria-label={inputDisabled[s.sessionId] ? "Enable remote input" : "Disable remote input"}
+                title={inputDisabled[s.sessionId] ? "Remote input disabled — click to enable" : "Disable remote input"}
+                aria-pressed={!!inputDisabled[s.sessionId]}
+                onClick={() => setInputDisabled(d => ({ ...d, [s.sessionId]: !d[s.sessionId] }))}
+              >
+                {inputDisabled[s.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
+              </button>
               <button
                 className="tool"
                 disabled={s.phase !== "connected"}
@@ -693,14 +718,14 @@ function App() {
               <button className="tool" aria-label="Back to the tab bar" title="Back to the tab bar" onClick={() => dock(s.sessionId)}>
                 <DockIcon />
               </button>
-              <button className="tool-danger" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
-                Disconnect
+              <button className="tool tool-disconnect" aria-label="Disconnect" title="Disconnect" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
+                <DisconnectIcon />
               </button>
             </div>
             <WindowControls maximized={popout.maximized} target={popout.label} onClose={() => dock(s.sessionId)} closeTitle="Close this window (the session goes back to the tab bar)" />
           </div>
           <div className="workspace-body">
-            <SessionView session={s} media={medias.current.get(s.sessionId)} stream={streams[s.sessionId]} visible focused tiled={false} label={nameOf(s.peerId)} scale={sessionScale} onFocus={() => {}} onMaximize={() => {}} onClose={() => void act(() => window.remote.disconnect(s.sessionId))} />
+            <SessionView session={s} media={medias.current.get(s.sessionId)} stream={streams[s.sessionId]} visible focused tiled={false} label={nameOf(s.peerId)} scale={sessionScale} inputDisabled={!!inputDisabled[s.sessionId]} onFocus={() => {}} onMaximize={() => {}} onClose={() => void act(() => window.remote.disconnect(s.sessionId))} />
           </div>
         </div>,
         popout.root,
@@ -1199,9 +1224,20 @@ function App() {
             {current && (
               <>
                 {transfers[current.sessionId] && <TransferChip status={transfers[current.sessionId]!} />}
-                <span className="session-stats" title={statsTitle(current, currentStats)}>
-                  {statsLine(current, currentStats)}
+                <span className="session-stats compact" title={statsTitle(current, currentStats)}>
+                  {currentStats ? `${currentStats.rtt}ms` : ""}
                 </span>
+                <div className="toolbar-separator" />
+                <button
+                  className={`tool ${inputDisabled[current.sessionId] ? "active warn" : ""}`}
+                  disabled={current.phase !== "connected"}
+                  aria-label={inputDisabled[current.sessionId] ? "Enable remote input" : "Disable remote input"}
+                  title={inputDisabled[current.sessionId] ? "Remote input disabled — click to enable" : "Disable remote input"}
+                  aria-pressed={!!inputDisabled[current.sessionId]}
+                  onClick={() => setInputDisabled(d => ({ ...d, [current.sessionId]: !d[current.sessionId] }))}
+                >
+                  {inputDisabled[current.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
+                </button>
                 <button
                   className="tool"
                   disabled={current.phase !== "connected"}
@@ -1222,8 +1258,8 @@ function App() {
                 <button className="tool" disabled={current.phase !== "connected"} aria-label={fullscreen ? "Exit full screen" : "Full screen"} title={fullscreen ? "Exit full screen" : "Full screen"} onClick={toggleFullscreen}>
                   {fullscreen ? <ExitFullIcon /> : <FullIcon />}
                 </button>
-                <button className="tool-danger" onClick={() => void act(() => window.remote.disconnect(current.sessionId))}>
-                  Disconnect
+                <button className="tool tool-disconnect" aria-label="Disconnect" title="Disconnect" onClick={() => void act(() => window.remote.disconnect(current.sessionId))}>
+                  <DisconnectIcon />
                 </button>
               </>
             )}
@@ -1250,6 +1286,7 @@ function App() {
             tiled={gridActive}
             label={nameOf(s.peerId)}
             scale={gridActive ? "fit" : (scales[s.sessionId] ?? "fit")}
+            inputDisabled={!!inputDisabled[s.sessionId]}
             onFocus={() => setTab(s.peerId)}
             onMaximize={() => {
               setTab(s.peerId);

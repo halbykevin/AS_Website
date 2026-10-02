@@ -22,11 +22,15 @@ export class RemoteMedia {
   private lastBytes = 0;
   private lastTime = 0;
   private disconnectedTimer?: ReturnType<typeof setTimeout>;
+  private iceRestartAttempts = 0;
   // Controller: whether this session is on screen. A hidden session asks the other computer to pause
   // its video, so sessions in background tabs cost almost no bandwidth or CPU on either side.
   private visible = true;
   private lastQuality = 0;
   private paramsChain: Promise<void> = Promise.resolve();
+  // Zero-frame detection: counts consecutive stats ticks with fps=0 while the session should be producing frames.
+  private zeroFpsStreak = 0;
+  private keyframeRecoveryDone = false;
   // The target passes the screen the user picked (getDisplayMedia needs the Accept click's user gesture).
   // Clipboard file transfer state (see transfer.rs): controller streams, target receives in order.
   private lastFilesFp?: string;
@@ -44,15 +48,45 @@ export class RemoteMedia {
         candidate: event.candidate.candidate, sdpMid: event.candidate.sdpMid, sdpMLineIndex: event.candidate.sdpMLineIndex
       } }).catch(() => this.fail('Signaling interrupted'));
     };
-    this.pc.ontrack = event => { this.video(event.streams[0] ?? new MediaStream([event.track])); };
+    this.pc.ontrack = event => {
+      const track = event.track;
+      const stream = event.streams[0] ?? new MediaStream([track]);
+      // Guard against receiving an already-ended track (race between capture stop and negotiation).
+      if (track.readyState === 'ended') return;
+      track.onended = () => { if (!this.stopped && this.session.role === 'controller') this.fail('Remote screen sharing ended'); };
+      track.onunmute = () => { if (!this.stopped) this.video(stream); };
+      this.video(stream);
+    };
     this.pc.ondatachannel = event => this.channel(event.channel);
     this.pc.onconnectionstatechange = () => {
       if (this.stopped) return;
       if (this.pc.connectionState === 'connected') {
         clearTimeout(this.disconnectedTimer);
+        this.iceRestartAttempts = 0;
         void this.connected().catch(() => this.fail('Could not authorize the media connection'));
-      } else if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') this.fail('Peer connection ended');
-      else if (this.pc.connectionState === 'disconnected') this.disconnectedTimer = setTimeout(() => this.fail('Network connection lost'), 5000);
+      } else if (this.pc.connectionState === 'failed') {
+        // Attempt ICE restart before giving up entirely.
+        if (this.ready && this.iceRestartAttempts < 2) {
+          this.iceRestartAttempts++;
+          this.pc.restartIce();
+        } else {
+          this.fail('Peer connection ended');
+        }
+      } else if (this.pc.connectionState === 'closed') {
+        this.fail('Peer connection ended');
+      } else if (this.pc.connectionState === 'disconnected') {
+        // Try ICE restart first; only fail after a generous timeout.
+        if (this.ready) this.pc.restartIce();
+        this.disconnectedTimer = setTimeout(() => {
+          if (this.stopped) return;
+          if (this.iceRestartAttempts < 2) {
+            this.iceRestartAttempts++;
+            this.pc.restartIce();
+          } else {
+            this.fail('Network connection lost');
+          }
+        }, 8000);
+      }
     };
     this.startPromise = this.start();
     void this.startPromise.catch(error => this.fail(error instanceof Error ? error.message : 'Unable to start screen sharing'));
@@ -106,7 +140,11 @@ export class RemoteMedia {
         await this.localDescription('webrtc.answer', await this.pc.createAnswer());
         for (const sender of this.pc.getSenders()) if (sender.track?.kind === 'video') {
           const params = sender.getParameters();
-          if (params.encodings.length) { params.encodings[0]!.maxBitrate = 4_000_000; params.encodings[0]!.maxFramerate = 30; await sender.setParameters(params); }
+          if (params.encodings.length) {
+            params.encodings[0]!.maxBitrate = 4_000_000;
+            params.encodings[0]!.maxFramerate = 30;
+            await sender.setParameters(params).catch(() => undefined);
+          }
         }
       }
     }
@@ -146,6 +184,7 @@ export class RemoteMedia {
     if (this.session.role !== 'controller' || this.visible === visible) return;
     this.visible = visible;
     this.sendControl({ type: visible ? 'resume' : 'pause' });
+    if (visible) { this.zeroFpsStreak = 0; this.keyframeRecoveryDone = false; }
   }
   /** Controller: ask the other computer to encode at roughly the pixel width shown here. In a grid of
    *  small tiles this cuts encode, bandwidth and decode dramatically, so several sessions stay smooth. */
@@ -183,7 +222,9 @@ export class RemoteMedia {
   private async setSending(active: boolean) {
     for (const sender of this.pc.getSenders()) if (sender.track?.kind === 'video') {
       const params = sender.getParameters();
-      if (!params.encodings.length || params.encodings[0]!.active === active) continue;
+      if (!params.encodings.length) continue;
+      // Always apply the requested state — don't skip when it appears unchanged, because a prior
+      // setParameters call may have failed silently and left the actual encoder in the wrong state.
       params.encodings[0]!.active = active;
       await sender.setParameters(params).catch(() => undefined);
     }
@@ -206,12 +247,30 @@ export class RemoteMedia {
     await window.remote.signal({ type: 'session.connected', sessionId: this.session.sessionId, connectionType });
     if (this.stopped) return;
     this.ready = true;
-    if (!this.visible) this.sendControl({ type: 'pause' });
-    this.statsTimer = setInterval(() => void this.measure().then(this.status).catch(() => undefined), 2000);
+    // Ensure the encoder starts in the correct state: if we are visible, explicitly resume
+    // (in case the target defaulted to paused); if hidden, pause.
+    this.sendControl({ type: this.visible ? 'resume' : 'pause' });
+    this.statsTimer = setInterval(() => {
+      void this.measure().then(measured => {
+        this.status(measured);
+        if (this.session.role === 'controller' && this.visible) this.checkFrameHealth(measured);
+      }).catch(() => undefined);
+    }, 1000);
     if (this.session.permissions.includes('clipboard')) {
       // Baseline the controller's copied files so a selection made before the session is not auto-sent.
       if (this.session.role === 'controller') this.lastFilesFp = (await window.remote.clipboardFiles(this.session.sessionId).catch(() => null))?.fingerprint;
       this.clipboardTimer = setInterval(() => { void this.syncClipboard(); void this.syncFiles(); }, 1000);
+    }
+  }
+  /** Controller: detect when the video track is alive but producing zero frames, and recover. */
+  private checkFrameHealth(stats: Stats) {
+    if (stats.fps > 0) { this.zeroFpsStreak = 0; this.keyframeRecoveryDone = false; return; }
+    this.zeroFpsStreak++;
+    // After 3 consecutive zero-fps ticks (~3s), force a keyframe by toggling pause/resume.
+    if (this.zeroFpsStreak === 3 && !this.keyframeRecoveryDone) {
+      this.keyframeRecoveryDone = true;
+      this.sendControl({ type: 'pause' });
+      setTimeout(() => { if (!this.stopped && this.visible) this.sendControl({ type: 'resume' }); }, 200);
     }
   }
   private async syncClipboard() {
