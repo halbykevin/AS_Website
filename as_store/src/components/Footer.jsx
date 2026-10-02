@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Icon from "./Icon.jsx";
 import { defaultSettings } from "@/lib/site";
+import { hoursSentence } from "@/lib/hours";
 
 function FooterLink({ href = "#", children }) {
   const cls = "text-xs text-as-ink/60 transition-colors hover:text-as-red";
@@ -23,6 +24,7 @@ export default function Footer({ settings }) {
     ? settings.footerGroups
     : defaultSettings.footerGroups;
   const contact = settings?.contact || {};
+  const hours = hoursSentence(settings?.hours);
   const socials = settings?.socials || {};
   const socialEntries = Object.entries(socials).filter(([, v]) => v);
 
@@ -32,6 +34,7 @@ export default function Footer({ settings }) {
         {(contact.phone || contact.email || contact.address) && (
           <p className="border-b border-black/10 pb-4 text-xs leading-relaxed text-as-ink/50">
             {contact.address && <>Visit us in {contact.address}. </>}
+            {hours && <>Open {hours} </>}
             {contact.phone && <>Call {contact.phone}. </>}
             {contact.email && (
               <>
@@ -100,6 +103,7 @@ export default function Footer({ settings }) {
             </span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <FooterLink href="/faq">FAQ</FooterLink>
             <FooterLink href="/pages/shipping">
               Shipping &amp; Returns
             </FooterLink>

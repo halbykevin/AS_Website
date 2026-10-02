@@ -70,7 +70,8 @@ export default function ComingSoon() {
           />
         </div>
 
-        <p className="mt-12 text-xs text-as-charcoal/40">
+        {/* Rendered at build time — see the same line in Footer.jsx. */}
+        <p className="mt-12 text-xs text-as-charcoal/40" suppressHydrationWarning>
           © {new Date().getFullYear()} {brand.name} — {brand.legalName}. All rights reserved.
         </p>
       </main>

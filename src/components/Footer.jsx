@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 import EventsLink from './EventsLink.jsx'
+import { hoursSentence } from '../lib/hours.js'
 
 export default function Footer() {
-  const { brand, contact } = useContent()
+  const { brand, contact, shop } = useContent()
+  const hours = hoursSentence(shop?.hours)
   return (
     <footer id="contact" className="border-t border-black/5 bg-white">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
@@ -14,6 +16,14 @@ export default function Footer() {
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-as-charcoal/60">
               {brand.tagline}
             </p>
+            {/* Where and when, on every page: the name-address-hours line
+                local search reads, stated the same way everywhere. */}
+            {(shop?.address || hours) && (
+              <p className="mt-3 max-w-xs text-xs leading-relaxed text-as-charcoal/50">
+                {shop?.address && <>Visit us in {shop.address}. </>}
+                {hours && <>Open {hours}</>}
+              </p>
+            )}
           </div>
 
           {/* Explore */}
@@ -23,6 +33,7 @@ export default function Footer() {
               <li><EventsLink className="transition hover:text-as-red">Events</EventsLink></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">What We Do</Link></li>
               <li><Link to="/what-we-do" className="transition hover:text-as-red">About</Link></li>
+              <li><Link to="/faq" className="transition hover:text-as-red">FAQ</Link></li>
               <li><Link to="/contact" className="transition hover:text-as-red">Contact</Link></li>
             </ul>
           </div>
@@ -67,7 +78,11 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 border-t border-black/5 pt-6 text-center text-xs text-as-charcoal/50">
-          <p>© {new Date().getFullYear()} {brand.name} — {brand.legalName}. All rights reserved.</p>
+          {/* The year was rendered at build time; a page built last December
+              must not fail hydration over it on New Year's Day. */}
+          <p suppressHydrationWarning>
+            © {new Date().getFullYear()} {brand.name} — {brand.legalName}. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>

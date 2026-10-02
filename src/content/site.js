@@ -19,6 +19,7 @@ export const nav = [
   { label: 'What We Do', href: '/what-we-do' },
   { label: 'Events', href: '/events' },
   { label: 'About', href: '/what-we-do' },
+  { label: 'FAQ', href: '/faq' },
   { label: 'Contact', href: '/contact' },
 ]
 

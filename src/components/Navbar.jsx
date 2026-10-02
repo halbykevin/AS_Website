@@ -11,6 +11,9 @@ import EventsLink from './EventsLink.jsx'
 const isEventsHref = (href) => href === '/events' || href.startsWith('/events?')
 import { optimizedImage } from '../lib/api'
 
+// AS Desk — the remote-support portal, reached from the pill beside Store.
+const REMOTE_SUPPORT_URL = 'https://asdesk.as.com.lb/'
+
 export default function Navbar() {
   const { brand, nav, store } = useContent()
   const logoH = Number(brand.logoSize) || 48
@@ -90,14 +93,16 @@ export default function Navbar() {
             enabled). On mobile it floats, centered over the bar; on desktop it
             sits in the flex flow between the logo and the links so it never
             overlaps a nav item. */}
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%] md:static md:left-auto md:top-auto md:z-0 md:translate-x-0 md:translate-y-0">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[30%] lg:static lg:left-auto lg:top-auto lg:z-0 lg:translate-x-0 lg:translate-y-0">
           <div className="pointer-events-auto">
             <BasketballButton />
           </div>
         </div>
 
-        {/* Desktop nav — the two red CTAs lead, then the content links */}
-        <div className="hidden items-center gap-8 md:flex">
+        {/* Desktop nav — the red CTAs lead, then the content links. From lg up:
+            three pills plus five links don't fit a 768px tablet without wrapping,
+            so tablets get the mobile menu. */}
+        <div className="hidden items-center gap-8 lg:flex">
           <div className="flex items-center gap-3">
             <a
               href={storeUrl}
@@ -106,6 +111,14 @@ export default function Navbar() {
               className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
             >
               Store
+            </a>
+            <a
+              href={REMOTE_SUPPORT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
+            >
+              Remote Support
             </a>
             <EventsLink className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md">
               Browse Events
@@ -145,7 +158,7 @@ export default function Navbar() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-as-charcoal md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-as-charcoal lg:hidden"
           aria-label="Toggle menu"
           aria-expanded={open}
         >
@@ -157,7 +170,7 @@ export default function Navbar() {
 
       {/* Mobile menu — always rendered, animates open via grid-rows height + fade */}
       <div
-        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out md:hidden ${
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out lg:hidden ${
           open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
@@ -170,6 +183,14 @@ export default function Navbar() {
               className="rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
             >
               Store
+            </a>
+            <a
+              href={REMOTE_SUPPORT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
+            >
+              Remote Support
             </a>
             <EventsLink className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white">
               Browse Events

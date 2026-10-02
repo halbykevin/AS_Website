@@ -6,12 +6,16 @@ import Icon from '@/components/Icon.jsx'
 import { Button, Card, Field, Input, Select, Toggle, Spinner, Badge } from '@/components/admin/ui.jsx'
 import { useToast } from '@/components/admin/toast.jsx'
 import { adminApi } from '@/lib/adminApi'
+import { DAYS, DAY_NAMES, hoursSentence } from '@/lib/hours'
 
 const EMPTY = {
   storeName: 'AS Store',
   published: false,
   announcement: { enabled: true, text: '' },
   contact: { email: '', phone: '', whatsapp: '', address: '' },
+  // The shop's week: { mon: ['09:00','17:00'] | null, … }. Every day starts
+  // closed, so an unconfigured week says nothing rather than something wrong.
+  hours: Object.fromEntries(DAYS.map((d) => [d, null])),
   socials: { instagram: '', facebook: '', tiktok: '', x: '', youtube: '' },
   navLinks: [],
   footerGroups: [],
@@ -101,6 +105,7 @@ export default function SettingsPage() {
         ...data,
         announcement: { ...EMPTY.announcement, ...(data.announcement || {}) },
         contact: { ...EMPTY.contact, ...(data.contact || {}) },
+        hours: { ...EMPTY.hours, ...(data.hours || {}) },
         homeNew: { ...EMPTY.homeNew, ...(data.homeNew || {}) },
         loginButton: { ...EMPTY.loginButton, ...(data.loginButton || {}) },
         delivery: { ...EMPTY.delivery, ...(data.delivery || {}) },
@@ -517,6 +522,52 @@ export default function SettingsPage() {
           <Field label="Address">
             <Input value={form.contact.address} onChange={(e) => setNested('contact', 'address', e.target.value)} />
           </Field>
+        </div>
+      </Section>
+
+      {/* Opening hours */}
+      <Section
+        title="Opening hours"
+        summary={hoursSentence(form.hours) || 'Not set — the site says nothing about hours.'}
+      >
+        <p className="text-sm text-admin-text/55">
+          The shop&apos;s week, shown on the FAQ, the contact page and the footer here — and on
+          as.com.lb and the ticketing hub, which read it from this page. Times are Lebanon time.
+        </p>
+        <div className="divide-y divide-admin-line/10 rounded-xl border border-admin-line/10">
+          {DAYS.map((d) => {
+            const span = form.hours[d]
+            const setDay = (v) => setForm((f) => ({ ...f, hours: { ...f.hours, [d]: v } }))
+            return (
+              <div key={d} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                <span className="w-24 shrink-0 text-sm font-semibold text-admin-text">{DAY_NAMES[d]}</span>
+                <Toggle
+                  checked={Boolean(span)}
+                  onChange={(open) => setDay(open ? ['09:00', '17:00'] : null)}
+                  label={span ? 'Open' : 'Closed'}
+                />
+                {span && (
+                  <span className="flex items-center gap-2">
+                    <Input
+                      type="time"
+                      aria-label={`${DAY_NAMES[d]} opens`}
+                      value={span[0]}
+                      onChange={(e) => setDay([e.target.value, span[1]])}
+                      className="w-32"
+                    />
+                    <span className="text-sm text-admin-text/45">to</span>
+                    <Input
+                      type="time"
+                      aria-label={`${DAY_NAMES[d]} closes`}
+                      value={span[1]}
+                      onChange={(e) => setDay([span[0], e.target.value])}
+                      className="w-32"
+                    />
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </Section>
 

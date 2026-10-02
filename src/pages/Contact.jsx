@@ -5,12 +5,14 @@ import { useContent } from '../store/content.jsx'
 import { sendContactMessage, whatsappContactUrl } from '../lib/api.js'
 import { contact as contactDefaults } from '../content/site.js'
 import EventsLink from '../components/EventsLink.jsx'
+import { hoursLines } from '../lib/hours.js'
 
 // The public contact page: three one-tap channels (WhatsApp, Instagram, email)
 // and a message form that posts to /api/contact — the API stores the message and
 // emails it to the staff inbox. Reached from the "Contact" nav item and footer.
 export default function Contact() {
-  const { contact, brand, whatsappNumber } = useContent()
+  const { contact, brand, whatsappNumber, shop } = useContent()
+  const hours = hoursLines(shop?.hours)
   const copy = { ...contactDefaults.page, ...(contact.page || {}) }
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '', website: '' })
@@ -118,12 +120,33 @@ export default function Contact() {
             <div className="rounded-2xl border border-black/[0.06] bg-as-charcoal/[0.03] p-5 sm:p-6">
               <p className="text-sm font-bold text-as-charcoal">{brand.name}</p>
               <p className="mt-1 text-sm leading-relaxed text-as-charcoal/55">{brand.tagline}</p>
+              {shop?.address && (
+                <p className="mt-4 flex gap-2.5 text-sm leading-relaxed text-as-charcoal/70">
+                  <Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
+                  <span>{shop.address}</span>
+                </p>
+              )}
+              {hours.length > 0 && (
+                <div className="mt-3 flex gap-2.5 text-sm text-as-charcoal/70">
+                  <Icon name="clock" className="mt-0.5 h-4 w-4 shrink-0 text-as-red" />
+                  <ul className="space-y-0.5">
+                    {hours.map((h) => (
+                      <li key={h.label}>
+                        <span className="font-semibold text-as-charcoal">{h.label}:</span> {h.value}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
                 <EventsLink className="text-as-red transition hover:text-as-red-light">
                   Browse events →
                 </EventsLink>
                 <Link to="/what-we-do" className="text-as-red transition hover:text-as-red-light">
                   What we do →
+                </Link>
+                <Link to="/faq" className="text-as-red transition hover:text-as-red-light">
+                  FAQ →
                 </Link>
               </div>
             </div>

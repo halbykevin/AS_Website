@@ -114,7 +114,7 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   because a 404 the morning after the show discards every link it earned. Full reasoning in
   [as_ticketing/README.md](as_ticketing/README.md).
 - **`as.com.lb/events` 301s here**, one-to-one, from the root [vercel.json](vercel.json) —
-  and is out of the marketing site's `public/sitemap.xml` with it. Two domains rendering
+  and is out of the marketing site's generated `sitemap.xml` with it. Two domains rendering
   the same events under different URLs split the ranking signals between them, and the
   slugs match precisely so that this redirect can be an exact mapping rather than a dump
   onto a listing page. The destination is hardcoded there because a static host cannot
@@ -131,7 +131,8 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
 
 ## Scripts
 
-Frontend (repo root): `npm run dev` · `npm run build` · `npm run preview`
+Frontend (repo root): `npm run dev` · `npm run build` (pre-renders — needs the API, see
+*Pre-rendering & AI search*) · `npm run build:spa` (plain SPA, no API needed) · `npm run preview`
 Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
 
 `npm run app` (repo root) is the Android release: it builds the Play Store bundle on EAS,
@@ -436,6 +437,33 @@ enters 7.5, and Whish collects exactly that.
   Google an Offer for a product deliberately kept out of the Merchant feed would undo the point of
   keeping it out. **Its slug is case-sensitive** (`WHERE p.slug = $1`), so `/product/RaiOne` works
   and `/product/raione` does not.
+
+### AS-Punch licence renewal (`/product/RaiOne?renewal=<code>`)
+
+An AS-Punch installation's **Renew now** button opens RaiOne with a code issued by the AS-Punch
+licence server ([server/src/licenseRenewal.js](as_store/server/src/licenseRenewal.js),
+[LicenseRenewalBox.jsx](as_store/src/components/LicenseRenewalBox.jsx)). The page then shows that
+business's monthly amount in a **disabled** field instead of the typed amount and Add to Bag, takes
+name + mobile, and goes straight to Whish — it never touches the bag.
+
+- **The amount is never the browser's.** `POST /api/orders` with `licenseRenewal` resolves the code
+  against the licence server again and prices a single line (price = amount, qty 1) from that
+  answer; the sent quantity is ignored. Only an exclusive product can carry a renewal, so every
+  exemption above (no VAT, delivery, cash, wallet, vouchers) applies. A code that is paid, lapsed,
+  superseded by a price change, or unknown is refused with a sentence the customer can act on.
+- **Paid means reported, and reported means retried.** `markWhishPaid` calls
+  `queueLicenseRenewal`, which reports the payment (HMAC-signed with
+  `LICENSE_SERVER_BILLING_SECRET`) before the customer's order page loads. If the licence server is
+  down the order stays `license_renewal_status = 'pending'` and a worker re-sends it with backoff
+  capped at an hour — indefinitely, because it is money already taken. The notification outbox was
+  not used for this: it gives up after four tries. The licence server is idempotent on the order id.
+- **Without a code RaiOne is exactly what it was** — typed amount, $5 minimum. The RaiOne Systems
+  desktop app sends its customers to this page to pay, so it must stay open.
+- The code is read in the browser (`window.location.search`), and an exclusive product's buy box
+  renders nothing until it has been, so the editable amount never flashes before the fixed one.
+- Unset `LICENSE_SERVER_URL` / `LICENSE_SERVER_BILLING_SECRET` = renewal links say "unavailable";
+  ordinary orders are unaffected. Schema: [db/license_renewal.sql](as_store/db/license_renewal.sql)
+  (columns on `orders`, applied last by `migrate.js`).
 
 ### The quantity picker
 
@@ -806,6 +834,99 @@ The site never hard-depends on the backend:
 
 To add an editable field: add the column (migrate) → map it in `app.js` → surface it in the admin editor → consume it via `useContent()`.
 
+## Pre-rendering & AI search (as.com.lb)
+
+The marketing site is a React SPA, and AI answer-engine crawlers (GPTBot, ClaudeBot,
+PerplexityBot…) don't run JavaScript — they used to receive an empty `<div id="root">`. So
+`npm run build` now **pre-renders every public route to static HTML**, which the browser then
+**hydrates**: `vite build` → `vite build --ssr src/entry-server.jsx` → `node scripts/prerender.mjs`.
+
+- **What it writes into `dist/`**: `index.html`, `what-we-do.html`, `what-we-do/<slug>.html`,
+  `contact.html` (served extensionless by `cleanUrls` in [vercel.json](vercel.json)); `spa.html`,
+  the plain shell every other URL rewrites to (admin, unknown paths). The rewrite destination is
+  **`/spa`, not `/spa.html`**: under `cleanUrls` the file only exists at its extensionless path,
+  and `/spa.html` 404'd `/admin` and every other non-prerendered URL from 2026-09-30 to 10-01.
+  Also generated: `sitemap.xml`,
+  `robots.txt`, `llms.txt`, **generated** from the same content — there are no hand-kept copies
+  in `public/` any more. The as-website project already runs `npm run build` into `dist/` by
+  default. **Never put build settings (`buildCommand`, `outputDirectory`…) in the root
+  `vercel.json`**: the as-store and as_ticketing builds read it too — on 2026-09-30 an
+  `outputDirectory: "dist"` there failed both Next.js deploys ("output directory dist was not
+  found at as_store/dist").
+- **Content comes from the live API at build time** (`VITE_API_URL`). If it can't be reached the
+  **build fails on purpose** — Vercel keeps the previous, pre-rendered deployment instead of
+  shipping empty shells. `PRERENDER_ALLOW_FALLBACK=1` ships the plain SPA anyway.
+- **One head, two writers.** [src/lib/seo.js](src/lib/seo.js) `routeHead()` is the only place
+  titles, descriptions, canonicals, OpenGraph and JSON-LD come from; the build writes it between
+  the `<!--seo:start-->`/`<!--seo:end-->` markers in `index.html`, and
+  [RouteHead](src/components/RouteHead.jsx) applies the same result on client navigation. The
+  JSON-LD is an `@graph` whose **Organization `@id` (`https://www.as.com.lb/#organization`) is the
+  parent the store's and the ticketing hub's own Organization nodes point at**
+  (`parentOrganization`) — that shared id is what makes three domains read as one company.
+- **The canonical host is `www.as.com.lb`** (`SITE_URL`, overridable with `VITE_SITE_URL`),
+  because that is the one that answers — Vercel's domain settings 308 the bare domain to www. To
+  switch, flip that redirect and the env var together (and `NEXT_PUBLIC_COMPANY_URL` on the store
+  and hub, which build the parent `@id` from it).
+- **Hydration rules** — the first client render must reproduce the build's HTML exactly:
+  - The page ships the content it was built from as `window.__AS_DATA__` (`snapshotOf()` in
+    [entry-server.jsx](src/entry-server.jsx) — **events, banners and categories are left out**,
+    ~120 KB no pre-rendered page shows), and `ContentProvider` starts from it, then refreshes from
+    the API. [main.jsx](src/main.jsx) hydrates only when `window.__AS_PATH__` is the current path.
+  - Use `useReducedMotion` from [src/lib/motion.js](src/lib/motion.js), **never framer-motion's**:
+    theirs reads the media query during hydration, and React does not patch attributes on a
+    mismatch, so reduced-motion visitors would keep every Reveal at `opacity: 0`.
+  - Nothing browser-only or time/random-dependent in render: `window`, `localStorage`,
+    `Math.random()` belong in effects. The footer's `new Date().getFullYear()` carries
+    `suppressHydrationWarning` for the built-in-December case.
+  - The store slideshow's **random** mode re-samples on every API call, so the refresh keeps the
+    pre-rendered first slide and takes the rest fresh (`keepFirstSlide` in `store/content.jsx`) —
+    otherwise the products swap under the visitor a moment after load.
+- **Freshness**: visitors always get current content (the refresh); crawlers get it at the next
+  build. [server/src/rebuild.js](server/src/rebuild.js) calls a **Vercel Deploy Hook**
+  (`SITE_REBUILD_HOOK_URL`) after an admin write to pre-rendered content (debounced 120 s) and
+  daily for the store products. Unset = pages refresh only on deploy.
+- The homepage has a visually hidden `<h1>` (it is three visual panels with no headline) and the
+  What We Do typewriter's words as screen-reader text; the slideshow's first slide loads eagerly —
+  it is the LCP now that the HTML arrives rendered.
+- **`llms.txt` on all three sites** — Markdown briefings for answer engines, each built from what
+  that site already publishes: this one from the content ([src/lib/seoFiles.js](src/lib/seoFiles.js)),
+  the store's from its checkout settings, return policy and catalog
+  ([as_store/src/app/llms.txt/route.js](as_store/src/app/llms.txt/route.js)), the hub's from the
+  live listing ([as_ticketing/src/app/llms.txt/route.js](as_ticketing/src/app/llms.txt/route.js)).
+  Nothing in them is copy that exists only for machines; the shop's address and hours come from the
+  store admin (see *The shop, its hours, and the FAQs*).
+
+## The shop, its hours, and the FAQs (all three sites)
+
+The physical shop — **AS Store, Kferhata, Zgharta, North Lebanon**, open Mon–Fri 9–5 and Sat 9–2
+(owner-confirmed 2026-09-30) — is described in **one place**: the AS Store admin, Settings →
+**Contact** (address) and **Opening hours** (`settings.opening_hours`, JSONB: one key per day,
+`["HH:MM","HH:MM"]` or `null` = closed; schema default = the confirmed week, and a guarded one-time
+`UPDATE` in `as_store/db/schema.sql` refined the old "Zgharta, Lebanon"). Everything else reads it:
+
+- **The store** directly (FAQ, contact page, footer, `llms.txt`, and an `ElectronicsStore` node
+  `https://store.as.com.lb/#shop` with `openingHoursSpecification`, which the `OnlineStore` points at
+  via `hasPOS`).
+- **as.com.lb and the ticketing hub** through the site API's **`GET /api/shop`**
+  ([server/src/app.js](server/src/app.js)) — a server-to-server relay of the store's settings over
+  `STORE_API_URL`, cached 5 min with the last good copy kept, the store-banner pattern. as.com.lb
+  declares the **same `#shop` node** and gives the company that address, so the two sites describe
+  one place. A change of hours in the store admin reaches the pre-rendered as.com.lb pages at the
+  next build (the daily rebuild covers it; the store admin does not fire the site's deploy hook).
+- Wording comes from `lib/hours.js`, a **deliberate copy in all three packages** (store, site, hub —
+  like `search.js`/`wheel.js`): the same week must read identically everywhere. Tested in
+  `as_store/test/hours.test.js`.
+
+**Each site has a `/faq`** whose answers are **assembled from data, never typed**:
+[as_store/src/lib/faq.js](as_store/src/lib/faq.js) (delivery fee/threshold/VAT from the checkout's
+settings, return window from `returnPolicy.js`, delivery estimate from `ShippingReturns`, payment
+methods as `/pages/terms` states them, the wallet only while it is enabled),
+[src/lib/faq.js](src/lib/faq.js) (brand, divisions, solutions, shop, channels), and
+[as_ticketing/src/lib/faq.js](as_ticketing/src/lib/faq.js) (the Reserve → WhatsApp flow, the
+seat-map "request, not a booking" rule, live categories). One list feeds both the page and its
+`FAQPage` JSON-LD, because Google requires the markup to match what the page shows. The address and
+hours questions simply disappear when the store admin has none to state.
+
 ## Publish gate (Coming Soon)
 
 - Driven by `settings.published` (toggled in the admin dashboard).
@@ -817,7 +938,8 @@ To add an editable field: add the column (migrate) → map it in `app.js` → su
 ## Structure
 
 ```
-vercel.json                # SPA rewrite (all paths -> index.html)
+vercel.json                # cleanUrls, /events 301s, fallback rewrite -> /spa (no build settings — see above)
+scripts/prerender.mjs      # build step: public routes -> static HTML + sitemap/robots/llms.txt
 WebScarping/               # Python scrapers, spawned by the API:
                            #   scrape.py + ecom_scraper/  (e-commerce products)
                            #   events_sync.py + event_sources/  (ticketing events → DB)
@@ -825,10 +947,16 @@ marketing/                 # Remotion studio — the app's Instagram reel (npm r
 server/                    # Express + Postgres API (deployed to the VPS)
   src/{index,app,db,auth,migrate,seed}.js
   src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output
+  src/rebuild.js           # Vercel Deploy Hook on content edits (pre-rendered site freshness)
   README.md                # endpoints + deploy guide
   .env.example             # DATABASE_URL, ADMIN_*, JWT_SECRET, CORS_ORIGIN, PUBLIC_URL
 src/
-  App.jsx                  # routes: /admin/* (auth) + public site (gated)
+  App.jsx                  # routes: /admin/* (auth) + public site (gated); AppRoutes = router-less table
+  main.jsx                 # hydrates a pre-rendered page, else renders from scratch
+  entry-server.jsx         # build-time renderer (StaticRouter) — never shipped to the browser
+  lib/seo.js               # routeHead(): titles, canonicals, OG, JSON-LD — build + client
+  lib/seoFiles.js          # sitemap.xml / robots.txt / llms.txt generators (build only)
+  lib/motion.js            # hydration-safe useReducedMotion
   config/site.js           # publish fallback + isPreview()
   content/site.js          # static default copy (+ nav, CTA labels)
   data/events.js           # static default events
@@ -838,7 +966,7 @@ src/
   store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
   components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, StoreSearch, BannerCta, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
-  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact
+  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact, Faq
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
     components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
@@ -849,12 +977,13 @@ tailwind.config.js          # brand colors, Inter font, animations
 
 ## Env
 
-- Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com`
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+- Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com` — read at **build** time too (pre-rendering).
+  Optional: `VITE_SITE_URL` (canonical host, default `https://www.as.com.lb`), `PRERENDER_ALLOW_FALLBACK=1`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. `SITE_REBUILD_HOOK_URL` (+ `SITE_REBUILD_DELAY_SECONDS`, `SITE_REBUILD_EVERY_HOURS`) rebuilds the pre-rendered site on content edits. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 
-Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`
+Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`, `/faq`
 Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited

@@ -1,7 +1,7 @@
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
-import { getSettings } from '@/lib/api'
+import { getSettings, getShop } from '@/lib/api'
 import {
   DEFAULT_OG_IMAGES,
   SITE_NAME,
@@ -84,7 +84,7 @@ export const viewport = {
 }
 
 export default async function RootLayout({ children }) {
-  const settings = await getSettings()
+  const [settings, shop] = await Promise.all([getSettings(), getShop()])
   return (
     <html lang="en" className={inter.variable}>
       <head>
@@ -121,7 +121,7 @@ gtag('config', '${GA_ID}');`}
         )}
         <Header />
         <main className="flex-1">{children}</main>
-        <Footer settings={settings} />
+        <Footer settings={settings} shop={shop} />
       </body>
     </html>
   )

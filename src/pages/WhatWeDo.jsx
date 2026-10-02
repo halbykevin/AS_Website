@@ -5,10 +5,10 @@ import {
   useScroll,
   useTransform,
   useSpring,
-  useReducedMotion,
   useMotionValue,
   useMotionTemplate,
 } from 'framer-motion'
+import { useReducedMotion } from '../lib/motion.js'
 import Icon from '../components/Icon.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { useContent } from '../store/content.jsx'

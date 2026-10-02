@@ -18,6 +18,15 @@ export const SITE_URL = (
 export const SITE_NAME = 'AS Store'
 export const SITE_TAGLINE = 'Online shopping for tech & electronics in Lebanon'
 export const CURRENCY = 'USD'
+export const LEGAL_NAME = 'Absolute Solutions SAL'
+
+// The parent company's site. Its Organization node is declared there
+// (src/lib/seo.js at the repo root) under this exact @id, and the ticketing
+// hub points at the same one — which is what tells a search or answer engine
+// that the three domains are one company. The www host is the one that serves
+// (the bare domain redirects to it).
+export const COMPANY_URL = (process.env.NEXT_PUBLIC_COMPANY_URL || 'https://www.as.com.lb').replace(/\/$/, '')
+export const COMPANY_ORG_ID = `${COMPANY_URL}/#organization`
 
 // The Merchant-feed derivations. Product structured data and the XML feed are
 // built from the same functions so they cannot disagree about a price, an
@@ -38,6 +47,9 @@ import {
 // Safe to import at module scope: lib/returnPolicy.js imports nothing.
 import { merchantReturnPolicyJsonLd } from './returnPolicy.js'
 
+// Pure, imports nothing — safe at module scope like returnPolicy.js.
+import { openingHoursJsonLd } from './hours.js'
+
 // Absolute URL for a site-relative path (safe for OG images / canonicals).
 export const absoluteUrl = (path = '/') =>
   `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
@@ -57,20 +69,93 @@ export function metaDescription(text, fallback = '') {
 // you have one; the logo is a safe fallback that always resolves.
 export const DEFAULT_OG_IMAGE = absoluteUrl('/as-store-logo.png')
 
+// Lebanon's governorates, as an address names them ("North Lebanon", "Mount
+// Lebanon", "Bekaa"…). The one that ends an address is its addressRegion.
+const GOVERNORATE =
+  /^((north|south|mount) lebanon|north|south|beirut|bekaa|akkar|nabatieh|baalbek[- ]hermel|keserwan[- ]jbeil)( governorate)?$/i
+
+/**
+ * The shop's address (Site Settings -> Contact) as a PostalAddress. It is one
+ * free-text field, read the way Lebanese addresses are written — "village,
+ * town, governorate[, Lebanon]", e.g. "Kferhata, Zgharta, North Lebanon": the
+ * country and the governorate come off the end, the last part left is the
+ * town, and anything ahead of it is the finer location. The country is always
+ * Lebanon: the store delivers nowhere else.
+ *
+ * A deliberate copy of the same function in src/lib/seo.js at the repo root,
+ * which describes the same shop — keep the two in step.
+ */
+export function postalAddress(text = '') {
+  const parts = String(text)
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (parts.length > 1 && /^leban(on|ese republic)$/i.test(parts[parts.length - 1])) parts.pop()
+  const region = parts.length > 1 && GOVERNORATE.test(parts[parts.length - 1]) ? parts.pop() : ''
+  const locality = parts.pop()
+  return {
+    '@type': 'PostalAddress',
+    ...(parts.length ? { streetAddress: parts.join(', ') } : {}),
+    ...(locality ? { addressLocality: locality } : {}),
+    ...(region ? { addressRegion: region } : {}),
+    addressCountry: 'LB',
+  }
+}
+
+/**
+ * The physical shop — where returns are made and where people walk in — as a
+ * LocalBusiness. Its @id is shared: as.com.lb's markup declares the same node
+ * (built from the same settings, through the site API's /api/shop), so both
+ * sites describe one place. Omitted until there is an address to state.
+ */
+export function shopJsonLd(settings = {}) {
+  const address = String(settings?.contact?.address || '').trim()
+  if (!address) return null
+  const hours = openingHoursJsonLd(settings.hours)
+  return {
+    '@type': 'ElectronicsStore',
+    '@id': `${SITE_URL}/#shop`,
+    name: SITE_NAME,
+    url: `${SITE_URL}/faq`,
+    image: absoluteUrl('/as-store-logo.png'),
+    address: postalAddress(address),
+    ...(settings?.contact?.phone ? { telephone: settings.contact.phone } : {}),
+    ...(settings?.contact?.email ? { email: settings.contact.email } : {}),
+    ...(hours.length ? { openingHoursSpecification: hours } : {}),
+    areaServed: { '@type': 'Country', name: 'Lebanon' },
+    parentOrganization: { '@id': COMPANY_ORG_ID },
+  }
+}
+
 // site-wide Organization + WebSite JSON-LD. Rendered once in the root layout so
 // Google can attach the brand knowledge panel + sitelinks search box.
+//
+// The node is the store itself — an OnlineStore named AS Store, the same name
+// every Offer's `seller` carries — and it hangs off AS Company through
+// `parentOrganization`, rather than calling itself "AS Company": one company,
+// three sites, and each site's node says which part of it this is.
 export function organizationJsonLd(settings = {}) {
-  const sameAs = Object.values(settings.socials || {}).filter(Boolean)
+  const shop = shopJsonLd(settings)
+  // Profile URLs only: a bare "https://facebook.com" (the settings default)
+  // would claim the store IS Facebook.
+  const sameAs = Object.values(settings.socials || {}).filter((u) => /^https?:\/\/[^/]+\/./i.test(u || ''))
+  const address = String(settings?.contact?.address || '').trim()
   return {
     '@context': 'https://schema.org',
     '@graph': [
       {
-        '@type': 'Organization',
+        '@type': 'OnlineStore',
         '@id': `${SITE_URL}/#organization`,
-        name: 'AS Company (Absolute Solutions SAL)',
-        alternateName: SITE_NAME,
+        name: SITE_NAME,
+        legalName: LEGAL_NAME,
+        description: SITE_TAGLINE,
         url: SITE_URL,
         logo: absoluteUrl('/as-store-logo.png'),
+        parentOrganization: { '@type': 'Organization', '@id': COMPANY_ORG_ID, name: 'AS Company', url: `${COMPANY_URL}/` },
+        areaServed: { '@type': 'Country', name: 'Lebanon' },
+        ...(address ? { address: postalAddress(address) } : {}),
+        // The counter behind the website: where orders can be returned.
+        ...(shop ? { hasPOS: { '@id': shop['@id'] } } : {}),
         ...(sameAs.length ? { sameAs } : {}),
         ...(settings?.contact?.email ? { email: settings.contact.email } : {}),
         ...(settings?.contact?.phone ? { telephone: settings.contact.phone } : {}),
@@ -94,6 +179,7 @@ export function organizationJsonLd(settings = {}) {
           'query-input': 'required name=search_term_string',
         },
       },
+      ...(shop ? [shop] : []),
     ],
   }
 }

@@ -1,7 +1,10 @@
+import Link from 'next/link'
 import { BrandLockup } from './Brand'
+import { hoursSentence } from '@/lib/hours'
 
-export default function Footer({ settings = {} }) {
+export default function Footer({ settings = {}, shop = null }) {
   const year = new Date().getFullYear()
+  const hours = hoursSentence(shop?.hours)
   return (
     <footer className="mt-20 border-t border-black/5 bg-white">
       <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8">
@@ -12,10 +15,17 @@ export default function Footer({ settings = {} }) {
               What&apos;s on across Lebanon — concerts, comedy, theatre, festivals and nights out,
               in one place. Brought to you by AS Company.
             </p>
+            {(shop?.address || hours) && (
+              <p className="mt-3 text-xs leading-relaxed text-as-charcoal/50">
+                {shop?.address && <>Visit us in {shop.address}. </>}
+                {hours && <>Open {hours}</>}
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-2 text-sm text-as-charcoal/65">
             <a href="https://www.as.com.lb" className="transition hover:text-as-red">AS Company</a>
             <a href="https://store.as.com.lb" className="transition hover:text-as-red">AS Store</a>
+            <Link href="/faq" className="transition hover:text-as-red">FAQ</Link>
             <a href="https://www.as.com.lb/contact" className="transition hover:text-as-red">Contact</a>
             {settings.contactEmail && (
               <a href={`mailto:${settings.contactEmail}`} className="transition hover:text-as-red">

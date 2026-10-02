@@ -10,6 +10,9 @@ const latest = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Tailwind 4 runs through its Vite plugin, not PostCSS. An inline config stops Vite searching
+  // parent folders and picking up the marketing site's Tailwind 3 postcss.config.js at the repo root.
+  css: { postcss: {} },
   build: { target: 'es2022' },
   server: { proxy: latest },
   preview: { proxy: latest },

@@ -76,3 +76,13 @@ export async function getCategories() {
 export async function getSettings() {
   return get('/api/settings', {})
 }
+
+/**
+ * The physical shop — address, phone, opening hours — as the AS Store admin
+ * states them, relayed by the site API (/api/shop). null when unknown, so the
+ * FAQ and the footer leave it out rather than guess.
+ */
+export async function getShop() {
+  const shop = await get('/api/shop', null)
+  return shop && (shop.address || shop.hours) ? shop : null
+}

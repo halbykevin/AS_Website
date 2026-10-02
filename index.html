@@ -3,41 +3,30 @@
   <head>
     <meta name="google-site-verification" content="fw5Sai7ohTaQHYwYwqVeKtxtdyc5lmYDLhpi2EpnfUg" />
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/jpeg" href="/ASCompanyLogo.jpg" />
-    <link rel="apple-touch-icon" href="/ASCompanyLogo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#A41E22" />
+
+    <!-- Per-route head: title, description, canonical, OpenGraph/Twitter,
+         favicon and JSON-LD. scripts/prerender.mjs replaces everything between
+         these markers with the route's own tags (src/lib/seo.js), and
+         <RouteHead> keeps them in step as a visitor navigates. What is here is
+         only the fallback for pages that are not pre-rendered (dev, admin). -->
+    <!--seo:start-->
+    <title>AS Company — Telecommunication &amp; Electronics in Lebanon</title>
     <meta
       name="description"
-      content="AS Company (Absolute Solutions SAL) — Lebanon's market leader in telecommunication and electronics since 2008. Discover our services, upcoming events and the World Cup 2026 predictor game."
+      content="AS Company (Absolute Solutions SAL) — market leader in telecommunication and electronics in Lebanon since 2008."
     />
+    <link rel="icon" href="/ASCompanyLogo.jpg" />
+    <link rel="apple-touch-icon" href="/ASCompanyLogo.jpg" />
+    <!--seo:end-->
 
-    <!-- Open Graph (WhatsApp, Facebook, LinkedIn link previews) -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="AS Company" />
-    <meta property="og:title" content="AS Company — Absolute Solutions SAL" />
-    <meta
-      property="og:description"
-      content="Lebanon's market leader in telecommunication and electronics since 2008. Discover our services, upcoming events and the World Cup 2026 predictor game."
-    />
-    <meta property="og:url" content="https://as.com.lb/" />
-    <meta property="og:image" content="https://as.com.lb/ASCompanyLogo.jpg" />
-    <meta property="og:image:alt" content="AS Company — Absolute Solutions SAL logo" />
-
-    <!-- Twitter / X card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="AS Company — Absolute Solutions SAL" />
-    <meta
-      name="twitter:description"
-      content="Lebanon's market leader in telecommunication and electronics since 2008."
-    />
-    <meta name="twitter:image" content="https://as.com.lb/ASCompanyLogo.jpg" />
-
-    <!-- Warm up the API + event-image CDN early: the homepage data and the LCP
-         banner image come from these origins (Lighthouse "preconnect candidates"). -->
+    <!-- Warm up the origins the first paint needs: the API (content refresh +
+         logo) and the store's image host, which serves the homepage slideshow's
+         product photos — the largest thing above the fold. The event-image
+         CDNs that used to be here served a banner the homepage no longer has. -->
     <link rel="preconnect" href="https://asapi.as.com.lb" crossorigin />
-    <link rel="preconnect" href="https://cdn.ticketingboxoffice.com" crossorigin />
-    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin />
-    <link rel="preconnect" href="https://images-ihjoz-com.s3.amazonaws.com" crossorigin />
+    <link rel="preconnect" href="https://store-api.as.com.lb" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Load fonts without blocking render: fetch as "print", then swap to "all" on load -->
@@ -58,7 +47,6 @@
         rel="stylesheet"
       />
     </noscript>
-    <title>AS Company — Telecommunication & Electronics in Lebanon</title>
   </head>
   <body>
     <div id="root"></div>

@@ -15,9 +15,10 @@ const dbDir = path.join(__dirname, '..', '..', 'db')
 // loyalty.sql is still applied — the tables it creates are retained but no
 // longer read, so a DB rebuilt from scratch still has somewhere for that
 // conversion to look.
-// exclusive.sql comes last: it adds columns to `products` and `orders` and
-// seeds a product row, so everything it touches has to exist first.
-for (const name of ['schema.sql', 'notifications.sql', 'spin.sql', 'loyalty.sql', 'wallet.sql', 'exclusive.sql']) {
+// exclusive.sql comes after those: it adds columns to `products` and `orders`
+// and seeds a product row, so everything it touches has to exist first.
+// license_renewal.sql only adds columns to `orders`, and follows it.
+for (const name of ['schema.sql', 'notifications.sql', 'spin.sql', 'loyalty.sql', 'wallet.sql', 'exclusive.sql', 'license_renewal.sql']) {
   const sql = fs.readFileSync(path.join(dbDir, name), 'utf8')
   await pool.query(sql)
   console.log(`AS Store ${name} applied.`)

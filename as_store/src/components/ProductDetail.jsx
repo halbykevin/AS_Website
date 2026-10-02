@@ -10,6 +10,7 @@ import ImageLightbox from './ImageLightbox.jsx'
 import Breadcrumbs from './Breadcrumbs.jsx'
 import ShareMenu from './ShareMenu.jsx'
 import QtyField from './QtyField.jsx'
+import LicenseRenewalBox from './LicenseRenewalBox.jsx'
 import { addItem, isBulk, maxQtyOf, minQtyOf, stepOf, formatQty, qtyLabelOf } from '@/store/cartSlice'
 import { SITE_URL } from '@/lib/seo'
 import { PRODUCT_IMAGE_FALLBACK } from '@/lib/productImage'
@@ -59,6 +60,20 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
   useEffect(() => {
     setQty(minQty)
   }, [product.id, minQty])
+
+  // An AS-Punch licence renewal arrives as ?renewal=<code> on an exclusive
+  // product, and replaces the typed amount with the licence's fixed one. It is
+  // read here in the browser rather than by the page, which stays static and
+  // cached for every other visitor. Until it has been read, an exclusive
+  // product's buy box stays empty — otherwise the editable amount would flash
+  // before the fixed one replaced it.
+  const [renewalCode, setRenewalCode] = useState('')
+  const [urlRead, setUrlRead] = useState(!product.exclusive)
+  useEffect(() => {
+    if (!product.exclusive) return
+    setRenewalCode(new URLSearchParams(window.location.search).get('renewal') || '')
+    setUrlRead(true)
+  }, [product.exclusive])
 
   // Price-hidden product: the API sends no price for these, so there is nothing
   // to render and nothing to sell. The quantity stepper and Add to Bag go with
@@ -169,6 +184,9 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
             </h1>
             {product.tagline && <p className="mt-3 text-xl text-as-ink/60">{product.tagline}</p>}
 
+            {/* A renewal's price is the licence's, stated in the box below; the
+                product's own $1 would only confuse it. */}
+            {!renewalCode && (
             <div className="mt-6 flex items-center gap-3">
               {quoteOnly ? (
                 <span className="text-2xl font-semibold text-as-red">{cfp.label}</span>
@@ -184,6 +202,7 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                 </>
               )}
             </div>
+            )}
 
             {/* The price above is the goods alone. Skipped for a quote-only
                 product: there is no figure on screen to qualify — and for an
@@ -223,6 +242,10 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
               </div>
             )}
 
+            {renewalCode && <LicenseRenewalBox code={renewalCode} product={product} />}
+
+            {urlRead && !renewalCode && (
+            <>
             {/* items-end, not items-center: the typed box below carries a label
                 above it, and centring would float Add to Bag against the middle
                 of the pair rather than sitting on the same line as the box. */}
@@ -331,6 +354,8 @@ export default function ProductDetail({ product, whatsapp, breadcrumb = [] }) {
                     product "in steps of 1" is noise. */}
                 {qtyStep < 1 ? ' · halves and decimals are fine' : ''}
               </p>
+            )}
+            </>
             )}
 
             {product.categorySlug && (

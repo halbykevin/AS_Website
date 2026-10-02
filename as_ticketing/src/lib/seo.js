@@ -20,6 +20,13 @@ export const SITE_NAME = 'AS Ticketing Hub'
 export const SITE_TAGLINE = 'Events in Lebanon — concerts, comedy, theatre & festivals'
 export const LEGAL_NAME = 'Absolute Solutions SAL'
 
+// The parent company's site. Its Organization node is declared there (src/lib/
+// seo.js at the repo root) under this exact @id, and the AS Store points at the
+// same one — which is what tells a search or answer engine that the three
+// domains are one company. The www host is the one that serves.
+export const COMPANY_URL = (process.env.NEXT_PUBLIC_COMPANY_URL || 'https://www.as.com.lb').replace(/\/$/, '')
+export const COMPANY_ORG_ID = `${COMPANY_URL}/#organization`
+
 // Every event on this platform happens in Lebanon (the sync runs with
 // --country Lebanon), which is what lets the country be a constant here.
 const COUNTRY = 'LB'
@@ -126,12 +133,15 @@ export function organizationJsonLd(settings = {}) {
     '@context': 'https://schema.org',
     '@graph': [
       {
+        // The hub itself, hanging off AS Company — see COMPANY_ORG_ID.
         '@type': 'Organization',
         '@id': `${SITE_URL}/#organization`,
-        name: `AS Company (${settings.legalName || LEGAL_NAME})`,
-        alternateName: SITE_NAME,
+        name: SITE_NAME,
+        legalName: settings.legalName || LEGAL_NAME,
+        description: SITE_TAGLINE,
         url: SITE_URL,
         logo: DEFAULT_OG_IMAGE,
+        parentOrganization: { '@type': 'Organization', '@id': COMPANY_ORG_ID, name: 'AS Company', url: `${COMPANY_URL}/` },
         areaServed: { '@type': 'Country', name: 'Lebanon' },
         ...(sameAs.length ? { sameAs } : {}),
         ...(settings.contactEmail ? { email: settings.contactEmail } : {}),

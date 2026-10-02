@@ -74,6 +74,15 @@ import {
   refundOrderWalletSafe,
   WalletError,
 } from "./wallet.js";
+import {
+  licenseRenewalRouter,
+  licenseRenewalEnabled,
+  isRenewalCode,
+  resolveRenewal,
+  renewalRefusal,
+  queueLicenseRenewal,
+  licenseRenewalJson,
+} from "./licenseRenewal.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.resolve(
@@ -384,6 +393,9 @@ const settingsJson = (r) => ({
     whatsapp: r.contact_whatsapp || "",
     address: r.contact_address || "",
   },
+  // The shop's week: { mon: ["09:00","17:00"] | null, ... sun }. null when no
+  // day is set at all, so a client can tell "never configured" from "closed".
+  hours: openingHours(r.opening_hours),
   socials: r.socials || {},
   // Copy for price-hidden products. Which products use it is the per-product
   // `callForPrice` flag; this is only what they say.
@@ -453,6 +465,52 @@ const tagValue = (v, kind, field) => {
     throw err;
   }
   return s;
+};
+
+// ---- Opening hours ----
+// The shop's week as stored in settings.opening_hours: one key per day, each
+// ["HH:MM","HH:MM"] (open, close) or null for closed. Read leniently — a
+// malformed day reads as closed rather than breaking the settings response —
+// and written strictly (openingHoursValue), so the admin is told what is wrong.
+const HOURS_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const validSpan = (v) =>
+  Array.isArray(v) && v.length === 2 && HHMM.test(v[0]) && HHMM.test(v[1]) && v[0] < v[1];
+
+function openingHours(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  let any = false;
+  for (const d of HOURS_DAYS) {
+    out[d] = validSpan(raw[d]) ? [raw[d][0], raw[d][1]] : null;
+    if (out[d]) any = true;
+  }
+  return any ? out : null;
+}
+
+// Settings input: undefined leaves the column alone; anything else must be a
+// complete, valid week or the save is refused with the day that is wrong.
+const openingHoursValue = (v) => {
+  if (v === undefined) return null;
+  const fail = (msg) => {
+    const err = new Error(msg);
+    err.status = 400;
+    throw err;
+  };
+  if (!v || typeof v !== "object") fail("Opening hours must list every day of the week.");
+  const out = {};
+  for (const d of HOURS_DAYS) {
+    const span = v[d];
+    if (span === null || span === undefined) {
+      out[d] = null;
+      continue;
+    }
+    if (!validSpan(span)) {
+      fail(`Opening hours for ${d}: use HH:MM times with the closing time after the opening time.`);
+    }
+    out[d] = [span[0], span[1]];
+  }
+  return JSON.stringify(out);
 };
 
 // Settings money input: undefined/blank leaves the column alone (COALESCE), a
@@ -601,6 +659,8 @@ const orderJson = (r) => ({
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
   collectUrl: r.whish_collect_url || "", // hosted Whish page, for resuming an unpaid payment
+  // An AS-Punch licence renewal and where it stands — null on every other order.
+  licenseRenewal: licenseRenewalJson(r),
   customerId: r.customer_id,
   customerEmail: r.customer_email, // present on admin queries
   itemCount: r.item_count, // present on list queries
@@ -1823,6 +1883,38 @@ app.post(
       });
     }
 
+    // An AS-Punch licence renewal (see licenseRenewal.js). What it costs is the
+    // licence server's answer for this code, resolved here and now — the
+    // quantity the browser sent for the line is ignored, so an edited request
+    // cannot change the amount. Only an exclusive product can carry one, which
+    // is what keeps VAT, delivery, cash and the wallet off it.
+    const renewalCode = b.licenseRenewal ? String(b.licenseRenewal) : "";
+    let renewal = null;
+    if (renewalCode) {
+      if (!isRenewalCode(renewalCode)) {
+        return res.status(400).json({ error: "This renewal link is not valid.", code: "renewal_invalid" });
+      }
+      if (!licenseRenewalEnabled()) {
+        return res.status(503).json({ error: "Online licence renewal is unavailable right now.", code: "renewal_unavailable" });
+      }
+      if (resolvedRows.length !== 1 || !resolvedRows[0].exclusive) {
+        return res.status(400).json({ error: "A licence renewal is paid on its own.", code: "renewal_item" });
+      }
+      try {
+        renewal = await resolveRenewal(renewalCode);
+      } catch (e) {
+        console.error("[license-renewal] resolve at checkout failed:", e?.message || e);
+        return res.status(502).json({
+          error: "Could not reach the licensing server. Please try again in a moment.",
+          code: "renewal_unreachable",
+        });
+      }
+      const refusal = renewalRefusal(renewal);
+      if (refusal) {
+        return res.status(400).json({ error: refusal, code: `renewal_${renewal?.status || "invalid"}` });
+      }
+    }
+
     // Nothing is being carried anywhere on an exclusive order, so demanding a
     // street address for one would be asking for a detail with no use. Every
     // other order still needs somewhere to go.
@@ -1834,7 +1926,22 @@ app.post(
 
     const items = [];
     let subtotal = 0;
-    for (const it of cleaned) {
+    if (renewal) {
+      // One line at the licence server's price, not quantity × unit price: the
+      // product's own bounds and step describe typed amounts, and this amount
+      // is not typed by anyone.
+      const p = resolvedRows[0];
+      items.push({
+        productId: p.id,
+        name: `${p.name} — licence renewal: ${renewal.companyName || "AS-Punch"} (${renewal.periodMonths || 1} month)`,
+        price: Number(renewal.amount),
+        qty: 1,
+        image: p.image || "",
+        step: 1,
+      });
+      subtotal = Number(renewal.amount);
+    }
+    for (const it of renewal ? [] : cleaned) {
       const p = byId.get(it.productId);
       if (!p) continue;
       const pct = Number(p.sale_percent) || 0;
@@ -1971,8 +2078,9 @@ app.post(
     let orderId;
     try {
       const { rows } = await query(
-        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, wallet_amount, payment_method, payment_status, exclusive, currency)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'USD') RETURNING id`,
+        `INSERT INTO orders (customer_id, status, full_name, phone, email, address, city, notes, subtotal, delivery_fee, vat_percent, vat_amount, discount_amount, voucher_code, voucher_id, wallet_amount, payment_method, payment_status, exclusive, currency,
+                             license_renewal_code, license_renewal_status, license_renewal_result)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'USD',$20,$21,$22) RETURNING id`,
         [
           customerId,
           settledByWallet ? "confirmed" : "pending",
@@ -1996,6 +2104,15 @@ app.post(
           // earnings on every status change, and looking the product's flag up
           // then would rewrite this order's history the day someone clears it.
           exclusiveOrder,
+          renewal ? renewalCode : null,
+          renewal ? "awaiting_payment" : null,
+          renewal
+            ? JSON.stringify({
+                companyName: renewal.companyName || null,
+                periodMonths: renewal.periodMonths || 1,
+                licenseExpiresAt: renewal.licenseExpiresAt || null,
+              })
+            : null,
         ],
       );
       orderId = rows[0].id;
@@ -2127,6 +2244,10 @@ async function markWhishPaid(orderId) {
   // Being paid moves the order to 'confirmed' — wallet credit if the programme
   // awards that early, nothing yet under the default 'delivered' rule.
   await syncOrderWalletSafe(orderId);
+  // An AS-Punch licence renewal is reported to the licence server now, so the
+  // order page the customer is about to land on can already say "renewed".
+  // A no-op for every other order; never throws.
+  await queueLicenseRenewal(orderId);
   const detail = await loadOrderDetail(orderId);
   sendOrderEmails(detail, signOrderToken(orderId)).catch((e) =>
     console.error("[mail]", e?.message || e),
@@ -3321,7 +3442,8 @@ app.put(
          call_for_price_button     = COALESCE($35, call_for_price_button),
          call_for_price_note       = COALESCE($36, call_for_price_note),
          call_for_price_message    = COALESCE($37, call_for_price_message),
-         call_for_price_url        = COALESCE($38, call_for_price_url)
+         call_for_price_url        = COALESCE($38, call_for_price_url),
+         opening_hours             = COALESCE($39::jsonb, opening_hours)
        WHERE id = 1 RETURNING *`,
       [
         b.storeName ?? null,
@@ -3371,6 +3493,7 @@ app.put(
         b.callForPrice?.note ?? null,
         b.callForPrice?.message ?? null,
         b.callForPrice?.url ?? null,
+        openingHoursValue(b.hours),
       ],
     );
     res.json(settingsJson(rows[0]));
@@ -3712,6 +3835,7 @@ app.use(scraperRouter);
 app.use(notificationsRouter);
 app.use(spinRouter);
 app.use(walletRouter);
+app.use(licenseRenewalRouter);
 
 // ========================= Errors =========================
 app.use((err, _req, res, _next) => {

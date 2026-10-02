@@ -20,6 +20,7 @@ export default async function sitemap() {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/shop`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE_URL}/faq`, changeFrequency: 'monthly', priority: 0.5 },
     // Bespoke code pages (always exist) — not gated by loadPage below. These
     // are the ones Google Merchant Center reads, so they must be discoverable.
     { url: `${SITE_URL}/pages/privacy`, changeFrequency: 'yearly', priority: 0.3 },

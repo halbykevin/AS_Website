@@ -12,6 +12,7 @@ export default async function sitemap() {
 
   return [
     { url: `${SITE_URL}/events`, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${SITE_URL}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
     // The category tabs are real, indexable pages with their own titles and
     // canonicals — so they belong here, ranked below the full listing.
     ...categories.map((c) => ({
