@@ -45,6 +45,8 @@ const InputOffIcon = () => (
   </svg>
 );
 const DisconnectIcon = icon("M18.36 5.64a9 9 0 1 1-12.73 0M12 2v10", 12);
+const MenuIcon = icon("M4 6h16M4 12h16M4 18h16", 14);
+const ConnectIcon = icon("M5 12h14M13 5l7 7-7 7", 14);
 
 const relative = new Intl.RelativeTimeFormat(undefined, {
   numeric: "auto",
@@ -359,6 +361,7 @@ function App() {
   const [uaPassword, setUaPassword] = useState("");
   const [uaConfirm, setUaConfirm] = useState("");
   const [uaOpen, setUaOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [permissions, setPermissions] = useState<Capability[]>(["screen"]);
   const [now, setNow] = useState(Date.now());
@@ -1002,66 +1005,6 @@ function App() {
           </label>
         </details>
       </section>
-      {(state.unattendedEnabled || state.status === "ready") && (
-        <section className="panel unattended" aria-labelledby="ua-title">
-          <span className="panel-label" id="ua-title">
-            Unattended access to this computer
-          </span>
-          {state.unattendedEnabled ? (
-            <>
-              <p className="muted">
-                <span className="live-dot on" /> On — someone with the password can connect without anyone here approving. Sessions are still shown, and <kbd>Ctrl+Alt+Shift+F12</kbd> stops instantly.
-              </p>
-              <button className="secondary" disabled={busy} onClick={() => void act(() => window.remote.clearUnattended())}>
-                Turn off
-              </button>
-            </>
-          ) : uaOpen ? (
-            <form
-              className="ua-form"
-              onSubmit={e => {
-                e.preventDefault();
-                if (uaPassword !== uaConfirm) {
-                  setError("The passwords do not match.");
-                  return;
-                }
-                void act(async () => {
-                  await window.remote.setUnattended(uaPassword);
-                  setUaPassword("");
-                  setUaConfirm("");
-                  setUaOpen(false);
-                });
-              }}
-            >
-              <input type="password" value={uaPassword} onChange={e => setUaPassword(e.target.value)} placeholder="New password (at least 8 characters)" autoComplete="new-password" autoFocus />
-              <input type="password" value={uaConfirm} onChange={e => setUaConfirm(e.target.value)} placeholder="Confirm password" autoComplete="new-password" />
-              <div className="ua-actions">
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setUaOpen(false);
-                    setUaPassword("");
-                    setUaConfirm("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button className="primary" disabled={busy || uaPassword.length < 8}>
-                  Save password
-                </button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <p className="muted">Set a password to reach this computer later without anyone here to approve the request.</p>
-              <button className="secondary" onClick={() => setUaOpen(true)}>
-                Set a password…
-              </button>
-            </>
-          )}
-        </section>
-      )}
       {!!state.recent?.length && (
         <section className="recent" aria-labelledby="recent-title">
           <span className="panel-label" id="recent-title">
@@ -1135,8 +1078,9 @@ function App() {
   );
 
   if (!tabs.length) {
+    const isReady = state.status === "ready";
     return (
-      <div className="shell">
+      <div className="shell ad-shell">
         <div className="titlebar" onMouseDown={drag}>
           <span className="app-name">
             <span className="logo">
@@ -1144,11 +1088,255 @@ function App() {
             </span>
             ASDesk
           </span>
-          <WindowControls maximized={maximized} />
+          <span className="ad-nav-label">New Session</span>
+          <div className="ad-titlebar-right">
+            {loaded && state.status !== "setup" && (
+              <button
+                className={`ad-menu-toggle ${menuOpen ? "active" : ""}`}
+                aria-label="Menu"
+                title="Settings & options"
+                onClick={() => setMenuOpen(m => !m)}
+              >
+                <MenuIcon />
+              </button>
+            )}
+            <WindowControls maximized={maximized} />
+          </div>
         </div>
+
+        {loaded && state.status !== "setup" && (
+          <div className="address-bar">
+            <span className={`addr-dot ${state.status}`} title={labels[state.status]} />
+            <form
+              className="addr-form"
+              onSubmit={e => {
+                e.preventDefault();
+                connectTo(target.replaceAll(" ", ""));
+              }}
+            >
+              <input
+                value={target}
+                onChange={e => setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))}
+                placeholder="Enter Remote Address"
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={!isReady}
+              />
+              <button
+                type="submit"
+                className="addr-connect"
+                disabled={busy || !isReady || !validTarget || full}
+                aria-label="Connect"
+                title={full ? `Up to ${MAX_SESSIONS} sessions` : "Connect"}
+              >
+                <ConnectIcon />
+              </button>
+            </form>
+          </div>
+        )}
+
         {errorBar}
-        {home}
-        {statusbar}
+
+        {!loaded ? (
+          <main className="ad-main" />
+        ) : state.status === "setup" ? (
+          <main className="setup">
+            <h1>Set up this computer</h1>
+            <p className="muted">Connect to your remote-access server to get a connection ID.</p>
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                void act(async () => {
+                  await window.remote.setup({
+                    server,
+                    ...(token.trim() ? { enrollmentToken: token } : {})
+                  });
+                  setToken("");
+                });
+              }}
+            >
+              <label htmlFor="server">Company server</label>
+              <input id="server" type="url" value={server} onChange={e => setServer(e.target.value)} required placeholder="https://remote.yourcompany.com" autoComplete="off" />
+              <label htmlFor="token">Enrollment token (optional)</label>
+              <input id="token" type="password" value={token} onChange={e => setToken(e.target.value)} autoComplete="off" placeholder="Only if your server requires one" />
+              <button className="primary wide" disabled={busy}>
+                {busy ? "Registering…" : "Set up this computer"}
+              </button>
+            </form>
+          </main>
+        ) : (
+          <main className="ad-main">
+            <div className="ad-center">
+              <span className="ad-id-label">Your Address</span>
+              <div className="ad-id-row">
+                <span className="ad-device-id" data-testid="device-id">
+                  {formatId(state.deviceId)}
+                </span>
+                <button
+                  className="ad-id-action"
+                  disabled={!state.deviceId}
+                  aria-label="Copy ID"
+                  title="Copy ID"
+                  onClick={() => {
+                    void window.remote
+                      .copyId()
+                      .then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      })
+                      .catch(() => setError("Select the ID and copy it with Ctrl+C"));
+                  }}
+                >
+                  {copied ? <CheckIcon /> : <CopyIcon />}
+                </button>
+              </div>
+            </div>
+
+            {!!state.recent?.length && (
+              <section className="ad-recent" aria-labelledby="ad-recent-title">
+                <span className="panel-label" id="ad-recent-title">
+                  Recent
+                </span>
+                <ul>
+                  {state.recent.map(r => {
+                    const openSession = controlled.find(s => s.peerId === r.id);
+                    const open = !!openSession || tabs.includes(r.id);
+                    const label = r.name ? `${r.name} (${formatId(r.id)})` : formatId(r.id);
+                    const when = open ? (
+                      <>
+                        <span className="live-dot on" />
+                        open
+                      </>
+                    ) : (
+                      <>
+                        <HistoryIcon />
+                        {ago(r.at, now)}
+                      </>
+                    );
+                    if (renaming === r.id)
+                      return (
+                        <li key={r.id}>
+                          <RenameField id={r.id} name={r.name} onDone={value => saveName(r.id, r.name, value)} />
+                        </li>
+                      );
+                    return (
+                      <li key={r.id}>
+                        <button className="recent-connect" disabled={busy || !isReady || (!open && full)} aria-label={open ? `Show ${label}` : `Connect to ${label}`} title={open ? "Show this session" : `Connect to ${label}`} onClick={() => (openSession && popouts[openSession.sessionId] ? popOut(openSession) : open ? setTab(r.id) : connectTo(r.id))}>
+                          {r.name ? (
+                            <>
+                              <span className="recent-name">{r.name}</span>
+                              <span className="recent-time">
+                                <span className="recent-id-small">{formatId(r.id)}</span>·{when}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="recent-id">{formatId(r.id)}</span>
+                              <span className="recent-time">{when}</span>
+                            </>
+                          )}
+                        </button>
+                        <div className="recent-actions">
+                          <button aria-label={`Remove ${label} from recent`} title="Remove" onClick={() => void act(() => window.remote.forget(r.id))}>
+                            <CloseIcon />
+                          </button>
+                          <button aria-label={r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`} title={r.name ? "Rename" : "Add a name"} onClick={() => setRenaming(r.id)}>
+                            <RenameIcon />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+          </main>
+        )}
+
+        {menuOpen && (
+          <>
+            <div className="ad-menu-backdrop" onClick={() => setMenuOpen(false)} />
+            <div className="ad-menu">
+              <div className="ad-menu-section">
+                <span className="ad-menu-title">Connection Options</span>
+                <label className="check">
+                  <input type="checkbox" checked={clipboardEnabled} onChange={e => setClipboardEnabled(e.target.checked)} />
+                  Request clipboard & file transfer
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
+                  Use relay only
+                </label>
+                <label className="ad-menu-field-label" htmlFor="ua-connect-menu">
+                  Unattended password
+                </label>
+                <input id="ua-connect-menu" type="password" value={unattendedPassword} onChange={e => setUnattendedPassword(e.target.value)} placeholder="If target has one set" autoComplete="off" />
+                <label className="check">
+                  <input type="checkbox" checked={rememberPassword} disabled={!unattendedPassword.trim()} onChange={e => setRememberPassword(e.target.checked)} />
+                  Remember password
+                </label>
+              </div>
+              {(state.unattendedEnabled || isReady) && (
+                <div className="ad-menu-section">
+                  <span className="ad-menu-title">Unattended Access</span>
+                  {state.unattendedEnabled ? (
+                    <>
+                      <p className="muted ad-menu-text">
+                        <span className="live-dot on" /> On — password access accepted automatically.
+                      </p>
+                      <button className="secondary ad-menu-btn-action" disabled={busy} onClick={() => void act(() => window.remote.clearUnattended())}>
+                        Turn off
+                      </button>
+                    </>
+                  ) : uaOpen ? (
+                    <form
+                      className="ua-form"
+                      onSubmit={e => {
+                        e.preventDefault();
+                        if (uaPassword !== uaConfirm) {
+                          setError("The passwords do not match.");
+                          return;
+                        }
+                        void act(async () => {
+                          await window.remote.setUnattended(uaPassword);
+                          setUaPassword("");
+                          setUaConfirm("");
+                          setUaOpen(false);
+                        });
+                      }}
+                    >
+                      <input type="password" value={uaPassword} onChange={e => setUaPassword(e.target.value)} placeholder="New password (min 8 chars)" autoComplete="new-password" autoFocus />
+                      <input type="password" value={uaConfirm} onChange={e => setUaConfirm(e.target.value)} placeholder="Confirm password" autoComplete="new-password" />
+                      <div className="ua-actions">
+                        <button type="button" className="secondary" onClick={() => { setUaOpen(false); setUaPassword(""); setUaConfirm(""); }}>
+                          Cancel
+                        </button>
+                        <button className="primary" disabled={busy || uaPassword.length < 8}>
+                          Save
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <p className="muted ad-menu-text">Set a password for unattended access.</p>
+                      <button className="secondary ad-menu-btn-action" onClick={() => setUaOpen(true)}>
+                        Set a password…
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="ad-menu-footer">
+                <span className={`status status-${state.status}`}>
+                  <i />
+                  {labels[state.status]}
+                </span>
+                <span className="ad-menu-version">v{state.appVersion}</span>
+              </div>
+            </div>
+          </>
+        )}
+
         {incomingModal}
         {popoutViews}
       </div>
