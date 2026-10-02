@@ -16,9 +16,11 @@ use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::tungstenite::{client::IntoClientRequest, http::HeaderValue, protocol::WebSocketConfig, Message};
 
+use zeroize::Zeroizing;
+
 use crate::{identity::{self, Identity, Recent, RECENT_LIMIT}, input::Input, log, platform::{self, Rect},
     protocol::{is_public_id, is_uuid, valid_capabilities, Capability, ClientMessage, InputEvent}, security,
-    transfer::{self, FileInfo}};
+    transfer::{self, FileInfo}, unattended};
 
 /// Sessions (including waiting requests) one computer may control at once; matches the server.
 pub const MAX_SESSIONS: usize = 8;
@@ -37,7 +39,9 @@ pub enum Phase { Negotiating, Connected }
 pub struct IceServer { pub urls: Vec<String>, pub username: String, pub credential: String }
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ActiveSession { pub session_id: String, pub role: Role, pub peer_id: String, pub permissions: Vec<Capability>, pub expires_at: i64, pub ice_servers: Vec<IceServer>, pub relay_only: bool, pub phase: Phase }
+pub struct ActiveSession { pub session_id: String, pub role: Role, pub peer_id: String, pub permissions: Vec<Capability>, pub expires_at: i64, pub ice_servers: Vec<IceServer>, pub relay_only: bool, pub phase: Phase,
+    /// This session was approved by the unattended password, not by someone clicking Accept.
+    pub unattended: bool }
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Incoming { pub request_id: String, pub source_id: String, pub permissions: Vec<Capability>, pub expires_at: i64 }
@@ -58,6 +62,9 @@ pub struct DesktopState {
     /// Established sessions, in the order they started.
     pub sessions: Vec<ActiveSession>,
     pub native_available: bool,
+    /// Unattended access is configured on this computer (a password is set). The password itself is
+    /// never sent to the UI — only whether one exists.
+    pub unattended_enabled: bool,
     pub app_version: String,
 }
 impl DesktopState {
@@ -71,6 +78,9 @@ pub enum DesktopEvent {
     Signal { message: ClientMessage },
     /// A session ended (its media must stop); `session_id` is absent when all sessions ended.
     Stop { #[serde(rename = "sessionId", skip_serializing_if = "Option::is_none")] session_id: Option<String>, reason: String },
+    /// Unattended access: the controller proved the password, so the UI should capture the screen and
+    /// accept this request automatically — the same capture+accept the Accept button runs, no click.
+    AutoAccept { #[serde(rename = "requestId")] request_id: String, permissions: Vec<Capability> },
     /// A window was maximized or restored ("main", or a popped-out session's "session-<id>").
     Window { label: String, maximized: bool },
     /// A popped-out session's window was closed from outside the page (Alt+F4, the taskbar): the page
@@ -88,7 +98,9 @@ pub trait Host: Send + Sync + 'static {
 type Reply<T> = oneshot::Sender<Result<T, String>>;
 enum Cmd {
     Setup { server: String, token: Option<String>, reply: Reply<()> },
-    Connect { target: String, clipboard: bool, relay: bool, reply: Reply<()> },
+    Connect { target: String, clipboard: bool, relay: bool, password: Option<String>, remember: bool, reply: Reply<()> },
+    SetUnattended { password: String, reply: Reply<()> },
+    ClearUnattended { reply: Reply<()> },
     Accept { request_id: String, permissions: Vec<Capability>, source_id: String, width: u32, height: u32, thumbnail: Option<Vec<u8>>, reply: Reply<()> },
     Reject { request_id: String, reply: Reply<()> },
     Cancel { target: String, reply: Reply<()> },
@@ -131,7 +143,11 @@ impl AgentHandle {
     }
     pub fn state(&self) -> DesktopState { self.snapshot.lock().unwrap().clone() }
     pub async fn setup(&self, server: String, token: Option<String>) -> Result<(), String> { self.call(|reply| Cmd::Setup { server, token, reply }).await }
-    pub async fn connect(&self, target: String, clipboard: bool, relay: bool) -> Result<(), String> { self.call(|reply| Cmd::Connect { target, clipboard, relay, reply }).await }
+    pub async fn connect(&self, target: String, clipboard: bool, relay: bool, password: Option<String>, remember: bool) -> Result<(), String> {
+        self.call(|reply| Cmd::Connect { target, clipboard, relay, password, remember, reply }).await
+    }
+    pub async fn set_unattended(&self, password: String) -> Result<(), String> { self.call(|reply| Cmd::SetUnattended { password, reply }).await }
+    pub async fn clear_unattended(&self) -> Result<(), String> { self.call(|reply| Cmd::ClearUnattended { reply }).await }
     pub async fn accept(&self, request_id: String, permissions: Vec<Capability>, source_id: String, width: u32, height: u32, thumbnail: Option<Vec<u8>>) -> Result<(), String> {
         self.call(|reply| Cmd::Accept { request_id, permissions, source_id, width, height, thumbnail, reply }).await
     }
@@ -190,6 +206,7 @@ pub fn start(options: Options, host: Arc<dyn Host>) -> AgentHandle {
         stopped: false, backoff: 1000, retry_generation: 0, timer_generation: 0, clock_offset: 0, used_nonces: VecDeque::new(),
         consent: None, shared: None, requests: Vec::new(), sessions: HashMap::new(), deferred: VecDeque::new(), sent: VecDeque::new(),
         file_send: HashMap::new(), file_recv: HashMap::new(), elevated: None,
+        unattended: None, challenge: None, auth_failures: VecDeque::new(), auto_accept: None,
     };
     // Received files stay pasteable for the rest of the run (also after the session ends); the next
     // start reclaims the space, since no transfer can be in flight then.
@@ -279,13 +296,17 @@ async fn open_socket(http: &reqwest::Client, server: &str, device_id: &str, key:
     Ok(socket)
 }
 
-/// A request this computer sent.
-struct Request { target: String, request_id: Option<String>, permissions: Vec<Capability>, relay_only: bool }
+/// A request this computer sent. For unattended access it carries the password to answer a challenge
+/// with (held only until the request is accepted or dropped) and whether to remember it on success.
+struct Request { target: String, request_id: Option<String>, permissions: Vec<Capability>, relay_only: bool,
+    unattended_secret: Option<Zeroizing<String>>, remember: bool }
+/// A challenge this computer (the target) sent for an incoming unattended request, awaiting its proof.
+struct Challenge { request_id: String, nonce: String, controller_id: String, expires_at: i64 }
 /// An accepted session: authority (grant) and verification state. `active` is set once its relay
 /// credentials are known and the UI may start media.
 struct Session {
     claims: security::Claims, role: Role, relay_only: bool, active: bool,
-    peer_verified: bool, signal_sent: bool, connected_media: bool, timer: u64,
+    peer_verified: bool, signal_sent: bool, connected_media: bool, timer: u64, unattended: bool,
 }
 /// What a sent message was about, so a server error answering it affects only that.
 #[derive(Clone)]
@@ -315,6 +336,13 @@ struct Agent {
     // While sharing this screen, input is sent to the SYSTEM helper (full access) when it is running;
     // absent means in-process injection (normal-desktop control only). See elevation.rs.
     elevated: Option<crate::elevation::ElevatedInput>,
+    // Unattended access (unattended.rs). The verifier is this computer's stored password secret; the
+    // challenge is the one outstanding for an incoming request; auth_failures throttles guessing; and
+    // auto_accept names a request whose proof verified, so its session is tagged unattended.
+    unattended: Option<unattended::Verifier>,
+    challenge: Option<Challenge>,
+    auth_failures: VecDeque<i64>,
+    auto_accept: Option<String>,
 }
 
 impl Agent {
@@ -340,6 +368,8 @@ impl Agent {
 
     async fn load(&mut self, auto_server: Option<String>) {
         self.state.recent = identity::load_recent(&self.dir);
+        self.unattended = unattended::load(&self.dir);
+        self.state.unattended_enabled = self.unattended.is_some();
         match identity::load(&self.dir, &self.legacy) {
             Ok(Some(identity)) => {
                 self.state.device_id = Some(identity.device_id.clone()); self.state.server = Some(identity.server.clone());
@@ -449,7 +479,7 @@ impl Agent {
     fn end_session(&mut self, session_id: &str, reason: &str, notify_server: bool) {
         let Some(session) = self.sessions.remove(session_id) else { return };
         if notify_server { let _ = self.send(ClientMessage::SessionEnd { session_id: session_id.into() }, None); }
-        if session.role == Role::Target { self.input.stop(); self.elevated = None; self.consent = None; self.shared = None; self.state.incoming = None; }
+        if session.role == Role::Target { self.input.stop(); self.elevated = None; self.consent = None; self.shared = None; self.state.incoming = None; self.challenge = None; self.auto_accept = None; }
         self.file_send.remove(session_id);
         if let Some(partial) = self.file_recv.remove(session_id) { partial.cancel(); }
         self.state.sessions.retain(|s| s.session_id != session_id);
@@ -474,12 +504,14 @@ impl Agent {
         self.file_send.clear();
         for (_, partial) in self.file_recv.drain() { partial.cancel(); }
         self.input.stop(); self.elevated = None; self.consent = None; self.shared = None;
+        self.challenge = None; self.auto_accept = None;
         self.state.sessions.clear(); self.state.incoming = None;
         self.host.emit(DesktopEvent::Stop { session_id: None, reason: reason.into() });
         self.publish();
     }
     fn clear_incoming(&mut self) {
         self.state.incoming = None;
+        self.challenge = None; self.auto_accept = None;
         if self.state.target_session().is_none() && !self.sessions.values().any(|s| s.role == Role::Target) { self.input.stop(); self.elevated = None; self.consent = None; self.shared = None; }
     }
     fn save_recent(&mut self, list: Vec<Recent>) {
@@ -491,9 +523,17 @@ impl Agent {
         match cmd {
             Cmd::Setup { server, token, reply } => { let _ = reply.send(logged("setup", self.setup(&server, token.as_deref()).await)); }
             Cmd::AutoSetup { server } => self.auto_setup(server).await,
-            Cmd::Connect { target, clipboard, relay, reply } => {
-                log::write(format!("request to {target} (clipboard {clipboard}, relay only {relay})"));
-                let _ = reply.send(logged("connect", self.connect(target, clipboard, relay)));
+            Cmd::Connect { target, clipboard, relay, password, remember, reply } => {
+                log::write(format!("request to {target} (clipboard {clipboard}, relay only {relay}, unattended {})", password.is_some()));
+                let _ = reply.send(logged("connect", self.connect(target, clipboard, relay, password.map(Zeroizing::new), remember)));
+            }
+            Cmd::SetUnattended { password, reply } => { let _ = reply.send(logged("set unattended access", self.set_unattended(&password))); }
+            Cmd::ClearUnattended { reply } => {
+                unattended::clear(&self.dir);
+                self.unattended = None; self.challenge = None; self.auth_failures.clear();
+                self.state.unattended_enabled = false; self.publish();
+                log::write("unattended access turned off");
+                let _ = reply.send(Ok(()));
             }
             Cmd::Accept { request_id, permissions, source_id, width, height, thumbnail, reply } => {
                 let _ = reply.send(logged("accept", self.accept(request_id, permissions, &source_id, width, height, thumbnail.as_deref())));
@@ -645,7 +685,7 @@ impl Agent {
         }
     }
 
-    fn connect(&mut self, target: String, clipboard: bool, relay: bool) -> Result<(), String> {
+    fn connect(&mut self, target: String, clipboard: bool, relay: bool, password: Option<Zeroizing<String>>, remember: bool) -> Result<(), String> {
         if self.state.status != Status::Ready { return Err("This computer is not connected to the server yet.".into()); }
         if !is_public_id(&target) { return Err("Enter a nine-digit computer ID".into()); }
         if self.identity.as_ref().is_some_and(|i| i.device_id == target) { return Err("Enter another computer’s ID".into()); }
@@ -657,10 +697,32 @@ impl Agent {
         if self.requests.len() + self.sessions.len() >= MAX_SESSIONS { return Err(server_error("session_limit")); }
         let mut permissions = vec![Capability::Screen, Capability::Mouse, Capability::Keyboard];
         if clipboard { permissions.push(Capability::Clipboard); }
+        // No password typed: fall back to one saved for this computer, so a remembered unattended
+        // connection is one click. An explicit password always wins and is the one remembered.
+        let secret = password.or_else(|| unattended::remembered(&self.dir, &target));
         self.send(ClientMessage::ConnectionRequest { target_id: target.clone(), permissions: permissions.clone() }, Some(Subject::Request(target.clone())))?;
-        self.requests.push(Request { target, request_id: None, permissions, relay_only: relay });
+        self.requests.push(Request { target, request_id: None, permissions, relay_only: relay, unattended_secret: secret, remember });
         self.state.error = None; self.publish();
         Ok(())
+    }
+    fn set_unattended(&mut self, password: &str) -> Result<(), String> {
+        let verifier = unattended::Verifier::create(password)?;
+        unattended::save(&self.dir, &verifier)?;
+        self.unattended = Some(verifier); self.auth_failures.clear();
+        self.state.unattended_enabled = true; self.publish();
+        log::write("unattended access turned on");
+        Ok(())
+    }
+    /// True when too many wrong proofs have arrived recently, so new attempts are refused for a while.
+    /// This is what stops an opportunistic attacker from grinding passwords against an idle computer.
+    fn auth_locked(&mut self) -> bool {
+        let cutoff = now_ms() - 10 * 60 * 1000;
+        while self.auth_failures.front().is_some_and(|&t| t < cutoff) { self.auth_failures.pop_front(); }
+        self.auth_failures.len() >= 5
+    }
+    fn record_auth_failure(&mut self) {
+        self.auth_failures.push_back(now_ms());
+        if self.auth_failures.len() > 32 { self.auth_failures.pop_front(); }
     }
     fn accept(&mut self, request_id: String, permissions: Vec<Capability>, source_id: &str, width: u32, height: u32, thumbnail: Option<&[u8]>) -> Result<(), String> {
         let incoming = self.state.incoming.clone().filter(|i| i.request_id == request_id && self.consent.is_none()).ok_or("That request is no longer available.")?;
@@ -782,9 +844,65 @@ impl Agent {
                 let expires_at = m["expiresAt"].as_f64().ok_or("Invalid server message")? as i64;
                 if !is_uuid(request_id) || !is_public_id(source_id) || !valid_capabilities(&permissions) { return Err("Invalid server message".into()); }
                 log::write(format!("incoming request from {source_id}"));
+                let (request_id, source_id) = (request_id.to_string(), source_id.to_string());
                 // Deadlines shown and checked locally are converted to this computer's clock.
-                self.state.incoming = Some(Incoming { request_id: request_id.into(), source_id: source_id.into(), permissions, expires_at: expires_at - self.clock_offset });
+                let local_expiry = expires_at - self.clock_offset;
+                self.state.incoming = Some(Incoming { request_id: request_id.clone(), source_id: source_id.clone(), permissions, expires_at: local_expiry });
+                self.challenge = None;
                 self.publish();
+                // Unattended access: offer the controller a challenge straight away. If it proves the
+                // password, the request is accepted with no one here; if not (or it is a human-to-human
+                // request), the normal Accept dialog above still works. A recent run of wrong guesses
+                // withholds the challenge entirely, so there is no oracle to grind against.
+                if self.unattended.is_some() {
+                    if self.auth_locked() {
+                        log::write("unattended challenge withheld: too many recent failures");
+                    } else if let (Ok(nonce), Some((salt, params))) = (unattended::nonce(),
+                        self.unattended.as_ref().map(|v| (v.salt().to_string(), v.params().to_string()))) {
+                        self.challenge = Some(Challenge { request_id: request_id.clone(), nonce: nonce.clone(), controller_id: source_id, expires_at: local_expiry });
+                        let _ = self.send(ClientMessage::ConnectionChallenge { request_id, nonce, salt, params }, Some(Subject::Incoming));
+                    }
+                }
+            }
+            // Controller side: the target asked us to prove the unattended password. If the user gave
+            // one for this request, derive the proof and send it; otherwise ignore and wait (a person
+            // at the other end may still accept by hand).
+            "connection.challenge" => {
+                let (request_id, nonce, salt, params) = (text(m, "requestId")?, text(m, "nonce")?, text(m, "salt")?, text(m, "params")?);
+                if !is_uuid(request_id) { return Err("Invalid server message".into()); }
+                let device_id = self.identity.as_ref().map(|i| i.device_id.clone());
+                let found = self.requests.iter().find(|r| r.request_id.as_deref() == Some(request_id))
+                    .and_then(|r| r.unattended_secret.as_ref().map(|s| (r.target.clone(), s.clone())));
+                if let (Some(controller_id), Some((target_id, secret))) = (device_id, found) {
+                    match unattended::prove(&secret, salt, params, &controller_id, &target_id, request_id, nonce) {
+                        Some(proof) => { log::write(format!("answering unattended challenge from {}", format_id(&target_id))); let _ = self.send(ClientMessage::ConnectionProve { request_id: request_id.into(), proof }, Some(Subject::Request(target_id))); }
+                        None => log::write("could not compute an unattended proof (bad challenge)"),
+                    }
+                }
+            }
+            // Target side: a controller answered our challenge. Verify it against the stored password
+            // and, if it holds, accept the request automatically (the UI captures and accepts, exactly
+            // as the Accept button does). A wrong proof is counted toward the lockout and declines.
+            "connection.prove" => {
+                let (request_id, proof) = (text(m, "requestId")?.to_string(), text(m, "proof")?.to_string());
+                let for_incoming = self.state.incoming.as_ref().is_some_and(|i| i.request_id == request_id);
+                let valid = for_incoming && self.challenge.as_ref().zip(self.unattended.as_ref()).zip(self.identity.as_ref())
+                    .is_some_and(|((challenge, verifier), identity)| challenge.request_id == request_id && challenge.expires_at > now_ms()
+                        && verifier.verify(&challenge.controller_id, &identity.device_id, &request_id, &challenge.nonce, &proof));
+                if valid {
+                    log::write("unattended proof verified — accepting automatically");
+                    self.challenge = None;
+                    let permissions = self.state.incoming.as_ref().map(|i| i.permissions.clone()).unwrap_or_default();
+                    self.auto_accept = Some(request_id.clone());
+                    self.host.emit(DesktopEvent::AutoAccept { request_id, permissions });
+                } else if self.challenge.as_ref().is_some_and(|c| c.request_id == request_id) {
+                    self.record_auth_failure();
+                    log::write("unattended proof rejected");
+                    self.challenge = None;
+                    let _ = self.send(ClientMessage::ConnectionReject { request_id }, Some(Subject::Incoming));
+                    self.clear_incoming();
+                    self.publish();
+                }
             }
             "connection.accepted" => self.accepted(m)?,
             kind if kind.starts_with("webrtc.") => {
@@ -852,26 +970,33 @@ impl Agent {
         let role = if grant.controller_device_id == device_id { Role::Controller } else { Role::Target };
         if m["sessionId"].as_str() != Some(grant.session_id.as_str()) || self.sessions.contains_key(&grant.session_id) { return Err("Unexpected session".into()); }
         let request_id = m["requestId"].as_str();
-        let relay_only = match role {
+        let (relay_only, unattended) = match role {
             Role::Target => {
                 let consent = self.consent.as_ref().filter(|(id, _)| Some(id.as_str()) == request_id).ok_or("Local consent required")?;
                 if grant.capabilities.iter().any(|p| !consent.1.contains(p)) || self.sessions.values().any(|s| s.role == Role::Target) { return Err("Local consent required".into()); }
                 // The request stays until its session is running (see relay_ready), so the UI keeps
-                // the captured screen for it in between.
-                false
+                // the captured screen for it in between. It is an unattended session only if its proof
+                // is what accepted it (not a person clicking Accept on an unattended-enabled computer).
+                let unattended = self.auto_accept.as_deref() == request_id;
+                if unattended { self.auto_accept = None; }
+                (false, unattended)
             }
             Role::Controller => {
                 let index = self.requests.iter().position(|r| r.request_id.as_deref() == request_id && r.target == grant.target_device_id)
                     .ok_or("Unexpected authorization")?;
                 if grant.capabilities.iter().any(|p| !self.requests[index].permissions.contains(p)) { return Err("Unexpected authorization".into()); }
-                self.requests.remove(index).relay_only
+                let request = self.requests.remove(index);
+                // The target accepted, so an unattended password it answered with was correct: now it
+                // is safe to save the one the user asked to remember.
+                if request.remember { if let Some(secret) = &request.unattended_secret { unattended::remember(&self.dir, &request.target, secret); } }
+                (request.relay_only, request.unattended_secret.is_some())
             }
         };
         self.used_nonces.push_back(grant.nonce.clone());
         if self.used_nonces.len() > 1000 { self.used_nonces.pop_front(); }
         let session_id = grant.session_id.clone();
         let deadline = grant.exp * 1000 - self.server_now();
-        self.sessions.insert(session_id.clone(), Session { claims: grant, role, relay_only, active: false, peer_verified: false, signal_sent: false, connected_media: false, timer: 0 });
+        self.sessions.insert(session_id.clone(), Session { claims: grant, role, relay_only, active: false, peer_verified: false, signal_sent: false, connected_media: false, timer: 0, unattended });
         self.set_timer(&session_id, deadline, "Connection timed out");
         self.publish();
         let (http, tx) = (self.http.clone(), self.tx.clone());
@@ -892,7 +1017,7 @@ impl Agent {
     fn relay_ready(&mut self, session_id: String, result: Result<Vec<IceServer>, String>) {
         let Some(session) = self.sessions.get_mut(&session_id).filter(|s| !s.active) else { return };
         session.active = true;
-        let (claims, role, relay_only) = (session.claims.clone(), session.role, session.relay_only);
+        let (claims, role, relay_only, unattended) = (session.claims.clone(), session.role, session.relay_only, session.unattended);
         if let Err(error) = &result { log::write(format!("relay credentials unavailable: {error}")); }
         let ice_servers = match result {
             Ok(servers) => servers,
@@ -907,7 +1032,7 @@ impl Agent {
         if role == Role::Target { self.state.incoming = None; }
         log::write(format!("session started as {role:?} with {} (relay only {relay_only}, {} relay servers, {} sessions)", format_id(&peer_id), ice_servers.len(), self.sessions.len()));
         self.state.sessions.push(ActiveSession { session_id, role, peer_id: peer_id.clone(), permissions: claims.capabilities.clone(),
-            expires_at: claims.exp * 1000, ice_servers, relay_only, phase: Phase::Negotiating });
+            expires_at: claims.exp * 1000, ice_servers, relay_only, phase: Phase::Negotiating, unattended });
         self.publish();
         if role == Role::Controller {
             // Computers this one has controlled, newest first, like AnyDesk's recent sessions.

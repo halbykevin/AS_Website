@@ -26,7 +26,7 @@ struct Stored {
     encrypted_key: Option<String>,
 }
 
-fn write_atomic(dir: &Path, name: &str, data: &[u8]) -> io::Result<()> {
+pub(crate) fn write_atomic(dir: &Path, name: &str, data: &[u8]) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     let temp = dir.join(format!("{name}.tmp"));
     fs::write(&temp, data)?;

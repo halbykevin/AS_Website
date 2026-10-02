@@ -1,16 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import type {
-  Capability,
-  ClientMessage,
-} from "../../../packages/protocol/src/index.ts";
-import type {
-  ActiveSession,
-  DesktopState,
-  InputEvent,
-  TransferStatus,
-} from "./contracts.ts";
+import type { Capability, ClientMessage } from "../../../packages/protocol/src/index.ts";
+import type { ActiveSession, DesktopState, InputEvent, TransferStatus } from "./contracts.ts";
 import { RemoteMedia } from "./media.ts";
 import type { Stats } from "./media.ts";
 import logoUrl from "../assets/icon.png";
@@ -20,25 +12,13 @@ import "./styles.css";
 const icon =
   (d: string, size = 16) =>
   () => (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );
 // Absolute, so it also resolves inside a popped-out session's window (an about:blank document).
 const logoSrc = new URL(logoUrl, document.baseURI).href;
-const Logo = () => (
-  <img className="logo-img" src={logoSrc} alt="" width={18} height={18} />
-);
+const Logo = () => <img className="logo-img" src={logoSrc} alt="" width={18} height={18} />;
 const CopyIcon = icon("M9 9h10v10H9zM5 15V5h10");
 const CheckIcon = icon("m5 12 5 5 9-10");
 const MinIcon = icon("M5 12h14", 14);
@@ -60,7 +40,7 @@ const RenameIcon = icon("M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4", 13);
 
 const relative = new Intl.RelativeTimeFormat(undefined, {
   numeric: "auto",
-  style: "short",
+  style: "short"
 });
 function ago(at: number, now: number) {
   const minutes = Math.round((at - now) / 60000);
@@ -69,20 +49,11 @@ function ago(at: number, now: number) {
   if (minutes > -1440) return relative.format(Math.round(minutes / 60), "hour");
   return relative.format(Math.round(minutes / 1440), "day");
 }
-const formatId = (id?: string) =>
-  id?.replace(/(\d{3})(?=\d)/g, "$1 ") ?? "— — —";
+const formatId = (id?: string) => id?.replace(/(\d{3})(?=\d)/g, "$1 ") ?? "— — —";
 const NAME_MAX = 40;
 
 /** Inline editor for a recent computer's name: Enter or leaving the field saves, Escape cancels. */
-function RenameField({
-  id,
-  name,
-  onDone,
-}: {
-  id: string;
-  name?: string;
-  onDone: (name?: string | null) => void;
-}) {
+function RenameField({ id, name, onDone }: { id: string; name?: string; onDone: (name?: string | null) => void }) {
   const done = useRef(false);
   // Enter unmounts the field, which can blur it too: finish only once.
   const finish = (value?: string | null) => {
@@ -93,7 +64,7 @@ function RenameField({
   return (
     <form
       className="recent-rename"
-      onSubmit={(e) => {
+      onSubmit={e => {
         e.preventDefault();
         finish(new FormData(e.currentTarget).get("name") as string);
       }}
@@ -108,14 +79,14 @@ function RenameField({
         title="Enter to save, Esc to cancel"
         autoComplete="off"
         spellCheck={false}
-        onFocus={(e) => e.currentTarget.select()}
-        onKeyDown={(e) => {
+        onFocus={e => e.currentTarget.select()}
+        onKeyDown={e => {
           if (e.key === "Escape") {
             e.stopPropagation();
             finish();
           }
         }}
-        onBlur={(e) => finish(e.currentTarget.value)}
+        onBlur={e => finish(e.currentTarget.value)}
       />
       <span className="recent-time recent-id-small">{formatId(id)}</span>
     </form>
@@ -125,13 +96,13 @@ const permissionLabels: Record<Capability, string> = {
   screen: "view",
   mouse: "mouse",
   keyboard: "keyboard",
-  clipboard: "clipboard",
+  clipboard: "clipboard"
 };
 const labels: Record<DesktopState["status"], string> = {
   setup: "Setup required",
   connecting: "Connecting",
   ready: "Ready to connect",
-  offline: "Offline",
+  offline: "Offline"
 };
 const HOME = "home";
 // Matches the agent and server limit (MAX_SESSIONS / MAX_CONTROLLER_SESSIONS).
@@ -145,7 +116,7 @@ async function thumbnail(stream: MediaStream): Promise<number[] | undefined> {
   video.srcObject = stream;
   try {
     await video.play();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 300));
     const canvas = document.createElement("canvas");
     canvas.width = 32;
     canvas.height = 18;
@@ -153,12 +124,7 @@ async function thumbnail(stream: MediaStream): Promise<number[] | undefined> {
     if (!context || !video.videoWidth) return undefined;
     context.drawImage(video, 0, 0, 32, 18);
     const rgba = context.getImageData(0, 0, 32, 18).data;
-    return Array.from({ length: 32 * 18 }, (_, i) =>
-      Math.round(
-        (rgba[i * 4]! * 299 + rgba[i * 4 + 1]! * 587 + rgba[i * 4 + 2]! * 114) /
-          1000,
-      ),
-    );
+    return Array.from({ length: 32 * 18 }, (_, i) => Math.round((rgba[i * 4]! * 299 + rgba[i * 4 + 1]! * 587 + rgba[i * 4 + 2]! * 114) / 1000));
   } catch {
     return undefined;
   } finally {
@@ -167,39 +133,16 @@ async function thumbnail(stream: MediaStream): Promise<number[] | undefined> {
 }
 
 /** The frameless window's buttons; `target` names a popped-out session's window instead of this one. */
-function WindowControls({
-  maximized,
-  target,
-  onClose,
-  closeTitle = "Close to tray",
-}: {
-  maximized: boolean;
-  target?: string;
-  onClose?: () => void;
-  closeTitle?: string;
-}) {
+function WindowControls({ maximized, target, onClose, closeTitle = "Close to tray" }: { maximized: boolean; target?: string; onClose?: () => void; closeTitle?: string }) {
   return (
     <div className="window-controls">
-      <button
-        aria-label="Minimize"
-        title="Minimize"
-        onClick={() => void window.remote.window("minimize", target)}
-      >
+      <button aria-label="Minimize" title="Minimize" onClick={() => void window.remote.window("minimize", target)}>
         <MinIcon />
       </button>
-      <button
-        aria-label={maximized ? "Restore" : "Maximize"}
-        title={maximized ? "Restore" : "Maximize"}
-        onClick={() => void window.remote.window("maximize", target)}
-      >
+      <button aria-label={maximized ? "Restore" : "Maximize"} title={maximized ? "Restore" : "Maximize"} onClick={() => void window.remote.window("maximize", target)}>
         {maximized ? <RestoreIcon /> : <MaxIcon />}
       </button>
-      <button
-        className="close"
-        aria-label="Close"
-        title={closeTitle}
-        onClick={onClose ?? (() => void window.remote.window("close", target))}
-      >
+      <button className="close" aria-label="Close" title={closeTitle} onClick={onClose ?? (() => void window.remote.window("close", target))}>
         <CloseIcon />
       </button>
     </div>
@@ -209,43 +152,20 @@ function WindowControls({
 // `target`: a popped-out session's window (its page is drawn from here, so it is moved from here too).
 function drag(e: React.MouseEvent, target?: string) {
   const element = e.target as HTMLElement;
-  if (
-    e.button !== 0 ||
-    element.ownerDocument.fullscreenElement ||
-    element.closest(
-      "button, input, label, summary, a, .device-id, [role=tab], .tab",
-    )
-  )
-    return;
+  if (e.button !== 0 || element.ownerDocument.fullscreenElement || element.closest("button, input, label, summary, a, .device-id, [role=tab], .tab")) return;
   if (e.detail === 2) void window.remote.window("maximize", target);
   else if (target) void window.remote.window("drag", target);
   else void window.remote.startDrag();
 }
 function TransferChip({ status }: { status: TransferStatus }) {
   return (
-    <span
-      className={`transfer-chip ${status.state}`}
-      role="status"
-      title={`${status.direction === "send" ? "Sending" : "Receiving"} ${status.label}`}
-    >
-      {status.state === "done"
-        ? `✓ ${status.direction === "send" ? "Sent" : "Ready to paste"}`
-        : status.state === "failed"
-          ? "⚠ Transfer failed"
-          : `${status.direction === "send" ? "↑" : "↓"} ${Math.round(status.progress * 100)}%`}
+    <span className={`transfer-chip ${status.state}`} role="status" title={`${status.direction === "send" ? "Sending" : "Receiving"} ${status.label}`}>
+      {status.state === "done" ? `✓ ${status.direction === "send" ? "Sent" : "Ready to paste"}` : status.state === "failed" ? "⚠ Transfer failed" : `${status.direction === "send" ? "↑" : "↓"} ${Math.round(status.progress * 100)}%`}
     </span>
   );
 }
-const statsLine = (session: ActiveSession, stats?: Stats) =>
-  stats
-    ? `${stats.path} · ${stats.rtt} ms · ${stats.fps} fps`
-    : session.phase === "connected"
-      ? "Connected"
-      : "Connecting";
-const statsTitle = (session: ActiveSession, stats?: Stats) =>
-  stats
-    ? `${stats.codec || "Video"} · ${stats.bitrate.toFixed(1)} Mbps · ${session.permissions.join(", ")}`
-    : undefined;
+const statsLine = (session: ActiveSession, stats?: Stats) => (stats ? `${stats.path} · ${stats.rtt} ms · ${stats.fps} fps` : session.phase === "connected" ? "Connected" : "Connecting");
+const statsTitle = (session: ActiveSession, stats?: Stats) => (stats ? `${stats.codec || "Video"} · ${stats.bitrate.toFixed(1)} Mbps · ${session.permissions.join(", ")}` : undefined);
 
 /** A session shown in its own window. The window is only a surface: this page draws into its document
  * (see popOut), so the session's connection, input and state never move. */
@@ -259,31 +179,7 @@ const POPOUT = "session-";
 
 /** One remote screen with its own video, scaling and input. Sessions in background tabs stay
  * mounted (their connection is kept) and the other computer pauses their video until shown. */
-function SessionView({
-  session,
-  media,
-  stream,
-  visible,
-  focused,
-  tiled,
-  label,
-  scale,
-  onFocus,
-  onClose,
-  onMaximize,
-}: {
-  session: ActiveSession;
-  media?: RemoteMedia;
-  stream?: MediaStream;
-  visible: boolean;
-  focused: boolean;
-  tiled: boolean;
-  label: string;
-  scale: "fit" | "actual";
-  onFocus: () => void;
-  onClose: () => void;
-  onMaximize: () => void;
-}) {
+function SessionView({ session, media, stream, visible, focused, tiled, label, scale, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const viewer = useRef<HTMLDivElement>(null);
   const lastMove = useRef(0);
@@ -305,30 +201,18 @@ function SessionView({
   useEffect(() => {
     const element = video.current;
     if (!element || !media || !visible) return;
-    const report = () =>
-      media.setQuality(
-        Math.round(
-          element.clientWidth *
-            ((element.ownerDocument.defaultView ?? window).devicePixelRatio ||
-              1),
-        ),
-      );
+    const report = () => media.setQuality(Math.round(element.clientWidth * ((element.ownerDocument.defaultView ?? window).devicePixelRatio || 1)));
     const observer = new ResizeObserver(report);
     observer.observe(element);
     report();
     return () => observer.disconnect();
   }, [media, visible, scale]);
   const send = (event: InputEvent) => media?.send(event);
-  function point(
-    event: React.MouseEvent,
-  ): { x: number; y: number } | undefined {
+  function point(event: React.MouseEvent): { x: number; y: number } | undefined {
     const element = video.current;
     if (!element?.videoWidth) return;
     const rect = element.getBoundingClientRect();
-    const fit = Math.min(
-      rect.width / element.videoWidth,
-      rect.height / element.videoHeight,
-    );
+    const fit = Math.min(rect.width / element.videoWidth, rect.height / element.videoHeight);
     const width = element.videoWidth * fit,
       height = element.videoHeight * fit;
     const x = (event.clientX - rect.left - (rect.width - width) / 2) / width;
@@ -336,14 +220,9 @@ function SessionView({
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
     return { x, y };
   }
-  const dpr =
-    (viewer.current?.ownerDocument.defaultView ?? window).devicePixelRatio || 1;
-  const actualSize =
-    scale === "actual" && frame.width
-      ? { width: frame.width / dpr, height: frame.height / dpr }
-      : undefined;
-  const button = (e: React.MouseEvent) =>
-    e.button === 2 ? "right" : e.button === 1 ? "middle" : "left";
+  const dpr = (viewer.current?.ownerDocument.defaultView ?? window).devicePixelRatio || 1;
+  const actualSize = scale === "actual" && frame.width ? { width: frame.width / dpr, height: frame.height / dpr } : undefined;
+  const button = (e: React.MouseEvent) => (e.button === 2 ? "right" : e.button === 1 ? "middle" : "left");
   return (
     <div
       className={`viewer ${scale} ${tiled ? "tiled" : ""} ${focused ? "focused" : ""}`}
@@ -353,17 +232,17 @@ function SessionView({
       aria-label={`Remote desktop input area for ${label}`}
       data-peer={session.peerId}
       data-phase={session.phase}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={e => e.preventDefault()}
       onBlur={() => send({ type: "release" })}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         e.preventDefault();
         if (!e.repeat) send({ type: "key", code: e.code, down: true });
       }}
-      onKeyUp={(e) => {
+      onKeyUp={e => {
         e.preventDefault();
         send({ type: "key", code: e.code, down: false });
       }}
-      onMouseMove={(e) => {
+      onMouseMove={e => {
         if (performance.now() - lastMove.current < 20) return;
         const position = point(e);
         if (position) {
@@ -371,23 +250,20 @@ function SessionView({
           send({ type: "move", ...position });
         }
       }}
-      onMouseDown={(e) => {
+      onMouseDown={e => {
         e.preventDefault();
         e.currentTarget.focus();
         onFocus();
         const position = point(e);
-        if (position)
-          send({ type: "button", ...position, button: button(e), down: true });
+        if (position) send({ type: "button", ...position, button: button(e), down: true });
       }}
-      onMouseUp={(e) =>
-        send({ type: "button", button: button(e), down: false })
-      }
+      onMouseUp={e => send({ type: "button", button: button(e), down: false })}
       onMouseLeave={() => send({ type: "release" })}
-      onWheel={(e) =>
+      onWheel={e =>
         send({
           type: "wheel",
           x: Math.round(Math.max(-1200, Math.min(1200, e.deltaX))),
-          y: Math.round(Math.max(-1200, Math.min(1200, -e.deltaY))),
+          y: Math.round(Math.max(-1200, Math.min(1200, -e.deltaY)))
         })
       }
     >
@@ -397,19 +273,17 @@ function SessionView({
         muted
         playsInline
         style={actualSize}
-        onResize={(e) =>
+        onResize={e =>
           setFrame({
             width: e.currentTarget.videoWidth,
-            height: e.currentTarget.videoHeight,
+            height: e.currentTarget.videoHeight
           })
         }
       />
       {tiled && (
-        <div className="tile-bar" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="tile-bar" onMouseDown={e => e.stopPropagation()}>
           <span className="tile-id">
-            <span
-              className={`live-dot ${session.phase === "connected" ? "on" : ""}`}
-            />
+            <span className={`live-dot ${session.phase === "connected" ? "on" : ""}`} />
             {label}
           </span>
           <span className="tile-actions">
@@ -417,7 +291,7 @@ function SessionView({
               className="tile-btn"
               title="Maximize this session"
               aria-label={`Maximize ${label}`}
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 onMaximize();
               }}
@@ -428,7 +302,7 @@ function SessionView({
               className="tile-btn"
               title="Disconnect"
               aria-label={`Disconnect ${label}`}
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 onClose();
               }}
@@ -454,7 +328,8 @@ function App() {
     outgoing: [],
     sessions: [],
     nativeAvailable: false,
-    appVersion: "",
+    unattendedEnabled: false,
+    appVersion: ""
   });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -464,6 +339,13 @@ function App() {
   const [target, setTarget] = useState("");
   const [clipboardEnabled, setClipboardEnabled] = useState(true);
   const [relay, setRelay] = useState(false);
+  // Controller side: an unattended password to try on the target, and whether to save it here.
+  const [unattendedPassword, setUnattendedPassword] = useState("");
+  const [rememberPassword, setRememberPassword] = useState(false);
+  // Target side: the "set unattended password" form.
+  const [uaPassword, setUaPassword] = useState("");
+  const [uaConfirm, setUaConfirm] = useState("");
+  const [uaOpen, setUaOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [permissions, setPermissions] = useState<Capability[]>(["screen"]);
   const [now, setNow] = useState(Date.now());
@@ -475,9 +357,7 @@ function App() {
   // Focus view (one session at a time) or grid/split view (all at once). Remembered per viewer.
   const [layout, setLayout] = useState<"focus" | "grid">(() => {
     try {
-      return localStorage.getItem("asdesk.layout") === "grid"
-        ? "grid"
-        : "focus";
+      return localStorage.getItem("asdesk.layout") === "grid" ? "grid" : "focus";
     } catch {
       return "focus";
     }
@@ -490,15 +370,15 @@ function App() {
     }
   }, [layout]);
   const [stats, setStats] = useState<Record<string, Stats>>({});
-  const [transfers, setTransfers] = useState<Record<string, TransferStatus>>(
-    {},
-  );
+  const [transfers, setTransfers] = useState<Record<string, TransferStatus>>({});
   const [streams, setStreams] = useState<Record<string, MediaStream>>({});
   // Sessions popped out of the tab bar into their own windows, by session ID.
   const [popouts, setPopouts] = useState<Record<string, Popout>>({});
   const popoutsRef = useRef(popouts);
   popoutsRef.current = popouts;
   const sessionsRef = useRef<ActiveSession[]>([]);
+  // Latest unattended auto-accept handler, called from the event listener (which is bound once).
+  const autoAcceptRef = useRef<(requestId: string, perms: Capability[]) => void>(() => {});
   // A tab being dragged (see startTear); `tore` swallows the click that ends a tear.
   const tear = useRef<{ id: string; out: boolean } | undefined>(undefined);
   const tore = useRef(false);
@@ -514,7 +394,7 @@ function App() {
   // The screen captured for an accepted request, held until the session's media takes it over.
   const capture = useRef<MediaStream | undefined>(undefined);
   const releaseCapture = () => {
-    capture.current?.getTracks().forEach((track) => track.stop());
+    capture.current?.getTracks().forEach(track => track.stop());
     capture.current = undefined;
   };
   const act = async (work: () => Promise<unknown>) => {
@@ -524,12 +404,7 @@ function App() {
     try {
       await work();
     } catch (e) {
-      const message =
-        typeof e === "string"
-          ? e
-          : e instanceof Error
-            ? e.message
-            : "Something went wrong";
+      const message = typeof e === "string" ? e : e instanceof Error ? e.message : "Something went wrong";
       setError(message);
       void window.remote.report(message).catch(() => undefined);
     } finally {
@@ -543,35 +418,26 @@ function App() {
   };
   // Names the user gave recent computers: shown in place of the ID wherever a computer is named.
   const [renaming, setRenaming] = useState<string>();
-  const nameOf = (id: string) =>
-    state.recent?.find((r) => r.id === id)?.name ?? formatId(id);
-  const saveName = (
-    id: string,
-    current: string | undefined,
-    value?: string | null,
-  ) => {
+  const nameOf = (id: string) => state.recent?.find(r => r.id === id)?.name ?? formatId(id);
+  const saveName = (id: string, current: string | undefined, value?: string | null) => {
     setRenaming(undefined);
     if (value == null) return; // cancelled
     const name = value.trim().replace(/\s+/g, " ");
-    if (name !== (current ?? ""))
-      void act(() => window.remote.renameRecent(id, name || null));
+    if (name !== (current ?? "")) void act(() => window.remote.renameRecent(id, name || null));
   };
   const stopMedia = (sessionId: string) => {
     medias.current.get(sessionId)?.stop();
     medias.current.delete(sessionId);
     pending.current.delete(sessionId);
     queues.current.delete(sessionId);
-    setStats((s) => without(s, sessionId));
-    setStreams((s) => without(s, sessionId));
-    setTransfers((s) => without(s, sessionId));
+    setStats(s => without(s, sessionId));
+    setStreams(s => without(s, sessionId));
+    setTransfers(s => without(s, sessionId));
   };
   const deliver = (sessionId: string, message: ClientMessage) => {
     const media = medias.current.get(sessionId);
     if (!media) {
-      pending.current.set(sessionId, [
-        ...(pending.current.get(sessionId) ?? []),
-        message,
-      ]);
+      pending.current.set(sessionId, [...(pending.current.get(sessionId) ?? []), message]);
       return;
     }
     const next = (queues.current.get(sessionId) ?? Promise.resolve())
@@ -585,16 +451,16 @@ function App() {
 
   useEffect(() => {
     let alive = true;
-    void window.remote.state().then((s) => {
+    void window.remote.state().then(s => {
       if (alive) {
         setState(s);
         setLoaded(true);
       }
     });
-    void window.remote.window("state").then((value) => {
+    void window.remote.window("state").then(value => {
       if (alive) setMaximized(value);
     });
-    const unsubscribe = window.remote.onEvent((event) => {
+    const unsubscribe = window.remote.onEvent(event => {
       if (event.type === "state") {
         setState(event.state);
         setLoaded(true);
@@ -602,14 +468,13 @@ function App() {
       if (event.type === "window") {
         if (event.label === "main") setMaximized(event.maximized);
         else
-          setPopouts((p) => {
+          setPopouts(p => {
             const id = event.label.slice(POPOUT.length);
-            return p[id]
-              ? { ...p, [id]: { ...p[id]!, maximized: event.maximized } }
-              : p;
+            return p[id] ? { ...p, [id]: { ...p[id]!, maximized: event.maximized } } : p;
           });
       }
       if (event.type === "popout") dockRef.current(event.sessionId);
+      if (event.type === "autoaccept") autoAcceptRef.current(event.requestId, event.permissions);
       if (event.type === "stop") {
         if (event.sessionId) stopMedia(event.sessionId);
         else {
@@ -617,16 +482,14 @@ function App() {
           releaseCapture();
         }
       }
-      if (event.type === "signal" && "sessionId" in event.message)
-        deliver(event.message.sessionId, event.message);
+      if (event.type === "signal" && "sessionId" in event.message) deliver(event.message.sessionId, event.message);
     });
     const onFullscreen = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFullscreen);
     const clock = setInterval(() => {
       setNow(Date.now());
       // A popout window that went away some other way gives its session back to the tab bar.
-      for (const [id, popout] of Object.entries(popoutsRef.current))
-        if (popout.win.closed) dockRef.current(id, false);
+      for (const [id, popout] of Object.entries(popoutsRef.current)) if (popout.win.closed) dockRef.current(id, false);
     }, 1000);
     return () => {
       alive = false;
@@ -644,64 +507,46 @@ function App() {
       if (medias.current.has(id)) continue;
       const media = new RemoteMedia(
         session,
-        (stream) => setStreams((s) => ({ ...s, [id]: stream })),
-        (value) => setStats((s) => ({ ...s, [id]: value })),
-        (message) => {
+        stream => setStreams(s => ({ ...s, [id]: stream })),
+        value => setStats(s => ({ ...s, [id]: value })),
+        message => {
           console.error("Media startup:", message);
           setError(message);
           void window.remote.disconnect(id);
         },
         session.role === "target" ? capture.current : undefined,
-        (status) => {
-          setTransfers((t) => ({ ...t, [id]: status }));
-          if (status.state !== "active")
-            setTimeout(
-              () =>
-                setTransfers((t) =>
-                  t[id]?.state === "active" ? t : without(t, id),
-                ),
-              4000,
-            );
-        },
+        status => {
+          setTransfers(t => ({ ...t, [id]: status }));
+          if (status.state !== "active") setTimeout(() => setTransfers(t => (t[id]?.state === "active" ? t : without(t, id))), 4000);
+        }
       );
       if (session.role === "target") capture.current = undefined;
       medias.current.set(id, media);
-      for (const message of pending.current.get(id)?.splice(0) ?? [])
-        deliver(id, message);
+      for (const message of pending.current.get(id)?.splice(0) ?? []) deliver(id, message);
     }
-    for (const id of [...medias.current.keys()])
-      if (!state.sessions.some((s) => s.sessionId === id)) stopMedia(id);
-  }, [state.sessions.map((s) => s.sessionId).join()]);
+    for (const id of [...medias.current.keys()]) if (!state.sessions.some(s => s.sessionId === id)) stopMedia(id);
+  }, [state.sessions.map(s => s.sessionId).join()]);
   useEffect(() => {
     const incoming = state.incoming;
     // A request that was answered elsewhere, cancelled or expired releases a screen captured for it.
     if (!incoming) {
-      if (!state.sessions.some((s) => s.role === "target")) releaseCapture();
+      if (!state.sessions.some(s => s.role === "target")) releaseCapture();
       return;
     }
     // Default every requested capability on (like AnyDesk: accepting grants what was asked). The user
     // can still untick any before accepting. Mouse/keyboard/clipboard need the native agent.
-    setPermissions(
-      incoming.permissions.filter(
-        (p) => p === "screen" || state.nativeAvailable,
-      ),
-    );
+    setPermissions(incoming.permissions.filter(p => p === "screen" || state.nativeAvailable));
   }, [state.incoming?.requestId, state.sessions.length]);
 
   sessionsRef.current = state.sessions;
-  const controlled = state.sessions.filter((s) => s.role === "controller");
+  const controlled = state.sessions.filter(s => s.role === "controller");
   // Sessions in the tab bar; popped-out ones are drawn into their own windows instead.
-  const docked = controlled.filter((s) => !popouts[s.sessionId]);
-  const waitingFor = state.outgoing.filter(
-    (o) => !controlled.some((s) => s.peerId === o.targetId),
-  );
-  const tabs = [
-    ...docked.map((s) => s.peerId),
-    ...waitingFor.map((o) => o.targetId),
-  ];
+  const docked = controlled.filter(s => !popouts[s.sessionId]);
+  const waitingFor = state.outgoing.filter(o => !controlled.some(s => s.peerId === o.targetId));
+  const tabs = [...docked.map(s => s.peerId), ...waitingFor.map(o => o.targetId)];
   // Keep the selected tab valid: a finished session or answered request falls back to another tab.
   useEffect(() => {
-    tabs.forEach((t) => seenTabs.current.add(t));
+    tabs.forEach(t => seenTabs.current.add(t));
     if (tab !== HOME && !tabs.includes(tab) && seenTabs.current.has(tab)) {
       seenTabs.current.delete(tab);
       setTab(tabs.at(-1) ?? HOME);
@@ -711,19 +556,8 @@ function App() {
   // paused at the source, so hidden sessions cost almost nothing.
   const gridActive = layout === "grid" && tab !== HOME && docked.length >= 1;
   useEffect(() => {
-    for (const session of controlled)
-      medias.current
-        .get(session.sessionId)
-        ?.setVisible(
-          !!popouts[session.sessionId] || gridActive || session.peerId === tab,
-        );
-  }, [
-    tab,
-    gridActive,
-    controlled.map((s) => s.sessionId).join(),
-    Object.keys(streams).join(),
-    Object.keys(popouts).join(),
-  ]);
+    for (const session of controlled) medias.current.get(session.sessionId)?.setVisible(!!popouts[session.sessionId] || gridActive || session.peerId === tab);
+  }, [tab, gridActive, controlled.map(s => s.sessionId).join(), Object.keys(streams).join(), Object.keys(popouts).join()]);
 
   // ── Popped-out sessions ─────────────────────────────────────────────────────────────────────────
   // A session dragged out of the tab bar (or sent there with its button) gets its own window, like a
@@ -742,11 +576,7 @@ function App() {
     // those unsigned, and a screen left of or above the main one has negative coordinates.
     const left = Math.round(at ? at.x - 140 : window.screenX + 48),
       top = Math.round(at ? at.y - 18 : window.screenY + 48);
-    const win = window.open(
-      `about:blank#asdesk-popout=${id}&at=${left},${top}`,
-      "_blank",
-      `popup,width=${width},height=${height}`,
-    );
+    const win = window.open(`about:blank#asdesk-popout=${id}&at=${left},${top}`, "_blank", `popup,width=${width},height=${height}`);
     if (!win) {
       setError("This session could not be opened in its own window.");
       return;
@@ -754,9 +584,7 @@ function App() {
     const doc = win.document;
     doc.title = `${nameOf(session.peerId)} · ASDesk`;
     doc.documentElement.lang = "en";
-    for (const sheet of document.querySelectorAll<HTMLLinkElement>(
-      'link[rel="stylesheet"]',
-    )) {
+    for (const sheet of document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')) {
       const link = doc.createElement("link");
       link.rel = "stylesheet";
       link.href = sheet.href;
@@ -765,21 +593,19 @@ function App() {
     const root = doc.createElement("div");
     root.id = "root";
     doc.body.append(root);
-    setPopouts((p) => ({
+    setPopouts(p => ({
       ...p,
-      [id]: { win, root, label: `${POPOUT}${id}`, maximized: false },
+      [id]: { win, root, label: `${POPOUT}${id}`, maximized: false }
     }));
-    if (tab === session.peerId)
-      setTab(tabs.filter((t) => t !== session.peerId).at(-1) ?? HOME);
+    if (tab === session.peerId) setTab(tabs.filter(t => t !== session.peerId).at(-1) ?? HOME);
   };
   /** Puts a popped-out session back into the tab bar (and shows it, unless it ended) and closes its window. */
   const dock = (sessionId: string, show = true) => {
     const popout = popoutsRef.current[sessionId];
     if (!popout) return;
-    setPopouts((p) => without(p, sessionId));
-    if (!popout.win.closed)
-      void window.remote.window("close", popout.label).catch(() => undefined);
-    const session = sessionsRef.current.find((s) => s.sessionId === sessionId);
+    setPopouts(p => without(p, sessionId));
+    if (!popout.win.closed) void window.remote.window("close", popout.label).catch(() => undefined);
+    const session = sessionsRef.current.find(s => s.sessionId === sessionId);
     if (show && session) {
       setTab(session.peerId);
       void window.remote.window("focus").catch(() => undefined);
@@ -789,20 +615,12 @@ function App() {
   dockRef.current = dock;
   // A session that ended closes its window.
   useEffect(() => {
-    for (const id of Object.keys(popoutsRef.current))
-      if (!state.sessions.some((s) => s.sessionId === id)) dock(id, false);
-  }, [state.sessions.map((s) => s.sessionId).join()]);
+    for (const id of Object.keys(popoutsRef.current)) if (!state.sessions.some(s => s.sessionId === id)) dock(id, false);
+  }, [state.sessions.map(s => s.sessionId).join()]);
   // Dragging a tab out of the tab bar (down into the page, or off the window) pops it out where it is
   // dropped. The tab keeps the pointer for the whole drag, so the drop is seen even outside the window.
-  const startTear = (
-    e: React.PointerEvent<HTMLElement>,
-    session: ActiveSession,
-  ) => {
-    if (
-      e.button !== 0 ||
-      (e.target as HTMLElement).closest(".tab-close, .tab-popout")
-    )
-      return;
+  const startTear = (e: React.PointerEvent<HTMLElement>, session: ActiveSession) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest(".tab-close, .tab-popout")) return;
     tear.current = { id: session.sessionId, out: false };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -810,20 +628,13 @@ function App() {
     const t = tear.current;
     const bar = e.currentTarget.closest(".toolbar")?.getBoundingClientRect();
     if (!t || !bar) return;
-    const out =
-      e.clientY > bar.bottom + 24 ||
-      e.clientY < bar.top - 24 ||
-      e.clientX < 0 ||
-      e.clientX > window.innerWidth;
+    const out = e.clientY > bar.bottom + 24 || e.clientY < bar.top - 24 || e.clientX < 0 || e.clientX > window.innerWidth;
     if (out !== t.out) {
       t.out = out;
       setTearing(out ? t.id : undefined);
     }
   };
-  const endTear = (
-    e: React.PointerEvent<HTMLElement>,
-    session: ActiveSession,
-  ) => {
+  const endTear = (e: React.PointerEvent<HTMLElement>, session: ActiveSession) => {
     const t = tear.current;
     tear.current = undefined;
     setTearing(undefined);
@@ -844,123 +655,85 @@ function App() {
     setTearing(undefined);
   };
   const popoutViews = controlled
-    .filter((s) => popouts[s.sessionId])
-    .map((s) => {
+    .filter(s => popouts[s.sessionId])
+    .map(s => {
       const popout = popouts[s.sessionId]!,
         sessionStats = stats[s.sessionId],
         transfer = transfers[s.sessionId];
       const sessionScale = scales[s.sessionId] ?? "fit";
       return createPortal(
         <div className="session workspace popout">
-          <div className="toolbar" onMouseDown={(e) => drag(e, popout.label)}>
+          <div className="toolbar" onMouseDown={e => drag(e, popout.label)}>
             <span className="popout-name">
               <span className="logo">
                 <Logo />
               </span>
-              <span
-                className={`live-dot ${s.phase === "connected" ? "on" : ""}`}
-              />
+              <span className={`live-dot ${s.phase === "connected" ? "on" : ""}`} />
               {nameOf(s.peerId)}
             </span>
             <div className="toolbar-actions">
               {transfer && <TransferChip status={transfer} />}
-              <span
-                className="session-stats"
-                title={statsTitle(s, sessionStats)}
-              >
+              <span className="session-stats" title={statsTitle(s, sessionStats)}>
                 {statsLine(s, sessionStats)}
               </span>
               <button
                 className="tool"
                 disabled={s.phase !== "connected"}
-                aria-label={
-                  sessionScale === "fit" ? "Original size" : "Fit to window"
-                }
-                title={
-                  sessionScale === "fit"
-                    ? "Original size (1:1)"
-                    : "Fit to window"
-                }
+                aria-label={sessionScale === "fit" ? "Original size" : "Fit to window"}
+                title={sessionScale === "fit" ? "Original size (1:1)" : "Fit to window"}
                 onClick={() =>
-                  setScales((v) => ({
+                  setScales(v => ({
                     ...v,
-                    [s.sessionId]: sessionScale === "fit" ? "actual" : "fit",
+                    [s.sessionId]: sessionScale === "fit" ? "actual" : "fit"
                   }))
                 }
               >
                 {sessionScale === "fit" ? <ActualIcon /> : <FitIcon />}
               </button>
-              <button
-                className="tool"
-                aria-label="Back to the tab bar"
-                title="Back to the tab bar"
-                onClick={() => dock(s.sessionId)}
-              >
+              <button className="tool" aria-label="Back to the tab bar" title="Back to the tab bar" onClick={() => dock(s.sessionId)}>
                 <DockIcon />
               </button>
-              <button
-                className="tool-danger"
-                onClick={() =>
-                  void act(() => window.remote.disconnect(s.sessionId))
-                }
-              >
+              <button className="tool-danger" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
                 Disconnect
               </button>
             </div>
-            <WindowControls
-              maximized={popout.maximized}
-              target={popout.label}
-              onClose={() => dock(s.sessionId)}
-              closeTitle="Close this window (the session goes back to the tab bar)"
-            />
+            <WindowControls maximized={popout.maximized} target={popout.label} onClose={() => dock(s.sessionId)} closeTitle="Close this window (the session goes back to the tab bar)" />
           </div>
           <div className="workspace-body">
-            <SessionView
-              session={s}
-              media={medias.current.get(s.sessionId)}
-              stream={streams[s.sessionId]}
-              visible
-              focused
-              tiled={false}
-              label={nameOf(s.peerId)}
-              scale={sessionScale}
-              onFocus={() => {}}
-              onMaximize={() => {}}
-              onClose={() =>
-                void act(() => window.remote.disconnect(s.sessionId))
-              }
-            />
+            <SessionView session={s} media={medias.current.get(s.sessionId)} stream={streams[s.sessionId]} visible focused tiled={false} label={nameOf(s.peerId)} scale={sessionScale} onFocus={() => {}} onMaximize={() => {}} onClose={() => void act(() => window.remote.disconnect(s.sessionId))} />
           </div>
         </div>,
         popout.root,
-        s.sessionId,
+        s.sessionId
       );
     });
 
   const toggleFullscreen = () => {
-    const done = document.fullscreenElement
-      ? document.exitFullscreen()
-      : workspace.current?.requestFullscreen();
+    const done = document.fullscreenElement ? document.exitFullscreen() : workspace.current?.requestFullscreen();
     void done?.catch(() => setError("Full screen is unavailable"));
   };
   const connectTo = (id: string) => {
     setTarget(formatId(id));
     setTab(id);
+    const password = unattendedPassword.trim() || undefined;
+    const remember = rememberPassword && !!password;
     void act(async () => {
       try {
-        await window.remote.connect(id, clipboardEnabled, relay);
+        await window.remote.connect(id, clipboardEnabled, relay, password, remember);
+        // Don't leave a password sitting in the box for the next, different computer.
+        setUnattendedPassword("");
+        setRememberPassword(false);
       } catch (error) {
-        setTab((t) => (t === id && !seenTabs.current.has(id) ? HOME : t));
+        setTab(t => (t === id && !seenTabs.current.has(id) ? HOME : t));
         throw error;
       }
     });
   };
   // Accepting captures the primary screen straight away (no picker; capture needs this click's user
   // gesture), then tells the agent which display it is.
-  const acceptIncoming = (requestId: string) =>
+  const acceptIncoming = (requestId: string, perms: Capability[] = permissions) =>
     act(async () => {
-      const wantsControl =
-        permissions.includes("mouse") || permissions.includes("keyboard");
+      const wantsControl = perms.includes("mouse") || perms.includes("keyboard");
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
@@ -969,62 +742,54 @@ function App() {
             displaySurface: "monitor",
             width: { max: 1920 },
             height: { max: 1080 },
-            frameRate: { ideal: 24, max: 30 },
+            frameRate: { ideal: 24, max: 30 }
           },
           selfBrowserSurface: "exclude",
           surfaceSwitching: "exclude",
-          monitorTypeSurfaces: "include",
+          monitorTypeSurfaces: "include"
         } as DisplayMediaStreamOptions);
       } catch (e) {
-        void window.remote
-          .report(
-            `screen capture: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`,
-          )
-          .catch(() => undefined);
-        throw new Error(
-          "This screen could not be shared. Choose Accept & share again, or reject the request.",
-        );
+        void window.remote.report(`screen capture: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`).catch(() => undefined);
+        throw new Error("This screen could not be shared. Choose Accept & share again, or reject the request.");
       }
       const track = stream.getVideoTracks()[0];
       const settings = track?.getSettings();
       if (!track || !settings) {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach(t => t.stop());
         throw new Error("Screen capture is unavailable");
       }
       // WebView2 reports the captured surface in the settings; if one ever does not (older runtimes, such
       // as the Windows 7 edition's), the track label names it instead (screen:<id>:0 for a whole screen).
-      const surface =
-        settings.displaySurface ??
-        (/^screen/i.test(track.label) ? "monitor" : undefined);
+      const surface = settings.displaySurface ?? (/^screen/i.test(track.label) ? "monitor" : undefined);
       if (wantsControl && surface !== "monitor") {
-        stream.getTracks().forEach((t) => t.stop());
-        throw new Error(
-          "The whole screen could not be shared, so control is not possible.",
-        );
+        stream.getTracks().forEach(t => t.stop());
+        throw new Error("The whole screen could not be shared, so control is not possible.");
       }
       releaseCapture();
       capture.current = stream;
       try {
-        await window.remote.accept(
-          requestId,
-          permissions,
-          settings.deviceId ?? track.label,
-          settings.width ?? 0,
-          settings.height ?? 0,
-          await thumbnail(stream),
-        );
+        await window.remote.accept(requestId, perms, settings.deviceId ?? track.label, settings.width ?? 0, settings.height ?? 0, await thumbnail(stream));
       } catch (error) {
         releaseCapture();
         throw error;
       }
     });
+  // Unattended: the agent verified the controller's password, so capture and accept with no click.
+  // Only what the native agent can honour is granted (screen always; control needs the agent).
+  autoAcceptRef.current = (requestId, perms) => {
+    if (state.incoming?.requestId !== requestId || busy) return;
+    void acceptIncoming(
+      requestId,
+      perms.filter(p => p === "screen" || state.nativeAvailable)
+    );
+  };
 
   const activeError = error || state.error;
   // The message can be the page's own or the agent's (a declined request, a lost connection): clear both.
   const dismissError = () => {
     setError("");
     if (state.error) {
-      setState((s) => ({ ...s, error: undefined }));
+      setState(s => ({ ...s, error: undefined }));
       void window.remote.dismissError().catch(() => undefined);
     }
   };
@@ -1038,48 +803,19 @@ function App() {
   );
   const incomingModal = state.incoming && (
     <div className="modal-backdrop">
-      <section
-        className="modal incoming"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="incoming-title"
-      >
+      <section className="modal incoming" role="dialog" aria-modal="true" aria-labelledby="incoming-title">
         <div className="modal-head">
           <h2 id="incoming-title">Connection request</h2>
-          <span className="countdown">
-            {Math.max(0, Math.ceil((state.incoming.expiresAt - now) / 1000))}s
-          </span>
+          <span className="countdown">{Math.max(0, Math.ceil((state.incoming.expiresAt - now) / 1000))}s</span>
         </div>
         <p className="muted">
-          <strong>{formatId(state.incoming.sourceId)}</strong> wants to access
-          this computer. Only accept if you know who is connecting.
+          <strong>{formatId(state.incoming.sourceId)}</strong> wants to access this computer. Only accept if you know who is connecting.
         </p>
         <div className="permissions">
-          {state.incoming.permissions.map((p) => (
+          {state.incoming.permissions.map(p => (
             <label className="check" key={p}>
-              <input
-                type="checkbox"
-                checked={permissions.includes(p)}
-                disabled={
-                  p === "screen" ||
-                  (!state.nativeAvailable &&
-                    (p === "mouse" || p === "keyboard"))
-                }
-                onChange={(e) =>
-                  setPermissions(
-                    e.target.checked
-                      ? [...permissions, p]
-                      : permissions.filter((v) => v !== p),
-                  )
-                }
-              />
-              {p === "screen"
-                ? "View this screen"
-                : p === "mouse"
-                  ? "Control mouse"
-                  : p === "keyboard"
-                    ? "Use keyboard"
-                    : "Share clipboard and files"}
+              <input type="checkbox" checked={permissions.includes(p)} disabled={p === "screen" || (!state.nativeAvailable && (p === "mouse" || p === "keyboard"))} onChange={e => setPermissions(e.target.checked ? [...permissions, p] : permissions.filter(v => v !== p))} />
+              {p === "screen" ? "View this screen" : p === "mouse" ? "Control mouse" : p === "keyboard" ? "Use keyboard" : "Share clipboard and files"}
             </label>
           ))}
         </div>
@@ -1089,20 +825,10 @@ function App() {
           </p>
         )}
         <div className="modal-actions">
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={() =>
-              void act(() => window.remote.reject(state.incoming!.requestId))
-            }
-          >
+          <button className="secondary" disabled={busy} onClick={() => void act(() => window.remote.reject(state.incoming!.requestId))}>
             Reject
           </button>
-          <button
-            className="primary"
-            disabled={busy || now >= state.incoming.expiresAt}
-            onClick={() => void acceptIncoming(state.incoming!.requestId)}
-          >
+          <button className="primary" disabled={busy || now >= state.incoming.expiresAt} onClick={() => void acceptIncoming(state.incoming!.requestId)}>
             {busy ? "Preparing…" : "Accept & share"}
           </button>
         </div>
@@ -1110,13 +836,11 @@ function App() {
     </div>
   );
 
-  const sharing = state.sessions.find((s) => s.role === "target");
+  const sharing = state.sessions.find(s => s.role === "target");
   if (sharing) {
     // The shared computer's window is hidden during a session (a notification and the tray icon say
     // that sharing is on). Opened from the tray, it shows this; it is left out of the shared image.
-    const granted = sharing.permissions
-      .filter((p) => p !== "screen")
-      .map((p) => permissionLabels[p]);
+    const granted = sharing.permissions.filter(p => p !== "screen").map(p => permissionLabels[p]);
     const live = sharing.phase === "connected";
     return (
       <div className="shell">
@@ -1133,15 +857,11 @@ function App() {
           <section className="panel sharing-card">
             <div className="sharing-title">
               <span className={`live-dot ${live ? "on" : ""}`} />
-              <strong>
-                {live
-                  ? "Your screen is being shared"
-                  : "Starting screen sharing…"}
-              </strong>
+              <strong>{live ? "Your screen is being shared" : "Starting screen sharing…"}</strong>
             </div>
             <p className="muted">
-              with <b className="peer-id">{formatId(sharing.peerId)}</b> ·{" "}
-              {granted.length ? `can use ${granted.join(", ")}` : "view only"}
+              with <b className="peer-id">{formatId(sharing.peerId)}</b> · {granted.length ? `can use ${granted.join(", ")}` : "view only"}
+              {sharing.unattended && " · unattended"}
             </p>
             {activeError && (
               <p className="modal-error" role="alert">
@@ -1152,12 +872,7 @@ function App() {
               <span className="muted">
                 <kbd>Ctrl+Alt+Shift+F12</kbd> stops instantly
               </span>
-              <button
-                className="danger"
-                onClick={() =>
-                  void act(() => window.remote.disconnect(sharing.sessionId))
-                }
-              >
+              <button className="danger" onClick={() => void act(() => window.remote.disconnect(sharing.sessionId))}>
                 Disconnect
               </button>
             </div>
@@ -1176,40 +891,23 @@ function App() {
   ) : state.status === "setup" ? (
     <main className="setup">
       <h1>Set up this computer</h1>
-      <p className="muted">
-        Connect to your remote-access server to get a connection ID.
-      </p>
+      <p className="muted">Connect to your remote-access server to get a connection ID.</p>
       <form
-        onSubmit={(e) => {
+        onSubmit={e => {
           e.preventDefault();
           void act(async () => {
             await window.remote.setup({
               server,
-              ...(token.trim() ? { enrollmentToken: token } : {}),
+              ...(token.trim() ? { enrollmentToken: token } : {})
             });
             setToken("");
           });
         }}
       >
         <label htmlFor="server">Company server</label>
-        <input
-          id="server"
-          type="url"
-          value={server}
-          onChange={(e) => setServer(e.target.value)}
-          required
-          placeholder="https://remote.yourcompany.com"
-          autoComplete="off"
-        />
+        <input id="server" type="url" value={server} onChange={e => setServer(e.target.value)} required placeholder="https://remote.yourcompany.com" autoComplete="off" />
         <label htmlFor="token">Enrollment token (optional)</label>
-        <input
-          id="token"
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          autoComplete="off"
-          placeholder="Only if your server requires one"
-        />
+        <input id="token" type="password" value={token} onChange={e => setToken(e.target.value)} autoComplete="off" placeholder="Only if your server requires one" />
         <button className="primary wide" disabled={busy}>
           {busy ? "Registering…" : "Set up this computer"}
         </button>
@@ -1241,9 +939,7 @@ function App() {
             {copied ? <CheckIcon /> : <CopyIcon />}
           </button>
         </div>
-        <p className="muted">
-          Share this ID to get help. You approve every request.
-        </p>
+        <p className="muted">Share this ID to get help. You approve every request.</p>
       </section>
       <section className="panel">
         <label className="panel-label" htmlFor="remote-id">
@@ -1251,66 +947,106 @@ function App() {
         </label>
         <form
           className="connect"
-          onSubmit={(e) => {
+          onSubmit={e => {
             e.preventDefault();
             connectTo(target.replaceAll(" ", ""));
           }}
         >
-          <input
-            id="remote-id"
-            value={target}
-            onChange={(e) =>
-              setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))
-            }
-            placeholder="000 000 000"
-            inputMode="numeric"
-            autoComplete="off"
-            disabled={state.status !== "ready"}
-          />
-          <button
-            className="primary"
-            disabled={busy || state.status !== "ready" || !validTarget || full}
-            title={
-              full
-                ? `You can control up to ${MAX_SESSIONS} computers at once`
-                : undefined
-            }
-          >
+          <input id="remote-id" value={target} onChange={e => setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))} placeholder="000 000 000" inputMode="numeric" autoComplete="off" disabled={state.status !== "ready"} />
+          <button className="primary" disabled={busy || state.status !== "ready" || !validTarget || full} title={full ? `You can control up to ${MAX_SESSIONS} computers at once` : undefined}>
             Connect
           </button>
         </form>
         <details className="options">
           <summary>Options</summary>
           <label className="check">
-            <input
-              type="checkbox"
-              checked={clipboardEnabled}
-              onChange={(e) => setClipboardEnabled(e.target.checked)}
-            />
+            <input type="checkbox" checked={clipboardEnabled} onChange={e => setClipboardEnabled(e.target.checked)} />
             Request clipboard and file transfer
           </label>
           <label className="check">
-            <input
-              type="checkbox"
-              checked={relay}
-              onChange={(e) => setRelay(e.target.checked)}
-            />
+            <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
             Use relay only
+          </label>
+          <label className="panel-label ua-field-label" htmlFor="ua-connect">
+            Unattended password
+          </label>
+          <input id="ua-connect" type="password" value={unattendedPassword} onChange={e => setUnattendedPassword(e.target.value)} placeholder="Only if that computer has one set" autoComplete="off" />
+          <label className="check">
+            <input type="checkbox" checked={rememberPassword} disabled={!unattendedPassword.trim()} onChange={e => setRememberPassword(e.target.checked)} />
+            Remember this password on this computer
           </label>
         </details>
       </section>
+      {(state.unattendedEnabled || state.status === "ready") && (
+        <section className="panel unattended" aria-labelledby="ua-title">
+          <span className="panel-label" id="ua-title">
+            Unattended access to this computer
+          </span>
+          {state.unattendedEnabled ? (
+            <>
+              <p className="muted">
+                <span className="live-dot on" /> On — someone with the password can connect without anyone here approving. Sessions are still shown, and <kbd>Ctrl+Alt+Shift+F12</kbd> stops instantly.
+              </p>
+              <button className="secondary" disabled={busy} onClick={() => void act(() => window.remote.clearUnattended())}>
+                Turn off
+              </button>
+            </>
+          ) : uaOpen ? (
+            <form
+              className="ua-form"
+              onSubmit={e => {
+                e.preventDefault();
+                if (uaPassword !== uaConfirm) {
+                  setError("The passwords do not match.");
+                  return;
+                }
+                void act(async () => {
+                  await window.remote.setUnattended(uaPassword);
+                  setUaPassword("");
+                  setUaConfirm("");
+                  setUaOpen(false);
+                });
+              }}
+            >
+              <input type="password" value={uaPassword} onChange={e => setUaPassword(e.target.value)} placeholder="New password (at least 8 characters)" autoComplete="new-password" autoFocus />
+              <input type="password" value={uaConfirm} onChange={e => setUaConfirm(e.target.value)} placeholder="Confirm password" autoComplete="new-password" />
+              <div className="ua-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setUaOpen(false);
+                    setUaPassword("");
+                    setUaConfirm("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button className="primary" disabled={busy || uaPassword.length < 8}>
+                  Save password
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <p className="muted">Set a password to reach this computer later without anyone here to approve the request.</p>
+              <button className="secondary" onClick={() => setUaOpen(true)}>
+                Set a password…
+              </button>
+            </>
+          )}
+        </section>
+      )}
       {!!state.recent?.length && (
         <section className="recent" aria-labelledby="recent-title">
           <span className="panel-label" id="recent-title">
             Recent
           </span>
           <ul>
-            {state.recent.map((r) => {
-              const openSession = controlled.find((s) => s.peerId === r.id);
+            {state.recent.map(r => {
+              const openSession = controlled.find(s => s.peerId === r.id);
               const open = !!openSession || tabs.includes(r.id);
-              const label = r.name
-                ? `${r.name} (${formatId(r.id)})`
-                : formatId(r.id);
+              const label = r.name ? `${r.name} (${formatId(r.id)})` : formatId(r.id);
               const when = open ? (
                 <>
                   <span className="live-dot on" />
@@ -1325,38 +1061,17 @@ function App() {
               if (renaming === r.id)
                 return (
                   <li key={r.id}>
-                    <RenameField
-                      id={r.id}
-                      name={r.name}
-                      onDone={(value) => saveName(r.id, r.name, value)}
-                    />
+                    <RenameField id={r.id} name={r.name} onDone={value => saveName(r.id, r.name, value)} />
                   </li>
                 );
               return (
                 <li key={r.id}>
-                  <button
-                    className="recent-connect"
-                    disabled={
-                      busy || state.status !== "ready" || (!open && full)
-                    }
-                    aria-label={open ? `Show ${label}` : `Connect to ${label}`}
-                    title={open ? "Show this session" : `Connect to ${label}`}
-                    onClick={() =>
-                      openSession && popouts[openSession.sessionId]
-                        ? popOut(openSession)
-                        : open
-                          ? setTab(r.id)
-                          : connectTo(r.id)
-                    }
-                  >
+                  <button className="recent-connect" disabled={busy || state.status !== "ready" || (!open && full)} aria-label={open ? `Show ${label}` : `Connect to ${label}`} title={open ? "Show this session" : `Connect to ${label}`} onClick={() => (openSession && popouts[openSession.sessionId] ? popOut(openSession) : open ? setTab(r.id) : connectTo(r.id))}>
                     {r.name ? (
                       <>
                         <span className="recent-name">{r.name}</span>
                         <span className="recent-time">
-                          <span className="recent-id-small">
-                            {formatId(r.id)}
-                          </span>
-                          ·{when}
+                          <span className="recent-id-small">{formatId(r.id)}</span>·{when}
                         </span>
                       </>
                     ) : (
@@ -1367,20 +1082,10 @@ function App() {
                     )}
                   </button>
                   <div className="recent-actions">
-                    <button
-                      aria-label={`Remove ${label} from recent`}
-                      title="Remove"
-                      onClick={() => void act(() => window.remote.forget(r.id))}
-                    >
+                    <button aria-label={`Remove ${label} from recent`} title="Remove" onClick={() => void act(() => window.remote.forget(r.id))}>
                       <CloseIcon />
                     </button>
-                    <button
-                      aria-label={
-                        r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`
-                      }
-                      title={r.name ? "Rename" : "Add a name"}
-                      onClick={() => setRenaming(r.id)}
-                    >
+                    <button aria-label={r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`} title={r.name ? "Rename" : "Add a name"} onClick={() => setRenaming(r.id)}>
                       <RenameIcon />
                     </button>
                   </div>
@@ -1399,8 +1104,7 @@ function App() {
         {labels[state.status]}
       </span>
       <span className="statusbar-meta">
-        {sessionCount ? `${sessionCount} of ${MAX_SESSIONS} sessions · ` : ""}v
-        {state.appVersion}
+        {sessionCount ? `${sessionCount} of ${MAX_SESSIONS} sessions · ` : ""}v{state.appVersion}
       </span>
     </footer>
   );
@@ -1427,43 +1131,19 @@ function App() {
   }
 
   // Workspace: a tab per computer being controlled (or waiting to be), plus Home to start another.
-  const current = docked.find((s) => s.peerId === tab);
-  const waiting =
-    tab !== HOME && !current
-      ? waitingFor.find((o) => o.targetId === tab)
-      : undefined;
+  const current = docked.find(s => s.peerId === tab);
+  const waiting = tab !== HOME && !current ? waitingFor.find(o => o.targetId === tab) : undefined;
   const scale = current ? (scales[current.sessionId] ?? "fit") : "fit";
   const currentStats = current ? stats[current.sessionId] : undefined;
   return (
-    <div
-      className={`session workspace ${fullscreen ? "is-fullscreen" : ""}`}
-      ref={workspace}
-    >
+    <div className={`session workspace ${fullscreen ? "is-fullscreen" : ""}`} ref={workspace}>
       <div className="toolbar tabbar" onMouseDown={drag}>
         <div className="tabs" role="tablist" aria-label="Sessions">
-          <button
-            role="tab"
-            aria-selected={tab === HOME}
-            className={`tab home-tab ${tab === HOME ? "active" : ""}`}
-            aria-label="Home"
-            title="Home — connect to another computer"
-            onClick={() => setTab(HOME)}
-          >
+          <button role="tab" aria-selected={tab === HOME} className={`tab home-tab ${tab === HOME ? "active" : ""}`} aria-label="Home" title="Home — connect to another computer" onClick={() => setTab(HOME)}>
             <HomeIcon />
           </button>
-          {docked.map((s) => (
-            <div
-              key={s.sessionId}
-              className={`tab ${tab === s.peerId ? "active" : ""} ${tearing === s.sessionId ? "tearing" : ""}`}
-              data-peer={s.peerId}
-              data-phase={s.phase}
-              title="Drag out of the tab bar to open in its own window"
-              onPointerDown={(e) => startTear(e, s)}
-              onPointerMove={moveTear}
-              onPointerUp={(e) => endTear(e, s)}
-              onPointerCancel={cancelTear}
-              onLostPointerCapture={cancelTear}
-            >
+          {docked.map(s => (
+            <div key={s.sessionId} className={`tab ${tab === s.peerId ? "active" : ""} ${tearing === s.sessionId ? "tearing" : ""}`} data-peer={s.peerId} data-phase={s.phase} title="Drag out of the tab bar to open in its own window" onPointerDown={e => startTear(e, s)} onPointerMove={moveTear} onPointerUp={e => endTear(e, s)} onPointerCancel={cancelTear} onLostPointerCapture={cancelTear}>
               <button
                 role="tab"
                 aria-selected={tab === s.peerId}
@@ -1474,63 +1154,29 @@ function App() {
                   if (!tore.current) setTab(s.peerId);
                 }}
               >
-                <span
-                  className={`live-dot ${s.phase === "connected" ? "on" : ""}`}
-                />
+                <span className={`live-dot ${s.phase === "connected" ? "on" : ""}`} />
                 <span className="tab-label">{nameOf(s.peerId)}</span>
               </button>
-              <button
-                className="tab-popout"
-                aria-label={`Open ${nameOf(s.peerId)} in its own window`}
-                title="Open in its own window"
-                onClick={() => popOut(s)}
-              >
+              <button className="tab-popout" aria-label={`Open ${nameOf(s.peerId)} in its own window`} title="Open in its own window" onClick={() => popOut(s)}>
                 <PopoutIcon />
               </button>
-              <button
-                className="tab-close"
-                aria-label={`Disconnect ${nameOf(s.peerId)}`}
-                title="Disconnect"
-                onClick={() =>
-                  void act(() => window.remote.disconnect(s.sessionId))
-                }
-              >
+              <button className="tab-close" aria-label={`Disconnect ${nameOf(s.peerId)}`} title="Disconnect" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
                 <TabCloseIcon />
               </button>
             </div>
           ))}
-          {waitingFor.map((o) => (
-            <div
-              key={o.targetId}
-              className={`tab waiting ${tab === o.targetId ? "active" : ""}`}
-            >
-              <button
-                role="tab"
-                aria-selected={tab === o.targetId}
-                className="tab-main"
-                aria-label={`Request to ${nameOf(o.targetId)}`}
-                title={formatId(o.targetId)}
-                onClick={() => setTab(o.targetId)}
-              >
+          {waitingFor.map(o => (
+            <div key={o.targetId} className={`tab waiting ${tab === o.targetId ? "active" : ""}`}>
+              <button role="tab" aria-selected={tab === o.targetId} className="tab-main" aria-label={`Request to ${nameOf(o.targetId)}`} title={formatId(o.targetId)} onClick={() => setTab(o.targetId)}>
                 <span className="spinner tiny" />
                 <span className="tab-label">{nameOf(o.targetId)}</span>
               </button>
-              <button
-                className="tab-close"
-                aria-label={`Cancel request to ${nameOf(o.targetId)}`}
-                title="Cancel request"
-                onClick={() => void act(() => window.remote.cancel(o.targetId))}
-              >
+              <button className="tab-close" aria-label={`Cancel request to ${nameOf(o.targetId)}`} title="Cancel request" onClick={() => void act(() => window.remote.cancel(o.targetId))}>
                 <TabCloseIcon />
               </button>
             </div>
           ))}
-          <button
-            className="tab new-tab"
-            aria-label="New connection"
-            title="New connection"
-            onClick={() => setTab(HOME)}
-          >
+          <button className="tab new-tab" aria-label="New connection" title="New connection" onClick={() => setTab(HOME)}>
             <PlusIcon />
           </button>
         </div>
@@ -1540,16 +1186,10 @@ function App() {
               <button
                 className={`tool ${layout === "grid" ? "active" : ""}`}
                 aria-pressed={layout === "grid"}
-                aria-label={
-                  layout === "grid" ? "Focus one session" : "Split all sessions"
-                }
-                title={
-                  layout === "grid"
-                    ? "Focus view (one at a time)"
-                    : "Split view (all sessions)"
-                }
+                aria-label={layout === "grid" ? "Focus one session" : "Split all sessions"}
+                title={layout === "grid" ? "Focus view (one at a time)" : "Split view (all sessions)"}
                 onClick={() => {
-                  setLayout((l) => (l === "grid" ? "focus" : "grid"));
+                  setLayout(l => (l === "grid" ? "focus" : "grid"));
                   if (tab === HOME) setTab(docked[0]!.peerId);
                 }}
               >
@@ -1558,56 +1198,31 @@ function App() {
             )}
             {current && (
               <>
-                {transfers[current.sessionId] && (
-                  <TransferChip status={transfers[current.sessionId]!} />
-                )}
-                <span
-                  className="session-stats"
-                  title={statsTitle(current, currentStats)}
-                >
+                {transfers[current.sessionId] && <TransferChip status={transfers[current.sessionId]!} />}
+                <span className="session-stats" title={statsTitle(current, currentStats)}>
                   {statsLine(current, currentStats)}
                 </span>
                 <button
                   className="tool"
                   disabled={current.phase !== "connected"}
-                  aria-label={
-                    scale === "fit" ? "Original size" : "Fit to window"
-                  }
-                  title={
-                    scale === "fit" ? "Original size (1:1)" : "Fit to window"
-                  }
+                  aria-label={scale === "fit" ? "Original size" : "Fit to window"}
+                  title={scale === "fit" ? "Original size (1:1)" : "Fit to window"}
                   onClick={() =>
-                    setScales((s) => ({
+                    setScales(s => ({
                       ...s,
-                      [current.sessionId]: scale === "fit" ? "actual" : "fit",
+                      [current.sessionId]: scale === "fit" ? "actual" : "fit"
                     }))
                   }
                 >
                   {scale === "fit" ? <ActualIcon /> : <FitIcon />}
                 </button>
-                <button
-                  className="tool"
-                  aria-label="Open in its own window"
-                  title="Open in its own window"
-                  onClick={() => popOut(current)}
-                >
+                <button className="tool" aria-label="Open in its own window" title="Open in its own window" onClick={() => popOut(current)}>
                   <PopoutIcon />
                 </button>
-                <button
-                  className="tool"
-                  disabled={current.phase !== "connected"}
-                  aria-label={fullscreen ? "Exit full screen" : "Full screen"}
-                  title={fullscreen ? "Exit full screen" : "Full screen"}
-                  onClick={toggleFullscreen}
-                >
+                <button className="tool" disabled={current.phase !== "connected"} aria-label={fullscreen ? "Exit full screen" : "Full screen"} title={fullscreen ? "Exit full screen" : "Full screen"} onClick={toggleFullscreen}>
                   {fullscreen ? <ExitFullIcon /> : <FullIcon />}
                 </button>
-                <button
-                  className="tool-danger"
-                  onClick={() =>
-                    void act(() => window.remote.disconnect(current.sessionId))
-                  }
-                >
+                <button className="tool-danger" onClick={() => void act(() => window.remote.disconnect(current.sessionId))}>
                   Disconnect
                 </button>
               </>
@@ -1624,7 +1239,7 @@ function App() {
             {statusbar}
           </div>
         )}
-        {docked.map((s) => (
+        {docked.map(s => (
           <SessionView
             key={s.sessionId}
             session={s}
@@ -1640,9 +1255,7 @@ function App() {
               setTab(s.peerId);
               setLayout("focus");
             }}
-            onClose={() =>
-              void act(() => window.remote.disconnect(s.sessionId))
-            }
+            onClose={() => void act(() => window.remote.disconnect(s.sessionId))}
           />
         ))}
         {waiting && (
@@ -1651,16 +1264,9 @@ function App() {
               <span className="spinner" />
               <h2>Waiting for approval</h2>
               <p className="muted">
-                The person at <strong>{nameOf(waiting.targetId)}</strong> needs
-                to accept.
+                The person at <strong>{nameOf(waiting.targetId)}</strong> needs to accept.
               </p>
-              <button
-                className="secondary"
-                disabled={busy}
-                onClick={() =>
-                  void act(() => window.remote.cancel(waiting.targetId))
-                }
-              >
+              <button className="secondary" disabled={busy} onClick={() => void act(() => window.remote.cancel(waiting.targetId))}>
                 Cancel request
               </button>
             </section>

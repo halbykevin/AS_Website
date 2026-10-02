@@ -11,6 +11,7 @@ mod protocol;
 mod security;
 mod tls;
 mod transfer;
+mod unattended;
 
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 
@@ -142,7 +143,10 @@ impl Host for Shell {
 type Result<T> = std::result::Result<T, String>;
 #[tauri::command] fn get_state(agent: State<'_, AgentHandle>) -> DesktopState { agent.state() }
 #[tauri::command] async fn setup(agent: State<'_, AgentHandle>, server: String, enrollment_token: Option<String>) -> Result<()> { agent.setup(server, enrollment_token).await }
-#[tauri::command] async fn connect(agent: State<'_, AgentHandle>, target_id: String, clipboard: bool, relay_only: bool) -> Result<()> { agent.connect(target_id, clipboard, relay_only).await }
+#[tauri::command] async fn connect(agent: State<'_, AgentHandle>, target_id: String, clipboard: bool, relay_only: bool, password: Option<String>, remember: bool) -> Result<()> { agent.connect(target_id, clipboard, relay_only, password, remember).await }
+/// Turn unattended access on for this computer (set or replace the password) or off (no password).
+#[tauri::command] async fn set_unattended(agent: State<'_, AgentHandle>, password: String) -> Result<()> { agent.set_unattended(password).await }
+#[tauri::command] async fn clear_unattended(agent: State<'_, AgentHandle>) -> Result<()> { agent.clear_unattended().await }
 #[tauri::command] async fn forget(agent: State<'_, AgentHandle>, target_id: String) -> Result<()> { agent.forget(target_id).await }
 #[tauri::command] async fn dismiss_error(agent: State<'_, AgentHandle>) -> Result<()> { agent.dismiss_error().await }
 #[tauri::command] async fn rename_recent(agent: State<'_, AgentHandle>, target_id: String, name: Option<String>) -> Result<()> { agent.rename_recent(target_id, name).await }
@@ -297,7 +301,7 @@ fn main() {
             .build())
         .invoke_handler(tauri::generate_handler![get_state, setup, connect, forget, rename_recent, dismiss_error, accept, reject, cancel, disconnect, signal, input, read_clipboard,
             clipboard_files, file_read, file_recv_begin, file_recv_open, file_recv_chunk, file_recv_finish, file_cancel,
-            copy_id, window_action, probe_display, report])
+            set_unattended, clear_unattended, copy_id, window_action, probe_display, report])
         .setup(move |app| {
             let handle = app.handle().clone();
             let roaming = app.path().data_dir().expect("roaming app data");

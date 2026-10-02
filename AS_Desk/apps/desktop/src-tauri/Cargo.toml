@@ -11,6 +11,11 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 aes-gcm = "0.10"
+# Unattended access (src/unattended.rs): Argon2id password verifier + HMAC-SHA256 challenge-response.
+argon2 = "0.5"
+hmac = "0.12"
+sha2 = "0.10"
+zeroize = "1"
 base64 = "0.22"
 ed25519-dalek = "2"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }

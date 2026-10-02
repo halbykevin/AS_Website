@@ -41,6 +41,13 @@ pub enum ClientMessage {
     ConnectionReject { request_id: String },
     #[serde(rename = "connection.cancel")]
     ConnectionCancel { request_id: String },
+    // Unattended access: relayed between the request's two parties (see unattended.rs). The target
+    // challenges with a fresh nonce and its verifier's salt/params; the controller answers with a
+    // proof derived from the password. nonce/salt/proof are base64, params is "m=..,t=..,p=..".
+    #[serde(rename = "connection.challenge")]
+    ConnectionChallenge { request_id: String, nonce: String, salt: String, params: String },
+    #[serde(rename = "connection.prove")]
+    ConnectionProve { request_id: String, proof: String },
     #[serde(rename = "session.end")]
     SessionEnd { session_id: String },
     #[serde(rename = "session.connected")]
@@ -67,6 +74,9 @@ impl ClientMessage {
             Self::ConnectionRequest { target_id, permissions } => is_public_id(target_id) && valid_capabilities(permissions),
             Self::ConnectionAccept { request_id, permissions } => is_uuid(request_id) && valid_capabilities(permissions),
             Self::ConnectionReject { request_id } | Self::ConnectionCancel { request_id } => is_uuid(request_id),
+            Self::ConnectionChallenge { request_id, nonce, salt, params } => is_uuid(request_id)
+                && (1..=64).contains(&nonce.len()) && (1..=64).contains(&salt.len()) && (1..=64).contains(&params.len()),
+            Self::ConnectionProve { request_id, proof } => is_uuid(request_id) && (1..=128).contains(&proof.len()),
             Self::SessionEnd { session_id } | Self::SessionConnected { session_id, .. } => is_uuid(session_id),
             Self::Offer { session_id, sdp, signature } | Self::Answer { session_id, sdp, signature } =>
                 is_uuid(session_id) && (1..=49152).contains(&sdp.len()) && signature.as_ref().is_none_or(|s| s.len() <= 128),
