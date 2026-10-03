@@ -749,6 +749,9 @@ impl Agent {
         Ok(())
     }
     fn set_unattended(&mut self, password: &str) -> Result<(), String> {
+        // macOS shows its own picker for every screen capture, and only someone at the Mac can answer
+        // it, so a Mac cannot be reached with nobody there (docs/macos.md).
+        if cfg!(target_os = "macos") { return Err("Unattended access isn't available on a Mac: macOS asks the person there to choose the screen for every session.".into()); }
         let verifier = unattended::Verifier::create(password)?;
         unattended::save(&self.dir, &verifier)?;
         self.unattended = Some(verifier); self.auth_failures.clear();

@@ -5,11 +5,12 @@ import { join, resolve } from "node:path";
 
 // Writes apps/website/public/releases.json for a released version.
 //
-//   npm run website:publish -- --version 0.7.1 [--legacy-version 0.7.1] [--base-url URL] [--copy] [--skip-verify]
+//   npm run website:publish -- --version 0.7.1 [--legacy-version 0.7.1] [--mac-version 0.7.1] [--base-url URL] [--copy] [--skip-verify]
 //
 // The standard installer (Windows 10/11 x64) is required. The legacy Windows 7 edition (x64 + x86) is
 // taken from release/ when --legacy-version (default: --version) was built, otherwise the manifest keeps
 // the legacy installers it already lists: that edition is big and slow to build, so it can lag behind.
+// The macOS disk image works the same way with --mac-version: it is built on a Mac (docs/macos.md).
 
 // --key value, --key=value, or a bare --flag.
 const args = new Map();
@@ -29,9 +30,10 @@ const sha256 = (file) =>
   });
 const version = args.get("version");
 const legacyVersion = args.get("legacy-version") ?? version;
-if (typeof version !== "string" || !semver.test(version) || !semver.test(String(legacyVersion)))
+const macVersion = args.get("mac-version") ?? version;
+if (typeof version !== "string" || !semver.test(version) || !semver.test(String(legacyVersion)) || !semver.test(String(macVersion)))
   throw new Error(
-    "Usage: npm run website:publish -- --version 0.7.1 [--legacy-version 0.7.1] [--base-url https://example.com/downloads] [--copy] [--skip-verify]",
+    "Usage: npm run website:publish -- --version 0.7.1 [--legacy-version 0.7.1] [--mac-version 0.7.1] [--base-url https://example.com/downloads] [--copy] [--skip-verify]",
   );
 
 const source = resolve(args.get("source") ?? "release");
@@ -52,6 +54,10 @@ const legacyFiles = ["x64", "x86"].map((arch) => ({
 const hasLegacy = legacyFiles.every(({ file }) => existsSync(join(source, file)));
 if (hasLegacy) local.push(...legacyFiles);
 else if (args.has("legacy-version")) throw new Error(`Legacy installers for ${legacyVersion} are not in ${source}`);
+const macFile = { edition: "macos", arch: "universal", version: macVersion, file: `ASDesk-${macVersion}-macos-universal.dmg` };
+const hasMac = existsSync(join(source, macFile.file));
+if (hasMac) local.push(macFile);
+else if (args.has("mac-version")) throw new Error(`The macOS disk image for ${macVersion} is not in ${source}`);
 
 const installers = [];
 for (const { file, ...installer } of local) {
@@ -62,10 +68,11 @@ for (const { file, ...installer } of local) {
   }
   installers.push({ ...installer, url: `${targetRoot}/${file}`, size, sha256: await sha256(join(source, file)) });
 }
-if (!hasLegacy) {
-  const kept = (current.latest?.installers ?? []).filter((installer) => installer.edition === "legacy");
+for (const [edition, built, label] of [["legacy", hasLegacy, "legacy installers"], ["macos", hasMac, "macOS disk image"]]) {
+  if (built) continue;
+  const kept = (current.latest?.installers ?? []).filter((installer) => installer.edition === edition);
   installers.push(...kept);
-  console.log(kept.length ? `Keeping legacy installers ${kept[0].version}` : "No legacy installers listed");
+  console.log(kept.length ? `Keeping the ${label} ${kept[0].version}` : `No ${label} listed`);
 }
 
 // The site links straight to these files, so refuse to publish links that would 404 or serve another build.
@@ -80,7 +87,7 @@ if (!copy && !args.has("skip-verify")) {
   if (problems.length)
     throw new Error(
       `Installers are not on the download server yet:\n  ${problems.join("\n  ")}\n` +
-        "Upload them first with: npm run desktop:publish (and -- --win7 for legacy), or pass --copy / --skip-verify.",
+        "Upload them first with: npm run desktop:publish (-- --win7 for legacy, -- --mac for macOS), or pass --copy / --skip-verify.",
     );
 }
 

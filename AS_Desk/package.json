@@ -20,6 +20,8 @@
     "desktop:package": "node tools/desktop.mjs package",
     "desktop:package:win7": "node tools/desktop.mjs package --win7",
     "desktop:release:win7": "node tools/desktop.mjs release --win7",
+    "desktop:package:mac": "node tools/desktop.mjs package --mac",
+    "desktop:release:mac": "node tools/desktop.mjs release --mac",
     "desktop:publish": "node deploy/wrapper.cjs publish-desktop",
     "server:build": "node tools/build-server.mjs",
     "server:smoke": "node tools/build-server.mjs && node tools/server-smoke.mjs",

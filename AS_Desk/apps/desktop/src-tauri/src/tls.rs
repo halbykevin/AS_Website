@@ -20,7 +20,7 @@ pub fn client_config() -> Arc<ClientConfig> {
         let native = rustls_native_certs::load_native_certs();
         let (added, ignored) = roots.add_parsable_certificates(native.certs);
         if !native.errors.is_empty() || ignored > 0 {
-            log::write(format!("tls: {added} Windows roots added, {ignored} unusable, {} store errors", native.errors.len()));
+            log::write(format!("tls: {added} system roots added, {ignored} unusable, {} store errors", native.errors.len()));
         }
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let config = ClientConfig::builder_with_provider(provider)

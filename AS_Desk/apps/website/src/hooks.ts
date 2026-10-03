@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useQuery } from "@tanstack/react-query";
-import { compareVersions, fetchLatestStandard, fetchReleaseManifest, type Architecture, type Edition, type Installer } from "./api";
+import { compareVersions, fetchLatest, fetchReleaseManifest, type Architecture, type Edition, type Installer } from "./api";
 import { detectPlatform } from "./platform";
 import type { AppDispatch, RootState } from "./store";
 
@@ -27,24 +27,30 @@ export function useThemeSync() {
 /** The release manifest, and the installer recommended for this visitor (shared by every download button). */
 export function useDownload() {
   const releases = useQuery({ queryKey: ["release-manifest"], queryFn: fetchReleaseManifest });
-  // The download server knows about a standard release as soon as it is published; the manifest only
-  // after the site is redeployed. Prefer whichever is newer, and fall back to the manifest on any error.
+  // The download server knows about a Windows or macOS release as soon as it is published; the manifest
+  // only after the site is redeployed. Prefer whichever is newer, and fall back to the manifest on any error.
   const listed = releases.data?.latest.installers ?? [];
   const listedStandard = listed.find((installer) => installer.edition === "standard");
+  const downloadsBase = listedStandard?.url.slice(0, listedStandard.url.lastIndexOf("/"));
   const live = useQuery({
-    queryKey: ["latest-standard"],
-    queryFn: () => fetchLatestStandard(listedStandard!.url.slice(0, listedStandard!.url.lastIndexOf("/"))),
-    enabled: !!listedStandard,
+    queryKey: ["latest-installers", downloadsBase],
+    queryFn: () => Promise.all([fetchLatest("standard", downloadsBase!), fetchLatest("macos", downloadsBase!)]),
+    enabled: !!downloadsBase,
     retry: false,
   });
-  const newer = live.data && listedStandard && compareVersions(live.data.version, listedStandard.version) > 0 ? live.data : undefined;
-  const installers: Installer[] = newer ? [newer, ...listed.filter((installer) => installer !== listedStandard)] : listed;
+  const fetched: (Installer | undefined)[] = live.data ?? [];
+  const newer = fetched.filter((installer): installer is Installer => {
+    const current = installer && listed.find((item) => item.edition === installer.edition);
+    return !!installer && (!current || compareVersions(installer.version, current.version) > 0);
+  });
+  const installers: Installer[] = [...newer, ...listed.filter((installer) => !newer.some((item) => item.edition === installer.edition))];
   const find = (edition: Edition, arch: Architecture) =>
     installers.find((installer) => installer.edition === edition && installer.arch === arch);
   const platform = detectPlatform();
   return {
     installers,
     find,
+    platform,
     recommended: find(platform.edition, platform.arch) ?? find("standard", "x64"),
     isLoading: releases.isPending,
     isError: releases.isError,

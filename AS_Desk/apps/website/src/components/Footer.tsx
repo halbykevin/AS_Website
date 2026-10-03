@@ -8,7 +8,7 @@ export function Footer() {
       <Container className="flex flex-col gap-8 py-10 md:flex-row md:items-center md:justify-between">
         <div className="space-y-3">
           <Logo size="sm" />
-          <p className="text-sm text-subtle">Free remote desktop for Windows.</p>
+          <p className="text-sm text-subtle">Free remote desktop for Windows and Mac.</p>
         </div>
         <nav aria-label="Footer">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">

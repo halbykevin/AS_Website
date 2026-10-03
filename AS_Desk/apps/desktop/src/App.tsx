@@ -16,6 +16,11 @@ const icon =
       <path d={d} />
     </svg>
   );
+/** On a Mac the system draws the window buttons (src-tauri/src/main.rs, chrome); a `mac` root leaves
+ *  room for them. macOS also picks the screen to share itself and has no unattended access. */
+const MAC = /Macintosh|Mac OS X/.test(navigator.userAgent);
+const platformClass = MAC ? " mac" : "";
+const STOP_KEYS = MAC ? "⌃⌥⇧F12" : "Ctrl+Alt+Shift+F12";
 // Absolute, so it also resolves inside a popped-out session's window (an about:blank document).
 const logoSrc = new URL(logoUrl, document.baseURI).href;
 const Logo = () => <img className="logo-img" src={logoSrc} alt="" width={18} height={18} />;
@@ -170,6 +175,7 @@ async function thumbnail(stream: MediaStream): Promise<number[] | undefined> {
 
 /** The frameless window's buttons; `target` names a popped-out session's window instead of this one. */
 function WindowControls({ maximized, target, onClose, closeTitle = "Close to tray" }: { maximized: boolean; target?: string; onClose?: () => void; closeTitle?: string }) {
+  if (MAC) return null;
   return (
     <div className="window-controls">
       <button aria-label="Minimize" title="Minimize" onClick={() => void window.remote.window("minimize", target)}>
@@ -219,6 +225,8 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
   const viewer = useRef<HTMLDivElement>(null);
   // The pointer position not sent yet (see the move listener below) and when the last one went out.
   const moves = useRef<{ last: number; timer?: ReturnType<typeof setTimeout>; pending?: { x: number; y: number } }>({ last: 0 });
+  // macOS sends no keyup for a key let go while ⌘ is held: those are released when ⌘ is.
+  const withCommand = useRef(new Set<string>());
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const element = video.current;
@@ -316,10 +324,16 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
       onBlur={() => send({ type: "release" })}
       onKeyDown={e => {
         e.preventDefault();
+        if (MAC && e.metaKey && !e.code.startsWith("Meta")) withCommand.current.add(e.code);
         if (!e.repeat) send({ type: "key", code: e.code, down: true });
       }}
       onKeyUp={e => {
         e.preventDefault();
+        withCommand.current.delete(e.code);
+        if (e.code.startsWith("Meta")) {
+          for (const code of withCommand.current) send({ type: "key", code, down: false });
+          withCommand.current.clear();
+        }
         send({ type: "key", code: e.code, down: false });
       }}
       onMouseDown={e => {
@@ -776,7 +790,7 @@ function App() {
         transfer = transfers[s.sessionId];
       const sessionScale = scales[s.sessionId] ?? "fit";
       return createPortal(
-        <div className="session workspace popout ad-shell">
+        <div className={`session workspace popout ad-shell${platformClass}`}>
           <div className="toolbar" onMouseDown={e => drag(e, popout.label)}>
             <span className="popout-name">
               <span className="logo">
@@ -896,7 +910,7 @@ function App() {
       const surface = settings.displaySurface ?? (/^screen/i.test(track.label) ? "monitor" : undefined);
       if (wantsControl && surface !== "monitor") {
         stream.getTracks().forEach(t => t.stop());
-        throw new Error("The whole screen could not be shared, so control is not possible.");
+        throw new Error(MAC ? "A window was chosen, not a whole display, so control is not possible. Choose Accept & share again and pick a display." : "The whole screen could not be shared, so control is not possible.");
       }
       releaseCapture();
       capture.current = stream;
@@ -952,6 +966,7 @@ function App() {
             </label>
           ))}
         </div>
+        {MAC && <p className="muted">After you accept, macOS asks which screen to share. Choose a whole display for the mouse and keyboard to work.</p>}
         {activeError && (
           <p className="modal-error" role="alert">
             {activeError}
@@ -976,7 +991,7 @@ function App() {
     const granted = sharing.permissions.filter(p => p !== "screen").map(p => permissionLabels[p]);
     const live = sharing.phase === "connected";
     return (
-      <div className="shell">
+      <div className={`shell${platformClass}`}>
         <div className="titlebar" onMouseDown={drag}>
           <span className="app-name">
             <span className="logo">
@@ -1003,7 +1018,7 @@ function App() {
             )}
             <div className="sharing-foot">
               <span className="muted">
-                <kbd>Ctrl+Alt+Shift+F12</kbd> stops instantly
+                <kbd>{STOP_KEYS}</kbd> stops instantly
               </span>
               <button className="danger" onClick={() => void act(() => window.remote.disconnect(sharing.sessionId))}>
                 Disconnect
@@ -1197,7 +1212,7 @@ function App() {
             Use relay only
           </label>
         </div>
-        {(state.unattendedEnabled || isReady) && (
+        {!MAC && (state.unattendedEnabled || isReady) && (
           <div className="ad-menu-section">
             <span className="ad-menu-title">Unattended Access</span>
             {state.unattendedEnabled ? (
@@ -1273,7 +1288,7 @@ function App() {
   const scale = current ? (scales[current.sessionId] ?? "fit") : "fit";
   const currentStats = current ? stats[current.sessionId] : undefined;
   return (
-    <div className={`session workspace ad-shell ${fullscreen ? "is-fullscreen" : ""}`} ref={workspace}>
+    <div className={`session workspace ad-shell${platformClass} ${fullscreen ? "is-fullscreen" : ""}`} ref={workspace}>
       <div className="toolbar tabbar" onMouseDown={drag}>
         <span className="app-name">
           <span className="logo">

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { Installer } from "../api";
 import { useDownload } from "../hooks";
-import { ArrowRightIcon, CheckIcon, ClipboardIcon, DownloadIcon, WindowsIcon } from "./icons";
+import { ArrowRightIcon, CheckIcon, ClipboardIcon, DownloadIcon, LaptopIcon, WindowsIcon } from "./icons";
 import { buttonClass, cx, focusRing } from "./ui";
 
 const formatSize = (bytes: number) => {
@@ -10,9 +10,11 @@ const formatSize = (bytes: number) => {
 };
 
 const editionLabel = (installer: Installer) =>
-  installer.edition === "standard"
-    ? "Windows 10 & 11"
-    : `Windows 7 & 8 · ${installer.arch === "x64" ? "64-bit" : "32-bit"}`;
+  installer.edition === "macos"
+    ? "macOS 13 or later"
+    : installer.edition === "standard"
+      ? "Windows 10 & 11"
+      : `Windows 7 & 8 · ${installer.arch === "x64" ? "64-bit" : "32-bit"}`;
 
 /** A button that downloads the recommended installer directly; used outside the hero (header, pricing). */
 export function DirectDownloadLink({
@@ -36,44 +38,57 @@ const inlineLink = cx(
   focusRing,
 );
 
-/** The other installers, as a quiet line under the main button. */
+/** The other installers, as quiet lines under the main button. */
 function OtherVersions({ recommended }: { recommended: Installer }) {
   const { find } = useDownload();
   const standard = find("standard", "x64");
+  const mac = find("macos", "universal");
   const legacy = [find("legacy", "x64"), find("legacy", "x86")].filter(
     (installer) => installer !== undefined,
   );
 
-  if (recommended.edition === "legacy")
-    return standard ? (
-      <p>
-        On Windows 10 or 11?{" "}
-        <a href={standard.url} className={inlineLink}>
-          Get the {standard.size ? `${formatSize(standard.size)} ` : ""}installer
-        </a>
-      </p>
-    ) : null;
-
-  return legacy.length ? (
-    <p>
-      Windows 7, 8 or 32-bit?{" "}
-      {legacy.map((installer, index) => (
-        <span key={installer.url}>
-          {index > 0 && " · "}
-          <a href={installer.url} className={inlineLink}>
-            {installer.arch === "x64" ? "64-bit" : "32-bit"}
+  return (
+    <>
+      {recommended.edition !== "standard" && standard && (
+        <p>
+          On Windows 10 or 11?{" "}
+          <a href={standard.url} className={inlineLink}>
+            Get the {standard.size ? `${formatSize(standard.size)} ` : ""}installer
+          </a>
+        </p>
+      )}
+      {recommended.edition === "standard" && legacy.length > 0 && (
+        <p>
+          Windows 7, 8 or 32-bit?{" "}
+          {legacy.map((installer, index) => (
+            <span key={installer.url}>
+              {index > 0 && " · "}
+              <a href={installer.url} className={inlineLink}>
+                {installer.arch === "x64" ? "64-bit" : "32-bit"}
+              </a>{" "}
+              {installer.size > 0 && <span className="text-subtle">({formatSize(installer.size)})</span>}
+            </span>
+          ))}
+        </p>
+      )}
+      {recommended.edition !== "macos" && mac && (
+        <p>
+          On a Mac?{" "}
+          <a href={mac.url} className={inlineLink}>
+            Download for macOS
           </a>{" "}
-          {installer.size > 0 && <span className="text-subtle">({formatSize(installer.size)})</span>}
-        </span>
-      ))}
-    </p>
-  ) : null;
+          {mac.size > 0 && <span className="text-subtle">({formatSize(mac.size)})</span>}
+        </p>
+      )}
+    </>
+  );
 }
 
 /** The installer's SHA-256, so anyone can check the file they got is the one published here. */
 function Checksum({ installer }: { installer: Installer }) {
   const [copied, setCopied] = useState(false);
   if (!installer.sha256) return null;
+  const file = installer.url.split("/").pop();
   const copy = () =>
     navigator.clipboard
       .writeText(installer.sha256!)
@@ -89,7 +104,7 @@ function Checksum({ installer }: { installer: Installer }) {
       </summary>
       <div className="mt-2 max-w-md rounded-lg border border-line bg-surface p-3 text-xs">
         <p className="text-muted">
-          SHA-256 of <span className="font-medium text-fg">{installer.url.split("/").pop()}</span>
+          SHA-256 of <span className="font-medium text-fg">{file}</span>
         </p>
         <div className="mt-1.5 flex items-start gap-2">
           <code className="min-w-0 flex-1 font-mono break-all text-fg select-all">{installer.sha256}</code>
@@ -98,7 +113,15 @@ function Checksum({ installer }: { installer: Installer }) {
           </button>
         </div>
         <p className="mt-2 text-subtle">
-          Check it in PowerShell: <code className="font-mono text-fg">Get-FileHash .\{installer.url.split("/").pop()}</code>
+          {installer.edition === "macos" ? (
+            <>
+              Check it in Terminal: <code className="font-mono text-fg">shasum -a 256 ~/Downloads/{file}</code>
+            </>
+          ) : (
+            <>
+              Check it in PowerShell: <code className="font-mono text-fg">Get-FileHash .\{file}</code>
+            </>
+          )}
         </p>
       </div>
     </details>
@@ -107,7 +130,10 @@ function Checksum({ installer }: { installer: Installer }) {
 
 /** The primary call to action: the right installer for this visitor, straight from the hero. */
 export function HeroDownload() {
-  const { recommended, isLoading, isError } = useDownload();
+  const { recommended, platform, isLoading, isError } = useDownload();
+  // Until the release list loads, this visitor's own system; then whatever is actually offered.
+  const mac = (recommended?.edition ?? platform.edition) === "macos";
+  const SystemIcon = mac ? LaptopIcon : WindowsIcon;
 
   const details = isError
     ? "Couldn't load the latest release — refresh to try again"
@@ -128,9 +154,9 @@ export function HeroDownload() {
           ),
         })}
       >
-        <WindowsIcon className="size-5 shrink-0" />
+        <SystemIcon className="size-5 shrink-0" />
         <span className="flex flex-1 flex-col items-start leading-tight">
-          <span className="text-[15px]">Download for Windows</span>
+          <span className="text-[15px]">Download for {mac ? "macOS" : "Windows"}</span>
           <span
             id="download-status"
             className="text-xs font-medium text-white/80"

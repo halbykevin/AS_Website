@@ -1,0 +1,83 @@
+# Builds the ASDesk macOS app (AS_Desk/) on a Mac runner: a Mac app can only be built on macOS.
+# One universal disk image for Apple silicon and Intel. Run it from Actions → "ASDesk macOS" → Run
+# workflow, download the "ASDesk-macOS" artifact into AS_Desk/release/, then publish it from any
+# computer with `npm run desktop:publish -- --mac`. Signing secrets: AS_Desk/docs/macos.md#signing.
+name: ASDesk macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Sign with the Developer ID certificate and notarize (needs the Apple secrets)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asdesk-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: AS_Desk
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: AS_Desk/package-lock.json
+
+      - name: Rust for Apple silicon and Intel
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - run: npm ci
+
+      # The agent embeds the built UI, so it is built before the tests compile.
+      - name: Check the desktop UI and test the agent
+        run: |
+          npm run desktop:check
+          npm run desktop:build
+          npm run desktop:test
+
+      - name: Build the disk image (not notarized)
+        if: ${{ !inputs.release }}
+        run: npm run desktop:package:mac
+
+      # Secrets reach the build only as environment variables, never in the script text.
+      - name: Build, sign and notarize the disk image
+        if: ${{ inputs.release }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY.p8"
+          printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
+          chmod 600 "$APPLE_API_KEY_PATH"
+          npm run desktop:release:mac
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ASDesk-macOS
+          path: |
+            AS_Desk/release/ASDesk-*-macos-universal.dmg
+            AS_Desk/release/ASDesk-*-macos-universal.dmg.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

@@ -14,7 +14,8 @@
 #   npm run server:admin -- devices | revoke <id> | restore <id> | sessions [n]
 #   npm run server:backup         take a database backup now
 #   npm run desktop:publish       upload the newest installer to https://<domain>/downloads/
-#                                 (-- --win7 for the Windows 7 edition's x64 and x86 installers)
+#                                 (-- --win7 for the Windows 7 edition's x64 and x86 installers,
+#                                  -- --mac for the macOS disk image)
 #
 # Any command takes --host <name> to pick a profile (deploy/.env.vps.<name>).
 # =============================================================================
@@ -186,21 +187,28 @@ cmd_backup() {
 
 # Uploads one installer and points its stable download name at it. The standard edition is
 # ASDesk-Setup-x64.exe (plus the pre-rename alias and latest.json); the Windows 7 edition is
-# ASDesk-Setup-win7-x64.exe / -x86.exe, the names the standard installer sends older PCs to.
+# ASDesk-Setup-win7-x64.exe / -x86.exe, the names the standard installer sends older PCs to; the macOS
+# edition is ASDesk-macOS.dmg (plus latest-macos.json). The website reads both pointers.
 publish_installer() {
-  local file="$1" name sum size link
+  local file="$1" name sum size link pointer=""
   name="$(basename "$file")"
   [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "unexpected installer name: $name"
   case "$name" in
     ASDesk-*-win7-x64-Setup.exe) link="ASDesk-Setup-win7-x64.exe" ;;
     ASDesk-*-win7-x86-Setup.exe) link="ASDesk-Setup-win7-x86.exe" ;;
-    ASDesk-*-x64-Setup.exe) link="ASDesk-Setup-x64.exe" ;;
+    ASDesk-*-x64-Setup.exe) link="ASDesk-Setup-x64.exe"; pointer="latest.json" ;;
+    ASDesk-*-macos-universal.dmg) link="ASDesk-macOS.dmg"; pointer="latest-macos.json" ;;
     *) die "not an ASDesk installer name: $name" ;;
   esac
   sum="$(sha256sum "$file" | awk '{print $1}')"
   size="$(wc -c < "$file" | tr -d ' ')"
-  # Browsers (Chrome/Edge Safe Browsing) and SmartScreen block or warn on unsigned installers.
-  if command -v powershell.exe >/dev/null 2>&1; then
+  if [[ "$name" == *.dmg ]]; then
+    # Gatekeeper blocks a disk image that is not notarized until the person allows it in System
+    # Settings. Notarization cannot be checked from here, so desktop.mjs records it next to the image.
+    grep -q '"notarized": true' "$file.json" 2>/dev/null \
+      || warn "$name is not notarized: macOS will ask people to allow it in System Settings. Build with npm run desktop:release:mac (docs/macos.md)."
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    # Browsers (Chrome/Edge Safe Browsing) and SmartScreen block or warn on unsigned installers.
     local signature
     signature="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-AuthenticodeSignature -LiteralPath '$(cygpath -w "$file" 2>/dev/null || echo "$file")').Status" 2>/dev/null | tr -d '\r')"
     [ "$signature" = "Valid" ] || warn "$name is not code-signed ($signature): browsers may block it as a suspicious download. Build with npm run desktop:release."
@@ -209,7 +217,10 @@ publish_installer() {
   scp_upload "$file" "$REMOTE_BASE/downloads/.$name.part" || die "upload failed"
   local extra=""
   if [ "$link" = "ASDesk-Setup-x64.exe" ]; then
-    extra="&& ln -sfn '$name' CompanyRemote-Setup-x64.exe && printf '{\"file\":\"%s\",\"sha256\":\"%s\",\"size\":%s,\"published\":\"%s\"}\n' '$name' '$sum' '$size' \"\$(date -u +%FT%TZ)\" > latest.json"
+    extra="&& ln -sfn '$name' CompanyRemote-Setup-x64.exe"
+  fi
+  if [ -n "$pointer" ]; then
+    extra="$extra && printf '{\"file\":\"%s\",\"sha256\":\"%s\",\"size\":%s,\"published\":\"%s\"}\n' '$name' '$sum' '$size' \"\$(date -u +%FT%TZ)\" > '.$pointer.part' && mv -f '.$pointer.part' '$pointer'"
   fi
   ssh_run "cd $REMOTE_BASE/downloads && echo '$sum  .$name.part' | sha256sum -c --quiet - && mv -f '.$name.part' '$name' && chmod 644 '$name' && ln -sfn '$name' '$link' $extra" \
     || die "publishing failed (checksum or move)"
@@ -227,6 +238,10 @@ cmd_publish_desktop() {
     version="$(basename "$x64" | sed -E 's/^ASDesk-(.+)-win7-x64-Setup\.exe$/\1/')"
     files=("$x64" "$REPO_ROOT/release/ASDesk-$version-win7-x86-Setup.exe")
     [ -f "${files[1]}" ] || die "missing ${files[1]##*/}; build both with: npm run desktop:package:win7"
+  elif [ "${1:-}" = "--mac" ]; then
+    # Built on a Mac, or downloaded from the "ASDesk macOS" workflow into release/ (docs/macos.md).
+    files=("$(ls -t "$REPO_ROOT"/release/ASDesk-*-macos-universal.dmg 2>/dev/null | head -1 || true)")
+    [ -n "${files[0]}" ] || die "no macOS disk image in release/. Build it on a Mac (npm run desktop:package:mac) or download it from the \"ASDesk macOS\" GitHub workflow into release/"
   elif [ -n "${1:-}" ]; then
     files=("$1")
   else

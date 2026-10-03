@@ -34,6 +34,8 @@ tauri-plugin-single-instance = "2"
 tokio = { version = "1", features = ["macros", "sync", "time"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
 windows-core = "0.61"
 windows-sys = { version = "0.61", features = [
@@ -45,6 +47,15 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_Pipes", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_StationsAndDesktops",
   "Win32_Security", "Win32_Security_Authorization", "Win32_System_Services",
 ] }
+
+# macOS (src/macos/): the pasteboard and system notifications through AppKit, the device key in the
+# login keychain. Quartz events and displays are plain C (src/macos/sys.rs). All already used by Tauri.
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "NSArray", "NSDistributedNotificationCenter", "NSNotification", "NSOperation", "NSString", "NSURL"] }
+security-framework = "3"
 
 # Size first: the installer is the product's first impression.
 [profile.release]

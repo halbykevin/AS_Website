@@ -8,9 +8,10 @@ import { resolve } from 'node:path';
 const desktop = JSON.parse(await readFile('apps/desktop/package.json', 'utf8'));
 const defaultServer = process.env.COMPANY_REMOTE_SERVER ?? desktop.companyRemote?.defaultServer ?? '';
 if (defaultServer && !/^https:\/\/[a-z0-9.-]+$/.test(defaultServer)) throw new Error(`Invalid default server: ${defaultServer}`);
-// The oldest engine the UI runs on: WebView2 109, the last for Windows 7 and 8 (the Windows 7 edition
-// ships it; see docs/windows7.md). Syntax and CSS are lowered to it; newer browser APIs need a fallback.
-const CHROMIUM = ['chrome109', 'edge109'];
-await viteBuild({ root: resolve('apps/desktop'), base: './', build: { outDir: 'dist/ui', emptyOutDir: true, target: CHROMIUM }, configFile: false, logLevel: 'warn',
+// The oldest engines the UI runs on: WebView2 109, the last for Windows 7 and 8 (the Windows 7 edition
+// ships it; see docs/windows7.md), and the WebKit of macOS 13 (Safari 16; docs/macos.md). Syntax and
+// CSS are lowered to both; newer browser APIs need a fallback.
+const ENGINES = ['chrome109', 'edge109', 'safari16'];
+await viteBuild({ root: resolve('apps/desktop'), base: './', build: { outDir: 'dist/ui', emptyOutDir: true, target: ENGINES }, configFile: false, logLevel: 'warn',
   define: { __DEFAULT_SERVER__: JSON.stringify(defaultServer) } });
 console.log(`Desktop UI built (${desktop.version}, default server ${defaultServer || 'none'})`);

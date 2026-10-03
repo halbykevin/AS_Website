@@ -1,7 +1,7 @@
 {
-  "name": "ASDesk — Free remote desktop for Windows",
+  "name": "ASDesk — Free remote desktop for Windows and Mac",
   "short_name": "ASDesk",
-  "description": "Free remote desktop for Windows, developed by rAIone.",
+  "description": "Free remote desktop for Windows and Mac, developed by rAIone.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#07111f",

@@ -16,18 +16,22 @@ enum Job { Start(Rect), Stop, Events(Vec<InputEvent>), Block(bool, oneshot::Send
 #[derive(Default)]
 struct Gate { session: Option<String>, mouse: bool, keyboard: bool }
 
-pub struct Injector { jobs: mpsc::Sender<Job>, gate: Mutex<Gate> }
+pub struct Injector { jobs: mpsc::Sender<Job>, gate: Mutex<Gate>, #[cfg_attr(windows, allow(dead_code))] dry_run: bool }
 
 impl Injector {
     /// `dry_run` validates and tracks everything but never touches the real desktop (tests).
     pub fn new(dry_run: bool) -> Self {
         let (jobs, queue) = mpsc::channel();
         std::thread::Builder::new().name("input".into()).spawn(move || run(queue, dry_run)).expect("input thread");
-        Self { jobs, gate: Mutex::default() }
+        Self { jobs, gate: Mutex::default(), dry_run }
     }
     /// A request was accepted with control: input will go to `display` once `allow` opens the session.
     pub fn start(&self, display: Rect) -> Result<(), String> {
         Input::check(display)?;
+        // macOS delivers injected input only with the Accessibility permission: ask now, while the
+        // person accepting can still be told, rather than drop every event later.
+        #[cfg(target_os = "macos")]
+        if !self.dry_run { Input::permitted()?; }
         *self.gate.lock().unwrap() = Gate::default();
         let _ = self.jobs.send(Job::Start(display));
         Ok(())

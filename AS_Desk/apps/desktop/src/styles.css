@@ -378,6 +378,15 @@ p {
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
+/* macOS: the system's traffic lights sit at the left of the title bar (src-tauri/src/main.rs, chrome),
+   and full screen hides them. */
+.mac > .toolbar,
+.mac > .titlebar {
+  padding-left: 76px;
+}
+.mac.is-fullscreen > .toolbar {
+  padding-left: 0;
+}
 
 /* Messages */
 .error {

@@ -8,7 +8,8 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/latest.json", "destination": "https://asdesk-api.raiapp.dev/downloads/latest.json" }
+    { "source": "/latest.json", "destination": "https://asdesk-api.raiapp.dev/downloads/latest.json" },
+    { "source": "/latest-macos.json", "destination": "https://asdesk-api.raiapp.dev/downloads/latest-macos.json" }
   ],
   "headers": [
     {
@@ -34,6 +35,10 @@
     },
     {
       "source": "/latest.json",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "source": "/latest-macos.json",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
     },
     {

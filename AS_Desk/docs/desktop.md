@@ -4,7 +4,9 @@ ASDesk's desktop app is a Tauri 2 application: a Rust core in a ~4.5 MB
 executable and a React UI in the system's WebView2 (built into Windows 11,
 installed on demand on Windows 10). The installer is about 1.6 MB. Windows 7 SP1
 and 8.x (32- and 64-bit) get a separate **Windows 7 edition** with its own
-WebView2; see [Windows 7 edition](windows7.md). Versions 0.3–0.5 were Electron
+WebView2; see [Windows 7 edition](windows7.md). Macs (macOS 13+, Apple silicon and
+Intel) get a **macOS edition**, the same app on WebKit with its own system layer
+in `src-tauri/src/macos/`; see [macOS edition](macos.md). Versions 0.3–0.5 were Electron
 apps (~80–106 MB); see [Upgrading from 0.5](#upgrading-from-05). Versions before
 0.6 were called Company Remote; the data folder (`%APPDATA%\Company Remote`),
 the app identifier (`com.companyremote.desktop`) and the protocol names keep
@@ -21,7 +23,8 @@ Rust core (trusted; apps/desktop/src-tauri)
   ├─ elevation.rs  SYSTEM service + helper for full-access input (UAC prompts, elevated apps)
   ├─ platform.rs   DPAPI, clipboard, displays, start-up entry, lock/suspend/display events,
   │                notifications, APIs newer than Windows 7 (resolved at run time)
-  ├─ tls.rs        rustls for every server connection: bundled Mozilla roots + Windows roots
+  ├─ tls.rs        rustls for every server connection: bundled Mozilla roots + system roots
+  ├─ macos/        platform, input, blocker, elevation and sys for macOS (docs/macos.md)
   └─ main.rs       frameless window, sharing panel, tray, shortcut, Tauri commands
        │  Tauri commands (capabilities/main.json lists the only ones the page may call)
 WebView2 (apps/desktop/src)
@@ -194,6 +197,7 @@ npm run desktop:debug    # test build (target/debug/ASDesk.exe)
 npm run desktop:e2e      # two instances end to end (E2E_SERVER=... E2E_RELAY=1 for production)
 npm run desktop:package  # release/ASDesk-<version>-x64-Setup.exe (Windows 10 and 11)
 npm run desktop:package:win7  # release/ASDesk-<version>-win7-{x64,x86}-Setup.exe (Windows 7 SP1+)
+npm run desktop:package:mac   # on a Mac: release/ASDesk-<version>-macos-universal.dmg (docs/macos.md)
 ```
 
 `desktop:e2e` launches three debug builds (a technician and two computers,
@@ -213,7 +217,8 @@ instead. The version shown and reported at enrollment is that file's `version`.
 `/downloads/` (`ASDesk-Setup-x64.exe`); `npm run desktop:publish -- --win7`
 uploads the Windows 7 edition's two (`ASDesk-Setup-win7-x64.exe`,
 `ASDesk-Setup-win7-x86.exe`), the names the standard installer sends older PCs
-to.
+to; `npm run desktop:publish -- --mac` uploads the macOS disk image
+(`ASDesk-macOS.dmg`, with `latest-macos.json` for the website).
 
 ## Window behaviour
 
@@ -257,6 +262,8 @@ menu's **Show log file** opens it. It is capped at 1 MB, with one previous file
 kept as `asdesk.old.log`.
 
 ## Windows signing
+
+(Signing and notarizing the macOS edition: [macOS edition](macos.md#signing).)
 
 `desktop:package` produces an unsigned installer. Chrome and Edge (Safe
 Browsing) then block it as a "suspicious download" and SmartScreen warns on

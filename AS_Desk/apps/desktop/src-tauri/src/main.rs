@@ -1,14 +1,27 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 //! ASDesk desktop shell: window, tray, shortcuts and the bridge between the web UI and the
 //! trusted agent. See docs/desktop.md for the security boundary.
+//!
+//! Windows and macOS share everything but the system layer: platform, input, blocker and elevation
+//! come from src/macos/ on a Mac (docs/macos.md).
+#[cfg(not(any(windows, target_os = "macos")))]
+compile_error!("ASDesk builds for Windows and macOS");
+
 mod agent;
+#[cfg_attr(target_os = "macos", path = "macos/blocker.rs")]
 mod blocker;
+#[cfg_attr(target_os = "macos", path = "macos/elevation.rs")]
 mod elevation;
 mod identity;
 mod inject;
+#[cfg_attr(target_os = "macos", path = "macos/input.rs")]
 mod input;
 mod log;
+#[cfg_attr(target_os = "macos", path = "macos/platform.rs")]
 mod platform;
+#[cfg(target_os = "macos")]
+#[path = "macos/sys.rs"]
+mod sys;
 mod protocol;
 mod security;
 mod tls;
@@ -32,6 +45,24 @@ use tauri_plugin_notification::NotificationExt;
 
 const NORMAL: (f64, f64) = (720.0, 440.0);
 const NORMAL_MIN: (f64, f64) = (540.0, 380.0);
+
+/// What the person here is told, in each system's own words.
+#[cfg(windows)]
+mod words {
+    pub const TRAY: &str = "the notification area";
+    pub const STOP_KEYS: &str = "Ctrl+Alt+Shift+F12";
+    pub const BLOCKED: &str = "The person helping you blocked them for this session. Press Ctrl+Alt+Shift+F12 to stop sharing, or Ctrl+Alt+Del to lock this computer.";
+    pub const STILL_RUNNING: &str = "It stays in the notification area so others can request access. Right-click the icon to quit.";
+    pub const AUTOSTART: &str = "Start with Windows";
+}
+#[cfg(target_os = "macos")]
+mod words {
+    pub const TRAY: &str = "the menu bar";
+    pub const STOP_KEYS: &str = "Control+Option+Shift+F12";
+    pub const BLOCKED: &str = "The person helping you blocked them for this session. Press Control+Option+Shift+F12 to stop sharing.";
+    pub const STILL_RUNNING: &str = "It stays in the menu bar so others can request access. Quit from its menu there.";
+    pub const AUTOSTART: &str = "Open at Login";
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode { Normal, Sharing, Viewing }
@@ -73,7 +104,7 @@ impl Shell {
                 let _ = w.hide();
                 drop(layout);
                 let peer = peer.map(format_id).unwrap_or_default();
-                self.notify("Your screen is being shared", &format!("with {peer}. To stop, choose End all sessions from the ASDesk icon in the notification area, or press Ctrl+Alt+Shift+F12."));
+                self.notify("Your screen is being shared", &format!("with {peer}. To stop, choose End all sessions from the ASDesk icon in {}, or press {}.", words::TRAY, words::STOP_KEYS));
             }
             Mode::Viewing => { let _ = w.set_min_size(Some(LogicalSize::new(NORMAL_MIN.0, NORMAL_MIN.1))); let _ = w.maximize(); drop(layout); self.show(); }
             Mode::Normal => {
@@ -101,6 +132,8 @@ impl Shell {
                 (None, n) => format!("ASDesk — controlling {n} computers{id}"),
             };
             let _ = tray.set_tooltip(Some(tooltip));
+            // macOS: the menu bar draws a template icon in its own colour; sharing stays in brand colours.
+            let _ = tray.set_icon_as_template(cfg!(target_os = "macos") && sharing.is_none());
             let _ = tray.set_icon(Some(if sharing.is_some() { self.icons.sharing.clone() } else { self.icons.normal.clone() }));
         }
         if let Some(tray) = self.tray.lock().unwrap().as_ref() {
@@ -110,12 +143,16 @@ impl Shell {
         }
     }
     fn notify(&self, title: &str, body: &str) {
-        if platform::toasts_supported() { let _ = self.app.notification().builder().title(title).body(body).show(); return; }
-        // Windows 7: a balloon on the tray icon (see platform::balloon).
-        let (title, body) = (title.to_string(), body.to_string());
-        if let Some(tray) = self.app.tray_by_id("main") {
-            let _ = tray.with_inner_tray_icon(move |icon| { if !platform::balloon(icon.window_handle(), &title, &body) { log::write("notification: no tray icon for a balloon"); } });
+        #[cfg(windows)]
+        if !platform::toasts_supported() {
+            // Windows 7: a balloon on the tray icon (see platform::balloon).
+            let (title, body) = (title.to_string(), body.to_string());
+            if let Some(tray) = self.app.tray_by_id("main") {
+                let _ = tray.with_inner_tray_icon(move |icon| { if !platform::balloon(icon.window_handle(), &title, &body) { log::write("notification: no tray icon for a balloon"); } });
+            }
+            return;
         }
+        let _ = self.app.notification().builder().title(title).body(body).show();
     }
 }
 
@@ -168,7 +205,7 @@ async fn accept(agent: State<'_, AgentHandle>, request_id: String, permissions: 
 #[tauri::command]
 async fn block_input(agent: State<'_, AgentHandle>, shell: State<'_, Arc<Shell>>, session_id: String, block: bool) -> Result<()> {
     agent.block_input(session_id, block).await?;
-    if block { shell.notify("Your keyboard and mouse are blocked", "The person helping you blocked them for this session. Press Ctrl+Alt+Shift+F12 to stop sharing, or Ctrl+Alt+Del to lock this computer."); }
+    if block { shell.notify("Your keyboard and mouse are blocked", words::BLOCKED); }
     else { shell.notify("Your keyboard and mouse work again", "The person helping you unblocked them."); }
     Ok(())
 }
@@ -233,9 +270,9 @@ fn popout_window(app: &AppHandle, url: tauri::Url, features: tauri::webview::New
         .filter(|(x, y)| x.abs() < 100_000 && y.abs() < 100_000);
     let label = format!("{POPOUT}{id}");
     if app.get_webview_window(&label).is_some() { return NewWindowResponse::Deny; }
-    let mut builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::External("about:blank".parse().expect("about:blank")))
-        .title("ASDesk").inner_size(1024.0, 680.0).min_inner_size(420.0, 280.0).decorations(false).shadow(true)
-        .window_features(features).focused(true);
+    let mut builder = chrome(WebviewWindowBuilder::new(app, &label, WebviewUrl::External("about:blank".parse().expect("about:blank")))
+        .title("ASDesk").inner_size(1024.0, 680.0).min_inner_size(420.0, 280.0).shadow(true)
+        .window_features(features).focused(true));
     if let Some((x, y)) = at { builder = builder.position(x as f64, y as f64); }
     let built = builder.build();
     match built {
@@ -268,6 +305,21 @@ fn emergency_stop(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") { let _ = w.reload(); }
 }
 
+/// The window frame. Windows: none, the page draws the title bar and its buttons. macOS: the system's
+/// traffic lights over the page's tab bar (which leaves room for them), centred in its 36 px.
+fn chrome<'a, M: Manager<Wry>>(builder: WebviewWindowBuilder<'a, Wry, M>) -> WebviewWindowBuilder<'a, Wry, M> {
+    #[cfg(windows)]
+    return builder.decorations(false);
+    #[cfg(target_os = "macos")]
+    return builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::LogicalPosition::new(12.0, 18.0));
+}
+
+#[cfg(target_os = "macos")]
+fn tune_webview(_window: &WebviewWindow) {
+    // WKWebView has no browser keys or zoom of its own to turn off, and macOS's
+    // inactiveSchedulingPolicy is already set by background_throttling.
+}
+#[cfg(windows)]
 fn tune_webview(window: &WebviewWindow) {
     // Browser behaviour that makes no sense in an app and would swallow keys meant for the remote
     // computer (F5, Ctrl+F, Ctrl+P, Alt+Left, Ctrl+wheel zoom...).
@@ -287,16 +339,19 @@ fn tune_webview(window: &WebviewWindow) {
 }
 
 fn main() {
-    // Before any window exists, in every mode (see platform::set_dpi_awareness).
-    platform::set_dpi_awareness();
+    #[cfg(windows)]
+    {
+        // Before any window exists, in every mode (see platform::set_dpi_awareness).
+        platform::set_dpi_awareness();
 
-    // Full-access control: these worker modes never start the UI. The service registers itself elevated
-    // from the installer; it then runs the helper as SYSTEM in the interactive session.
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--service") { elevation::run_service(); return; }
-    if args.iter().any(|a| a == "--elevated-helper") { elevation::run_helper(); return; }
-    if args.iter().any(|a| a == "--install-service") { std::process::exit(if elevation::install_service() { 0 } else { 1 }); }
-    if args.iter().any(|a| a == "--uninstall-service") { std::process::exit(if elevation::uninstall_service() { 0 } else { 1 }); }
+        // Full-access control: these worker modes never start the UI. The service registers itself elevated
+        // from the installer; it then runs the helper as SYSTEM in the interactive session.
+        let args: Vec<String> = std::env::args().collect();
+        if args.iter().any(|a| a == "--service") { elevation::run_service(); return; }
+        if args.iter().any(|a| a == "--elevated-helper") { elevation::run_helper(); return; }
+        if args.iter().any(|a| a == "--install-service") { std::process::exit(if elevation::install_service() { 0 } else { 1 }); }
+        if args.iter().any(|a| a == "--uninstall-service") { std::process::exit(if elevation::uninstall_service() { 0 } else { 1 }); }
+    }
 
     // Test builds can run several isolated instances side by side (tools/desktop-e2e.ts).
     let profile = std::env::var_os("COMPANY_REMOTE_PROFILE").filter(|_| cfg!(debug_assertions)).map(PathBuf::from);
@@ -327,14 +382,9 @@ fn main() {
                 app.path().app_local_data_dir().ok().map(|d| d.join("legacy")).into_iter().chain([roaming.join("ASDesk")]).collect()
             };
 
-            let mut window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            let mut window = chrome(WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("ASDesk").inner_size(NORMAL.0, NORMAL.1).min_inner_size(NORMAL_MIN.0, NORMAL_MIN.1)
-                .decorations(false).shadow(true).visible(false).use_https_scheme(true)
-                // WebView2 would otherwise ask which screen to share and show its own "is sharing your
-                // screen" bar naming the page's origin. This app shares the primary screen only after
-                // the user accepts in its own consent dialog, which the agent verifies; the page runs
-                // only the app's own code, and Permissions-Policy blocks camera and microphone.
-                .additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --use-fake-ui-for-media-stream")
+                .shadow(true).visible(false).use_https_scheme(true))
                 .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
                 .on_page_load(move |w, payload| {
                     if payload.event() != PageLoadEvent::Finished { return; }
@@ -343,12 +393,24 @@ fn main() {
                     if !hidden { let _ = w.show(); }
                 })
                 .on_new_window({ let app = app.handle().clone(); move |url, features| popout_window(&app, url, features) });
+            // WebView2 would otherwise ask which screen to share and show its own "is sharing your
+            // screen" bar naming the page's origin. This app shares the primary screen only after
+            // the user accepts in its own consent dialog, which the agent verifies; the page runs
+            // only the app's own code, and Permissions-Policy blocks camera and microphone. (macOS
+            // always shows its own screen picker, which is how the person there chooses what to share.)
+            #[cfg(windows)]
+            { window = window.additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --use-fake-ui-for-media-stream"); }
             if let Some(profile) = &profile { window = window.data_directory(profile.join("webview")); }
             let window = window.build()?;
             tune_webview(&window);
 
+            #[cfg(windows)]
             let icons = TrayIcons { normal: tauri::image::Image::from_bytes(include_bytes!("../../assets/tray@2x.png"))?,
                 sharing: tauri::image::Image::from_bytes(include_bytes!("../../assets/tray-sharing@2x.png"))? };
+            // The menu bar is 22 pt tall: 18 pt artwork at 2x (tools/generate-macos-icons.py).
+            #[cfg(target_os = "macos")]
+            let icons = TrayIcons { normal: tauri::image::Image::from_bytes(include_bytes!("../../assets/tray-template@2x.png"))?,
+                sharing: tauri::image::Image::from_bytes(include_bytes!("../../assets/tray-sharing-mac@2x.png"))? };
             let shell = Arc::new(Shell { app: handle.clone(), layout: Mutex::new(Layout { mode: Mode::Normal, saved: None }), tray: Mutex::new(None),
                 close_notice_shown: Mutex::new(false), icons });
             app.manage(shell.clone());
@@ -370,15 +432,17 @@ fn main() {
             // Tray: the app keeps running there so this computer can receive requests.
             let open = MenuItem::with_id(app, "open", "Open ASDesk", true, None::<&str>)?;
             let id = MenuItem::with_id(app, "id", "Not set up yet", false, None::<&str>)?;
-            let autostart = CheckMenuItem::with_id(app, "autostart", "Start with Windows", installed, platform::autostart_command().is_some(), None::<&str>)?;
+            let autostart = CheckMenuItem::with_id(app, "autostart", words::AUTOSTART, installed, platform::autostart_command().is_some(), None::<&str>)?;
             let end = MenuItem::with_id(app, "end", "End all sessions", false, None::<&str>)?;
             let show_log = MenuItem::with_id(app, "log", "Show log file", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &id, &PredefinedMenuItem::separator(app)?, &autostart, &end, &show_log, &PredefinedMenuItem::separator(app)?, &quit])?;
             *shell.tray.lock().unwrap() = Some(Tray { id, end, autostart });
-            TrayIconBuilder::with_id("main").icon(shell.icons.normal.clone())
-                .tooltip("ASDesk").menu(&menu).show_menu_on_left_click(false)
+            // A left click opens the window on Windows; on macOS every menu bar icon opens its menu.
+            TrayIconBuilder::with_id("main").icon(shell.icons.normal.clone()).icon_as_template(cfg!(target_os = "macos"))
+                .tooltip("ASDesk").menu(&menu).show_menu_on_left_click(cfg!(target_os = "macos"))
                 .on_tray_icon_event(|tray, event| {
+                    if !cfg!(windows) { return; }
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                         if let Some(shell) = tray.app_handle().try_state::<Arc<Shell>>() { shell.show(); }
                     }
@@ -386,7 +450,10 @@ fn main() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "open" => { if let Some(shell) = app.try_state::<Arc<Shell>>() { shell.show(); } }
                     "log" => {
+                        #[cfg(windows)]
                         if let Some(path) = log::path() { let _ = std::process::Command::new("explorer.exe").arg(format!("/select,{}", path.display())).spawn(); }
+                        #[cfg(target_os = "macos")]
+                        if let Some(path) = log::path() { let _ = std::process::Command::new("/usr/bin/open").arg("-R").arg(path).spawn(); }
                     }
                     "autostart" => {
                         let enable = platform::autostart_command().is_none();
@@ -414,10 +481,14 @@ fn main() {
             // Locking or sleeping this computer ends a session; a display change ends sharing only if
             // the shared display moved or changed size.
             let events = handle.clone();
-            platform::watch_system(window.hwnd()?.0 as _, move |event| match event {
+            let on_event = move |event| match event {
                 platform::SystemEvent::Locked | platform::SystemEvent::Suspending => emergency_stop(&events),
                 platform::SystemEvent::DisplaysChanged => { if let Some(agent) = events.try_state::<AgentHandle>() { agent.displays_changed(); } }
-            });
+            };
+            #[cfg(windows)]
+            platform::watch_system(window.hwnd()?.0 as _, on_event);
+            #[cfg(target_os = "macos")]
+            platform::watch_system(on_event);
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -435,7 +506,7 @@ fn main() {
                 let _ = window.hide();
                 if let Some(shell) = app.try_state::<Arc<Shell>>() {
                     let mut shown = shell.close_notice_shown.lock().unwrap();
-                    if !*shown { *shown = true; shell.notify("ASDesk is still running", "It stays in the notification area so others can request access. Right-click the icon to quit."); }
+                    if !*shown { *shown = true; shell.notify("ASDesk is still running", words::STILL_RUNNING); }
                 }
             }
             WindowEvent::Resized(_) => {
@@ -447,5 +518,11 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("failed to start ASDesk");
+    #[cfg(windows)]
     app.run(|_, _| {});
+    // Clicking the Dock icon brings back the window that was closed to the menu bar.
+    #[cfg(target_os = "macos")]
+    app.run(|app, event| {
+        if let tauri::RunEvent::Reopen { .. } = event { if let Some(shell) = app.try_state::<Arc<Shell>>() { shell.show(); } }
+    });
 }

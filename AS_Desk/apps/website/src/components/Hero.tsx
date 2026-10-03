@@ -19,7 +19,7 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-pretty text-muted">
-            ASDesk connects you to any Windows PC with a nine-digit ID. Help a friend, fix a parent's laptop or support a
+            ASDesk connects you to any Windows PC or Mac with a nine-digit ID. Help a friend, fix a parent's laptop or support a
             customer — no account, no license, no time limits. The person on the other side approves every session.
           </p>
 
