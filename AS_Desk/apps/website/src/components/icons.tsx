@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import { useId, type SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -61,6 +61,30 @@ export const WrenchIcon = icon([
 ]);
 export const SwapIcon = icon(["M4 8h15", "m15 4 4 4-4 4", "M20 16H5", "m9 12-4 4 4 4"]);
 export const KeyboardIcon = icon(["M3 6h18v12H3z", "M7 10h.01M11 10h.01M15 10h.01M7 14h10"]);
-/** A laptop, for the macOS download: Apple's logo is its trademark, not a platform glyph. */
-export const LaptopIcon = icon(["M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5V16H5z", "M2.5 19h19"]);
+/**
+ * The Mac, as the Finder's two-tone face: blue and grey halves split by a profile, two eyes and a smile.
+ * Drawn here in flat colours, so it reads the same on light, dark and brand-red backgrounds.
+ */
+export function MacIcon({ className = "size-4", ...props }: IconProps) {
+  const clip = `mac-${useId().replace(/:/g, "")}`;
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} {...props}>
+      <defs>
+        <clipPath id={clip}>
+          <rect x="2.5" y="3.5" width="19" height="17" rx="4" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect x="2.5" y="3.5" width="19" height="17" fill="#e0e0e0" />
+        <path d="M0 0H12.4L12.2 3.5C11.7 6.5 10.8 9.6 10.5 11.7L13.3 12C13.6 14.8 13.8 17.5 13.9 24H0Z" fill="#03a9f4" />
+        <path d="M12.2 3.5C11.7 6.5 10.8 9.6 10.5 11.7L13.3 12C13.6 14.8 13.8 17.5 13.9 20.5" fill="none" stroke="#0288d1" strokeWidth="1.1" strokeLinejoin="round" />
+      </g>
+      <g fill="none" stroke="#37474f" strokeLinecap="round">
+        <path d="M7.8 7.6v2" strokeWidth="1.6" />
+        <path d="M16.3 7.6v2" strokeWidth="1.6" />
+        <path d="M6.3 15.2q5.7 4.1 11.4 0" strokeWidth="1.4" />
+      </g>
+    </svg>
+  );
+}
 export const WindowsIcon = icon(["M4 5.5 11 4.5v7H4z", "M13 4.2 20 3v8.5h-7z", "M4 13h7v6.5l-7-1z", "M13 13h7V21l-7-1.2z"]);

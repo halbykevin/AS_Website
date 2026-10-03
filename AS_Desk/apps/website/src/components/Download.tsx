@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { Installer } from "../api";
 import { useDownload } from "../hooks";
-import { ArrowRightIcon, CheckIcon, ClipboardIcon, DownloadIcon, LaptopIcon, WindowsIcon } from "./icons";
+import { ArrowRightIcon, CheckIcon, ClipboardIcon, DownloadIcon, MacIcon, WindowsIcon } from "./icons";
 import { buttonClass, cx, focusRing } from "./ui";
 
 export const formatSize = (bytes: number) => {
@@ -142,7 +142,7 @@ function PlatformButton({
   primary: boolean;
   unavailable: string;
 }) {
-  const Icon = system === "macos" ? LaptopIcon : WindowsIcon;
+  const Icon = system === "macos" ? MacIcon : WindowsIcon;
   const details = installer
     ? [editionLabel(installer), installer.size > 0 && formatSize(installer.size)].filter(Boolean).join(" · ")
     : unavailable;

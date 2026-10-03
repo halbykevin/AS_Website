@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useDownload } from "../hooks";
 import { formatSize } from "./Download";
 import { TrafficLights } from "./HeroArt";
-import { DownloadIcon, KeyboardIcon, LaptopIcon, PowerIcon, ShieldCheckIcon, WindowsIcon } from "./icons";
+import { DownloadIcon, KeyboardIcon, MacIcon, PowerIcon, ShieldCheckIcon, WindowsIcon } from "./icons";
 import { Mark } from "./Logo";
 import { Container, SectionHeading, buttonClass, cx, focusRing } from "./ui";
 
@@ -200,7 +200,7 @@ export function MacSetup() {
           <div className="flex flex-col gap-3 lg:items-end">
             {mac ? (
               <a href={mac.url} className={buttonClass({ className: "h-14 gap-4 px-5" })}>
-                <LaptopIcon className="size-5" />
+                <MacIcon className="size-5" />
                 <span className="flex flex-col items-start leading-tight">
                   <span className="text-[15px]">Download for macOS</span>
                   <span className="text-xs font-medium text-white/80">
@@ -214,7 +214,7 @@ export function MacSetup() {
                 aria-disabled="true"
                 className={buttonClass({ variant: "secondary", className: cx("h-14 gap-3 px-5 opacity-70", isLoading && "invisible") })}
               >
-                <LaptopIcon className="size-5" />
+                <MacIcon className="size-5" />
                 The Mac download is almost ready
               </span>
             )}

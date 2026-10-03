@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode, SVGProps } from "react";
 import type { Installer } from "../api";
 import { useDownload } from "../hooks";
 import { formatSize } from "./Download";
-import { ArrowRightIcon, CheckIcon, DownloadIcon, LaptopIcon, SwapIcon, WindowsIcon } from "./icons";
+import { ArrowRightIcon, CheckIcon, DownloadIcon, MacIcon, SwapIcon, WindowsIcon } from "./icons";
 import { Container, SectionHeading, buttonClass, cx, focusRing } from "./ui";
 
 const inlineLink = cx("rounded-sm font-semibold text-fg underline hover:text-accent", focusRing);
@@ -120,7 +120,7 @@ export function Platforms() {
             }
           />
           <PlatformCard
-            icon={LaptopIcon}
+            icon={MacIcon}
             name="macOS"
             needs="macOS 13 Ventura or later"
             points={["One universal app for Apple silicon and Intel Macs", "Lives in the menu bar, with native window controls", "Asks for Screen Recording and Accessibility only when needed"]}

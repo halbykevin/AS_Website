@@ -1,5 +1,5 @@
 import { detectPlatform } from "../platform";
-import { LaptopIcon, LockIcon, SwapIcon, WindowsIcon } from "./icons";
+import { MacIcon, LockIcon, SwapIcon, WindowsIcon } from "./icons";
 import { Mark } from "./Logo";
 
 const bar = "rounded-full bg-screen-500";
@@ -41,7 +41,7 @@ export function HeroArt() {
 
       {/* Mac and PC, either way round */}
       <div className="absolute top-[4%] left-[2%] z-20 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-3.5 py-2 text-[11px] font-semibold text-muted shadow-lg shadow-black/15 backdrop-blur">
-        <LaptopIcon className="size-3.5 text-fg" />
+        <MacIcon className="size-4" />
         Mac
         <SwapIcon className="size-3.5 text-accent" />
         <WindowsIcon className="size-3 text-fg" />
