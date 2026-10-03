@@ -20,6 +20,7 @@ const api: DesktopAPI = {
   dismissError: () => invoke("dismiss_error"),
   accept: (requestId, permissions, sourceId, width, height, thumbnail) => invoke("accept", { requestId, permissions, sourceId, width, height, thumbnail }),
   report: message => invoke("report", { message }),
+  openWebsite: () => invoke("open_website"),
   reject: requestId => invoke("reject", { requestId }),
   cancel: targetId => invoke("cancel", { targetId }),
   disconnect: sessionId => invoke("disconnect", { sessionId: sessionId ?? null }),

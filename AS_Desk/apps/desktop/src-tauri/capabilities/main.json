@@ -28,6 +28,7 @@
     "allow-window-action",
     "allow-probe-display",
     "allow-report",
+    "allow-open-website",
     "allow-clipboard-files",
     "allow-file-read",
     "allow-file-recv-begin",

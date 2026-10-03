@@ -709,12 +709,14 @@ p {
   padding-left: 6px;
   text-overflow: ellipsis;
 }
+/* Status on the left, version in the middle, the developer's credit on the right: two equal outer
+   columns keep the middle one centred whatever the sides say. */
 .statusbar {
   height: 28px;
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 0 12px;
   border-top: 1px solid var(--border);
@@ -741,11 +743,42 @@ p {
 .status-connecting i {
   background: var(--faint);
 }
+.statusbar .status {
+  min-width: 0;
+  overflow: hidden;
+}
 .statusbar-meta {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
+}
+.statusbar-credit {
+  justify-self: end;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.statusbar-credit b {
+  font-weight: 600;
+  color: var(--text);
+}
+.statusbar-credit b span {
+  color: var(--accent);
+}
+.statusbar-credit:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.statusbar-credit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Settings menu (the ☰ in the tab bar) */

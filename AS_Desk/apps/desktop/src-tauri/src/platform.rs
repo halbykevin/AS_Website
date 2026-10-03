@@ -298,6 +298,16 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
     if status == 0 { Ok(()) } else { Err("Cannot change the Windows start-up settings".into()) }
 }
 
+// ── Links ────────────────────────────────────────────────────────────────────────────────────
+/// Opens an https address in the default browser.
+pub fn open_url(url: &str) -> Result<(), String> {
+    use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
+    if !url.starts_with("https://") { return Err("Only https links can be opened".into()); }
+    let result = unsafe { ShellExecuteW(null_mut(), wide("open").as_ptr(), wide(url).as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL) };
+    // ShellExecute reports success as a value above 32.
+    if result as usize > 32 { Ok(()) } else { Err("Cannot open the browser".into()) }
+}
+
 // ── Notifications ────────────────────────────────────────────────────────────────────────────
 /// Toast notifications are WinRT (Windows 8 and later). Windows 7 has no WinRT at all, and the WinRT
 /// imports are delay-loaded there (build.rs), so they must never be called; balloon() stands in.

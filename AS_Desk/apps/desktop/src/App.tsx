@@ -1186,6 +1186,8 @@ function App() {
       </div>
     </main>
   );
+  // Connection status, then the version in the middle, then the developer's credit, which opens their
+  // site in the browser (the agent knows the one address it may open).
   const statusbar = (
     <footer className="statusbar">
       <span className={`status status-${state.status}`}>
@@ -1195,6 +1197,20 @@ function App() {
       <span className="statusbar-meta">
         {sessionCount ? `${sessionCount} of ${MAX_SESSIONS} sessions · ` : ""}v{state.appVersion}
       </span>
+      <a
+        className="statusbar-credit"
+        href="https://www.raione.net"
+        title="www.raione.net"
+        onClick={e => {
+          e.preventDefault();
+          void window.remote.openWebsite().catch(() => undefined);
+        }}
+      >
+        Developed by{" "}
+        <b>
+          r<span>AI</span>one
+        </b>
+      </a>
     </footer>
   );
   const menu = menuOpen && (

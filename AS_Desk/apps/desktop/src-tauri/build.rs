@@ -1,6 +1,6 @@
 const COMMANDS: &[&str] = &["get_state", "setup", "connect", "forget", "rename_recent", "dismiss_error", "accept", "reject", "cancel", "disconnect", "signal", "input",
     "block_input", "prove_password", "read_clipboard", "clipboard_files", "file_read", "file_recv_begin", "file_recv_open", "file_recv_chunk", "file_recv_finish", "file_cancel",
-    "set_unattended", "clear_unattended", "copy_id", "window_action", "probe_display", "report"];
+    "set_unattended", "clear_unattended", "copy_id", "window_action", "probe_display", "report", "open_website"];
 
 fn main() {
     // The server installed copies register with on first run: COMPANY_REMOTE_SERVER, else

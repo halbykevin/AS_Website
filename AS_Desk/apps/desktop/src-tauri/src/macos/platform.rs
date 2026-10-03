@@ -213,6 +213,16 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
     fs::create_dir_all(path.parent().expect("LaunchAgents")).and_then(|_| fs::write(&path, plist)).map_err(|e| format!("Cannot change the login items: {e}"))
 }
 
+// ── Links ────────────────────────────────────────────────────────────────────────────────────
+/// Opens an https address in the default browser.
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("https://") { return Err("Only https links can be opened".into()); }
+    autoreleasepool(|_| {
+        let url = NSURL::URLWithString(&NSString::from_str(url)).ok_or("Invalid link")?;
+        if NSWorkspace::sharedWorkspace().openURL(&url) { Ok(()) } else { Err("Cannot open the browser".into()) }
+    })
+}
+
 // ── Screen lock, sleep and display changes ───────────────────────────────────────────────────
 #[derive(Clone, Copy, Debug)]
 pub enum SystemEvent { Locked, Suspending, DisplaysChanged }

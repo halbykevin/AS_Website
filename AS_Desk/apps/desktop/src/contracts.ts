@@ -55,6 +55,8 @@ export interface DesktopAPI {
   accept(requestId: string, permissions: Capability[], sourceId: string, width: number, height: number, thumbnail?: number[]): Promise<void>;
   /** Write an error the user saw to the local diagnostics log. */
   report(message: string): Promise<void>;
+  /** The developer's website (rAIone) in the default browser; the agent holds the address. */
+  openWebsite(): Promise<void>;
   reject(requestId: string): Promise<void>;
   /** Withdraw a request that is still waiting. */
   cancel(targetId: string): Promise<void>;

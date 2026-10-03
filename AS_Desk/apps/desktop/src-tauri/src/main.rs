@@ -291,6 +291,11 @@ fn probe_display(source_id: String, width: u32, height: u32) -> Result<(Rect, Ve
 /// Errors the UI shows (for example from the screen picker) also go to the diagnostics log.
 #[tauri::command]
 fn report(message: String) { log::write(format!("ui: {}", message.chars().take(500).collect::<String>())); }
+/// The developer's website, in the default browser (the status bar's credit). The address is fixed
+/// here, so the page can open this one site and nothing else.
+const DEVELOPER_SITE: &str = "https://www.raione.net";
+#[tauri::command]
+fn open_website() -> Result<()> { platform::open_url(DEVELOPER_SITE) }
 impl serde::Serialize for Rect {
     fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> { (self.x, self.y, self.width, self.height).serialize(s) }
 }
@@ -370,7 +375,7 @@ fn main() {
             .build())
         .invoke_handler(tauri::generate_handler![get_state, setup, connect, forget, rename_recent, dismiss_error, accept, reject, cancel, disconnect, signal, input, block_input, prove_password, read_clipboard,
             clipboard_files, file_read, file_recv_begin, file_recv_open, file_recv_chunk, file_recv_finish, file_cancel,
-            set_unattended, clear_unattended, copy_id, window_action, probe_display, report])
+            set_unattended, clear_unattended, copy_id, window_action, probe_display, report, open_website])
         .setup(move |app| {
             let handle = app.handle().clone();
             let roaming = app.path().data_dir().expect("roaming app data");
