@@ -4,7 +4,8 @@ import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { Hero } from "./components/Hero";
 import { HowItWorks } from "./components/HowItWorks";
-import { Pricing } from "./components/Pricing";
+import { MacSetup } from "./components/MacSetup";
+import { Platforms } from "./components/Platforms";
 import { useThemeSync } from "./hooks";
 
 export function App() {
@@ -24,7 +25,8 @@ export function App() {
         <Features />
         <Audiences />
         <HowItWorks />
-        <Pricing />
+        <MacSetup />
+        <Platforms />
         <Faq />
       </main>
       <Footer />

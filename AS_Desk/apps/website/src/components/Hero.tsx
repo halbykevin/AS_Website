@@ -12,15 +12,16 @@ export function Hero() {
         <div>
           <h1
             id="hero-title"
-            className="mt-6 font-display text-5xl leading-[0.98] font-semibold tracking-display text-balance sm:text-6xl xl:text-[4.25rem]"
+            className="font-display text-5xl leading-[0.98] font-semibold tracking-display text-balance sm:text-6xl xl:text-[4.25rem]"
           >
             Remote desktop,
             <span className="block text-accent">free for everyone.</span>
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-pretty text-muted">
-            ASDesk connects you to any Windows PC or Mac with a nine-digit ID. Help a friend, fix a parent's laptop or support a
-            customer — no account, no license, no time limits. The person on the other side approves every session.
+            ASDesk connects you to any Windows PC or Mac with a nine-digit ID. Help a friend, fix a parent's laptop or
+            support a customer — no account, no license, no time limits. The person on the other side approves every
+            session.
           </p>
 
           <HeroDownload />

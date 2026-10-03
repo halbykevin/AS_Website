@@ -190,7 +190,7 @@ cmd_backup() {
 # ASDesk-Setup-win7-x64.exe / -x86.exe, the names the standard installer sends older PCs to; the macOS
 # edition is ASDesk-macOS.dmg (plus latest-macos.json). The website reads both pointers.
 publish_installer() {
-  local file="$1" name sum size link pointer=""
+  local file="$1" name sum size link pointer="" facts=""
   name="$(basename "$file")"
   [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "unexpected installer name: $name"
   case "$name" in
@@ -204,9 +204,14 @@ publish_installer() {
   size="$(wc -c < "$file" | tr -d ' ')"
   if [[ "$name" == *.dmg ]]; then
     # Gatekeeper blocks a disk image that is not notarized until the person allows it in System
-    # Settings. Notarization cannot be checked from here, so desktop.mjs records it next to the image.
-    grep -q '"notarized": true' "$file.json" 2>/dev/null \
-      || warn "$name is not notarized: macOS will ask people to allow it in System Settings. Build with npm run desktop:release:mac (docs/macos.md)."
+    # Settings. Notarization cannot be checked from here, so desktop.mjs records it next to the image;
+    # the pointer passes it on, so the website shows the Open Anyway step only when it is needed.
+    if grep -q '"notarized": true' "$file.json" 2>/dev/null; then
+      facts=',"notarized":true'
+    else
+      facts=',"notarized":false'
+      warn "$name is not notarized: macOS will ask people to allow it in System Settings. Build with npm run desktop:release:mac (docs/macos.md)."
+    fi
   elif command -v powershell.exe >/dev/null 2>&1; then
     # Browsers (Chrome/Edge Safe Browsing) and SmartScreen block or warn on unsigned installers.
     local signature
@@ -220,7 +225,7 @@ publish_installer() {
     extra="&& ln -sfn '$name' CompanyRemote-Setup-x64.exe"
   fi
   if [ -n "$pointer" ]; then
-    extra="$extra && printf '{\"file\":\"%s\",\"sha256\":\"%s\",\"size\":%s,\"published\":\"%s\"}\n' '$name' '$sum' '$size' \"\$(date -u +%FT%TZ)\" > '.$pointer.part' && mv -f '.$pointer.part' '$pointer'"
+    extra="$extra && printf '{\"file\":\"%s\",\"sha256\":\"%s\",\"size\":%s,\"published\":\"%s\"%s}\n' '$name' '$sum' '$size' \"\$(date -u +%FT%TZ)\" '$facts' > '.$pointer.part' && mv -f '.$pointer.part' '$pointer'"
   fi
   ssh_run "cd $REMOTE_BASE/downloads && echo '$sum  .$name.part' | sha256sum -c --quiet - && mv -f '.$name.part' '$name' && chmod 644 '$name' && ln -sfn '$name' '$link' $extra" \
     || die "publishing failed (checksum or move)"

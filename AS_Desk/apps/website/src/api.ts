@@ -6,14 +6,15 @@ export type Architecture = 'x64' | 'x86' | 'universal';
  */
 export type Edition = 'standard' | 'legacy' | 'macos';
 
-export type Installer = { edition: Edition; arch: Architecture; version: string; url: string; size: number; sha256?: string };
+/** `notarized` (macOS only): Apple checked it, so it opens without System Settings' "Open Anyway". */
+export type Installer = { edition: Edition; arch: Architecture; version: string; url: string; size: number; sha256?: string; notarized?: boolean };
 
 export type Release = { version: string; publishedAt: string; installers: Installer[] };
 
 export type ReleaseManifest = { product: string; latest: Release; releases: Release[] };
 
 /** The download server's latest.json / latest-macos.json, written by `npm run desktop:publish` (proxied same-origin). */
-type LatestPointer = { file: string; sha256?: string; published?: string; size?: number };
+type LatestPointer = { file: string; sha256?: string; published?: string; size?: number; notarized?: boolean };
 
 /** The editions the download server keeps a pointer for, and how their files are named. */
 const POINTERS = {
@@ -30,7 +31,9 @@ export async function fetchLatest(edition: LiveEdition, downloadsBase: string): 
   const latest = (await response.json().catch(() => ({}))) as LatestPointer;
   const version = pointer.file.exec(latest.file ?? '')?.[1];
   if (!version) return undefined;
-  return { edition, arch: pointer.arch, version, url: `${downloadsBase}/${latest.file}`, size: latest.size ?? 0, sha256: latest.sha256 };
+  const installer: Installer = { edition, arch: pointer.arch, version, url: `${downloadsBase}/${latest.file}`, size: latest.size ?? 0, sha256: latest.sha256 };
+  if (typeof latest.notarized === 'boolean') installer.notarized = latest.notarized;
+  return installer;
 }
 
 /** Numeric semver comparison: positive when a is newer. */

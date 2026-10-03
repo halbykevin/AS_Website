@@ -75,7 +75,7 @@ export function Header() {
       {menuOpen && (
         <nav id="mobile-menu" aria-label="Mobile" className="border-t border-line/60 md:hidden">
           <Container className="flex flex-col gap-1 py-3">
-            {[...navLinks, { href: "#download", label: "Download" }].map((link) => (
+            {[...navLinks, { href: "#downloads", label: "Download" }].map((link) => (
               <a
                 key={link.href}
                 href={link.href}

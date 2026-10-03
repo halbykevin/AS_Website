@@ -15,12 +15,12 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export const navLinks = [
   { href: "#features", label: "Features" },
+  { href: "#mac", label: "Mac" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#free", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
 
-export const heroHighlights = ["No account", "No time limits", "End-to-end encrypted"];
+export const heroHighlights = ["Windows & Mac", "No account", "No time limits", "End-to-end encrypted"];
 
 export const features: Array<{ icon: Icon; title: string; body: string }> = [
   {
@@ -79,15 +79,6 @@ export const steps = [
   { title: "Approve and connect", body: "Accept the request, pick what to share, and disconnect whenever you are done." },
 ];
 
-export const freePerks = [
-  "Every feature included",
-  "No account or email",
-  "No session time limits",
-  "No ads or upsells",
-  "Personal and work use",
-  "Unlimited devices",
-];
-
 export const faqs = [
   {
     question: "Is ASDesk really free?",
@@ -102,7 +93,7 @@ export const faqs = [
   {
     question: "Can someone connect to my computer without my permission?",
     answer:
-      "No. ASDesk is attended remote desktop: every session needs the person at that computer to accept it, and they see who is asking and which permissions first. Only accept requests from people you know, and never because an unexpected caller asks you to.",
+      "No. Every session needs the person at that computer to accept it, and they see who is asking and which permissions first. The one exception is one you choose: on a Windows PC you can turn on unattended access with a password, and only someone who knows it can connect without a click. Only accept requests from people you know, and never because an unexpected caller asks you to.",
   },
   {
     question: "Is my session private?",
@@ -113,6 +104,16 @@ export const faqs = [
     question: "Which computers does ASDesk run on?",
     answer:
       "Windows 10 and 11 (64-bit) use the standard installer, just a couple of megabytes, which relies on the WebView2 runtime built into Windows and installs it automatically if it is missing. For Windows 7 SP1, 8, 8.1 or 32-bit Windows, use the legacy installer: it bundles its own runtime, which is why it is much larger. Macs need macOS 13 Ventura or later, Apple silicon or Intel, with one download for both. The first time a Mac shares its screen, macOS asks to allow Screen Recording, and Accessibility before it can be controlled; both are in System Settings, under Privacy & Security.",
+  },
+  {
+    question: "Can a Mac and a Windows PC connect to each other?",
+    answer:
+      "Yes, in either direction. It is the same app on both, so a Mac can help a PC and a PC can help a Mac. Keys arrive as the keys pressed: ⌘ on a Mac reaches a PC as the Windows key, and Ctrl from a PC reaches a Mac as Control.",
+  },
+  {
+    question: "Does unattended access work on a Mac?",
+    answer:
+      "Not yet for a Mac being helped: macOS asks the person at the Mac to choose the screen to share for every session, so someone has to be there. A Mac can still connect to a Windows PC that has unattended access turned on.",
   },
   {
     question: "Why does my browser or computer warn about the download?",

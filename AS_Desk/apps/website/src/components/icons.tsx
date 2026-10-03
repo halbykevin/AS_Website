@@ -59,6 +59,8 @@ export const WrenchIcon = icon([
   "M14.7 6.3a4 4 0 0 0 5 5L12 19a2.1 2.1 0 0 1-3-3l7.7-7.7",
   "M14.7 6.3 17 4a4 4 0 0 1 3 3l-2.3 2.3",
 ]);
+export const SwapIcon = icon(["M4 8h15", "m15 4 4 4-4 4", "M20 16H5", "m9 12-4 4 4 4"]);
+export const KeyboardIcon = icon(["M3 6h18v12H3z", "M7 10h.01M11 10h.01M15 10h.01M7 14h10"]);
 /** A laptop, for the macOS download: Apple's logo is its trademark, not a platform glyph. */
 export const LaptopIcon = icon(["M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5V16H5z", "M2.5 19h19"]);
 export const WindowsIcon = icon(["M4 5.5 11 4.5v7H4z", "M13 4.2 20 3v8.5h-7z", "M4 13h7v6.5l-7-1z", "M13 13h7V21l-7-1.2z"]);

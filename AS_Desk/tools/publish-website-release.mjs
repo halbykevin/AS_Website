@@ -66,7 +66,10 @@ for (const { file, ...installer } of local) {
     await mkdir(join(website, "public/downloads"), { recursive: true });
     await copyFile(join(source, file), join(website, "public/downloads", file));
   }
-  installers.push({ ...installer, url: `${targetRoot}/${file}`, size, sha256: await sha256(join(source, file)) });
+  // A disk image's notarization comes from what tools/desktop.mjs recorded next to it.
+  const facts = installer.edition === "macos" ? JSON.parse(await readFile(join(source, `${file}.json`), "utf8").catch(() => "{}")) : {};
+  installers.push({ ...installer, url: `${targetRoot}/${file}`, size, sha256: await sha256(join(source, file)),
+    ...(installer.edition === "macos" && { notarized: facts.notarized === true }) });
 }
 for (const [edition, built, label] of [["legacy", hasLegacy, "legacy installers"], ["macos", hasMac, "macOS disk image"]]) {
   if (built) continue;

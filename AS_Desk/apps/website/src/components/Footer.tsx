@@ -12,7 +12,7 @@ export function Footer() {
         </div>
         <nav aria-label="Footer">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
-            {[...navLinks, { href: "#download", label: "Download" }, { href: "#top", label: "Back to top ↑" }].map(
+            {[...navLinks, { href: "#downloads", label: "Download" }, { href: "#top", label: "Back to top ↑" }].map(
               (link) => (
                 <li key={link.href}>
                   <a href={link.href} className={cx("rounded-md transition-colors hover:text-fg", focusRing)}>
