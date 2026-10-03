@@ -58,6 +58,8 @@ export interface DesktopAPI {
   disconnect(sessionId?: string): Promise<void>;
   signal(message: ClientMessage): Promise<void>;
   input(sessionId: string, event: InputEvent): Promise<void>;
+  /** Block or unblock the local user's physical input on the TARGET machine. */
+  blockInput(sessionId: string, block: boolean): Promise<void>;
   clipboard(sessionId: string): Promise<string>;
   // Clipboard file transfer, controller → shared computer. Bytes cross as base64.
   clipboardFiles(sessionId: string): Promise<FilesSnapshot | null>;

@@ -19,6 +19,7 @@
     "allow-disconnect",
     "allow-signal",
     "allow-input",
+    "allow-block-input",
     "allow-read-clipboard",
     "allow-set-unattended",
     "allow-clear-unattended",

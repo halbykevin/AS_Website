@@ -162,11 +162,11 @@ export class RemoteMedia {
         this.received.set(channel.label, packet.seq);
         const control = packet.event?.type;
         if (channel.label === 'control') {
-          // Controller → target: pause/resume the encoder, and encode at the size the tile shows.
           if (this.session.role === 'target') {
-            // Serialize encoder-parameter changes so a resume and a resize can't clobber each other.
             if (control === 'pause' || control === 'resume') this.queueParams(() => this.setSending(control === 'resume'));
             else if (control === 'quality' && Number.isFinite(packet.event?.maxWidth)) this.queueParams(() => this.applyQuality(packet.event.maxWidth));
+            else if (control === 'disable-input' && typeof packet.event?.blocked === 'boolean')
+              void window.remote.blockInput(this.session.sessionId, packet.event.blocked).catch(() => {});
           }
           return;
         }
@@ -195,7 +195,12 @@ export class RemoteMedia {
     this.lastQuality = bucket;
     this.sendControl({ type: 'quality', maxWidth: bucket });
   }
-  private sendControl(event: { type: 'pause' | 'resume' } | { type: 'quality'; maxWidth: number }) {
+  /** Controller: block or unblock the target machine's local keyboard and mouse. */
+  setInputBlocked(blocked: boolean) {
+    if (this.session.role !== 'controller') return;
+    this.sendControl({ type: 'disable-input', blocked });
+  }
+  private sendControl(event: { type: 'pause' | 'resume' } | { type: 'quality'; maxWidth: number } | { type: 'disable-input'; blocked: boolean }) {
     const channel = this.channels.get('control');
     if (!this.ready || this.stopped || channel?.readyState !== 'open') return;
     const seq = (this.sequence.get('control') ?? 0) + 1; this.sequence.set('control', seq);

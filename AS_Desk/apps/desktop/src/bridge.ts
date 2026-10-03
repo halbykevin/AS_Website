@@ -24,6 +24,7 @@ const api: DesktopAPI = {
   disconnect: sessionId => invoke("disconnect", { sessionId: sessionId ?? null }),
   signal: message => invoke("signal", { message }),
   input: (sessionId, event) => invoke("input", { sessionId, event }),
+  blockInput: (sessionId, block) => invoke("block_input", { sessionId, block }),
   clipboard: sessionId => invoke("read_clipboard", { sessionId }),
   clipboardFiles: sessionId => invoke("clipboard_files", { sessionId }),
   fileRead: (sessionId, fingerprint, index, offset, len) => invoke("file_read", { sessionId, fingerprint, index, offset, len }),

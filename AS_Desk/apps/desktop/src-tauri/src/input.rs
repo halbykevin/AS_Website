@@ -3,6 +3,7 @@
 //! when a session stops.
 use std::{collections::HashSet, sync::Mutex};
 use windows_sys::Win32::UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{platform::Rect, protocol::{InputEvent, MouseButton}};
 
@@ -30,18 +31,25 @@ pub fn scan_code(code: &str) -> Option<(u16, bool)> {
 }
 
 struct State { keys: HashSet<(u16, bool)>, buttons: HashSet<MouseButton>, display: Option<Rect> }
-pub struct Input { state: Mutex<State>, dry_run: bool }
+pub struct Input { state: Mutex<State>, dry_run: bool, blocked: AtomicBool }
 
 impl Input {
     /// `dry_run` validates and tracks everything but never touches the real desktop (tests).
-    pub fn new(dry_run: bool) -> Self { Self { state: Mutex::new(State { keys: HashSet::new(), buttons: HashSet::new(), display: None }), dry_run } }
+    pub fn new(dry_run: bool) -> Self { Self { state: Mutex::new(State { keys: HashSet::new(), buttons: HashSet::new(), display: None }), dry_run, blocked: AtomicBool::new(false) } }
     pub fn start(&self, display: Rect) -> Result<(), String> {
         if display.width < 1 || display.height < 1 || display.width > 32768 || display.height > 32768 { return Err("Invalid display".into()); }
         self.release();
         self.state.lock().unwrap().display = Some(display);
         Ok(())
     }
-    pub fn stop(&self) { self.release(); self.state.lock().unwrap().display = None; }
+    pub fn stop(&self) { self.unblock_local(); self.release(); self.state.lock().unwrap().display = None; }
+    /// Block or unblock the local user's physical keyboard and mouse. Only injected input (from
+    /// the remote controller via SendInput) still goes through. Requires elevation.
+    pub fn block_local(&self, block: bool) {
+        if self.blocked.swap(block, Ordering::Relaxed) == block { return; }
+        if !self.dry_run { unsafe { BlockInput(if block { 1 } else { 0 }); } }
+    }
+    pub fn unblock_local(&self) { self.block_local(false); }
     pub fn active(&self) -> bool { self.state.lock().unwrap().display.is_some() }
     pub fn display(&self) -> Option<Rect> { self.state.lock().unwrap().display }
 
@@ -107,7 +115,7 @@ impl Input {
         Ok(())
     }
 }
-impl Drop for Input { fn drop(&mut self) { self.release(); } }
+impl Drop for Input { fn drop(&mut self) { self.unblock_local(); self.release(); } }
 
 #[cfg(test)]
 mod tests {

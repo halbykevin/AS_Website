@@ -160,6 +160,7 @@ async fn accept(agent: State<'_, AgentHandle>, request_id: String, permissions: 
 #[tauri::command] async fn disconnect(agent: State<'_, AgentHandle>, session_id: Option<String>) -> Result<()> { agent.disconnect(session_id, "Session ended").await }
 #[tauri::command] async fn signal(agent: State<'_, AgentHandle>, message: Value) -> Result<()> { agent.signal(message).await }
 #[tauri::command] async fn input(agent: State<'_, AgentHandle>, session_id: String, event: Value) -> Result<()> { agent.input(session_id, event).await }
+#[tauri::command] async fn block_input(agent: State<'_, AgentHandle>, session_id: String, block: bool) -> Result<()> { agent.block_input(session_id, block).await }
 #[tauri::command] async fn read_clipboard(agent: State<'_, AgentHandle>, session_id: String) -> Result<String> { agent.read_clipboard(session_id).await }
 // Clipboard file transfer (see transfer.rs). File bytes cross as base64; the data channel carries binary.
 #[tauri::command] async fn clipboard_files(agent: State<'_, AgentHandle>, session_id: String) -> Result<Option<transfer::Snapshot>> { agent.clipboard_files(session_id).await }
@@ -299,7 +300,7 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_handler(|app, _, event| { if event.state == ShortcutState::Pressed { emergency_stop(app); } })
             .build())
-        .invoke_handler(tauri::generate_handler![get_state, setup, connect, forget, rename_recent, dismiss_error, accept, reject, cancel, disconnect, signal, input, read_clipboard,
+        .invoke_handler(tauri::generate_handler![get_state, setup, connect, forget, rename_recent, dismiss_error, accept, reject, cancel, disconnect, signal, input, block_input, read_clipboard,
             clipboard_files, file_read, file_recv_begin, file_recv_open, file_recv_chunk, file_recv_finish, file_cancel,
             set_unattended, clear_unattended, copy_id, window_action, probe_display, report])
         .setup(move |app| {

@@ -188,7 +188,7 @@ const POPOUT = "session-";
 
 /** One remote screen with its own video, scaling and input. Sessions in background tabs stay
  * mounted (their connection is kept) and the other computer pauses their video until shown. */
-function SessionView({ session, media, stream, visible, focused, tiled, label, scale, inputDisabled: noInput, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; inputDisabled?: boolean; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
+function SessionView({ session, media, stream, visible, focused, tiled, label, scale, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const viewer = useRef<HTMLDivElement>(null);
   const lastMove = useRef(0);
@@ -222,7 +222,7 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
     report();
     return () => observer.disconnect();
   }, [media, visible, scale]);
-  const send = (event: InputEvent) => { if (!noInput) media?.send(event); };
+  const send = (event: InputEvent) => { media?.send(event); };
   function point(event: React.MouseEvent): { x: number; y: number } | undefined {
     const element = video.current;
     if (!element?.videoWidth) return;
@@ -240,7 +240,7 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
   const button = (e: React.MouseEvent) => (e.button === 2 ? "right" : e.button === 1 ? "middle" : "left");
   return (
     <div
-      className={`viewer ${scale} ${tiled ? "tiled" : ""} ${focused ? "focused" : ""} ${noInput ? "input-disabled" : ""}`}
+      className={`viewer ${scale} ${tiled ? "tiled" : ""} ${focused ? "focused" : ""}`}
       ref={viewer}
       tabIndex={visible ? 0 : -1}
       hidden={!visible}
@@ -697,10 +697,14 @@ function App() {
               <button
                 className={`tool ${inputDisabled[s.sessionId] ? "active warn" : ""}`}
                 disabled={s.phase !== "connected"}
-                aria-label={inputDisabled[s.sessionId] ? "Enable remote input" : "Disable remote input"}
-                title={inputDisabled[s.sessionId] ? "Remote input disabled — click to enable" : "Disable remote input"}
+                aria-label={inputDisabled[s.sessionId] ? "Enable target input" : "Disable target input"}
+                title={inputDisabled[s.sessionId] ? "Target input blocked — click to unblock" : "Block target's keyboard & mouse"}
                 aria-pressed={!!inputDisabled[s.sessionId]}
-                onClick={() => setInputDisabled(d => ({ ...d, [s.sessionId]: !d[s.sessionId] }))}
+                onClick={() => {
+                  const next = !inputDisabled[s.sessionId];
+                  medias.current.get(s.sessionId)?.setInputBlocked(next);
+                  setInputDisabled(d => ({ ...d, [s.sessionId]: next }));
+                }}
               >
                 {inputDisabled[s.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
               </button>
@@ -728,7 +732,7 @@ function App() {
             <WindowControls maximized={popout.maximized} target={popout.label} onClose={() => dock(s.sessionId)} closeTitle="Close this window (the session goes back to the tab bar)" />
           </div>
           <div className="workspace-body">
-            <SessionView session={s} media={medias.current.get(s.sessionId)} stream={streams[s.sessionId]} visible focused tiled={false} label={nameOf(s.peerId)} scale={sessionScale} inputDisabled={!!inputDisabled[s.sessionId]} onFocus={() => {}} onMaximize={() => {}} onClose={() => void act(() => window.remote.disconnect(s.sessionId))} />
+            <SessionView session={s} media={medias.current.get(s.sessionId)} stream={streams[s.sessionId]} visible focused tiled={false} label={nameOf(s.peerId)} scale={sessionScale} onFocus={() => {}} onMaximize={() => {}} onClose={() => void act(() => window.remote.disconnect(s.sessionId))} />
           </div>
         </div>,
         popout.root,
@@ -1267,14 +1271,6 @@ function App() {
                   <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
                   Use relay only
                 </label>
-                <label className="ad-menu-field-label" htmlFor="ua-connect-menu">
-                  Unattended password
-                </label>
-                <input id="ua-connect-menu" type="password" value={unattendedPassword} onChange={e => setUnattendedPassword(e.target.value)} placeholder="If target has one set" autoComplete="off" />
-                <label className="check">
-                  <input type="checkbox" checked={rememberPassword} disabled={!unattendedPassword.trim()} onChange={e => setRememberPassword(e.target.checked)} />
-                  Remember password
-                </label>
               </div>
               {(state.unattendedEnabled || isReady) && (
                 <div className="ad-menu-section">
@@ -1419,10 +1415,14 @@ function App() {
                 <button
                   className={`tool ${inputDisabled[current.sessionId] ? "active warn" : ""}`}
                   disabled={current.phase !== "connected"}
-                  aria-label={inputDisabled[current.sessionId] ? "Enable remote input" : "Disable remote input"}
-                  title={inputDisabled[current.sessionId] ? "Remote input disabled — click to enable" : "Disable remote input"}
+                  aria-label={inputDisabled[current.sessionId] ? "Enable target input" : "Disable target input"}
+                  title={inputDisabled[current.sessionId] ? "Target input blocked — click to unblock" : "Block target's keyboard & mouse"}
                   aria-pressed={!!inputDisabled[current.sessionId]}
-                  onClick={() => setInputDisabled(d => ({ ...d, [current.sessionId]: !d[current.sessionId] }))}
+                  onClick={() => {
+                    const next = !inputDisabled[current.sessionId];
+                    medias.current.get(current.sessionId)?.setInputBlocked(next);
+                    setInputDisabled(d => ({ ...d, [current.sessionId]: next }));
+                  }}
                 >
                   {inputDisabled[current.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
                 </button>
@@ -1474,7 +1474,6 @@ function App() {
             tiled={gridActive}
             label={nameOf(s.peerId)}
             scale={gridActive ? "fit" : (scales[s.sessionId] ?? "fit")}
-            inputDisabled={!!inputDisabled[s.sessionId]}
             onFocus={() => setTab(s.peerId)}
             onMaximize={() => {
               setTab(s.peerId);

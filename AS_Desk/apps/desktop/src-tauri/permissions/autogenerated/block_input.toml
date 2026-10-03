@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-block-input"
+description = "Enables the block_input command without any pre-configured scope."
+commands.allow = ["block_input"]
+
+[[permission]]
+identifier = "deny-block-input"
+description = "Denies the block_input command without any pre-configured scope."
+commands.deny = ["block_input"]

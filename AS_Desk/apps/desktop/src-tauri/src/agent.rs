@@ -108,6 +108,7 @@ enum Cmd {
     Disconnect { session_id: Option<String>, reason: String, reply: Option<Reply<()>> },
     Signal { message: Value, reply: Reply<()> },
     Input { session_id: String, event: Value, reply: Reply<()> },
+    BlockInput { session_id: String, block: bool, reply: Reply<()> },
     ReadClipboard { session_id: String, reply: Reply<String> },
     // Clipboard file transfer (transfer.rs): the controller offers and streams, the shared computer receives.
     ClipboardFiles { session_id: String, reply: Reply<Option<transfer::Snapshot>> },
@@ -160,6 +161,7 @@ impl AgentHandle {
     pub fn stop_all(&self, reason: &str) { let _ = self.tx.send(Cmd::Disconnect { session_id: None, reason: reason.into(), reply: None }); }
     pub async fn signal(&self, message: Value) -> Result<(), String> { self.call(|reply| Cmd::Signal { message, reply }).await }
     pub async fn input(&self, session_id: String, event: Value) -> Result<(), String> { self.call(|reply| Cmd::Input { session_id, event, reply }).await }
+    pub async fn block_input(&self, session_id: String, block: bool) -> Result<(), String> { self.call(|reply| Cmd::BlockInput { session_id, block, reply }).await }
     pub async fn read_clipboard(&self, session_id: String) -> Result<String, String> { self.call(|reply| Cmd::ReadClipboard { session_id, reply }).await }
     pub async fn clipboard_files(&self, session_id: String) -> Result<Option<transfer::Snapshot>, String> { self.call(|reply| Cmd::ClipboardFiles { session_id, reply }).await }
     /// File bytes cross the web view boundary as base64 (compact, unlike a JSON number array).
@@ -559,6 +561,11 @@ impl Agent {
             }
             Cmd::Signal { message, reply } => { let _ = reply.send(logged("signal", self.signal(message))); }
             Cmd::Input { session_id, event, reply } => { let _ = reply.send(self.relay_input(&session_id, event)); }
+            Cmd::BlockInput { session_id, block, reply } => {
+                let is_target = self.state.sessions.iter().any(|a| a.session_id == session_id && a.role == Role::Target);
+                if is_target { self.input.block_local(block); let _ = reply.send(Ok(())); }
+                else { let _ = reply.send(Err("Only the shared computer can block local input".into())); }
+            }
             Cmd::ReadClipboard { session_id, reply } => {
                 let allowed = self.sessions.get(&session_id).is_some_and(|s| s.connected_media)
                     && self.state.sessions.iter().any(|a| a.session_id == session_id && a.permissions.contains(&Capability::Clipboard));
