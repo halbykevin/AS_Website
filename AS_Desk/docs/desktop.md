@@ -15,7 +15,10 @@ Rust core (trusted; apps/desktop/src-tauri)
   ├─ agent.rs      identity, signed rendezvous WebSocket, consent, session grants, one actor task
   ├─ security.rs   grant and SDP signature checks (byte-compatible with the server and 0.5)
   ├─ identity.rs   Ed25519 key under DPAPI in %APPDATA%\Company Remote, recent computers
+  ├─ inject.rs     the shared screen's input path: a gate per session and one injector thread
   ├─ input.rs      SendInput: normalized coordinates, bounded wheel, physical scan codes
+  ├─ blocker.rs    "block user input": low-level hooks that swallow the local user's input
+  ├─ elevation.rs  SYSTEM service + helper for full-access input (UAC prompts, elevated apps)
   ├─ platform.rs   DPAPI, clipboard, displays, start-up entry, lock/suspend/display events,
   │                notifications, APIs newer than Windows 7 (resolved at run time)
   ├─ tls.rs        rustls for every server connection: bundled Mozilla roots + Windows roots
@@ -58,11 +61,11 @@ capture (`WDA_EXCLUDEFROMCAPTURE`).
 
 ## Unattended access
 
-A password set on a computer (Home → **Unattended access to this computer**)
-lets an authorised controller connect to it without anyone there clicking
-**Accept**, the way AnyDesk does. It is built on top of the ordinary consent
-flow, not beside it, so every existing safety property still holds: the session
-shows the always-on-top sharing panel, the tray icon and a notification, and
+A password set on a computer (☰ menu → **Unattended Access**) lets an
+authorised controller connect to it without anyone there clicking **Accept**,
+the way AnyDesk does. It is built on top of the ordinary consent flow, not
+beside it, so every existing safety property still holds: the session shows the
+always-on-top sharing panel, the tray icon and a notification, and
 `Ctrl+Alt+Shift+F12`, lock and suspend still end it.
 
 - **The password never leaves the computer and is never stored in the clear.**
@@ -72,11 +75,12 @@ shows the always-on-top sharing panel, the tray icon and a notification, and
   [unattended.rs](../apps/desktop/src-tauri/src/unattended.rs) the crypto).
 - **Proof is a challenge-response relayed peer-to-peer.** On an incoming request
   the target, if unattended is on, sends `connection.challenge` (a fresh nonce
-  plus the verifier's salt/cost); the controller derives the same key from the
-  typed password and answers `connection.prove` with
-  `HMAC-SHA256(key, transcript)`, where the transcript binds both device IDs,
-  the request ID and the nonce. The rendezvous server only relays these opaque
-  blobs between the request's two parties
+  plus the verifier's salt/cost). The controller keeps it and, as in AnyDesk,
+  asks for the password in the request's tab while it waits (a saved password
+  answers straight away); it derives the same key from that password and answers
+  `connection.prove` with `HMAC-SHA256(key, transcript)`, where the transcript
+  binds both device IDs, the request ID and the nonce. The rendezvous server
+  only relays these opaque blobs between the request's two parties
   (`services/control-api/src/rendezvous.ts`); it cannot read the password, and a
   captured proof cannot be replayed to another computer, request or a second
   time.
@@ -92,7 +96,9 @@ shows the always-on-top sharing panel, the tray icon and a notification, and
   works), and the server also rate-limits proofs.
 - **The controller may remember the password** per computer (DPAPI,
   `remembered.json`), saved only after a connection actually succeeds, so a
-  one-click reconnect from **Recent** is unattended too.
+  one-click reconnect from **Recent** is unattended too. A saved password the
+  other computer refuses (it was changed there) is forgotten, since otherwise
+  every later request would be refused before anyone there could accept it.
 
 Rollout: because the two new protocol messages are additive, old apps simply
 ignore them, but the **server must be deployed before** apps that use unattended
@@ -103,12 +109,14 @@ this.
 ## Several sessions at once
 
 A technician's computer can control up to 8 computers at the same time (waiting
-requests count), each in its own tab: **Home** starts another connection, a tab
-per computer shows it, `×` ends only that session. Every session is independent
-end to end: its own grant, signature checks and timers in the agent (`Session`
-in `agent.rs`), its own `RTCPeerConnection`, video and input channels in the UI.
-Server errors carry the ID of the message they answer, so a failure ends only
-the session or request it concerns.
+requests count), each in its own tab, as in AnyDesk: the tab bar is the title
+bar, **New Session** (or **+**, which also puts the cursor in the address bar)
+starts another connection, a tab per computer shows it, `×` ends only that
+session. Every session is independent end to end: its own grant, signature
+checks and timers in the agent (`Session` in `agent.rs`), its own
+`RTCPeerConnection`, video and input channels in the UI. Server errors carry the
+ID of the message they answer, so a failure ends only the session or request it
+concerns.
 
 **Own windows.** Dragging a tab down out of the tab bar (or off the window), or
 its ↗ button, opens that session in its own window where it is dropped; **Back
@@ -133,6 +141,49 @@ helper at a time and cannot control others meanwhile, and a computer that is
 controlling others cannot be controlled. Lock, suspend, the emergency shortcut
 and losing the server end every session; the tray's **End all sessions** does
 the same.
+
+## Blocking the other computer's keyboard and mouse
+
+The keyboard button in a session's toolbar blocks the keyboard and mouse of the
+person at the other computer, like AnyDesk's "Block user input"; the
+controller's own input keeps working. It needs a session that was granted
+control, and the other computer answers each request (`input-blocked` on the
+control channel), so the button shows what is actually in force.
+
+- **Hooks, not `BlockInput`**
+  ([blocker.rs](../apps/desktop/src-tauri/src/blocker.rs)). `BlockInput` needs
+  an elevated caller, lets through only `SendInput` from the thread that
+  blocked, and is silently undone by Ctrl+Alt+Del. Low-level keyboard and mouse
+  hooks on a dedicated thread swallow physical input instead; every event ASDesk
+  injects carries a marker in `dwExtraInfo` and passes.
+- **Where it runs.** With the SYSTEM helper installed, the helper installs the
+  hooks, so elevated windows are covered too. Without it the app does, which
+  covers everything except windows running as administrator.
+- **The person there is told and is never trapped.** A notification says their
+  keyboard and mouse are blocked. Ctrl+Alt+Del cannot be hooked, and locking the
+  computer ends the session. `Ctrl+Alt+Shift+F12` lifts the block and stops
+  sharing. A key held when the block starts can still be released.
+- **It never outlives the session.** Ending the session, the connection dropping
+  (the controller restores the block when it reconnects), ASDesk exiting or the
+  helper losing the app all unblock. Hooks belong to their thread, so even a
+  crash cannot leave the computer locked.
+
+## Latency
+
+- **Input never waits for the agent.** The agent opens a per-session gate when
+  the session's media connects
+  ([inject.rs](../apps/desktop/src-tauri/src/inject.rs)); after that, input goes
+  from the page straight to one injector thread, so file transfers, clipboard
+  reads and signaling cannot delay a keystroke. The page keeps one call in
+  flight per session (which keeps events in order) and coalesces pointer moves
+  queued behind it, so a slow moment never builds a backlog.
+- **Pointer moves leave immediately.** The viewer listens to `pointerrawupdate`,
+  which is not held back to the next animation frame like `mousemove`. It sends
+  at most every 4 ms and always sends the last position.
+- **Video is shown the moment it is decoded** (`jitterBufferTarget = 0`, or
+  `playoutDelayHint` on the Windows 7 edition's engine). The screen is captured
+  at up to 60 fps, with an 8 Mbit/s encoder ceiling for a full-size view.
+  Split-view tiles get less, and the encoder drops the rate on a busy computer.
 
 ## Build and test
 
@@ -166,8 +217,8 @@ to.
 
 ## Window behaviour
 
-- The window is frameless; the title bar, the session toolbar and the sharing
-  panel move it.
+- The window is frameless; the tab bar (and a popped-out session's toolbar)
+  moves it.
 - Closing hides it to the notification area; the tray menu has Quit and **Start
   with Windows** (enabled on the first installed run, launched with `--hidden`).
 - An incoming request shows the window, flashes the taskbar and posts a Windows

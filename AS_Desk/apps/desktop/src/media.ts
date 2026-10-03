@@ -2,7 +2,16 @@ import type { ActiveSession, FileInfo, FilesSnapshot, InputEvent, TransferStatus
 import type { ClientMessage } from '../../../packages/protocol/src/index.ts';
 
 export type Stats = { path: string; bitrate: number; rtt: number; fps: number; codec: string };
+/** Controller: what the other computer reports after a block request (`error` when it could not). */
+export type BlockState = (blocked: boolean, error?: string) => void;
 const FILE_CHUNK = 48 * 1024; // ≤ transfer::MAX_CHUNK; leaves headroom in the data-channel frame
+// Encoder ceilings for a full-size view. Bandwidth estimation picks the actual rate; a high ceiling
+// lets a big change on screen (a window opening) arrive in one sharp frame instead of several.
+const MAX_BITRATE = 8_000_000;
+const MAX_FRAMERATE = 60;
+// Input waiting for the agent beyond this is stale (the agent stalled): pointer moves are dropped first.
+const INPUT_BACKLOG = 256;
+type Control = { type: 'pause' | 'resume' } | { type: 'quality'; maxWidth: number } | { type: 'disable-input'; blocked: boolean } | { type: 'input-blocked'; blocked: boolean; error?: string };
 const toBase64 = (bytes: Uint8Array) => { let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
 const fromBase64 = (base64: string) => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 export class RemoteMedia {
@@ -39,9 +48,17 @@ export class RemoteMedia {
   private sendId?: string;
   private recv?: { id: string; label: string; total: number; received: number };
   private recvChain: Promise<void> = Promise.resolve();
+  // Blocking the shared computer's local keyboard and mouse: what the controller wants (re-sent after a
+  // reconnect) and, on the shared computer, what is in force.
+  private blockWanted = false;
+  private localBlocked = false;
+  // Shared computer: input on its way to the agent. One call is in flight at a time, which keeps the
+  // events in order; whatever arrives meanwhile goes in the next call, so a slow moment never queues.
+  private inputQueue: InputEvent[] = [];
+  private inputBusy = false;
   constructor(readonly session: ActiveSession, private video: (stream: MediaStream) => void,
     private status: (stats: Stats) => void, private fail: (message: string) => void, private capture?: MediaStream,
-    private transfer?: (status: TransferStatus) => void) {
+    private transfer?: (status: TransferStatus) => void, private blockState?: BlockState) {
     this.pc = new RTCPeerConnection({ iceServers: session.iceServers, iceTransportPolicy: session.relayOnly ? 'relay' : 'all', bundlePolicy: 'max-bundle' });
     this.pc.onicecandidate = event => {
       if (event.candidate && !this.stopped) void window.remote.signal({ type: 'webrtc.ice', sessionId: session.sessionId, candidate: {
@@ -53,6 +70,11 @@ export class RemoteMedia {
       const stream = event.streams[0] ?? new MediaStream([track]);
       // Guard against receiving an already-ended track (race between capture stop and negotiation).
       if (track.readyState === 'ended') return;
+      // Show each frame as soon as it is decoded: the default jitter buffer holds frames back to smooth
+      // playback, which a remote desktop pays for in latency on every move. (jitterBufferTarget is the
+      // standard name; playoutDelayHint the older Chromium one, for the Windows 7 edition.)
+      const receiver = event.receiver as RTCRtpReceiver & { playoutDelayHint?: number };
+      try { if ('jitterBufferTarget' in RTCRtpReceiver.prototype) receiver.jitterBufferTarget = 0; else receiver.playoutDelayHint = 0; } catch { /* unsupported */ }
       track.onended = () => { if (!this.stopped && this.session.role === 'controller') this.fail('Remote screen sharing ended'); };
       track.onunmute = () => { if (!this.stopped) this.video(stream); };
       this.video(stream);
@@ -60,9 +82,13 @@ export class RemoteMedia {
     this.pc.ondatachannel = event => this.channel(event.channel);
     this.pc.onconnectionstatechange = () => {
       if (this.stopped) return;
+      // A controller that cannot reach this computer cannot use it either: never leave the person here
+      // blocked while the connection is down. The controller asks again once it is back.
+      if (this.session.role === 'target' && this.localBlocked && this.pc.connectionState !== 'connected') this.applyBlock(false, false);
       if (this.pc.connectionState === 'connected') {
         clearTimeout(this.disconnectedTimer);
         this.iceRestartAttempts = 0;
+        if (this.ready && this.blockWanted) this.sendControl({ type: 'disable-input', blocked: true });
         void this.connected().catch(() => this.fail('Could not authorize the media connection'));
       } else if (this.pc.connectionState === 'failed') {
         // Attempt ICE restart before giving up entirely.
@@ -141,9 +167,18 @@ export class RemoteMedia {
         for (const sender of this.pc.getSenders()) if (sender.track?.kind === 'video') {
           const params = sender.getParameters();
           if (params.encodings.length) {
-            params.encodings[0]!.maxBitrate = 4_000_000;
-            params.encodings[0]!.maxFramerate = 30;
+            params.encodings[0]!.maxBitrate = MAX_BITRATE;
+            params.encodings[0]!.maxFramerate = MAX_FRAMERATE;
             await sender.setParameters(params).catch(() => undefined);
+          }
+          // The screen goes first when the link is busy, and is marked for priority on networks that
+          // honour DSCP. Separate, so an engine that refuses these keeps the limits above.
+          const priority = sender.getParameters();
+          const encoding = priority.encodings[0] as (RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }) | undefined;
+          if (encoding) {
+            encoding.priority = 'high';
+            encoding.networkPriority = 'high';
+            await sender.setParameters(priority).catch(() => undefined);
           }
         }
       }
@@ -165,8 +200,11 @@ export class RemoteMedia {
           if (this.session.role === 'target') {
             if (control === 'pause' || control === 'resume') this.queueParams(() => this.setSending(control === 'resume'));
             else if (control === 'quality' && Number.isFinite(packet.event?.maxWidth)) this.queueParams(() => this.applyQuality(packet.event.maxWidth));
-            else if (control === 'disable-input' && typeof packet.event?.blocked === 'boolean')
-              void window.remote.blockInput(this.session.sessionId, packet.event.blocked).catch(() => {});
+            else if (control === 'disable-input' && typeof packet.event?.blocked === 'boolean') this.applyBlock(packet.event.blocked, true);
+          } else if (control === 'input-blocked' && typeof packet.event?.blocked === 'boolean') {
+            // What the other computer reports is what is in force; a reconnect restores exactly that.
+            this.blockWanted = packet.event.blocked;
+            this.blockState?.(packet.event.blocked, typeof packet.event.error === 'string' ? packet.event.error.slice(0, 200) : undefined);
           }
           return;
         }
@@ -175,9 +213,37 @@ export class RemoteMedia {
           : channel.label === 'mouse-reliable' ? ['button', 'wheel'].includes(input.type) : channel.label === 'clipboard' ? input.type === 'clipboard' : input.type === 'release';
         if (!allowed || (this.session.role === 'controller' && input.type !== 'clipboard')) return;
         if (input.type === 'clipboard') this.lastClipboard = input.text;
-        void window.remote.input(this.session.sessionId, input).catch(() => this.fail('Peer sent unauthorized input'));
+        this.forward(input);
       } catch { this.fail('Invalid peer message'); }
     };
+  }
+  /** Shared computer: hands the peer's input to the agent in order, with no queue building up. While a
+   *  call is in flight, new events wait for the next one, and a pointer move replaces the move still
+   *  waiting behind it — only the latest position matters, the path to it does not. */
+  private forward(event: InputEvent) {
+    const queue = this.inputQueue;
+    if (event.type === 'move' && queue.at(-1)?.type === 'move') queue[queue.length - 1] = event;
+    else queue.push(event);
+    if (queue.length > INPUT_BACKLOG) this.inputQueue = queue.filter(e => e.type !== 'move');
+    if (!this.inputBusy) void this.pump();
+  }
+  private async pump() {
+    this.inputBusy = true;
+    try {
+      while (this.inputQueue.length && !this.stopped) {
+        // Within the agent's per-call limit, however far behind a stall left things.
+        const batch = this.inputQueue.splice(0, INPUT_BACKLOG);
+        await window.remote.input(this.session.sessionId, batch);
+      }
+    } catch { if (!this.stopped) this.fail('Peer sent unauthorized input'); }
+    finally { this.inputBusy = false; }
+  }
+  /** Shared computer: block or unblock the local keyboard and mouse, and tell the controller how it went. */
+  private applyBlock(blocked: boolean, answer: boolean) {
+    if (!blocked) this.localBlocked = false;
+    void window.remote.blockInput(this.session.sessionId, blocked).then(
+      () => { this.localBlocked = blocked; if (answer) this.sendControl({ type: 'input-blocked', blocked }); },
+      error => { if (answer) this.sendControl({ type: 'input-blocked', blocked: this.localBlocked, error: typeof error === 'string' ? error : 'Input could not be blocked' }); });
   }
   /** Controller: show or hide this session (see `visible`). */
   setVisible(visible: boolean) {
@@ -195,12 +261,14 @@ export class RemoteMedia {
     this.lastQuality = bucket;
     this.sendControl({ type: 'quality', maxWidth: bucket });
   }
-  /** Controller: block or unblock the target machine's local keyboard and mouse. */
+  /** Controller: block or unblock the other computer's local keyboard and mouse (it answers with
+   *  `input-blocked`, reported through blockState). */
   setInputBlocked(blocked: boolean) {
     if (this.session.role !== 'controller') return;
+    this.blockWanted = blocked;
     this.sendControl({ type: 'disable-input', blocked });
   }
-  private sendControl(event: { type: 'pause' | 'resume' } | { type: 'quality'; maxWidth: number } | { type: 'disable-input'; blocked: boolean }) {
+  private sendControl(event: Control) {
     const channel = this.channels.get('control');
     if (!this.ready || this.stopped || channel?.readyState !== 'open') return;
     const seq = (this.sequence.get('control') ?? 0) + 1; this.sequence.set('control', seq);
@@ -216,8 +284,9 @@ export class RemoteMedia {
       const scale = Math.max(1, Math.min(4, capture / Math.max(160, maxWidth)));
       const encoding = params.encodings[0]!;
       encoding.scaleResolutionDownBy = scale;
-      encoding.maxBitrate = Math.round(Math.max(500_000, Math.min(4_000_000, (capture / scale / 1920) * 4_000_000)));
-      encoding.maxFramerate = maxWidth < 640 ? 20 : 30;
+      encoding.maxBitrate = Math.round(Math.max(500_000, Math.min(MAX_BITRATE, (capture / scale / 1920) * MAX_BITRATE)));
+      // A full view gets every frame; tiles in the split view are glanced at, so they get fewer.
+      encoding.maxFramerate = maxWidth < 640 ? 20 : maxWidth < 1120 ? 30 : MAX_FRAMERATE;
       await sender.setParameters(params).catch(() => undefined);
     }
   }

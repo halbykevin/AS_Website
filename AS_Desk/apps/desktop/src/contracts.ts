@@ -6,8 +6,9 @@ export type ActiveSession = { sessionId: string; role: "controller" | "target"; 
 export type Incoming = { requestId: string; sourceId: string; permissions: Capability[]; expiresAt: number };
 /** A computer this one has controlled; `name` is the user's own label for it, kept on this computer only. */
 export type Recent = { id: string; at: number; name?: string };
-/** A request this computer sent that the other side has not answered yet. */
-export type Outgoing = { targetId: string; requestId?: string };
+/** A request this computer sent that the other side has not answered yet. `passwordPrompt`: that
+ *  computer has unattended access and asked for its password, which connects without anyone accepting. */
+export type Outgoing = { targetId: string; requestId?: string; passwordPrompt?: boolean };
 // A technician's computer may control several computers at once (`sessions` with role controller);
 // a computer being helped has at most one `incoming` request and one session with role target.
 export type DesktopState = { deviceId?: string; recent?: Recent[]; server?: string; status: "setup" | "offline" | "connecting" | "ready"; error?: string; incoming?: Incoming; outgoing: Outgoing[]; sessions: ActiveSession[]; nativeAvailable: boolean; unattendedEnabled: boolean; appVersion: string };
@@ -35,8 +36,11 @@ export interface DesktopAPI {
   /** Move the frameless window with the pointer (title bar, toolbar, sharing panel). */
   startDrag(): Promise<void>;
   setup(options: { server: string; enrollmentToken?: string }): Promise<void>;
-  /** `password` attempts unattended access on the target; `remember` saves it on this computer for next time. */
-  connect(targetId: string, clipboard: boolean, relayOnly: boolean, password?: string, remember?: boolean): Promise<void>;
+  /** A password saved for the target is tried automatically (unattended access). */
+  connect(targetId: string, clipboard: boolean, relayOnly: boolean): Promise<void>;
+  /** The unattended password for a waiting request whose computer asked for one (`passwordPrompt`);
+   *  `remember` saves it on this computer once it has been accepted. */
+  provePassword(targetId: string, password: string, remember: boolean): Promise<void>;
   /** Turn unattended access on for THIS computer by setting a password (replaces any existing one). */
   setUnattended(password: string): Promise<void>;
   /** Turn unattended access off for this computer. */
@@ -57,8 +61,9 @@ export interface DesktopAPI {
   /** End one session, or every session when none is named. */
   disconnect(sessionId?: string): Promise<void>;
   signal(message: ClientMessage): Promise<void>;
-  input(sessionId: string, event: InputEvent): Promise<void>;
-  /** Block or unblock the local user's physical input on the TARGET machine. */
+  /** The peer's events, in order. Keep one call in flight per session (see RemoteMedia.forward). */
+  input(sessionId: string, events: InputEvent[]): Promise<void>;
+  /** Shared computer: block or unblock the keyboard and mouse of the person here, as the controller asked. */
   blockInput(sessionId: string, block: boolean): Promise<void>;
   clipboard(sessionId: string): Promise<string>;
   // Clipboard file transfer, controller → shared computer. Bytes cross as base64.

@@ -20,6 +20,7 @@
     "allow-signal",
     "allow-input",
     "allow-block-input",
+    "allow-prove-password",
     "allow-read-clipboard",
     "allow-set-unattended",
     "allow-clear-unattended",

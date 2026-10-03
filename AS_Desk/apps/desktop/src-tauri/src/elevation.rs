@@ -67,6 +67,9 @@ enum Worker {
     Bind { x: i32, y: i32, width: i32, height: i32 },
     Input(InputEvent),
     Release,
+    /// Block (or unblock) the keyboard and mouse of the person at this computer. Done here rather
+    /// than in the app because only SYSTEM's hooks also cover elevated windows (blocker.rs).
+    Block(bool),
     Stop,
 }
 
@@ -161,9 +164,12 @@ fn serve(pipe: HANDLE, dry_run: bool) {
             Worker::Bind { x, y, width, height } => { let _ = input.start(Rect { x, y, width, height }); }
             Worker::Input(event) => { desktop.follow_input(); let _ = input.send(&event); }
             Worker::Release => input.release(),
+            Worker::Block(block) => { if let Err(error) = input.block_local(block) { log::write(format!("helper: {error}")); } }
             Worker::Stop => break,
         }
     }
+    // Also when the app went away without a word (its end of the pipe closed): never leave the
+    // person here blocked.
     input.stop();
 }
 
@@ -197,6 +203,7 @@ impl ElevatedInput {
     pub fn bind(&self, display: Rect) -> bool { self.write(&Worker::Bind { x: display.x, y: display.y, width: display.width, height: display.height }) }
     pub fn send(&self, event: &InputEvent) -> bool { self.write(&Worker::Input(event.clone())) }
     pub fn release(&self) { let _ = self.write(&Worker::Release); }
+    pub fn block(&self, block: bool) -> bool { self.write(&Worker::Block(block)) }
 }
 impl Drop for ElevatedInput { fn drop(&mut self) { let _ = self.write(&Worker::Stop); } }
 
@@ -358,7 +365,7 @@ mod tests {
         let mut writer = File::create(&path).unwrap();
         for message in [Worker::Bind { x: 0, y: 0, width: 1920, height: 1080 },
             Worker::Input(InputEvent::Button { button: MouseButton::Left, down: true, x: Some(0.5), y: Some(0.5) }),
-            Worker::Release, Worker::Stop] {
+            Worker::Release, Worker::Block(true), Worker::Stop] {
             write_frame(&mut writer, &message).unwrap();
         }
         drop(writer);
@@ -366,6 +373,7 @@ mod tests {
         assert!(matches!(read_frame(&mut reader), Some(Worker::Bind { width: 1920, .. })));
         assert!(matches!(read_frame(&mut reader), Some(Worker::Input(InputEvent::Button { down: true, .. }))));
         assert!(matches!(read_frame(&mut reader), Some(Worker::Release)));
+        assert!(matches!(read_frame(&mut reader), Some(Worker::Block(true))));
         assert!(matches!(read_frame(&mut reader), Some(Worker::Stop)));
         assert!(read_frame(&mut reader).is_none());
         let _ = std::fs::remove_file(&path);

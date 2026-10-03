@@ -1,11 +1,10 @@
 //! Keyboard and mouse injection with SendInput. Only normalized coordinates inside the shared display,
 //! bounded wheel values and physical scan codes are accepted; every held key and button is released
-//! when a session stops.
+//! and the local user's input unblocked when a session stops.
 use std::{collections::HashSet, sync::Mutex};
 use windows_sys::Win32::UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*};
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{platform::Rect, protocol::{InputEvent, MouseButton}};
+use crate::{blocker::{Blocker, INJECTED_MARK}, platform::Rect, protocol::{InputEvent, MouseButton}};
 
 // Physical Set-1 scan codes, independent of the keyboard layout (KeyboardEvent.code → scan code).
 const CODES: &[(&str, u16)] = &[
@@ -31,25 +30,36 @@ pub fn scan_code(code: &str) -> Option<(u16, bool)> {
 }
 
 struct State { keys: HashSet<(u16, bool)>, buttons: HashSet<MouseButton>, display: Option<Rect> }
-pub struct Input { state: Mutex<State>, dry_run: bool, blocked: AtomicBool }
+pub struct Input { state: Mutex<State>, dry_run: bool, blocker: Mutex<Blocker>, blocked: Mutex<bool> }
 
 impl Input {
     /// `dry_run` validates and tracks everything but never touches the real desktop (tests).
-    pub fn new(dry_run: bool) -> Self { Self { state: Mutex::new(State { keys: HashSet::new(), buttons: HashSet::new(), display: None }), dry_run, blocked: AtomicBool::new(false) } }
-    pub fn start(&self, display: Rect) -> Result<(), String> {
+    pub fn new(dry_run: bool) -> Self {
+        Self { state: Mutex::new(State { keys: HashSet::new(), buttons: HashSet::new(), display: None }), dry_run, blocker: Mutex::default(), blocked: Mutex::new(false) }
+    }
+    pub fn check(display: Rect) -> Result<(), String> {
         if display.width < 1 || display.height < 1 || display.width > 32768 || display.height > 32768 { return Err("Invalid display".into()); }
+        Ok(())
+    }
+    pub fn start(&self, display: Rect) -> Result<(), String> {
+        Self::check(display)?;
+        let _ = self.block_local(false);
         self.release();
         self.state.lock().unwrap().display = Some(display);
         Ok(())
     }
-    pub fn stop(&self) { self.unblock_local(); self.release(); self.state.lock().unwrap().display = None; }
-    /// Block or unblock the local user's physical keyboard and mouse. Only injected input (from
-    /// the remote controller via SendInput) still goes through. Requires elevation.
-    pub fn block_local(&self, block: bool) {
-        if self.blocked.swap(block, Ordering::Relaxed) == block { return; }
-        if !self.dry_run { unsafe { BlockInput(if block { 1 } else { 0 }); } }
+    pub fn stop(&self) { let _ = self.block_local(false); self.release(); self.state.lock().unwrap().display = None; }
+    /// Blocks or unblocks the keyboard and mouse of the person at this computer (blocker.rs); what
+    /// this struct injects still goes through.
+    pub fn block_local(&self, block: bool) -> Result<(), String> {
+        let mut blocked = self.blocked.lock().unwrap();
+        if *blocked == block { return Ok(()); }
+        if !self.dry_run { self.blocker.lock().unwrap().set(block)?; }
+        *blocked = block;
+        Ok(())
     }
-    pub fn unblock_local(&self) { self.block_local(false); }
+    #[cfg(test)]
+    pub fn blocked(&self) -> bool { *self.blocked.lock().unwrap() }
     pub fn active(&self) -> bool { self.state.lock().unwrap().display.is_some() }
     pub fn display(&self) -> Option<Rect> { self.state.lock().unwrap().display }
 
@@ -58,12 +68,13 @@ impl Input {
         // expected during a session and is not an error.
         if !self.dry_run { unsafe { SendInput(1, &input, std::mem::size_of::<INPUT>() as i32) }; }
     }
+    // Everything injected is marked, so blocking the local user's input never blocks the controller.
     fn mouse(&self, flags: u32, dx: i32, dy: i32, data: i32) {
-        self.emit(INPUT { r#type: INPUT_MOUSE, Anonymous: INPUT_0 { mi: MOUSEINPUT { dx, dy, mouseData: data as u32, dwFlags: flags, time: 0, dwExtraInfo: 0 } } });
+        self.emit(INPUT { r#type: INPUT_MOUSE, Anonymous: INPUT_0 { mi: MOUSEINPUT { dx, dy, mouseData: data as u32, dwFlags: flags, time: 0, dwExtraInfo: INJECTED_MARK } } });
     }
     fn key(&self, scan: u16, extended: bool, down: bool) {
         let flags = KEYEVENTF_SCANCODE | if extended { KEYEVENTF_EXTENDEDKEY } else { 0 } | if down { 0 } else { KEYEVENTF_KEYUP };
-        self.emit(INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: 0, wScan: scan, dwFlags: flags, time: 0, dwExtraInfo: 0 } } });
+        self.emit(INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: 0, wScan: scan, dwFlags: flags, time: 0, dwExtraInfo: INJECTED_MARK } } });
     }
     fn button(&self, button: MouseButton, down: bool) {
         let flags = match (button, down) {
@@ -115,7 +126,7 @@ impl Input {
         Ok(())
     }
 }
-impl Drop for Input { fn drop(&mut self) { self.unblock_local(); self.release(); } }
+impl Drop for Input { fn drop(&mut self) { let _ = self.block_local(false); self.release(); } }
 
 #[cfg(test)]
 mod tests {
@@ -144,5 +155,16 @@ mod tests {
         input.stop();
         let s = input.state.lock().unwrap();
         assert!(s.keys.is_empty() && s.buttons.is_empty() && s.display.is_none());
+    }
+    #[test]
+    fn a_session_never_outlives_its_block() {
+        let input = Input::new(true); input.start(SCREEN).unwrap();
+        input.block_local(true).unwrap();
+        assert!(input.blocked());
+        input.stop();
+        assert!(!input.blocked(), "stopping the session unblocks the local user");
+        input.block_local(true).unwrap();
+        input.start(SCREEN).unwrap();
+        assert!(!input.blocked(), "a new session starts unblocked");
     }
 }

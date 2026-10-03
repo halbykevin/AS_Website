@@ -37,11 +37,11 @@ const PopoutIcon = icon("M10 5H5v14h14v-5M14 4h6v6M20 4l-8 8", 12);
 const DockIcon = icon("M10 5H5v14h14v-5M20 4l-8 8M12 7v5h5");
 const HistoryIcon = icon("M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4M12 8v4l3 2", 14);
 const RenameIcon = icon("M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4", 13);
-const InputOnIcon = icon("M4 6h16v12H4zM9 17v3M15 17v3M7 20h10", 14);
-const InputOffIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M4 6h16v12H4zM9 17v3M15 17v3M7 20h10" />
-    <line x1="3" y1="3" x2="21" y2="21" stroke="#f55" strokeWidth="2.2" />
+/** A keyboard; struck through while the other computer's own keyboard and mouse are blocked. */
+const BlockInputIcon = ({ blocked }: { blocked: boolean }) => (
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8" />
+    {blocked && <path d="M3 3l18 18" strokeWidth="2.2" />}
   </svg>
 );
 const DisconnectIcon = icon("M18.36 5.64a9 9 0 1 1-12.73 0M12 2v10", 12);
@@ -117,6 +117,32 @@ const labels: Record<DesktopState["status"], string> = {
 const HOME = "home";
 // Matches the agent and server limit (MAX_SESSIONS / MAX_CONTROLLER_SESSIONS).
 const MAX_SESSIONS = 8;
+// Pointer moves go out at most this often (ms): 250 a second, finer than any screen refreshes.
+const MOVE_INTERVAL = 4;
+
+/** Asked while waiting for a computer that has unattended access: its password connects at once. */
+function PasswordPrompt({ busy, onSubmit }: { busy: boolean; onSubmit: (password: string, remember: boolean) => void }) {
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  return (
+    <form
+      className="password-prompt"
+      onSubmit={e => {
+        e.preventDefault();
+        if (password) onSubmit(password, remember);
+      }}
+    >
+      <input type="password" value={password} onChange={e => setPassword(e.target.value)} aria-label="Unattended password" placeholder="Password" autoComplete="off" autoFocus />
+      <label className="check">
+        <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+        Remember on this computer
+      </label>
+      <button className="primary wide" disabled={busy || !password}>
+        Connect with password
+      </button>
+    </form>
+  );
+}
 
 // A 32×18 grayscale frame of the shared screen. The agent compares it with each display to find the
 // one being shared (src-tauri/src/platform.rs, display_for_source).
@@ -191,7 +217,8 @@ const POPOUT = "session-";
 function SessionView({ session, media, stream, visible, focused, tiled, label, scale, onFocus, onClose, onMaximize }: { session: ActiveSession; media?: RemoteMedia; stream?: MediaStream; visible: boolean; focused: boolean; tiled: boolean; label: string; scale: "fit" | "actual"; onFocus: () => void; onClose: () => void; onMaximize: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const viewer = useRef<HTMLDivElement>(null);
-  const lastMove = useRef(0);
+  // The pointer position not sent yet (see the move listener below) and when the last one went out.
+  const moves = useRef<{ last: number; timer?: ReturnType<typeof setTimeout>; pending?: { x: number; y: number } }>({ last: 0 });
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const element = video.current;
@@ -223,7 +250,9 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
     return () => observer.disconnect();
   }, [media, visible, scale]);
   const send = (event: InputEvent) => { media?.send(event); };
-  function point(event: React.MouseEvent): { x: number; y: number } | undefined {
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  function point(event: { clientX: number; clientY: number }): { x: number; y: number } | undefined {
     const element = video.current;
     if (!element?.videoWidth) return;
     const rect = element.getBoundingClientRect();
@@ -235,6 +264,42 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
     return { x, y };
   }
+  // A position still waiting to go out is older than a click (which carries its own position): drop it.
+  const dropMove = () => {
+    clearTimeout(moves.current.timer);
+    moves.current.timer = moves.current.pending = undefined;
+  };
+  // Pointer moves leave the moment the OS delivers them: pointerrawupdate is not held back to the next
+  // animation frame the way mousemove is, which saves up to a frame on every move. At most one goes
+  // out per MOVE_INTERVAL, and the last one always does, so the remote cursor stops where this one did.
+  useEffect(() => {
+    const element = viewer.current;
+    if (!element) return;
+    const state = moves.current;
+    const flush = () => {
+      const position = state.pending;
+      clearTimeout(state.timer);
+      state.timer = state.pending = undefined;
+      if (!position) return;
+      state.last = performance.now();
+      sendRef.current({ type: "move", ...position });
+    };
+    const onMove = (event: Event) => {
+      const position = point(event as PointerEvent);
+      if (!position) return;
+      state.pending = position;
+      const wait = MOVE_INTERVAL - (performance.now() - state.last);
+      if (wait <= 0) flush();
+      else state.timer ??= setTimeout(flush, wait);
+    };
+    const type = "onpointerrawupdate" in (element.ownerDocument.defaultView ?? window) ? "pointerrawupdate" : "pointermove";
+    element.addEventListener(type, onMove);
+    return () => {
+      element.removeEventListener(type, onMove);
+      clearTimeout(state.timer);
+      state.timer = state.pending = undefined;
+    };
+  }, []);
   const dpr = (viewer.current?.ownerDocument.defaultView ?? window).devicePixelRatio || 1;
   const actualSize = scale === "actual" && frame.width ? { width: frame.width / dpr, height: frame.height / dpr } : undefined;
   const button = (e: React.MouseEvent) => (e.button === 2 ? "right" : e.button === 1 ? "middle" : "left");
@@ -257,30 +322,36 @@ function SessionView({ session, media, stream, visible, focused, tiled, label, s
         e.preventDefault();
         send({ type: "key", code: e.code, down: false });
       }}
-      onMouseMove={e => {
-        if (performance.now() - lastMove.current < 8) return;
-        const position = point(e);
-        if (position) {
-          lastMove.current = performance.now();
-          send({ type: "move", ...position });
-        }
-      }}
       onMouseDown={e => {
         e.preventDefault();
         e.currentTarget.focus();
         onFocus();
+        dropMove();
         const position = point(e);
         if (position) send({ type: "button", ...position, button: button(e), down: true });
       }}
-      onMouseUp={e => send({ type: "button", button: button(e), down: false })}
-      onMouseLeave={() => send({ type: "release" })}
-      onWheel={e =>
+      onMouseUp={e => {
+        dropMove();
+        const position = point(e);
+        send({ type: "button", ...position, button: button(e), down: false });
+      }}
+      onMouseLeave={() => {
+        dropMove();
+        send({ type: "release" });
+      }}
+      onWheel={e => {
+        // The wheel scrolls where the cursor is, so the latest position goes first.
+        const position = point(e);
+        if (position && moves.current.pending) {
+          dropMove();
+          send({ type: "move", ...position });
+        }
         send({
           type: "wheel",
           x: Math.round(Math.max(-1200, Math.min(1200, e.deltaX))),
           y: Math.round(Math.max(-1200, Math.min(1200, -e.deltaY)))
-        })
-      }
+        });
+      }}
     >
       <video
         ref={video}
@@ -354,9 +425,7 @@ function App() {
   const [target, setTarget] = useState("");
   const [clipboardEnabled, setClipboardEnabled] = useState(true);
   const [relay, setRelay] = useState(false);
-  // Controller side: an unattended password to try on the target, and whether to save it here.
-  const [unattendedPassword, setUnattendedPassword] = useState("");
-  const [rememberPassword, setRememberPassword] = useState(false);
+  const addressInput = useRef<HTMLInputElement>(null);
   // Target side: the "set unattended password" form.
   const [uaPassword, setUaPassword] = useState("");
   const [uaConfirm, setUaConfirm] = useState("");
@@ -370,6 +439,7 @@ function App() {
   // The selected tab: HOME, or the ID of a computer being controlled (or waiting to be).
   const [tab, setTab] = useState(HOME);
   const [scales, setScales] = useState<Record<string, "fit" | "actual">>({});
+  // Per session: the other computer's own keyboard and mouse are blocked (as it last reported).
   const [inputDisabled, setInputDisabled] = useState<Record<string, boolean>>({});
   // Focus view (one session at a time) or grid/split view (all at once). Remembered per viewer.
   const [layout, setLayout] = useState<"focus" | "grid">(() => {
@@ -450,6 +520,7 @@ function App() {
     setStats(s => without(s, sessionId));
     setStreams(s => without(s, sessionId));
     setTransfers(s => without(s, sessionId));
+    setInputDisabled(s => without(s, sessionId));
   };
   const deliver = (sessionId: string, message: ClientMessage) => {
     const media = medias.current.get(sessionId);
@@ -535,6 +606,10 @@ function App() {
         status => {
           setTransfers(t => ({ ...t, [id]: status }));
           if (status.state !== "active") setTimeout(() => setTransfers(t => (t[id]?.state === "active" ? t : without(t, id))), 4000);
+        },
+        (blocked, error) => {
+          setInputDisabled(d => ({ ...d, [id]: blocked }));
+          if (error) setError(`The keyboard and mouse at ${formatId(session.peerId)} could not be blocked: ${error}`);
         }
       );
       if (session.role === "target") capture.current = undefined;
@@ -671,6 +746,28 @@ function App() {
     tear.current = undefined;
     setTearing(undefined);
   };
+  /** Blocks the keyboard and mouse of the person at the other computer (AnyDesk's "Block user input").
+   *  Shown as on straight away; the other computer's answer then confirms or corrects it. */
+  const blockToggle = (s: ActiveSession) => {
+    const blocked = !!inputDisabled[s.sessionId];
+    const control = s.permissions.includes("mouse") || s.permissions.includes("keyboard");
+    return (
+      <button
+        className={`tool ${blocked ? "active warn" : ""}`}
+        disabled={s.phase !== "connected" || !control}
+        aria-pressed={blocked}
+        aria-label={blocked ? "Unblock their keyboard and mouse" : "Block their keyboard and mouse"}
+        title={!control ? "Blocking needs permission to control that computer" : blocked ? "Their keyboard and mouse are blocked; click to give them back" : "Block the keyboard and mouse of the person at that computer"}
+        onClick={() => {
+          const next = !blocked;
+          medias.current.get(s.sessionId)?.setInputBlocked(next);
+          setInputDisabled(d => ({ ...d, [s.sessionId]: next }));
+        }}
+      >
+        <BlockInputIcon blocked={blocked} />
+      </button>
+    );
+  };
   const popoutViews = controlled
     .filter(s => popouts[s.sessionId])
     .map(s => {
@@ -679,14 +776,14 @@ function App() {
         transfer = transfers[s.sessionId];
       const sessionScale = scales[s.sessionId] ?? "fit";
       return createPortal(
-        <div className="session workspace popout">
+        <div className="session workspace popout ad-shell">
           <div className="toolbar" onMouseDown={e => drag(e, popout.label)}>
             <span className="popout-name">
               <span className="logo">
                 <Logo />
               </span>
               <span className={`live-dot ${s.phase === "connected" ? "on" : ""}`} />
-              {nameOf(s.peerId)}
+              <span className="tab-label">{nameOf(s.peerId)}</span>
             </span>
             <div className="toolbar-actions">
               {transfer && <TransferChip status={transfer} />}
@@ -694,20 +791,7 @@ function App() {
                 {sessionStats ? `${sessionStats.rtt}ms` : ""}
               </span>
               <div className="toolbar-separator" />
-              <button
-                className={`tool ${inputDisabled[s.sessionId] ? "active warn" : ""}`}
-                disabled={s.phase !== "connected"}
-                aria-label={inputDisabled[s.sessionId] ? "Enable target input" : "Disable target input"}
-                title={inputDisabled[s.sessionId] ? "Target input blocked — click to unblock" : "Block target's keyboard & mouse"}
-                aria-pressed={!!inputDisabled[s.sessionId]}
-                onClick={() => {
-                  const next = !inputDisabled[s.sessionId];
-                  medias.current.get(s.sessionId)?.setInputBlocked(next);
-                  setInputDisabled(d => ({ ...d, [s.sessionId]: next }));
-                }}
-              >
-                {inputDisabled[s.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
-              </button>
+              {blockToggle(s)}
               <button
                 className="tool"
                 disabled={s.phase !== "connected"}
@@ -744,23 +828,38 @@ function App() {
     const done = document.fullscreenElement ? document.exitFullscreen() : workspace.current?.requestFullscreen();
     void done?.catch(() => setError("Full screen is unavailable"));
   };
+  // A computer with unattended access asks for its password while the request waits (PasswordPrompt);
+  // one saved on this computer is answered automatically.
   const connectTo = (id: string) => {
     setTarget(formatId(id));
     setTab(id);
-    const password = unattendedPassword.trim() || undefined;
-    const remember = rememberPassword && !!password;
+    setMenuOpen(false);
     void act(async () => {
       try {
-        await window.remote.connect(id, clipboardEnabled, relay, password, remember);
-        // Don't leave a password sitting in the box for the next, different computer.
-        setUnattendedPassword("");
-        setRememberPassword(false);
+        await window.remote.connect(id, clipboardEnabled, relay);
       } catch (error) {
         setTab(t => (t === id && !seenTabs.current.has(id) ? HOME : t));
         throw error;
       }
     });
   };
+  /** "+": the New Session tab with its address bar ready for the next computer, as in AnyDesk. */
+  const newSession = () => {
+    setTab(HOME);
+    setMenuOpen(false);
+    requestAnimationFrame(() => {
+      addressInput.current?.focus();
+      addressInput.current?.select();
+    });
+  };
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [menuOpen]);
   // Accepting captures the primary screen straight away (no picker; capture needs this click's user
   // gesture), then tells the agent which display it is.
   const acceptIncoming = (requestId: string, perms: Capability[] = permissions) =>
@@ -774,7 +873,9 @@ function App() {
             displaySurface: "monitor",
             width: { max: 1920 },
             height: { max: 1080 },
-            frameRate: { ideal: 24, max: 30 }
+            // A change on screen is picked up within 16 ms instead of 33. The capturer only delivers
+            // frames when something changes, and the encoder drops the rate itself if this PC is busy.
+            frameRate: { ideal: 60, max: 60 }
           },
           selfBrowserSurface: "exclude",
           surfaceSwitching: "exclude",
@@ -918,8 +1019,98 @@ function App() {
   // Every session counts toward the limit, popped out or not.
   const sessionCount = controlled.length + waitingFor.length;
   const full = sessionCount >= MAX_SESSIONS;
+  const isReady = state.status === "ready";
+  const setUp = loaded && state.status !== "setup";
+
+  // ── New Session (the home tab): address bar, this computer's address, recent sessions ─────────────
+  const addressBar = setUp && (
+    <div className="address-bar">
+      <span className={`addr-dot ${state.status}`} title={labels[state.status]} aria-hidden="true" />
+      <form
+        className="addr-form"
+        onSubmit={e => {
+          e.preventDefault();
+          connectTo(target.replaceAll(" ", ""));
+        }}
+      >
+        <input
+          ref={addressInput}
+          value={target}
+          onChange={e => setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))}
+          aria-label="Remote computer ID"
+          placeholder="Enter Remote Address"
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          disabled={!isReady}
+        />
+        <button type="submit" className="addr-connect" disabled={busy || !isReady || !validTarget || full} aria-label="Connect" title={full ? `You can control up to ${MAX_SESSIONS} computers at once` : "Connect"}>
+          <span className="addr-connect-text">Connect</span>
+          <ConnectIcon />
+        </button>
+      </form>
+    </div>
+  );
+  const recentList = !!state.recent?.length && (
+    <section className="recent" aria-labelledby="recent-title">
+      <h2 className="section-title" id="recent-title">
+        Recent sessions
+      </h2>
+      <ul>
+        {state.recent.map(r => {
+          const openSession = controlled.find(s => s.peerId === r.id);
+          const open = !!openSession || tabs.includes(r.id);
+          const label = r.name ? `${r.name} (${formatId(r.id)})` : formatId(r.id);
+          const when = open ? (
+            <>
+              <span className="live-dot on" />
+              open
+            </>
+          ) : (
+            <>
+              <HistoryIcon />
+              {ago(r.at, now)}
+            </>
+          );
+          if (renaming === r.id)
+            return (
+              <li key={r.id}>
+                <RenameField id={r.id} name={r.name} onDone={value => saveName(r.id, r.name, value)} />
+              </li>
+            );
+          return (
+            <li key={r.id}>
+              <button className="recent-connect" disabled={busy || !isReady || (!open && full)} aria-label={open ? `Show ${label}` : `Connect to ${label}`} title={open ? "Show this session" : `Connect to ${label}`} onClick={() => (openSession && popouts[openSession.sessionId] ? popOut(openSession) : open ? setTab(r.id) : connectTo(r.id))}>
+                {r.name ? (
+                  <>
+                    <span className="recent-name">{r.name}</span>
+                    <span className="recent-time">
+                      <span className="recent-id-small">{formatId(r.id)}</span>·{when}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="recent-id">{formatId(r.id)}</span>
+                    <span className="recent-time">{when}</span>
+                  </>
+                )}
+              </button>
+              <div className="recent-actions">
+                <button aria-label={`Remove ${label} from recent`} title="Remove" onClick={() => void act(() => window.remote.forget(r.id))}>
+                  <CloseIcon />
+                </button>
+                <button aria-label={r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`} title={r.name ? "Rename" : "Add a name"} onClick={() => setRenaming(r.id)}>
+                  <RenameIcon />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
   const home = !loaded ? (
-    <main className="home" />
+    <main className="ad-main" />
   ) : state.status === "setup" ? (
     <main className="setup">
       <h1>Set up this computer</h1>
@@ -946,127 +1137,38 @@ function App() {
       </form>
     </main>
   ) : (
-    <main className="home">
-      <section className="panel">
-        <span className="panel-label">Your ID</span>
-        <div className="id-row">
-          <span className="device-id" data-testid="device-id">
-            {formatId(state.deviceId)}
+    <main className="ad-main">
+      <div className="ad-content">
+        <section className="ad-hero" aria-labelledby="ad-id-label">
+          <span className="ad-id-label" id="ad-id-label">
+            Your Address
           </span>
-          <button
-            className="icon-button"
-            disabled={!state.deviceId}
-            aria-label="Copy ID"
-            title="Copy ID"
-            onClick={() => {
-              void window.remote
-                .copyId()
-                .then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                })
-                .catch(() => setError("Select the ID and copy it with Ctrl+C"));
-            }}
-          >
-            {copied ? <CheckIcon /> : <CopyIcon />}
-          </button>
-        </div>
-        <p className="muted">Share this ID to get help. You approve every request.</p>
-      </section>
-      <section className="panel">
-        <label className="panel-label" htmlFor="remote-id">
-          Remote computer ID
-        </label>
-        <form
-          className="connect"
-          onSubmit={e => {
-            e.preventDefault();
-            connectTo(target.replaceAll(" ", ""));
-          }}
-        >
-          <input id="remote-id" value={target} onChange={e => setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))} placeholder="000 000 000" inputMode="numeric" autoComplete="off" disabled={state.status !== "ready"} />
-          <button className="primary" disabled={busy || state.status !== "ready" || !validTarget || full} title={full ? `You can control up to ${MAX_SESSIONS} computers at once` : undefined}>
-            Connect
-          </button>
-        </form>
-        <details className="options">
-          <summary>Options</summary>
-          <label className="check">
-            <input type="checkbox" checked={clipboardEnabled} onChange={e => setClipboardEnabled(e.target.checked)} />
-            Request clipboard and file transfer
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
-            Use relay only
-          </label>
-          <label className="panel-label ua-field-label" htmlFor="ua-connect">
-            Unattended password
-          </label>
-          <input id="ua-connect" type="password" value={unattendedPassword} onChange={e => setUnattendedPassword(e.target.value)} placeholder="Only if that computer has one set" autoComplete="off" />
-          <label className="check">
-            <input type="checkbox" checked={rememberPassword} disabled={!unattendedPassword.trim()} onChange={e => setRememberPassword(e.target.checked)} />
-            Remember this password on this computer
-          </label>
-        </details>
-      </section>
-      {!!state.recent?.length && (
-        <section className="recent" aria-labelledby="recent-title">
-          <span className="panel-label" id="recent-title">
-            Recent
-          </span>
-          <ul>
-            {state.recent.map(r => {
-              const openSession = controlled.find(s => s.peerId === r.id);
-              const open = !!openSession || tabs.includes(r.id);
-              const label = r.name ? `${r.name} (${formatId(r.id)})` : formatId(r.id);
-              const when = open ? (
-                <>
-                  <span className="live-dot on" />
-                  open
-                </>
-              ) : (
-                <>
-                  <HistoryIcon />
-                  {ago(r.at, now)}
-                </>
-              );
-              if (renaming === r.id)
-                return (
-                  <li key={r.id}>
-                    <RenameField id={r.id} name={r.name} onDone={value => saveName(r.id, r.name, value)} />
-                  </li>
-                );
-              return (
-                <li key={r.id}>
-                  <button className="recent-connect" disabled={busy || state.status !== "ready" || (!open && full)} aria-label={open ? `Show ${label}` : `Connect to ${label}`} title={open ? "Show this session" : `Connect to ${label}`} onClick={() => (openSession && popouts[openSession.sessionId] ? popOut(openSession) : open ? setTab(r.id) : connectTo(r.id))}>
-                    {r.name ? (
-                      <>
-                        <span className="recent-name">{r.name}</span>
-                        <span className="recent-time">
-                          <span className="recent-id-small">{formatId(r.id)}</span>·{when}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="recent-id">{formatId(r.id)}</span>
-                        <span className="recent-time">{when}</span>
-                      </>
-                    )}
-                  </button>
-                  <div className="recent-actions">
-                    <button aria-label={`Remove ${label} from recent`} title="Remove" onClick={() => void act(() => window.remote.forget(r.id))}>
-                      <CloseIcon />
-                    </button>
-                    <button aria-label={r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`} title={r.name ? "Rename" : "Add a name"} onClick={() => setRenaming(r.id)}>
-                      <RenameIcon />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="ad-id-row">
+            <span className="ad-device-id" data-testid="device-id">
+              {formatId(state.deviceId)}
+            </span>
+            <button
+              className="ad-id-action"
+              disabled={!state.deviceId}
+              aria-label="Copy ID"
+              title="Copy ID"
+              onClick={() => {
+                void window.remote
+                  .copyId()
+                  .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  })
+                  .catch(() => setError("Select the ID and copy it with Ctrl+C"));
+              }}
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+          </div>
+          <p className="ad-hint">{state.unattendedEnabled ? "Unattended access is on: anyone with the password can connect without approval." : "Share this address to get help. You approve every request."}</p>
         </section>
-      )}
+        {recentList}
+      </div>
     </main>
   );
   const statusbar = (
@@ -1080,315 +1182,152 @@ function App() {
       </span>
     </footer>
   );
-
-  if (!tabs.length) {
-    const isReady = state.status === "ready";
-    return (
-      <div className="shell ad-shell">
-        <div className="titlebar" onMouseDown={drag}>
-          <span className="app-name">
-            <span className="logo">
-              <Logo />
-            </span>
-            ASDesk
-          </span>
-          <span className="ad-nav-label">New Session</span>
-          <div className="ad-titlebar-right">
-            {loaded && state.status !== "setup" && (
-              <button
-                className={`ad-menu-toggle ${menuOpen ? "active" : ""}`}
-                aria-label="Menu"
-                title="Settings & options"
-                onClick={() => setMenuOpen(m => !m)}
-              >
-                <MenuIcon />
-              </button>
-            )}
-            <WindowControls maximized={maximized} />
-          </div>
+  const menu = menuOpen && (
+    <>
+      <div className="ad-menu-backdrop" onClick={() => setMenuOpen(false)} />
+      <div className="ad-menu" role="dialog" aria-label="Settings and options">
+        <div className="ad-menu-section">
+          <span className="ad-menu-title">Connection Options</span>
+          <label className="check">
+            <input type="checkbox" checked={clipboardEnabled} onChange={e => setClipboardEnabled(e.target.checked)} />
+            Request clipboard & file transfer
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
+            Use relay only
+          </label>
         </div>
-
-        {loaded && state.status !== "setup" && (
-          <div className="address-bar">
-            <span className={`addr-dot ${state.status}`} title={labels[state.status]} />
-            <form
-              className="addr-form"
-              onSubmit={e => {
-                e.preventDefault();
-                connectTo(target.replaceAll(" ", ""));
-              }}
-            >
-              <input
-                value={target}
-                onChange={e => setTarget(e.target.value.replace(/[^\d ]/g, "").slice(0, 11))}
-                placeholder="Enter Remote Address"
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={!isReady}
-              />
-              <button
-                type="submit"
-                className="addr-connect"
-                disabled={busy || !isReady || !validTarget || full}
-                aria-label="Connect"
-                title={full ? `Up to ${MAX_SESSIONS} sessions` : "Connect"}
+        {(state.unattendedEnabled || isReady) && (
+          <div className="ad-menu-section">
+            <span className="ad-menu-title">Unattended Access</span>
+            {state.unattendedEnabled ? (
+              <>
+                <p className="muted ad-menu-text">
+                  <span className="live-dot on" /> On: anyone with the password can connect without approval.
+                </p>
+                <button className="secondary ad-menu-btn-action" disabled={busy} onClick={() => void act(() => window.remote.clearUnattended())}>
+                  Turn off
+                </button>
+              </>
+            ) : uaOpen ? (
+              <form
+                className="ua-form"
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (uaPassword !== uaConfirm) {
+                    setError("The passwords do not match.");
+                    return;
+                  }
+                  void act(async () => {
+                    await window.remote.setUnattended(uaPassword);
+                    setUaPassword("");
+                    setUaConfirm("");
+                    setUaOpen(false);
+                  });
+                }}
               >
-                <ConnectIcon />
-              </button>
-            </form>
+                <input type="password" value={uaPassword} onChange={e => setUaPassword(e.target.value)} placeholder="New password (min 8 chars)" autoComplete="new-password" autoFocus />
+                <input type="password" value={uaConfirm} onChange={e => setUaConfirm(e.target.value)} placeholder="Confirm password" autoComplete="new-password" />
+                <div className="ua-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setUaOpen(false);
+                      setUaPassword("");
+                      setUaConfirm("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button className="primary" disabled={busy || uaPassword.length < 8}>
+                    Save
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <p className="muted ad-menu-text">Let this computer be reached with a password, without anyone here to accept.</p>
+                <button className="secondary ad-menu-btn-action" onClick={() => setUaOpen(true)}>
+                  Set a password…
+                </button>
+              </>
+            )}
           </div>
         )}
-
-        {errorBar}
-
-        {!loaded ? (
-          <main className="ad-main" />
-        ) : state.status === "setup" ? (
-          <main className="setup">
-            <h1>Set up this computer</h1>
-            <p className="muted">Connect to your remote-access server to get a connection ID.</p>
-            <form
-              onSubmit={e => {
-                e.preventDefault();
-                void act(async () => {
-                  await window.remote.setup({
-                    server,
-                    ...(token.trim() ? { enrollmentToken: token } : {})
-                  });
-                  setToken("");
-                });
-              }}
-            >
-              <label htmlFor="server">Company server</label>
-              <input id="server" type="url" value={server} onChange={e => setServer(e.target.value)} required placeholder="https://remote.yourcompany.com" autoComplete="off" />
-              <label htmlFor="token">Enrollment token (optional)</label>
-              <input id="token" type="password" value={token} onChange={e => setToken(e.target.value)} autoComplete="off" placeholder="Only if your server requires one" />
-              <button className="primary wide" disabled={busy}>
-                {busy ? "Registering…" : "Set up this computer"}
-              </button>
-            </form>
-          </main>
-        ) : (
-          <main className="ad-main">
-            <div className="ad-center">
-              <span className="ad-id-label">Your Address</span>
-              <div className="ad-id-row">
-                <span className="ad-device-id" data-testid="device-id">
-                  {formatId(state.deviceId)}
-                </span>
-                <button
-                  className="ad-id-action"
-                  disabled={!state.deviceId}
-                  aria-label="Copy ID"
-                  title="Copy ID"
-                  onClick={() => {
-                    void window.remote
-                      .copyId()
-                      .then(() => {
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      })
-                      .catch(() => setError("Select the ID and copy it with Ctrl+C"));
-                  }}
-                >
-                  {copied ? <CheckIcon /> : <CopyIcon />}
-                </button>
-              </div>
-            </div>
-
-            {!!state.recent?.length && (
-              <section className="ad-recent" aria-labelledby="ad-recent-title">
-                <span className="panel-label" id="ad-recent-title">
-                  Recent
-                </span>
-                <ul>
-                  {state.recent.map(r => {
-                    const openSession = controlled.find(s => s.peerId === r.id);
-                    const open = !!openSession || tabs.includes(r.id);
-                    const label = r.name ? `${r.name} (${formatId(r.id)})` : formatId(r.id);
-                    const when = open ? (
-                      <>
-                        <span className="live-dot on" />
-                        open
-                      </>
-                    ) : (
-                      <>
-                        <HistoryIcon />
-                        {ago(r.at, now)}
-                      </>
-                    );
-                    if (renaming === r.id)
-                      return (
-                        <li key={r.id}>
-                          <RenameField id={r.id} name={r.name} onDone={value => saveName(r.id, r.name, value)} />
-                        </li>
-                      );
-                    return (
-                      <li key={r.id}>
-                        <button className="recent-connect" disabled={busy || !isReady || (!open && full)} aria-label={open ? `Show ${label}` : `Connect to ${label}`} title={open ? "Show this session" : `Connect to ${label}`} onClick={() => (openSession && popouts[openSession.sessionId] ? popOut(openSession) : open ? setTab(r.id) : connectTo(r.id))}>
-                          {r.name ? (
-                            <>
-                              <span className="recent-name">{r.name}</span>
-                              <span className="recent-time">
-                                <span className="recent-id-small">{formatId(r.id)}</span>·{when}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="recent-id">{formatId(r.id)}</span>
-                              <span className="recent-time">{when}</span>
-                            </>
-                          )}
-                        </button>
-                        <div className="recent-actions">
-                          <button aria-label={`Remove ${label} from recent`} title="Remove" onClick={() => void act(() => window.remote.forget(r.id))}>
-                            <CloseIcon />
-                          </button>
-                          <button aria-label={r.name ? `Rename ${label}` : `Name ${formatId(r.id)}`} title={r.name ? "Rename" : "Add a name"} onClick={() => setRenaming(r.id)}>
-                            <RenameIcon />
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
-          </main>
-        )}
-
-        {menuOpen && (
-          <>
-            <div className="ad-menu-backdrop" onClick={() => setMenuOpen(false)} />
-            <div className="ad-menu">
-              <div className="ad-menu-section">
-                <span className="ad-menu-title">Connection Options</span>
-                <label className="check">
-                  <input type="checkbox" checked={clipboardEnabled} onChange={e => setClipboardEnabled(e.target.checked)} />
-                  Request clipboard & file transfer
-                </label>
-                <label className="check">
-                  <input type="checkbox" checked={relay} onChange={e => setRelay(e.target.checked)} />
-                  Use relay only
-                </label>
-              </div>
-              {(state.unattendedEnabled || isReady) && (
-                <div className="ad-menu-section">
-                  <span className="ad-menu-title">Unattended Access</span>
-                  {state.unattendedEnabled ? (
-                    <>
-                      <p className="muted ad-menu-text">
-                        <span className="live-dot on" /> On — password access accepted automatically.
-                      </p>
-                      <button className="secondary ad-menu-btn-action" disabled={busy} onClick={() => void act(() => window.remote.clearUnattended())}>
-                        Turn off
-                      </button>
-                    </>
-                  ) : uaOpen ? (
-                    <form
-                      className="ua-form"
-                      onSubmit={e => {
-                        e.preventDefault();
-                        if (uaPassword !== uaConfirm) {
-                          setError("The passwords do not match.");
-                          return;
-                        }
-                        void act(async () => {
-                          await window.remote.setUnattended(uaPassword);
-                          setUaPassword("");
-                          setUaConfirm("");
-                          setUaOpen(false);
-                        });
-                      }}
-                    >
-                      <input type="password" value={uaPassword} onChange={e => setUaPassword(e.target.value)} placeholder="New password (min 8 chars)" autoComplete="new-password" autoFocus />
-                      <input type="password" value={uaConfirm} onChange={e => setUaConfirm(e.target.value)} placeholder="Confirm password" autoComplete="new-password" />
-                      <div className="ua-actions">
-                        <button type="button" className="secondary" onClick={() => { setUaOpen(false); setUaPassword(""); setUaConfirm(""); }}>
-                          Cancel
-                        </button>
-                        <button className="primary" disabled={busy || uaPassword.length < 8}>
-                          Save
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <p className="muted ad-menu-text">Set a password for unattended access.</p>
-                      <button className="secondary ad-menu-btn-action" onClick={() => setUaOpen(true)}>
-                        Set a password…
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="ad-menu-footer">
-                <span className={`status status-${state.status}`}>
-                  <i />
-                  {labels[state.status]}
-                </span>
-                <span className="ad-menu-version">v{state.appVersion}</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {incomingModal}
-        {popoutViews}
+        <div className="ad-menu-footer">
+          <span className={`status status-${state.status}`}>
+            <i />
+            {labels[state.status]}
+          </span>
+          <span className="ad-menu-version">v{state.appVersion}</span>
+        </div>
       </div>
-    );
-  }
+    </>
+  );
 
-  // Workspace: a tab per computer being controlled (or waiting to be), plus Home to start another.
+  // One window for everything, like AnyDesk: the tab bar is the title bar (New Session, a tab per
+  // computer being controlled or waiting, "+" for another), and the tab's content fills the rest.
   const current = docked.find(s => s.peerId === tab);
   const waiting = tab !== HOME && !current ? waitingFor.find(o => o.targetId === tab) : undefined;
   const scale = current ? (scales[current.sessionId] ?? "fit") : "fit";
   const currentStats = current ? stats[current.sessionId] : undefined;
   return (
-    <div className={`session workspace ${fullscreen ? "is-fullscreen" : ""}`} ref={workspace}>
+    <div className={`session workspace ad-shell ${fullscreen ? "is-fullscreen" : ""}`} ref={workspace}>
       <div className="toolbar tabbar" onMouseDown={drag}>
-        <div className="tabs" role="tablist" aria-label="Sessions">
-          <button role="tab" aria-selected={tab === HOME} className={`tab home-tab ${tab === HOME ? "active" : ""}`} aria-label="Home" title="Home — connect to another computer" onClick={() => setTab(HOME)}>
-            <HomeIcon />
-          </button>
-          {docked.map(s => (
-            <div key={s.sessionId} className={`tab ${tab === s.peerId ? "active" : ""} ${tearing === s.sessionId ? "tearing" : ""}`} data-peer={s.peerId} data-phase={s.phase} title="Drag out of the tab bar to open in its own window" onPointerDown={e => startTear(e, s)} onPointerMove={moveTear} onPointerUp={e => endTear(e, s)} onPointerCancel={cancelTear} onLostPointerCapture={cancelTear}>
-              <button
-                role="tab"
-                aria-selected={tab === s.peerId}
-                className="tab-main"
-                aria-label={`Session with ${nameOf(s.peerId)}`}
-                title={formatId(s.peerId)}
-                onClick={() => {
-                  if (!tore.current) setTab(s.peerId);
-                }}
-              >
-                <span className={`live-dot ${s.phase === "connected" ? "on" : ""}`} />
-                <span className="tab-label">{nameOf(s.peerId)}</span>
+        <span className="app-name">
+          <span className="logo">
+            <Logo />
+          </span>
+          <span className="app-title">ASDesk</span>
+        </span>
+        {setUp && (
+          <>
+            <div className="tabs" role="tablist" aria-label="Sessions">
+              <button role="tab" aria-selected={tab === HOME} className={`tab home-tab ${tab === HOME ? "active" : ""}`} aria-label="New Session" title="New Session: connect to another computer" onClick={() => setTab(HOME)}>
+                <HomeIcon />
+                <span className="tab-text">New Session</span>
               </button>
-              <button className="tab-popout" aria-label={`Open ${nameOf(s.peerId)} in its own window`} title="Open in its own window" onClick={() => popOut(s)}>
-                <PopoutIcon />
-              </button>
-              <button className="tab-close" aria-label={`Disconnect ${nameOf(s.peerId)}`} title="Disconnect" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
-                <TabCloseIcon />
-              </button>
+              {docked.map(s => (
+                <div key={s.sessionId} className={`tab ${tab === s.peerId ? "active" : ""} ${tearing === s.sessionId ? "tearing" : ""}`} data-peer={s.peerId} data-phase={s.phase} title="Drag out of the tab bar to open in its own window" onPointerDown={e => startTear(e, s)} onPointerMove={moveTear} onPointerUp={e => endTear(e, s)} onPointerCancel={cancelTear} onLostPointerCapture={cancelTear}>
+                  <button
+                    role="tab"
+                    aria-selected={tab === s.peerId}
+                    className="tab-main"
+                    aria-label={`Session with ${nameOf(s.peerId)}`}
+                    title={formatId(s.peerId)}
+                    onClick={() => {
+                      if (!tore.current) setTab(s.peerId);
+                    }}
+                  >
+                    <span className={`live-dot ${s.phase === "connected" ? "on" : ""}`} />
+                    <span className="tab-label">{nameOf(s.peerId)}</span>
+                  </button>
+                  <button className="tab-popout" aria-label={`Open ${nameOf(s.peerId)} in its own window`} title="Open in its own window" onClick={() => popOut(s)}>
+                    <PopoutIcon />
+                  </button>
+                  <button className="tab-close" aria-label={`Disconnect ${nameOf(s.peerId)}`} title="Disconnect" onClick={() => void act(() => window.remote.disconnect(s.sessionId))}>
+                    <TabCloseIcon />
+                  </button>
+                </div>
+              ))}
+              {waitingFor.map(o => (
+                <div key={o.targetId} className={`tab waiting ${tab === o.targetId ? "active" : ""}`}>
+                  <button role="tab" aria-selected={tab === o.targetId} className="tab-main" aria-label={`Request to ${nameOf(o.targetId)}`} title={formatId(o.targetId)} onClick={() => setTab(o.targetId)}>
+                    <span className="spinner tiny" />
+                    <span className="tab-label">{nameOf(o.targetId)}</span>
+                  </button>
+                  <button className="tab-close" aria-label={`Cancel request to ${nameOf(o.targetId)}`} title="Cancel request" onClick={() => void act(() => window.remote.cancel(o.targetId))}>
+                    <TabCloseIcon />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-          {waitingFor.map(o => (
-            <div key={o.targetId} className={`tab waiting ${tab === o.targetId ? "active" : ""}`}>
-              <button role="tab" aria-selected={tab === o.targetId} className="tab-main" aria-label={`Request to ${nameOf(o.targetId)}`} title={formatId(o.targetId)} onClick={() => setTab(o.targetId)}>
-                <span className="spinner tiny" />
-                <span className="tab-label">{nameOf(o.targetId)}</span>
-              </button>
-              <button className="tab-close" aria-label={`Cancel request to ${nameOf(o.targetId)}`} title="Cancel request" onClick={() => void act(() => window.remote.cancel(o.targetId))}>
-                <TabCloseIcon />
-              </button>
-            </div>
-          ))}
-          <button className="tab new-tab" aria-label="New connection" title="New connection" onClick={() => setTab(HOME)}>
-            <PlusIcon />
-          </button>
-        </div>
+            <button className="new-tab" aria-label="Open a new session" title="New session" onClick={newSession}>
+              <PlusIcon />
+            </button>
+          </>
+        )}
         {(current || docked.length >= 2) && (
           <div className="toolbar-actions">
             {docked.length >= 2 && (
@@ -1412,20 +1351,7 @@ function App() {
                   {currentStats ? `${currentStats.rtt}ms` : ""}
                 </span>
                 <div className="toolbar-separator" />
-                <button
-                  className={`tool ${inputDisabled[current.sessionId] ? "active warn" : ""}`}
-                  disabled={current.phase !== "connected"}
-                  aria-label={inputDisabled[current.sessionId] ? "Enable target input" : "Disable target input"}
-                  title={inputDisabled[current.sessionId] ? "Target input blocked — click to unblock" : "Block target's keyboard & mouse"}
-                  aria-pressed={!!inputDisabled[current.sessionId]}
-                  onClick={() => {
-                    const next = !inputDisabled[current.sessionId];
-                    medias.current.get(current.sessionId)?.setInputBlocked(next);
-                    setInputDisabled(d => ({ ...d, [current.sessionId]: next }));
-                  }}
-                >
-                  {inputDisabled[current.sessionId] ? <InputOffIcon /> : <InputOnIcon />}
-                </button>
+                {blockToggle(current)}
                 <button
                   className="tool"
                   disabled={current.phase !== "connected"}
@@ -1453,12 +1379,22 @@ function App() {
             )}
           </div>
         )}
-        {!fullscreen && <WindowControls maximized={maximized} />}
+        {!fullscreen && (
+          <div className="tabbar-end">
+            {setUp && (
+              <button className={`ad-menu-toggle ${menuOpen ? "active" : ""}`} aria-label="Menu" aria-expanded={menuOpen} title="Settings & options" onClick={() => setMenuOpen(m => !m)}>
+                <MenuIcon />
+              </button>
+            )}
+            <WindowControls maximized={maximized} />
+          </div>
+        )}
       </div>
       {errorBar}
       <div className={`workspace-body ${gridActive ? "grid" : ""}`}>
         {tab === HOME && (
-          <div className="workspace-home">
+          <div className="home-view">
+            {addressBar}
             {home}
             {statusbar}
           </div>
@@ -1484,12 +1420,21 @@ function App() {
         ))}
         {waiting && (
           <div className="waiting-pane">
-            <section className="panel waiting-card" role="status">
+            <section className="panel waiting-card">
               <span className="spinner" />
-              <h2>Waiting for approval</h2>
-              <p className="muted">
-                The person at <strong>{nameOf(waiting.targetId)}</strong> needs to accept.
-              </p>
+              <h2>Waiting for {nameOf(waiting.targetId)}</h2>
+              {waiting.passwordPrompt ? (
+                <>
+                  <p className="muted" role="status">
+                    That computer has unattended access. Enter its password to connect now, or wait for someone there to accept.
+                  </p>
+                  <PasswordPrompt key={waiting.targetId} busy={busy} onSubmit={(password, remember) => void act(() => window.remote.provePassword(waiting.targetId, password, remember))} />
+                </>
+              ) : (
+                <p className="muted" role="status">
+                  The person at <strong>{nameOf(waiting.targetId)}</strong> needs to accept.
+                </p>
+              )}
               <button className="secondary" disabled={busy} onClick={() => void act(() => window.remote.cancel(waiting.targetId))}>
                 Cancel request
               </button>
@@ -1497,6 +1442,7 @@ function App() {
           </div>
         )}
       </div>
+      {menu}
       {incomingModal}
       {popoutViews}
     </div>

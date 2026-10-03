@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::{client::IntoClientRequest, http::HeaderValu
 
 use zeroize::Zeroizing;
 
-use crate::{identity::{self, Identity, Recent, RECENT_LIMIT}, input::Input, log, platform::{self, Rect},
+use crate::{identity::{self, Identity, Recent, RECENT_LIMIT}, inject::Injector, log, platform::{self, Rect},
     protocol::{is_public_id, is_uuid, valid_capabilities, Capability, ClientMessage, InputEvent}, security,
     transfer::{self, FileInfo}, unattended};
 
@@ -47,7 +47,10 @@ pub struct ActiveSession { pub session_id: String, pub role: Role, pub peer_id: 
 pub struct Incoming { pub request_id: String, pub source_id: String, pub permissions: Vec<Capability>, pub expires_at: i64 }
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Outgoing { pub target_id: String, #[serde(skip_serializing_if = "Option::is_none")] pub request_id: Option<String> }
+pub struct Outgoing { pub target_id: String, #[serde(skip_serializing_if = "Option::is_none")] pub request_id: Option<String>,
+    /// The other computer has unattended access and asked for its password: typing it connects
+    /// without anyone there having to accept (see `prove`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")] pub password_prompt: bool }
 #[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopState {
@@ -107,8 +110,10 @@ enum Cmd {
     /// One session, or every session and request when `session_id` is None.
     Disconnect { session_id: Option<String>, reason: String, reply: Option<Reply<()>> },
     Signal { message: Value, reply: Reply<()> },
+    /// Clipboard text from the peer (keyboard and mouse input bypass the agent: inject.rs).
     Input { session_id: String, event: Value, reply: Reply<()> },
-    BlockInput { session_id: String, block: bool, reply: Reply<()> },
+    /// The unattended password for a request the other computer challenged (see Outgoing).
+    Prove { target: String, password: String, remember: bool, reply: Reply<()> },
     ReadClipboard { session_id: String, reply: Reply<String> },
     // Clipboard file transfer (transfer.rs): the controller offers and streams, the shared computer receives.
     ClipboardFiles { session_id: String, reply: Reply<Option<transfer::Snapshot>> },
@@ -135,7 +140,7 @@ enum Cmd {
 }
 
 #[derive(Clone)]
-pub struct AgentHandle { tx: mpsc::UnboundedSender<Cmd>, snapshot: Arc<Mutex<DesktopState>> }
+pub struct AgentHandle { tx: mpsc::UnboundedSender<Cmd>, snapshot: Arc<Mutex<DesktopState>>, input: Arc<Injector> }
 impl AgentHandle {
     async fn call<T>(&self, make: impl FnOnce(Reply<T>) -> Cmd) -> Result<T, String> {
         let (reply, response) = oneshot::channel();
@@ -160,8 +165,22 @@ impl AgentHandle {
     /// End every session and request without waiting (shortcuts, window and system events).
     pub fn stop_all(&self, reason: &str) { let _ = self.tx.send(Cmd::Disconnect { session_id: None, reason: reason.into(), reply: None }); }
     pub async fn signal(&self, message: Value) -> Result<(), String> { self.call(|reply| Cmd::Signal { message, reply }).await }
-    pub async fn input(&self, session_id: String, event: Value) -> Result<(), String> { self.call(|reply| Cmd::Input { session_id, event, reply }).await }
-    pub async fn block_input(&self, session_id: String, block: bool) -> Result<(), String> { self.call(|reply| Cmd::BlockInput { session_id, block, reply }).await }
+    /// Events from the peer, in order. Keyboard and mouse go straight to the input thread (the agent's
+    /// task never delays them); clipboard text, which is rare, goes through the agent.
+    pub async fn input(&self, session_id: String, events: Vec<Value>) -> Result<(), String> {
+        if events.len() > 512 { return Err("Too much input at once".into()); }
+        let mut injected = Vec::with_capacity(events.len());
+        for raw in events {
+            let event: InputEvent = serde_json::from_value(raw.clone()).map_err(|_| "Invalid input")?;
+            if matches!(event, InputEvent::Clipboard { .. }) { self.call(|reply| Cmd::Input { session_id: session_id.clone(), event: raw, reply }).await?; }
+            else { injected.push(event); }
+        }
+        if injected.is_empty() { Ok(()) } else { self.input.send(&session_id, injected) }
+    }
+    pub async fn block_input(&self, session_id: String, block: bool) -> Result<(), String> { self.input.block(&session_id, block).await }
+    pub async fn prove(&self, target: String, password: String, remember: bool) -> Result<(), String> {
+        self.call(|reply| Cmd::Prove { target, password, remember, reply }).await
+    }
     pub async fn read_clipboard(&self, session_id: String) -> Result<String, String> { self.call(|reply| Cmd::ReadClipboard { session_id, reply }).await }
     pub async fn clipboard_files(&self, session_id: String) -> Result<Option<transfer::Snapshot>, String> { self.call(|reply| Cmd::ClipboardFiles { session_id, reply }).await }
     /// File bytes cross the web view boundary as base64 (compact, unlike a JSON number array).
@@ -202,12 +221,13 @@ pub fn start(options: Options, host: Arc<dyn Host>) -> AgentHandle {
         .redirect(reqwest::redirect::Policy::none()).user_agent(format!("ASDesk/{}", options.version))
         .use_preconfigured_tls((*crate::tls::client_config()).clone()).build().expect("HTTP client");
     let state = snapshot.lock().unwrap().clone();
+    let input = Arc::new(Injector::new(options.dry_input));
     let mut agent = Agent {
-        previous: state.clone(), state, snapshot: snapshot.clone(), host, tx: tx.clone(), http, input: Arc::new(Input::new(options.dry_input)),
+        previous: state.clone(), state, snapshot: snapshot.clone(), host, tx: tx.clone(), http, input: input.clone(),
         dir: options.dir, legacy: options.legacy, version: options.version, identity: None, socket: None, socket_generation: 0,
         stopped: false, backoff: 1000, retry_generation: 0, timer_generation: 0, clock_offset: 0, used_nonces: VecDeque::new(),
         consent: None, shared: None, requests: Vec::new(), sessions: HashMap::new(), deferred: VecDeque::new(), sent: VecDeque::new(),
-        file_send: HashMap::new(), file_recv: HashMap::new(), elevated: None,
+        file_send: HashMap::new(), file_recv: HashMap::new(),
         unattended: None, challenge: None, auth_failures: VecDeque::new(), auto_accept: None,
     };
     // Received files stay pasteable for the rest of the run (also after the session ends); the next
@@ -218,7 +238,7 @@ pub fn start(options: Options, host: Arc<dyn Host>) -> AgentHandle {
         agent.load(auto_server).await;
         while let Some(cmd) = rx.recv().await { agent.handle(cmd).await; }
     });
-    AgentHandle { tx, snapshot }
+    AgentHandle { tx, snapshot, input }
 }
 
 /// Command results the user sees are also written to the diagnostics log when they fail.
@@ -300,8 +320,10 @@ async fn open_socket(http: &reqwest::Client, server: &str, device_id: &str, key:
 
 /// A request this computer sent. For unattended access it carries the password to answer a challenge
 /// with (held only until the request is accepted or dropped) and whether to remember it on success.
+/// A challenge that arrives before there is a password waits in `challenge` (nonce, salt, params)
+/// until the user types one (`prove`); `proved` and `saved` explain a rejection that follows.
 struct Request { target: String, request_id: Option<String>, permissions: Vec<Capability>, relay_only: bool,
-    unattended_secret: Option<Zeroizing<String>>, remember: bool }
+    unattended_secret: Option<Zeroizing<String>>, remember: bool, challenge: Option<(String, String, String)>, proved: bool, saved: bool }
 /// A challenge this computer (the target) sent for an incoming unattended request, awaiting its proof.
 struct Challenge { request_id: String, nonce: String, controller_id: String, expires_at: i64 }
 /// An accepted session: authority (grant) and verification state. `active` is set once its relay
@@ -316,7 +338,8 @@ enum Subject { Request(String), Incoming, Session(String) }
 
 struct Agent {
     state: DesktopState, previous: DesktopState, snapshot: Arc<Mutex<DesktopState>>, host: Arc<dyn Host>, tx: mpsc::UnboundedSender<Cmd>,
-    http: reqwest::Client, input: Arc<Input>,
+    // Input for a shared screen: the agent starts, opens and stops it; events bypass the agent (inject.rs).
+    http: reqwest::Client, input: Arc<Injector>,
     dir: PathBuf, legacy: Vec<PathBuf>, version: String, identity: Option<Identity>,
     socket: Option<mpsc::UnboundedSender<String>>, socket_generation: u64,
     stopped: bool, backoff: u64, retry_generation: u64, timer_generation: u64,
@@ -335,9 +358,6 @@ struct Agent {
     // Clipboard file transfer per session: files this controller copied, files arriving at this shared computer.
     file_send: HashMap<String, transfer::SendState>,
     file_recv: HashMap<String, transfer::RecvState>,
-    // While sharing this screen, input is sent to the SYSTEM helper (full access) when it is running;
-    // absent means in-process injection (normal-desktop control only). See elevation.rs.
-    elevated: Option<crate::elevation::ElevatedInput>,
     // Unattended access (unattended.rs). The verifier is this computer's stored password secret; the
     // challenge is the one outstanding for an incoming request; auth_failures throttles guessing; and
     // auto_accept names a request whose proof verified, so its session is tagged unattended.
@@ -352,9 +372,9 @@ impl Agent {
     fn publish(&mut self) {
         // An accepted session still fetching its relay credentials stays listed as waiting, so the UI
         // never sees that computer disappear between the request and the session.
-        self.state.outgoing = self.requests.iter().map(|r| Outgoing { target_id: r.target.clone(), request_id: r.request_id.clone() })
+        self.state.outgoing = self.requests.iter().map(|r| Outgoing { target_id: r.target.clone(), request_id: r.request_id.clone(), password_prompt: r.challenge.is_some() })
             .chain(self.sessions.values().filter(|s| s.role == Role::Controller && !s.active)
-                .map(|s| Outgoing { target_id: s.claims.target_device_id.clone(), request_id: None }))
+                .map(|s| Outgoing { target_id: s.claims.target_device_id.clone(), request_id: None, password_prompt: false }))
             .collect();
         *self.snapshot.lock().unwrap() = self.state.clone();
         self.host.emit(DesktopEvent::State { state: self.state.clone() });
@@ -481,7 +501,7 @@ impl Agent {
     fn end_session(&mut self, session_id: &str, reason: &str, notify_server: bool) {
         let Some(session) = self.sessions.remove(session_id) else { return };
         if notify_server { let _ = self.send(ClientMessage::SessionEnd { session_id: session_id.into() }, None); }
-        if session.role == Role::Target { self.input.stop(); self.elevated = None; self.consent = None; self.shared = None; self.state.incoming = None; self.challenge = None; self.auto_accept = None; }
+        if session.role == Role::Target { self.input.stop(); self.consent = None; self.shared = None; self.state.incoming = None; self.challenge = None; self.auto_accept = None; }
         self.file_send.remove(session_id);
         if let Some(partial) = self.file_recv.remove(session_id) { partial.cancel(); }
         self.state.sessions.retain(|s| s.session_id != session_id);
@@ -505,7 +525,7 @@ impl Agent {
         self.sessions.clear(); self.requests.clear(); self.deferred.clear();
         self.file_send.clear();
         for (_, partial) in self.file_recv.drain() { partial.cancel(); }
-        self.input.stop(); self.elevated = None; self.consent = None; self.shared = None;
+        self.input.stop(); self.consent = None; self.shared = None;
         self.challenge = None; self.auto_accept = None;
         self.state.sessions.clear(); self.state.incoming = None;
         self.host.emit(DesktopEvent::Stop { session_id: None, reason: reason.into() });
@@ -514,7 +534,7 @@ impl Agent {
     fn clear_incoming(&mut self) {
         self.state.incoming = None;
         self.challenge = None; self.auto_accept = None;
-        if self.state.target_session().is_none() && !self.sessions.values().any(|s| s.role == Role::Target) { self.input.stop(); self.elevated = None; self.consent = None; self.shared = None; }
+        if self.state.target_session().is_none() && !self.sessions.values().any(|s| s.role == Role::Target) { self.input.stop(); self.consent = None; self.shared = None; }
     }
     fn save_recent(&mut self, list: Vec<Recent>) {
         identity::save_recent(&self.dir, &list);
@@ -560,12 +580,8 @@ impl Agent {
                 if let Some(reply) = reply { let _ = reply.send(Ok(())); }
             }
             Cmd::Signal { message, reply } => { let _ = reply.send(logged("signal", self.signal(message))); }
-            Cmd::Input { session_id, event, reply } => { let _ = reply.send(self.relay_input(&session_id, event)); }
-            Cmd::BlockInput { session_id, block, reply } => {
-                let is_target = self.state.sessions.iter().any(|a| a.session_id == session_id && a.role == Role::Target);
-                if is_target { self.input.block_local(block); let _ = reply.send(Ok(())); }
-                else { let _ = reply.send(Err("Only the shared computer can block local input".into())); }
-            }
+            Cmd::Input { session_id, event, reply } => { let _ = reply.send(self.relay_clipboard(&session_id, event)); }
+            Cmd::Prove { target, password, remember, reply } => { let _ = reply.send(logged("unattended password", self.prove(&target, password, remember))); }
             Cmd::ReadClipboard { session_id, reply } => {
                 let allowed = self.sessions.get(&session_id).is_some_and(|s| s.connected_media)
                     && self.state.sessions.iter().any(|a| a.session_id == session_id && a.permissions.contains(&Capability::Clipboard));
@@ -706,10 +722,30 @@ impl Agent {
         if clipboard { permissions.push(Capability::Clipboard); }
         // No password typed: fall back to one saved for this computer, so a remembered unattended
         // connection is one click. An explicit password always wins and is the one remembered.
+        let saved = password.is_none();
         let secret = password.or_else(|| unattended::remembered(&self.dir, &target));
+        let saved = saved && secret.is_some();
         self.send(ClientMessage::ConnectionRequest { target_id: target.clone(), permissions: permissions.clone() }, Some(Subject::Request(target.clone())))?;
-        self.requests.push(Request { target, request_id: None, permissions, relay_only: relay, unattended_secret: secret, remember });
+        self.requests.push(Request { target, request_id: None, permissions, relay_only: relay, unattended_secret: secret, remember, challenge: None, proved: false, saved });
         self.state.error = None; self.publish();
+        Ok(())
+    }
+    /// The password typed while waiting for a computer that asked for one (AnyDesk-style). A wrong
+    /// one ends the request on the other side, and the UI says so.
+    fn prove(&mut self, target: &str, password: String, remember: bool) -> Result<(), String> {
+        let controller_id = self.identity.as_ref().map(|i| i.device_id.clone()).ok_or("Device not configured")?;
+        let request = self.requests.iter_mut().find(|r| r.target == target).ok_or("That request is no longer waiting.")?;
+        let (Some(request_id), Some((nonce, salt, params))) = (request.request_id.clone(), request.challenge.clone()) else {
+            return Err("That computer is not asking for a password.".into());
+        };
+        let secret = Zeroizing::new(password);
+        let proof = unattended::prove(&secret, &salt, &params, &controller_id, target, &request_id, &nonce).ok_or("The other computer sent an invalid challenge.")?;
+        // A challenge is answered once: the other computer accepts this proof or ends the request.
+        request.challenge = None;
+        request.unattended_secret = Some(secret); request.remember = remember; request.proved = true; request.saved = false;
+        log::write(format!("answering unattended challenge from {}", format_id(target)));
+        self.send(ClientMessage::ConnectionProve { request_id, proof }, Some(Subject::Request(target.into())))?;
+        self.publish();
         Ok(())
     }
     fn set_unattended(&mut self, password: &str) -> Result<(), String> {
@@ -741,11 +777,8 @@ impl Agent {
         let control = permissions.contains(&Capability::Mouse) || permissions.contains(&Capability::Keyboard);
         if control {
             let display = display.ok_or("This screen could not be identified for mouse and keyboard control. Untick Control mouse and Use keyboard to share the view only.")?;
+            // Input itself is accepted only once the session's media is connected (see signal).
             self.input.start(display)?;
-            // Full access (elevated apps, UAC prompt, lock screen) when the SYSTEM helper is running;
-            // otherwise input is injected in-process, which controls only the normal desktop.
-            self.elevated = crate::elevation::ElevatedInput::connect().filter(|helper| helper.bind(display));
-            log::write(if self.elevated.is_some() { "input via elevated helper (full access)" } else { "input in-process (no elevation service)" });
         }
         self.consent = Some((request_id.clone(), permissions.clone())); self.shared = display;
         if let Err(error) = self.send(ClientMessage::ConnectionAccept { request_id, permissions }, Some(Subject::Incoming)) {
@@ -760,6 +793,7 @@ impl Agent {
         let session_id = message.session_id().ok_or("Invalid signaling command")?.to_string();
         let key = self.identity.as_ref().map(|i| i.key.clone()).ok_or("Device not configured")?;
         let session = self.sessions.get_mut(&session_id).filter(|s| s.active).ok_or("No authorized session")?;
+        let (target, granted) = (session.role == Role::Target, session.claims.capabilities.clone());
         let role = match session.role { Role::Controller => "controller", Role::Target => "target" };
         let offer = matches!(message, ClientMessage::Offer { .. });
         let mut connected = false;
@@ -779,6 +813,8 @@ impl Agent {
             _ => return Err("Invalid signaling command".into()),
         }
         if connected {
+            // The peer is verified and its media is up: the shared screen now takes its input.
+            if target { self.input.allow(&session_id, &granted); }
             self.set_timer(&session_id, 8 * 60 * 60 * 1000, "Session time limit");
             if let Some(active) = self.state.sessions.iter_mut().find(|s| s.session_id == session_id) { active.phase = Phase::Connected; }
             self.publish();
@@ -795,25 +831,15 @@ impl Agent {
         if !self.clipboard_allowed(session_id, Role::Target) { return Err("Clipboard permission denied".into()); }
         self.file_recv.get_mut(session_id).filter(|r| r.id == transfer_id).ok_or_else(|| "No active file transfer".into())
     }
-    fn relay_input(&mut self, session_id: &str, raw: Value) -> Result<(), String> {
+    /// Clipboard text from the peer, in either direction, when the session was granted the clipboard.
+    fn relay_clipboard(&mut self, session_id: &str, raw: Value) -> Result<(), String> {
         let connected = self.sessions.get(session_id).is_some_and(|s| s.connected_media);
         let active = self.state.sessions.iter().find(|a| a.session_id == session_id).filter(|_| connected).ok_or("Input outside an active session")?;
         let event: InputEvent = serde_json::from_value(raw).map_err(|_| "Invalid input")?;
         event.validate()?;
-        if let InputEvent::Clipboard { text } = &event {
-            if !active.permissions.contains(&Capability::Clipboard) { return Err("Clipboard permission denied".into()); }
-            return platform::write_clipboard(text);
-        }
-        if active.role != Role::Target { return Err("Only the shared computer accepts input".into()); }
-        let needed = if matches!(event, InputEvent::Key { .. }) { Capability::Keyboard } else { Capability::Mouse };
-        if event != InputEvent::Release && !active.permissions.contains(&needed) { return Err("Input permission denied".into()); }
-        // The elevated helper injects everywhere (elevated windows, secure desktop); fall back to
-        // in-process injection if it has gone away mid-session.
-        let elevated = self.elevated.as_ref().map(|helper| if event == InputEvent::Release { helper.release(); true } else { helper.send(&event) });
-        match elevated {
-            Some(true) => Ok(()),
-            other => { if other == Some(false) { self.elevated = None; } if self.input.active() { self.input.send(&event)?; } Ok(()) }
-        }
+        let InputEvent::Clipboard { text } = &event else { return Err("Invalid input".into()) };
+        if !active.permissions.contains(&Capability::Clipboard) { return Err("Clipboard permission denied".into()); }
+        platform::write_clipboard(text)
     }
 
     fn process(&mut self, text: &str, received: i64) {
@@ -871,20 +897,24 @@ impl Agent {
                     }
                 }
             }
-            // Controller side: the target asked us to prove the unattended password. If the user gave
-            // one for this request, derive the proof and send it; otherwise ignore and wait (a person
-            // at the other end may still accept by hand).
+            // Controller side: the target asked us to prove the unattended password. With one for this
+            // request (typed or saved), derive the proof and send it; otherwise keep the challenge, so
+            // the user can type the password while waiting (or a person there accepts by hand).
             "connection.challenge" => {
                 let (request_id, nonce, salt, params) = (text(m, "requestId")?, text(m, "nonce")?, text(m, "salt")?, text(m, "params")?);
-                if !is_uuid(request_id) { return Err("Invalid server message".into()); }
+                if !is_uuid(request_id) || [nonce, salt, params].iter().any(|v| !(1..=64).contains(&v.len())) { return Err("Invalid server message".into()); }
                 let device_id = self.identity.as_ref().map(|i| i.device_id.clone());
-                let found = self.requests.iter().find(|r| r.request_id.as_deref() == Some(request_id))
-                    .and_then(|r| r.unattended_secret.as_ref().map(|s| (r.target.clone(), s.clone())));
-                if let (Some(controller_id), Some((target_id, secret))) = (device_id, found) {
-                    match unattended::prove(&secret, salt, params, &controller_id, &target_id, request_id, nonce) {
-                        Some(proof) => { log::write(format!("answering unattended challenge from {}", format_id(&target_id))); let _ = self.send(ClientMessage::ConnectionProve { request_id: request_id.into(), proof }, Some(Subject::Request(target_id))); }
-                        None => log::write("could not compute an unattended proof (bad challenge)"),
-                    }
+                let Some(request) = self.requests.iter_mut().find(|r| r.request_id.as_deref() == Some(request_id)) else { return Ok(()) };
+                let Some(secret) = request.unattended_secret.clone() else {
+                    request.challenge = Some((nonce.into(), salt.into(), params.into()));
+                    self.publish();
+                    return Ok(());
+                };
+                let target_id = request.target.clone();
+                request.proved = true;
+                match device_id.and_then(|controller_id| unattended::prove(&secret, salt, params, &controller_id, &target_id, request_id, nonce)) {
+                    Some(proof) => { log::write(format!("answering unattended challenge from {}", format_id(&target_id))); let _ = self.send(ClientMessage::ConnectionProve { request_id: request_id.into(), proof }, Some(Subject::Request(target_id))); }
+                    None => log::write("could not compute an unattended proof (bad challenge)"),
                 }
             }
             // Target side: a controller answered our challenge. Verify it against the stored password
@@ -937,6 +967,14 @@ impl Agent {
                     let who = format_id(&request.target);
                     log::write(format!("request to {who}: {kind}"));
                     match kind {
+                        // A refused password ends the request over there. A saved one that no longer
+                        // works is forgotten, or every later attempt would be refused the same way
+                        // before anyone there could accept it.
+                        "connection.rejected" if request.proved && request.saved => {
+                            unattended::forget(&self.dir, &request.target);
+                            self.state.error = Some(format!("The saved password for {who} no longer works, so it was removed. Connect again to ask for access."));
+                        }
+                        "connection.rejected" if request.proved => self.state.error = Some(format!("{who} did not accept that password.")),
                         "connection.rejected" => self.state.error = Some(format!("{who} declined the request.")),
                         "connection.expired" => self.state.error = Some(format!("No one answered at {who} in time.")),
                         _ => {}

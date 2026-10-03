@@ -154,8 +154,9 @@ try {
   const connect = async (to: { page: Page; id: string; pid: number }) => {
     await a.page.getByLabel('Remote computer ID').fill(to.id);
     if (relay) {
-      await a.page.getByText('Options', { exact: true }).click();
+      await a.page.getByRole('button', { name: 'Menu' }).click();
       await a.page.getByLabel('Use relay only').check();
+      await a.page.keyboard.press('Escape');
     }
     await a.page.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(to.page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
@@ -186,8 +187,8 @@ try {
   await a.page.keyboard.press('a');
   await a.page.keyboard.press('ControlLeft');
 
-  // Second session from the Home tab while the first stays connected.
-  await a.page.getByRole('tab', { name: 'Home' }).click();
+  // Second session from the New Session tab while the first stays connected.
+  await a.page.getByRole('tab', { name: 'New Session' }).click();
   await connect(c);
   await a.page.screenshot({ path: resolve(base, 'two-sessions.png') });
   await expect(a.page.locator(`.tab[data-peer="${b.id}"][data-phase="connected"]`)).toBeVisible();
