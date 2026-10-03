@@ -38,15 +38,46 @@ function token() {
   return password;
 }
 const auth = token();
-async function github(path, init = {}) {
-  const response = await fetch(path.startsWith('https://') ? path : `https://api.github.com/repos/${repo}${path}`, {
-    ...init, headers: { Authorization: `Bearer ${auth}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...init.headers },
-  });
-  if (!response.ok) throw new Error(`GitHub ${init.method ?? 'GET'} ${path}: ${response.status} ${(await response.text()).slice(0, 300)}`);
-  return response;
-}
-const json = async (path, init) => (await github(path, init)).json();
 const sleep = ms => new Promise(done => setTimeout(done, ms));
+
+// GitHub over a network that drops now and then. A read (GET) is retried with growing pauses, about
+// five minutes in all, after a connection error, a timeout, a 5xx answer or a rate limit. A write
+// (starting a build) is retried only when the connection never opened, so it can never start two.
+class GitHubError extends Error {}
+const ATTEMPTS = 10;
+const NEVER_SENT = new Set(['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH']);
+/** `read` turns the response into the result, inside the retry: a body cut off halfway is retried too. */
+async function github(path, init = {}, read = response => response) {
+  const url = path.startsWith('https://') ? path : `https://api.github.com/repos/${repo}${path}`;
+  const method = init.method ?? 'GET';
+  for (let attempt = 1; ; attempt++) {
+    let problem, wait;
+    try {
+      const response = await fetch(url, {
+        ...init, signal: AbortSignal.timeout(120_000),
+        headers: { Authorization: `Bearer ${auth}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...init.headers },
+      });
+      if (response.ok) return await read(response);
+      const limited = response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0');
+      if (method !== 'GET' || (response.status < 500 && !limited)) throw new GitHubError(`GitHub ${method} ${path}: ${response.status} ${(await response.text()).slice(0, 300)}`);
+      problem = `GitHub answered ${response.status}`;
+      const reset = Number(response.headers.get('x-ratelimit-reset'));
+      wait = Number(response.headers.get('retry-after')) || (reset ? reset - Date.now() / 1000 + 1 : undefined);
+    } catch (error) {
+      if (error instanceof GitHubError) throw error;
+      const code = error?.cause?.code ?? error?.code ?? error?.name;
+      if (method !== 'GET' && !NEVER_SENT.has(code)) {
+        throw new GitHubError(`Lost the connection to GitHub during ${method} ${path} (${code}); look at https://github.com/${repo}/actions before trying again`);
+      }
+      problem = `cannot reach GitHub (${code ?? error.message})`;
+    }
+    if (attempt >= ATTEMPTS) throw new GitHubError(`Gave up after ${ATTEMPTS} tries: ${problem}`);
+    const seconds = Math.round(Math.min(Math.max(wait ?? 2 ** attempt, 1), 60));
+    console.warn(`  … ${problem}; trying again in ${seconds}s`);
+    await sleep(seconds * 1000);
+  }
+}
+const json = (path, init) => github(path, init, response => response.json());
 const minutes = since => `${Math.floor((Date.now() - since) / 60000)}m${String(Math.floor(((Date.now() - since) % 60000) / 1000)).padStart(2, '0')}s`;
 
 /** The run to follow: the one named, one already going (or done) for this commit, or a new one. */
@@ -79,21 +110,35 @@ async function findOrStartRun() {
   throw new Error(`The build was started but did not appear; see https://github.com/${repo}/actions/workflows/${WORKFLOW}`);
 }
 
-/** Prints each step as it finishes, until the run does. */
+/**
+ * Prints each step as it finishes, until the run does. The build runs on GitHub whatever happens
+ * here, so a connection lost for a while only pauses the reporting; after half an hour without
+ * GitHub it stops, saying how to pick the build up again.
+ */
 async function follow(run) {
   console.log(run.html_url);
   if (run.status === 'completed') return run;
   const since = new Date(run.created_at).getTime(), printed = new Set();
-  process.on('SIGINT', () => { console.log('\nThe build keeps running on GitHub; run the same command again to pick it up.'); process.exit(130); });
+  const resume = `The build keeps running on GitHub (${run.html_url}); run the same command again to pick it up.`;
+  process.on('SIGINT', () => { console.log(`\n${resume}`); process.exit(130); });
+  let unreachableSince;
   for (;;) {
-    const { jobs } = await json(`/actions/runs/${run.id}/jobs`);
-    for (const step of jobs.flatMap(j => j.steps ?? [])) {
-      if (step.status !== 'completed' || printed.has(step.number) || step.conclusion === 'skipped') continue;
-      printed.add(step.number);
-      console.log(`  ${minutes(since).padStart(6)}  ${step.conclusion === 'success' ? '✓' : '✗'} ${step.name}`);
+    try {
+      const { jobs } = await json(`/actions/runs/${run.id}/jobs`);
+      for (const step of jobs.flatMap(j => j.steps ?? [])) {
+        if (step.status !== 'completed' || printed.has(step.number) || step.conclusion === 'skipped') continue;
+        printed.add(step.number);
+        console.log(`  ${minutes(since).padStart(6)}  ${step.conclusion === 'success' ? '✓' : '✗'} ${step.name}`);
+      }
+      run = await json(`/actions/runs/${run.id}`);
+      unreachableSince = undefined;
+      if (run.status === 'completed') return run;
+    } catch (error) {
+      if (!(error instanceof GitHubError)) throw error;
+      unreachableSince ??= Date.now();
+      if (Date.now() - unreachableSince > 30 * 60_000) throw new Error(`${error.message}. ${resume}`);
+      console.warn(`  … ${error.message}; still waiting for the build`);
     }
-    run = await json(`/actions/runs/${run.id}`);
-    if (run.status === 'completed') return run;
     await sleep(20_000);
   }
 }
@@ -104,7 +149,7 @@ async function explain(run) {
   for (const job of jobs.filter(j => j.conclusion === 'failure')) {
     const failed = job.steps?.find(s => s.conclusion === 'failure');
     console.error(`\n✗ ${failed ? `"${failed.name}"` : job.name} failed. Last lines of its log:\n`);
-    const log = await (await github(`/actions/jobs/${job.id}/logs`)).text();
+    const log = await github(`/actions/jobs/${job.id}/logs`, {}, response => response.text());
     console.error(log.split('\n').slice(-60).map(line => line.replace(/^\d{4}-\d\d-\d\dT[\d:.]+Z /, '')).join('\n'));
   }
 }
@@ -139,7 +184,7 @@ const { artifacts } = await json(`/actions/runs/${run.id}/artifacts`);
 const artifact = artifacts.find(a => a.name === ARTIFACT && !a.expired);
 if (!artifact) throw new Error(`The run has no ${ARTIFACT} artifact (it may have expired): ${run.html_url}`);
 console.log(`Downloading the disk image (${(artifact.size_in_bytes / 1048576).toFixed(1)} MB)…`);
-const files = unzip(Buffer.from(await (await github(artifact.archive_download_url)).arrayBuffer()));
+const files = unzip(await github(artifact.archive_download_url, {}, async response => Buffer.from(await response.arrayBuffer())));
 mkdirSync('release', { recursive: true });
 for (const { name, data } of files) {
   if (!/^ASDesk-\d+\.\d+\.\d+-macos-universal\.dmg(\.json)?$/.test(name)) throw new Error(`Unexpected file in the artifact: ${name}`);
