@@ -2,7 +2,7 @@
 # One universal disk image for Apple silicon and Intel. From Windows, `npm run desktop:package:mac`
 # (or desktop:release:mac) starts it, follows it and downloads the disk image into AS_Desk/release/
 # (tools/desktop-mac-remote.mjs); it can also be run from Actions → "ASDesk macOS" → Run workflow.
-# Then publish with `npm run desktop:publish -- --mac`. Signing secrets: AS_Desk/docs/macos.md#signing.
+# Then publish with `npm run desktop:publish`. Signing secrets: AS_Desk/docs/macos.md#signing.
 name: ASDesk macOS
 # The mode is in the run's name, so a build already running for a commit can be picked up again.
 run-name: ASDesk macOS ${{ inputs.release && 'release' || 'package' }}

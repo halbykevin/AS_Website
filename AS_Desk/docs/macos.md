@@ -14,12 +14,12 @@ A Mac can control Windows PCs and other Macs, and be controlled by either.
 ```bash
 npm run desktop:package:mac     # the disk image, signed ad hoc (not notarized)
 npm run desktop:release:mac     # signed with a Developer ID, notarized and stapled
-npm run desktop:publish -- --mac   # upload it (ASDesk-macOS.dmg on the server)
+npm run desktop:publish        # upload it with any newer Windows build (ASDesk-macOS.dmg on the server)
 ```
 
 A Mac app can only be built on macOS. On a Mac the first two build locally; anywhere else they build
 on GitHub's Macs with the **ASDesk macOS** workflow
-([.github/workflows/asdesk-macos.yml](../../.github/workflows/asdesk-macos.yml)) and download the
+(`.github/workflows/asdesk-macos.yml` at the repository's root) and download the
 result: see [Building without a Mac](#building-without-a-mac).
 
 ## What is different on a Mac
@@ -101,7 +101,7 @@ which needs the secrets below) runs the same commands on a GitHub-hosted Mac, th
 2. It prints each step as it finishes (the build takes a while: tests, then two architectures), and on
    a failure the end of the failed step's log.
 3. It downloads the disk image and its `.json` into `release/`, ready for
-   `npm run desktop:publish -- --mac`.
+   `npm run desktop:publish`.
 
 It signs in to GitHub as `GITHUB_TOKEN` (or `GH_TOKEN`) if set, else with the login `git push` uses.
 `node tools/desktop-mac-remote.mjs --run <id>` fetches the disk image of any finished run. The
@@ -119,7 +119,7 @@ file replaced by an empty one) and run `cargo check --target aarch64-apple-darwi
 `desktop:package:mac` signs ad hoc, which Apple silicon needs to run the app at all. Gatekeeper still
 blocks it when downloaded: macOS 15 and later say Apple could not verify ASDesk, and the person must
 open System Settings → Privacy & Security and choose **Open Anyway** (the old Control-click shortcut
-is gone). `desktop:publish -- --mac` warns when it uploads such an image.
+is gone). `desktop:publish` warns when it uploads such an image.
 
 `desktop:release:mac` produces what a download should be: the app and the disk image signed with a
 **Developer ID Application** certificate under the hardened runtime, both notarized by Apple and
@@ -144,10 +144,10 @@ Apple-signed processes.
 
 ## Publishing
 
-`npm run desktop:publish -- --mac` uploads the newest `release/ASDesk-*-macos-universal.dmg`, points
+`npm run desktop:publish` (or `-- --mac` for the Mac alone) uploads the newest `release/ASDesk-*-macos-universal.dmg` unless the server already has it, points
 `ASDesk-macOS.dmg` at it and writes `latest-macos.json` next to the Windows `latest.json`. The
 website reads that pointer (proxied as `/latest-macos.json`), so Mac visitors get **Download for
-macOS** as soon as the upload finishes; Windows visitors see **On a Mac?** under their button, and
-the other way round. `npm run website:publish -- --version <v>` also lists the disk image in
+macOS** as soon as the upload finishes, beside **Download for Windows** (each visitor's own system
+first). `npm run website:publish -- --version <v>` also lists the disk image in
 `releases.json` when it is in `release/` (`--mac-version` if the Mac build is of another version),
 and otherwise keeps the one already listed.

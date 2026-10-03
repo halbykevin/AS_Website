@@ -80,9 +80,18 @@ database.
 ```powershell
 npm run server:deploy       # server: test, build, upload, migrate, switch, health-check
 npm run desktop:package     # bump apps/desktop/package.json version first (desktop:release signs)
-npm run desktop:publish     # upload the installer to the server's downloads
-npm run desktop:publish -- --mac   # the macOS disk image, built on a Mac or by the "ASDesk macOS" workflow
+npm run desktop:publish     # publish the newest build of every edition in release/ (only what the server lacks)
+npm run desktop:publish -- --dry-run   # show what it would publish, change nothing
 ```
+
+`desktop:publish` looks in `release/` for the newest version of each edition
+(Windows 10/11, Windows 7 with both of its installers, macOS), compares it with
+what the server has in one round trip, and uploads only what is missing: an
+edition already up to date is skipped, and a file already on the server is only
+re-linked. It never moves a download back to an older version, nor replaces a
+published file with a different build of the same version (the website shows its
+checksum); `--force` allows both. `--windows`, `--win7` or `--mac` limit it to
+those editions, and a path publishes exactly that file.
 
 The macOS edition: `npm run desktop:package:mac` (or `desktop:release:mac` to
 sign and notarize) builds it on a Mac, and from Windows builds it on GitHub's
@@ -108,8 +117,8 @@ npm run website:publish -- --version 0.7.1
 The site offers the small standard installer (Windows 10/11 x64) by default,
 the legacy Windows 7 edition (x64/x86) to visitors on Windows 7/8 or 32-bit
 Windows, and the macOS disk image to Mac visitors (as soon as
-`desktop:publish -- --mac` uploads it; `website:publish` lists it too). Publish the installers first (`npm run desktop:publish`, plus
-`-- --win7` for the legacy edition), then run `website:publish`: it reads the
+`desktop:publish` uploads it; `website:publish` lists it too). Publish the installers first (`npm run desktop:publish`),
+then run `website:publish`: it reads the
 standard installer and, if built for that version (or `--legacy-version`), both
 legacy installers from `release/`, otherwise keeps the legacy entries already
 listed. It checks every link against the download server

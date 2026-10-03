@@ -13,9 +13,11 @@
 #   npm run server:token          print the enrollment token for setting up new computers
 #   npm run server:admin -- devices | revoke <id> | restore <id> | sessions [n]
 #   npm run server:backup         take a database backup now
-#   npm run desktop:publish       upload the newest installer to https://<domain>/downloads/
-#                                 (-- --win7 for the Windows 7 edition's x64 and x86 installers,
-#                                  -- --mac for the macOS disk image)
+#   npm run desktop:publish       publish the newest build of every edition in release/ (Windows,
+#                                 Windows 7, macOS) to https://<domain>/downloads/, skipping what the
+#                                 server already has. -- --dry-run shows the plan only; -- --windows,
+#                                 --win7 or --mac limit it to those; -- --force allows an older version
+#                                 or a changed file; -- <installer> publishes exactly that file
 #
 # Any command takes --host <name> to pick a profile (deploy/.env.vps.<name>).
 # =============================================================================
@@ -185,22 +187,81 @@ cmd_backup() {
   ssh_run "$REMOTE_BASE/bin/asdesk-backup manual"
 }
 
-# Uploads one installer and points its stable download name at it. The standard edition is
-# ASDesk-Setup-x64.exe (plus the pre-rename alias and latest.json); the Windows 7 edition is
-# ASDesk-Setup-win7-x64.exe / -x86.exe, the names the standard installer sends older PCs to; the macOS
-# edition is ASDesk-macOS.dmg (plus latest-macos.json). The website reads both pointers.
+# ── Desktop downloads ──────────────────────────────────────────────────────────────────────────
+# Each edition has a stable download name that points at its newest installer: ASDesk-Setup-x64.exe
+# (Windows 10/11, plus the pre-rename alias and latest.json), ASDesk-Setup-win7-x64.exe / -x86.exe
+# (Windows 7/8, the names the standard installer sends older PCs to) and ASDesk-macOS.dmg (plus
+# latest-macos.json). The website reads both pointers. A published file never changes: the website
+# shows its checksum, so a different build of a version needs a new version number (or --force).
+DESKTOP_EDITIONS="windows win7 mac"
+edition_label() { case "$1" in windows) echo "Windows 10/11" ;; win7) echo "Windows 7/8" ;; mac) echo "macOS" ;; esac; }
+edition_build_hint() { case "$1" in windows) echo "npm run desktop:package" ;; win7) echo "npm run desktop:package:win7" ;; mac) echo "npm run desktop:package:mac" ;; esac; }
+# The installer files of an edition's version, one per line.
+edition_files() {
+  case "$1" in
+    windows) echo "ASDesk-$2-x64-Setup.exe" ;;
+    win7) printf '%s\n' "ASDesk-$2-win7-x64-Setup.exe" "ASDesk-$2-win7-x86-Setup.exe" ;;
+    mac) echo "ASDesk-$2-macos-universal.dmg" ;;
+  esac
+}
+# The stable download name an installer is published under (Windows 7 first: its names also end in -x64-Setup.exe).
+stable_link() {
+  case "$1" in
+    ASDesk-*-win7-x64-Setup.exe) echo "ASDesk-Setup-win7-x64.exe" ;;
+    ASDesk-*-win7-x86-Setup.exe) echo "ASDesk-Setup-win7-x86.exe" ;;
+    ASDesk-*-x64-Setup.exe) echo "ASDesk-Setup-x64.exe" ;;
+    ASDesk-*-macos-universal.dmg) echo "ASDesk-macOS.dmg" ;;
+  esac
+}
+installer_version() { printf '%s' "$1" | sed -nE 's/^ASDesk-([0-9]+\.[0-9]+\.[0-9]+)-.*$/\1/p'; }
+# True when version $1 is newer than $2, compared as numbers (0.10.0 is newer than 0.9.0).
+version_newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+sha256_of() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
+size_of() { du -h "$1" | awk '{print $1}'; }
+plan_row() { printf "  %-14s %-7s %s\n" "$(edition_label "$1")" "$2" "$3"; }
+
+# The newest version of an edition that has every installer it needs in release/ (Windows 7: both).
+newest_build() {
+  local pattern v f complete
+  case "$1" in
+    windows) pattern='ASDesk-([0-9]+\.[0-9]+\.[0-9]+)-x64-Setup\.exe' ;;
+    win7) pattern='ASDesk-([0-9]+\.[0-9]+\.[0-9]+)-win7-x(64|86)-Setup\.exe' ;;
+    mac) pattern='ASDesk-([0-9]+\.[0-9]+\.[0-9]+)-macos-universal\.dmg' ;;
+  esac
+  for v in $(ls "$REPO_ROOT/release" 2>/dev/null | sed -nE "s/^$pattern\$/\1/p" | sort -Vru); do
+    complete=1
+    for f in $(edition_files "$1" "$v"); do [ -s "$REPO_ROOT/release/$f" ] || complete=0; done
+    if [ "$complete" = 1 ]; then echo "$v"; return 0; fi
+    warn "$(edition_label "$1") $v is incomplete in release/ (needs $(edition_files "$1" "$v" | tr '\n' ' ')); trying older builds"
+  done
+}
+
+# What the server has, in one round trip: where each stable name points, and the checksum of each
+# of the named files that is already there.
+REMOTE_DOWNLOADS=""
+read_remote_downloads() {
+  local names="" name
+  for name in "$@"; do names="$names '$name'"; done
+  REMOTE_DOWNLOADS="$(ssh_run "cd $REMOTE_BASE/downloads || exit 1; for l in ASDesk-Setup-x64.exe ASDesk-Setup-win7-x64.exe ASDesk-Setup-win7-x86.exe ASDesk-macOS.dmg; do t=\$(readlink \"\$l\") && echo \"link \$l \$t\"; done; for f in$names; do [ -f \"\$f\" ] && echo \"file \$f \$(sha256sum < \"\$f\" | cut -d' ' -f1)\"; done; true" | tr -d '\r')" \
+    || die "could not read what the server publishes"
+}
+remote_link() { printf '%s\n' "$REMOTE_DOWNLOADS" | awk -v k="$1" '$1 == "link" && $2 == k { print $3 }'; }
+remote_sum() { printf '%s\n' "$REMOTE_DOWNLOADS" | awk -v k="$1" '$1 == "file" && $2 == k { print $3 }'; }
+
+# Publishes one installer under its stable download name. `present`: the server already has this
+# exact file (same checksum), so only the name and pointer move.
 publish_installer() {
-  local file="$1" name sum size link pointer="" facts=""
+  local file="$1" present="${2:-}" name sum size link pointer="" facts="" place
   name="$(basename "$file")"
   [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "unexpected installer name: $name"
+  link="$(stable_link "$name")"
+  [ -n "$link" ] || die "not an ASDesk installer name: $name"
   case "$name" in
-    ASDesk-*-win7-x64-Setup.exe) link="ASDesk-Setup-win7-x64.exe" ;;
-    ASDesk-*-win7-x86-Setup.exe) link="ASDesk-Setup-win7-x86.exe" ;;
-    ASDesk-*-x64-Setup.exe) link="ASDesk-Setup-x64.exe"; pointer="latest.json" ;;
-    ASDesk-*-macos-universal.dmg) link="ASDesk-macOS.dmg"; pointer="latest-macos.json" ;;
-    *) die "not an ASDesk installer name: $name" ;;
+    ASDesk-*-win7-*) ;;
+    ASDesk-*-x64-Setup.exe) pointer="latest.json" ;;
+    ASDesk-*-macos-universal.dmg) pointer="latest-macos.json" ;;
   esac
-  sum="$(sha256sum "$file" | awk '{print $1}')"
+  sum="$(sha256_of "$file")"
   size="$(wc -c < "$file" | tr -d ' ')"
   if [[ "$name" == *.dmg ]]; then
     # Gatekeeper blocks a disk image that is not notarized until the person allows it in System
@@ -218,8 +279,14 @@ publish_installer() {
     signature="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-AuthenticodeSignature -LiteralPath '$(cygpath -w "$file" 2>/dev/null || echo "$file")').Status" 2>/dev/null | tr -d '\r')"
     [ "$signature" = "Valid" ] || warn "$name is not code-signed ($signature): browsers may block it as a suspicious download. Build with npm run desktop:release."
   fi
-  say "publishing $name ($(du -h "$file" | awk '{print $1}'))"
-  scp_upload "$file" "$REMOTE_BASE/downloads/.$name.part" || die "upload failed"
+  if [ -n "$present" ]; then
+    say "publishing $name (already on the server)"
+    place="echo '$sum  $name' | sha256sum -c --quiet -"
+  else
+    say "publishing $name ($(size_of "$file"))"
+    scp_upload "$file" "$REMOTE_BASE/downloads/.$name.part" || die "upload failed"
+    place="echo '$sum  .$name.part' | sha256sum -c --quiet - && mv -f '.$name.part' '$name'"
+  fi
   local extra=""
   if [ "$link" = "ASDesk-Setup-x64.exe" ]; then
     extra="&& ln -sfn '$name' CompanyRemote-Setup-x64.exe"
@@ -227,35 +294,100 @@ publish_installer() {
   if [ -n "$pointer" ]; then
     extra="$extra && printf '{\"file\":\"%s\",\"sha256\":\"%s\",\"size\":%s,\"published\":\"%s\"%s}\n' '$name' '$sum' '$size' \"\$(date -u +%FT%TZ)\" '$facts' > '.$pointer.part' && mv -f '.$pointer.part' '$pointer'"
   fi
-  ssh_run "cd $REMOTE_BASE/downloads && echo '$sum  .$name.part' | sha256sum -c --quiet - && mv -f '.$name.part' '$name' && chmod 644 '$name' && ln -sfn '$name' '$link' $extra" \
-    || die "publishing failed (checksum or move)"
+  ssh_run "cd $REMOTE_BASE/downloads && $place && chmod 644 '$name' && ln -sfn '$name' '$link' $extra" \
+    || die "publishing $name failed (checksum or move)"
   ok "https://$API_DOMAIN/downloads/$link"
   info "sha256 $sum"
 }
 
+# npm run desktop:publish [-- --dry-run] [--force] [--windows] [--win7] [--mac] [<installer>...]
+# Publishes the newest complete build of each edition in release/ (or of the editions named), and
+# only what the server does not already have. It never moves a download back to an older version,
+# nor replaces a published file with a different build of the same version, unless --force says so.
 cmd_publish_desktop() {
+  local dry_run=0 force=0 only="" arg
   local -a files=()
-  if [ "${1:-}" = "--win7" ]; then
-    # Both architectures of the newest Windows 7 build, which must be the same version.
-    local x64 version
-    x64="$(ls -t "$REPO_ROOT"/release/ASDesk-*-win7-x64-Setup.exe 2>/dev/null | head -1 || true)"
-    [ -n "$x64" ] || die "no Windows 7 installer found. Build them with: npm run desktop:package:win7"
-    version="$(basename "$x64" | sed -E 's/^ASDesk-(.+)-win7-x64-Setup\.exe$/\1/')"
-    files=("$x64" "$REPO_ROOT/release/ASDesk-$version-win7-x86-Setup.exe")
-    [ -f "${files[1]}" ] || die "missing ${files[1]##*/}; build both with: npm run desktop:package:win7"
-  elif [ "${1:-}" = "--mac" ]; then
-    # Built on a Mac, or downloaded from the "ASDesk macOS" workflow into release/ (docs/macos.md).
-    files=("$(ls -t "$REPO_ROOT"/release/ASDesk-*-macos-universal.dmg 2>/dev/null | head -1 || true)")
-    [ -n "${files[0]}" ] || die "no macOS disk image in release/. Build it on a Mac (npm run desktop:package:mac) or download it from the \"ASDesk macOS\" GitHub workflow into release/"
-  elif [ -n "${1:-}" ]; then
-    files=("$1")
-  else
-    files=("$(ls -t "$REPO_ROOT"/release/ASDesk-*-x64-Setup.exe 2>/dev/null | grep -v -- '-win7-' | head -1 || true)")
+  for arg in "$@"; do
+    case "$arg" in
+      --dry-run|-n) dry_run=1 ;;
+      --force) force=1 ;;
+      --windows) only="$only windows" ;;
+      --win7) only="$only win7" ;;
+      --mac) only="$only mac" ;;
+      -*) die "unknown option: $arg (use --dry-run, --force, --windows, --win7, --mac or an installer's path)" ;;
+      *) files+=("$arg") ;;
+    esac
+  done
+
+  # Installers named on the command line: exactly those.
+  if [ "${#files[@]}" -gt 0 ]; then
+    for arg in "${files[@]}"; do [ -s "$arg" ] || die "no such installer: $arg"; done
+    if [ "$dry_run" = 1 ]; then info "would publish: ${files[*]}"; return 0; fi
+    select_transport
+    for arg in "${files[@]}"; do publish_installer "$arg"; done
+    return 0
   fi
-  [ -n "${files[0]}" ] && [ -f "${files[0]}" ] || die "no installer found. Build one with: npm run desktop:package"
+
+  local editions="${only:-$DESKTOP_EDITIONS}" e v found="" candidates=""
+  for e in $editions; do
+    v="$(newest_build "$e")"
+    if [ -n "$v" ]; then found="$found $e:$v"; candidates="$candidates $(edition_files "$e" "$v" | tr '\n' ' ')"; fi
+  done
+  [ -n "$found" ] || die "no installers in release/. Build one with: npm run desktop:package (or :win7, :mac)"
   select_transport
-  local file
-  for file in "${files[@]}"; do publish_installer "$file"; done
+  # shellcheck disable=SC2086
+  read_remote_downloads $candidates
+
+  say "plan for https://$API_DOMAIN/downloads/"
+  local -a todo=() mine=()
+  local entry published f sum rsum steps conflict skipped=""
+  for e in $editions; do
+    v=""
+    for entry in $found; do if [ "${entry%%:*}" = "$e" ]; then v="${entry#*:}"; fi; done
+    if [ -z "$v" ]; then plan_row "$e" "-" "no build in release/ ($(edition_build_hint "$e"))"; continue; fi
+    published="$(installer_version "$(remote_link "$(stable_link "$(edition_files "$e" "$v" | head -1)")")")"
+    if [ -n "$published" ] && version_newer "$published" "$v" && [ "$force" != 1 ]; then
+      plan_row "$e" "$v" "skip: the server has $published, which is newer (--force publishes $v anyway)"
+      skipped=1
+      continue
+    fi
+    mine=(); steps=""; conflict=""
+    for f in $(edition_files "$e" "$v"); do
+      sum="$(sha256_of "$REPO_ROOT/release/$f")"
+      rsum="$(remote_sum "$f")"
+      if [ -n "$rsum" ] && [ "$rsum" != "$sum" ]; then conflict="$f"; fi
+      if [ "$rsum" = "$sum" ]; then
+        # On the server already: up to date if its download name points here, else only relink.
+        if [ "$(remote_link "$(stable_link "$f")")" != "$f" ]; then mine+=("$f|present"); steps="$steps, point $(stable_link "$f") at it"; fi
+      else
+        mine+=("$f|"); steps="$steps, upload $f ($(size_of "$REPO_ROOT/release/$f"))"
+      fi
+    done
+    if [ -n "$conflict" ] && [ "$force" != 1 ]; then
+      plan_row "$e" "$v" "skip: $conflict on the server is a different build. Published files never change: raise the version in apps/desktop/package.json (or --force)"
+      skipped=1
+      continue
+    fi
+    if [ "${#mine[@]}" -eq 0 ]; then plan_row "$e" "$v" "up to date"; continue; fi
+    if [ -n "$published" ] && [ "$published" != "$v" ]; then steps="$steps, replacing $published"; fi
+    plan_row "$e" "$v" "${steps#, }"
+    todo+=("${mine[@]}")
+  done
+
+  if [ "${#todo[@]}" -eq 0 ]; then
+    if [ -n "$skipped" ]; then warn "nothing published (see the skipped editions above)"; else ok "nothing to publish: the server is up to date"; fi
+    return 0
+  fi
+  if [ "$dry_run" = 1 ]; then info "dry run: nothing was changed"; return 0; fi
+  local item legacy="" live=""
+  for item in "${todo[@]}"; do
+    publish_installer "$REPO_ROOT/release/${item%%|*}" "${item#*|}"
+    case "$item" in *-win7-*) legacy=1 ;; *) live=1 ;; esac
+  done
+  ok "published ${#todo[@]} file(s)"
+  # The website follows latest.json and latest-macos.json by itself; Windows 7 comes from releases.json.
+  if [ -n "$live" ]; then info "the website offers the new Windows and Mac downloads right away"; fi
+  if [ -n "$legacy" ]; then info "to list the Windows 7 installers on the website: npm run website:publish -- --version <v>"; fi
 }
 
 case "$COMMAND" in

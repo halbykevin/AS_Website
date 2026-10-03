@@ -213,12 +213,18 @@ The server installed copies register with on first run is
 `companyRemote.defaultServer` in `apps/desktop/package.json` (override with
 `COMPANY_REMOTE_SERVER` at build time); debug builds show the setup form
 instead. The version shown and reported at enrollment is that file's `version`.
-`npm run desktop:publish` uploads the newest installer to the server's
-`/downloads/` (`ASDesk-Setup-x64.exe`); `npm run desktop:publish -- --win7`
-uploads the Windows 7 edition's two (`ASDesk-Setup-win7-x64.exe`,
-`ASDesk-Setup-win7-x86.exe`), the names the standard installer sends older PCs
-to; `npm run desktop:publish -- --mac` uploads the macOS disk image
-(`ASDesk-macOS.dmg`, with `latest-macos.json` for the website).
+`npm run desktop:publish` publishes the newest build of every edition in
+`release/` to the server's `/downloads/`, under stable names: `ASDesk-Setup-x64.exe`
+(with `latest.json` for the website), the Windows 7 edition's two
+(`ASDesk-Setup-win7-x64.exe`, `ASDesk-Setup-win7-x86.exe`, the names the standard
+installer sends older PCs to) and `ASDesk-macOS.dmg` (with `latest-macos.json`).
+Versions are compared as numbers, the Windows 7 edition counts only when both of
+its installers are there, and one SSH round trip tells it what the server already
+has, so it uploads only what is missing (a file already there is just re-linked).
+It refuses to move a download back to an older version or to replace a published
+file with a different build of the same version, unless `--force`. `-- --dry-run`
+prints the plan without changing anything; `--windows`, `--win7` and `--mac`
+limit it to those editions; a path publishes exactly that installer.
 
 ## Window behaviour
 

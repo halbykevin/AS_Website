@@ -6,7 +6,7 @@ import { crc32, inflateRawSync } from 'node:zlib';
 // The macOS edition, from a computer that is not a Mac (tools/desktop.mjs package|release --mac).
 // A Mac app can only be built on macOS, so the "ASDesk macOS" workflow builds it on GitHub's Macs from
 // the commit pushed for this branch; this starts it, follows it and unpacks its disk image into
-// release/, ready for `npm run desktop:publish -- --mac`. A build already running or finished for the
+// release/, ready for `npm run desktop:publish`. A build already running or finished for the
 // same commit is picked up instead of starting another (so a Ctrl+C loses nothing).
 //
 //   node tools/desktop-mac-remote.mjs package | release      (release: signed and notarized)
@@ -58,7 +58,8 @@ async function findOrStartRun() {
   const local = git('rev-parse', 'HEAD');
   const pushed = spawnSync('git', ['rev-parse', `origin/${branch}`], { encoding: 'utf8' }).stdout.trim();
   if (local !== pushed) throw new Error(`Push ${branch} first: the Mac builds GitHub's copy (${pushed.slice(0, 7) || 'not on GitHub'}), and this computer has ${local.slice(0, 7)}.`);
-  if (git('status', '--porcelain', '--', '.', '../.github')) console.warn('Note: uncommitted changes here are not part of the build.');
+  // This folder and the repository's workflows, wherever the repository root is.
+  if (git('status', '--porcelain', '--', '.', ':(top).github')) console.warn('Note: uncommitted changes here are not part of the build.');
 
   // The workflow names each run after its mode (run-name), so a release is never mistaken for a package.
   const title = `ASDesk macOS ${mode}`;
@@ -147,4 +148,4 @@ for (const { name, data } of files) {
 const image = files.find(f => f.name.endsWith('.dmg'));
 const info = JSON.parse(readFileSync(join('release', `${image.name}.json`), 'utf8'));
 console.log(`Disk image: ${resolve('release', image.name)} (${(image.data.length / 1048576).toFixed(1)} MB), signed ${info.signed}${info.notarized ? ', notarized' : ', not notarized'}`);
-console.log('Publish it with: npm run desktop:publish -- --mac');
+console.log('Publish it with: npm run desktop:publish');

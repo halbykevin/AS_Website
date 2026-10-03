@@ -10,7 +10,7 @@ ASDesk ships in two editions built from the same code:
 ```powershell
 npm run desktop:package:win7          # both Windows 7 installers into release/
 npm run desktop:release:win7          # the same, Authenticode-signed (WINDOWS_CERTIFICATE_THUMBPRINT)
-npm run desktop:publish -- --win7     # upload both; served as ASDesk-Setup-win7-x64.exe / -x86.exe
+npm run desktop:publish              # uploads both (with any newer standard/Mac build); -- --win7 for these alone
 ```
 
 The first build downloads the WebView2 runtime (about 200 MB per architecture) and a pinned nightly
