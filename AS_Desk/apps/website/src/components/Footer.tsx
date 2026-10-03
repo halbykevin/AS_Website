@@ -29,9 +29,15 @@ export function Footer() {
           <p>© {new Date().getFullYear()} ASDesk. Free to download and use.</p>
           <p>
             Designed and developed by{" "}
-            <span className="font-display font-semibold text-fg">
+            <a
+              href="https://www.raione.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cx("rounded-sm font-display font-semibold text-fg underline-offset-2 hover:underline", focusRing)}
+            >
               r<span className="text-accent">AI</span>one
-            </span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
           </p>
         </div>
       </Container>
