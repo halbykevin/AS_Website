@@ -456,19 +456,37 @@ p {
 .addr-dot.setup {
   background: var(--warn);
 }
+/* The field and Connect are one control: the group carries the border and the focus ring (for the
+   field or the button alike), and clips both to its rounded corners. */
 .addr-form {
   flex: 1;
   display: flex;
   min-width: 0;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--raised);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.addr-form:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .addr-form input:not([type="checkbox"]) {
   flex: 1;
-  height: 32px;
-  border-radius: 6px 0 0 6px;
-  border-right: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-family: var(--mono);
   font-size: 14px;
   letter-spacing: 1px;
+}
+.addr-form input:not([type="checkbox"]):focus {
+  box-shadow: none;
 }
 .addr-form input::placeholder {
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -480,9 +498,9 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
+  height: 100%;
   padding: 0 14px;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0;
   background: var(--accent);
   color: #fff;
   font-weight: 600;
@@ -496,6 +514,11 @@ p {
   background: var(--hover);
   color: var(--muted);
   opacity: 1;
+}
+/* The group's ring already shows focus; this marks the button itself, inside its own edges. */
+.addr-connect:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -4px;
 }
 /* Top-aligned and scrollable: this computer's address first, recent sessions right under it, the
    same width and gutters at every window size. */
