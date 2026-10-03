@@ -8,17 +8,21 @@ import { join, resolve } from 'node:path';
 // `--win7` (package/release): the Windows 7 edition instead, x64 and x86, for Windows 7 SP1 to 11
 // (docs/windows7.md): a pinned nightly Rust for the *-win7-windows-msvc targets, the static C runtime,
 // and a private copy of WebView2 109, the last version Microsoft made for Windows 7 and 8.
-// `--mac` (package/release, on a Mac): the macOS edition instead, one universal app for Apple silicon
-// and Intel in a disk image (docs/macos.md); from Windows, the "ASDesk macOS" GitHub workflow runs it.
+// `--mac` (package/release): the macOS edition instead, one universal app for Apple silicon and Intel
+// in a disk image (docs/macos.md). Anywhere but a Mac, the "ASDesk macOS" workflow builds it on
+// GitHub's Macs and tools/desktop-mac-remote.mjs brings the disk image back into release/.
 const mode = process.argv[2];
 const win7 = process.argv.includes('--win7');
 const mac = process.argv.includes('--mac');
 if (!['debug', 'package', 'release'].includes(mode) || ((win7 || mac) && mode === 'debug') || (win7 && mac)) throw new Error('Usage: node tools/desktop.mjs debug | package [--win7 | --mac] | release [--win7 | --mac]');
-if (mac && process.platform !== 'darwin') throw new Error('macOS builds run on a Mac. From Windows, run the "ASDesk macOS" workflow on GitHub Actions instead (docs/macos.md).');
 const run = (args, options = {}) => {
   const result = spawnSync(process.execPath, args, { stdio: 'inherit', ...options });
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
+if (mac && process.platform !== 'darwin') {
+  run(['tools/desktop-mac-remote.mjs', mode]);
+  process.exit(0);
+}
 const system = (command, args, what, env = {}) => {
   const result = spawnSync(command, args, { stdio: 'inherit', env: { ...process.env, ...env } });
   if (result.status !== 0) throw new Error(`${what} failed (${command} exited with ${result.status ?? result.error?.message})`);

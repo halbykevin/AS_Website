@@ -12,14 +12,15 @@ release/ASDesk-<version>-macos-universal.dmg.json   who signed it and whether it
 A Mac can control Windows PCs and other Macs, and be controlled by either.
 
 ```bash
-npm run desktop:package:mac     # on a Mac: the disk image, signed ad hoc (not notarized)
-npm run desktop:release:mac     # on a Mac: signed with a Developer ID, notarized and stapled
-npm run desktop:publish -- --mac   # from any computer: upload it (ASDesk-macOS.dmg on the server)
+npm run desktop:package:mac     # the disk image, signed ad hoc (not notarized)
+npm run desktop:release:mac     # signed with a Developer ID, notarized and stapled
+npm run desktop:publish -- --mac   # upload it (ASDesk-macOS.dmg on the server)
 ```
 
-A Mac app can only be built on macOS. From Windows, use the **ASDesk macOS** workflow
-([.github/workflows/asdesk-macos.yml](../../.github/workflows/asdesk-macos.yml)): see
-[Building without a Mac](#building-without-a-mac).
+A Mac app can only be built on macOS. On a Mac the first two build locally; anywhere else they build
+on GitHub's Macs with the **ASDesk macOS** workflow
+([.github/workflows/asdesk-macos.yml](../../.github/workflows/asdesk-macos.yml)) and download the
+result: see [Building without a Mac](#building-without-a-mac).
 
 ## What is different on a Mac
 
@@ -90,16 +91,22 @@ checks the app's signature and copies the image to `release/`. The macOS icons
 
 ## Building without a Mac
 
-The **ASDesk macOS** workflow runs the same commands on a GitHub-hosted Mac:
+On Windows (or Linux), `npm run desktop:package:mac` (`desktop:release:mac` to sign and notarize,
+which needs the secrets below) runs the same commands on a GitHub-hosted Mac, through
+`tools/desktop-mac-remote.mjs`:
 
-1. GitHub → **Actions** → **ASDesk macOS** → **Run workflow**. Tick **release** to sign and notarize
-   (needs the secrets below).
-2. When it finishes, download the **ASDesk-macOS** artifact from the run and unzip both files into
-   `AS_Desk/release/`.
-3. `npm run desktop:publish -- --mac`.
+1. It checks that this branch is pushed (GitHub builds its copy, not this computer's) and starts the
+   **ASDesk macOS** workflow for it, or picks up a build already running or finished for the same
+   commit and mode, so pressing Ctrl+C and running it again loses nothing.
+2. It prints each step as it finishes (the build takes a while: tests, then two architectures), and on
+   a failure the end of the failed step's log.
+3. It downloads the disk image and its `.json` into `release/`, ready for
+   `npm run desktop:publish -- --mac`.
 
-The workflow type-checks the UI and runs the agent's tests on macOS before building, and keeps the
-artifact for 30 days.
+It signs in to GitHub as `GITHUB_TOKEN` (or `GH_TOKEN`) if set, else with the login `git push` uses.
+`node tools/desktop-mac-remote.mjs --run <id>` fetches the disk image of any finished run. The
+workflow can also be started by hand (Actions → **ASDesk macOS** → **Run workflow**); it type-checks
+the UI and runs the agent's tests on macOS before building, and keeps the artifact for 30 days.
 
 A Windows machine can type-check the macOS code without a Mac (not build it: AppKit's headers and the
 linker's frameworks come only with Xcode). With the `aarch64-apple-darwin` target, Zig

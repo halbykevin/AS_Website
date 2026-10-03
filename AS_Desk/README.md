@@ -84,9 +84,10 @@ npm run desktop:publish     # upload the installer to the server's downloads
 npm run desktop:publish -- --mac   # the macOS disk image, built on a Mac or by the "ASDesk macOS" workflow
 ```
 
-The macOS edition is built on a Mac (`npm run desktop:package:mac`, or
-`desktop:release:mac` to sign and notarize) or by the **ASDesk macOS** GitHub
-Actions workflow; see [docs/macos.md](docs/macos.md).
+The macOS edition: `npm run desktop:package:mac` (or `desktop:release:mac` to
+sign and notarize) builds it on a Mac, and from Windows builds it on GitHub's
+Macs with the **ASDesk macOS** workflow and downloads the disk image into
+`release/`; see [docs/macos.md](docs/macos.md).
 
 Existing installations are not updated automatically; install the new version
 over the old one (the device ID and enrollment are kept).
