@@ -11,7 +11,7 @@ import EventsLink from './EventsLink.jsx'
 const isEventsHref = (href) => href === '/events' || href.startsWith('/events?')
 import { optimizedImage } from '../lib/api'
 
-// AS Desk — the remote-support portal, reached from the pill beside Store.
+// Remote support: the website of rAIdesk (formerly AS Desk), its own project outside this repo.
 const REMOTE_SUPPORT_URL = 'https://asdesk.as.com.lb/'
 
 export default function Navbar() {
