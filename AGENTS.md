@@ -1,0 +1,1057 @@
+# AS Company Website
+
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (the partner's own booking page). A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
+
+> The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
+> Office" badge and its logo are gone from the footer, `/events`, the event detail page and the
+> mobile app, and `public/ticketing-box-office.png` + the `ticketing` block in `content/site.js`
+> were deleted with them. Partner names survive only in the admin's sync page, where they name a
+> data source. The banner slider is expected to gain a logo + slogan later — nothing is there now.
+
+> The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
+
+## Architecture
+
+```
+Browser ──► Vercel (React static site, this repo root)          as.com.lb
+     │      Vercel (Next.js events platform, as_ticketing/)     ticketing.as.com.lb
+     │              └── no backend: reads the site API below
+     │
+     └─────► https://api.yourdomain.com  (Node/Express API in /server, on the VPS)
+                          ├── PostgreSQL          (data)
+                          ├── /uploads            (logo & event images on disk)
+                          ├── /scrapes            (per-run scraper output, runtime-only)
+                          └── WebScarping/         (Python scraper, spawned per scrape job)
+```
+
+- **Frontend** — React 18 + Vite 5 + Tailwind 3 + React Router 7. Hosted on **Vercel**.
+- **Backend** — Express + PostgreSQL (`pg`) in [server/](server/). Runs on the **VPS** under PM2, exposed at an `api.` subdomain with SSL. JWT-based single-admin auth. Images stored on disk.
+- The two talk over HTTP; the frontend's API base is `VITE_API_URL`.
+
+> History: an earlier iteration used PocketBase — fully removed. Don't reintroduce PocketBase concepts.
+
+## AS Ticketing Hub (`as_ticketing/`)
+
+`ticketing.as.com.lb` — the events platform, a **third Vercel project on this repo**
+(root directory `as_ticketing`, dev port 5181). Next.js 15 + Tailwind.
+
+- **It has no backend.** Events, categories and settings all come from the marketing site's
+  API (`/api/events`, `/api/categories`, `/api/settings`) — the same one `as.com.lb` reads,
+  filled by the events sync. One admin, one database, two properties. The store is the
+  opposite case (products/orders/customers/wallet exist nowhere else, so it earns its own
+  API); ticketing does not, and a second copy of the sync would be two things to keep in step.
+- **Its URLs match the marketing site's on purpose**: `/events/<slug>` uses the same slugs,
+  because both read the same rows. That is what lets `as.com.lb/events` 301 across one-to-one
+  later instead of dumping every existing link on a homepage. `/` redirects to `/events`.
+- **`settings.ticketing_url` is the handover switch** (Site Settings → Events, the twin of
+  `store_url`). Empty = events stay on `as.com.lb/events`; set it and the marketing site's nav,
+  footer, banner + "Book now" CTA, category tiles, event cards, contact page and detail-page
+  back-links all point here instead. They move together because they all go through
+  [src/components/EventsLink.jsx](src/components/EventsLink.jsx) — ten call sites deciding
+  separately would eventually half-migrate.
+- `src/lib/events.js` is a **deliberate copy** of the marketing site's date helpers and
+  `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
+  visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
+  reservation, worded the same way.
+- **Seat picking, on all three sources.** An event whose partner publishes a hall
+  gets a live seat map on its page: `GET /api/events/:slug/seatmap`
+  ([server/src/seatmap.js](server/src/seatmap.js)) routes to one reader per site
+  in [server/src/seatmap/](server/src/seatmap/) and the hub draws the answer
+  ([SeatMap.jsx](as_ticketing/src/components/SeatMap.jsx)). Pick seats, or a
+  quantity of a zone, or a table whole → a pre-filled WhatsApp message.
+  - **The three publish different things, and the panel stays honest about it.**
+    `tbo.js` rebuilds the hall as a grid (every seat is an `<input class=
+    "CellBtnClass">` in their page). `ihjoz.js` serves *their* SVG of the room:
+    tap a `seating="assigned"` block to load its numbered seats from
+    `/sections/<id>/map`, tap an `unassigned` one to take a zone or a table of
+    four whole. `tickit.js` serves their venue SVG plus zones from the JSON API
+    their own bundle calls — **Tick'it has no seats to pick** ("free seating
+    within your selected zone" is their own wording), so the zone is the choice
+    and inventing seat numbers there would be inventing a promise.
+  - **A partner's drawing is served, not redrawn**, because 82 tables called
+    V1…VII 25 mean nothing as a list and where they sit is the question being
+    asked. That puts third-party markup in our DOM, so
+    [seatmap/svg.js](server/src/seatmap/svg.js) reduces it to an **allow-list**
+    of shapes and attributes — no `<script>`, no `on*`, no `xlink:href`, no
+    `url()` in a style, no ids to collide with ours, only the `data-sid` that
+    addresses a block. Anything not named there is dropped, so a tag nobody has
+    seen cannot arrive and be trusted by accident.
+  - **It is a request, not a booking, and every layer says so**: nothing we run
+    can hold a seat, so staff confirm each one by hand and go back to the
+    customer if a seat has gone.
+  - Fetched on demand and cached a minute — a map stored by the sync would be
+    hours stale, which is a worse lie than "as of a minute ago" — only ever from
+    a URL already on the event row (never one from the query string). The night
+    is identified by **date and time**, because a run can play twice in one day
+    and each show is its own hall. `SEATMAP_ENABLED=0` turns it all off;
+    `SEATMAP_SOURCES=` keeps only the sources named. Full reasoning in
+    [as_ticketing/README.md](as_ticketing/README.md).
+- **You can search it.** A box in the `/events` hero and in the header on every
+  page, suggesting as you type: [as_ticketing/src/lib/search.js](as_ticketing/src/lib/search.js)
+  matches, [EventSearch.jsx](as_ticketing/src/components/EventSearch.jsx) draws.
+  There is no search endpoint — the catalogue is ~70 rows every page already
+  loads, so it is matched in memory, which keeps the "no backend of its own"
+  rule intact. **One matcher, two callers**: the listing filters the grid
+  server-side and the box ranks suggestions client-side through the same
+  `searchEvents()`, so a suggestion and the page it leads to can never disagree.
+  Every word must land somewhere (title beats venue, start-of-field beats
+  mid-word), text is folded first (case, accents, HTML, punctuation; Arabic
+  survives), and the client index deliberately sees less than the server —
+  titles/venues/cities/categories only, while the results page also searches
+  descriptions, where a support act's name usually hides. That is why the
+  dropdown never says "nothing found": its last row is always *see all results*.
+  A `?q=` page is `noindex, follow` with a self-canonical and no structured data
+  — an infinite query space rearranging pages Google already has.
+- **Search is a feature here, not a chore** — it is how someone finds an event they
+  didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
+  one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
+  `schema.org/Event` on every event page (the date/venue rich result, and the Events
+  experience on Search and Maps); a multi-night run emits **one Event per night**, `offers`
+  deliberately carries **no price** (we don't know it, and a fabricated `0` is a
+  misrepresentation where Google checks markup against reality), and each
+  `/events?category=<slug>` is its own indexable page while an unknown one is noindexed.
+  A finished event keeps its page — marked ended, `noindex, follow`, out of the sitemap —
+  because a 404 the morning after the show discards every link it earned. Full reasoning in
+  [as_ticketing/README.md](as_ticketing/README.md).
+- **`as.com.lb/events` 301s here**, one-to-one, from the root [vercel.json](vercel.json) —
+  and is out of the marketing site's generated `sitemap.xml` with it. Two domains rendering
+  the same events under different URLs split the ranking signals between them, and the
+  slugs match precisely so that this redirect can be an exact mapping rather than a dump
+  onto a listing page. The destination is hardcoded there because a static host cannot
+  read `settings.ticketing_url`: turning that setting off would put the marketing site's
+  own `/events` back in the nav while the redirect still sent everyone here, so unset the
+  redirect in the same change.
+- **The chrome is light because the logo is.** The supplied artwork
+  (`as_ticketing/public/Logo/logo.png`) is a square stacked lockup on a white card, so a dark
+  header would frame it in a white box. The header also can't use the lockup as-is — at 34px
+  its wordmark would be four pixels tall — so it relays the same elements horizontally: the
+  ticket mark (cropped out of the original) plus "Ticketing Hub" as live text. The favicon is
+  the mark on a transparent square. Full detail in
+  [as_ticketing/README.md](as_ticketing/README.md).
+
+## Scripts
+
+Frontend (repo root): `npm run dev` · `npm run build` (pre-renders — needs the API, see
+*Pre-rendering & AI search*) · `npm run build:spa` (plain SPA, no API needed) · `npm run preview`
+Backend ([server/](server/)): `npm run dev` · `npm start` · `npm run migrate` · `npm run seed`
+
+`npm run app` (repo root) is the Android release: it builds the Play Store bundle on EAS,
+waits, then prints (and copies) the expo.dev link to download the `.aab` from and upload to
+Play Console by hand — a browser fetches 60 MB faster than the script and is where the
+upload happens anyway. `--download` keeps a local copy in `mobile/build/` as well, `--latest`
+skips the build and prints the newest bundle's link. `npm run app:test` is the installable
+test APK (that one does download, and goes onto a connected phone); `mobile`'s own
+`npm run play` adds an `eas submit` leg for when the manual upload should stop.
+See [mobile/scripts/apk.mjs](mobile/scripts/apk.mjs).
+
+`npm run reel` (repo root) renders the mobile app's Instagram reel to
+`marketing/out/as-app-reel.mp4`; `npm run reel:studio` opens the Remotion editor to tune it.
+See [marketing/README.md](marketing/README.md).
+
+`npm run kill` (repo root) stops every dev server across all the sub-projects at once —
+it clears whatever is listening on the project's ports (vite 5173-5175, next 5180, site API
+8080, store API 8081, expo 8082-8083) and their child processes. `npm run kill:dry` lists them
+without killing. See [scripts/kill-dev.mjs](scripts/kill-dev.mjs).
+
+**Deploy the APIs:** `npm run deploy` (from any of the three package folders, on any OS).
+The repo holds **two** Node APIs, both served from one clone at `/opt/as-company` on the VPS:
+`site` = [server/](server/) → pm2 `as-api` :8080, and `store` = [as_store/server/](as_store/server/)
+→ pm2 `as-store-api` :8081. Target one with `npm run deploy:site` / `deploy:store`.
+
+[scripts/deploy.mjs](scripts/deploy.mjs) routes to [deploy.ps1](deploy.ps1) on Windows/macOS —
+which checks/creates the SSH key, installs it on the VPS on first run, remembers the target in
+`deploy.env` (git-ignored), pushes the branch, then runs [deploy.sh](deploy.sh) over SSH — or
+straight to `deploy.sh` when already on the VPS. `deploy.sh` preflights each app's `.env`,
+fast-forwards the branch **once**, then per app: installs deps only when its manifests changed,
+**fingerprints every schema-bearing file it owns** (the store's includes `as_store/db/*.sql`,
+since its `migrate.js` reads `../../db`) to decide whether `npm run migrate` is needed (taking a
+`pg_dump` first), restarts its PM2 process, and health-checks `/api/health`. An app with no
+changes is left running untouched; a failed health check rolls the code back. Flags: `--app`,
+`--branch`, `--dry-run`, `--force-migrate`, `--skip-migrate`, `--force-restart`.
+Details in [server/README.md](server/README.md).
+
+> The store API **must** live inside the clone (`/opt/as-company/as_store/server`) — a standalone
+> copy of `as_store/server/` breaks `migrate.js`'s `../../db` lookup. See [as_store/DEPLOY.md](as_store/DEPLOY.md).
+
+## Mobile app (`mobile/`)
+
+An Expo (SDK 54 / React Native 0.81) app that is **both** products in one binary: the marketing site's
+events and What We Do, and the full AS Store storefront with accounts, cart, checkout and orders. It
+talks to the same two APIs as the web (`websiteApiUrl` / `storeApiUrl`, plus `storeWebUrl` for the
+legal pages it links out to) and has no backend of its own. Everything visual comes from
+[mobile/src/theme](mobile/src/theme) + [mobile/src/ui](mobile/src/ui) — build new screens from those
+primitives rather than raw `View`/`Text`. Full detail in [mobile/README.md](mobile/README.md).
+
+Store-publishing requirements that are easy to break and hard to notice:
+
+- **Account deletion must exist and must stay honest.** `DELETE /api/account` +
+  [mobile/app/account/delete.jsx](mobile/app/account/delete.jsx). Deleting cascades everything
+  personal but keeps the order rows (bookkeeping/warranty) with their PII scrubbed, and refuses while
+  an order is in flight. The endpoint, that screen's copy, and the "Deleting your account" section of
+  [as_store/src/components/PrivacyPolicy.jsx](as_store/src/components/PrivacyPolicy.jsx) describe the
+  same behaviour on purpose — that policy is what Google Play and the App Store review. Anything new
+  that hangs off a customer (the AS Wallet ledger, for instance) must cascade on `customers.id` and
+  be named in all three.
+- **The privacy policy covers the app, not just the website**, and is reachable from the account tab
+  **signed out** ([mobile/app/legal.jsx](mobile/app/legal.jsx)). Anything new the app collects — push
+  tokens, device info, a new sign-in method — belongs in that page in the same change.
+- **Android 15/16 readiness** (Play Console flagged both before Feb 2027): the app must not restrict
+  orientation — `orientation: "default"` in app.json, so the manifest emits
+  `screenOrientation="unspecified"`, because Android 16 ignores the restriction on foldables and
+  tablets anyway and a portrait-locked layout just letterboxes there. And it must not touch the
+  deprecated window-colour APIs: `edgeToEdgeEnabled: true`, and **never pass `backgroundColor` to
+  `<StatusBar>`** — that prop calls `Window.setStatusBarColor`, deprecated in Android 15, a no-op
+  under edge-to-edge, and enough for Play to flag the build. Tint the status-bar area by giving a
+  `SafeAreaView edges={['top']}` a background instead, the way GlobalPromoBanner does.
+- **R8 has to stay on.** `expo-build-properties` with `enableMinifyInReleaseBuilds` +
+  `enableShrinkResourcesInReleaseBuilds` in app.json: the Android template defaults
+  `minifyEnabled` to **false**, which is how bundle 20 (1.1.0) shipped at **1% obfuscation**
+  and got flagged by Play (fix by Feb 2027 — under 25% in any category "may impact your
+  visibility and publishing capabilities"). Because R8 renames classes and reflection breaks
+  only in release, a minified build must be walked by hand (`npm run apk:prod`) before upload
+  — the debug build you developed against will never show it.
+- **OTA updates**: `expo-updates` with the `fingerprint` runtime policy and a channel per EAS profile.
+  `npm run update` ships a JS-only fix without a store review; anything touching native code needs a
+  real build, and fingerprint is what stops such an update from reaching a binary that can't run it.
+- **Error containment — nothing should take the whole app down.** Four layers, each catching what the
+  one below can't see: `<Boundary>` around a section ([mobile/src/components/Boundary.jsx](mobile/src/components/Boundary.jsx)),
+  `ScreenBoundary` exported as every route's `ErrorBoundary` (a broken screen keeps the tab bar
+  alive), [CrashScreen.jsx](mobile/src/components/CrashScreen.jsx) as the root last resort, and
+  `installGlobalErrorHandler()` ([mobile/src/lib/errors.js](mobile/src/lib/errors.js)) for throws
+  **outside** render — which React boundaries cannot see and which otherwise kill a release build.
+  New screens should keep the `ErrorBoundary` export; new data-driven sections should get a
+  `<Boundary>`. All of it funnels through `reportError`, the one place to wire a reporting service.
+  There is no crash *reporting* wired up today.
+
+## Marketing video (`marketing/`)
+
+A **Remotion** studio (its own npm package, JSX like the rest of the repo) that renders AS's
+social video. Today it holds one deliverable — `AppReel`, a ~26s **1080x1920** vertical reel for
+the mobile app — but it is a studio, not a one-off: another reel is a scene folder and a
+`<Composition>`, not another project. `npm run reel` / `npm run reel:studio` from the repo root;
+`npm run content` inside it. Full detail in [marketing/README.md](marketing/README.md).
+
+- **Nothing on screen is invented.** `scripts/fetch-content.mjs` snapshots real products (with
+  their photos), real upcoming events and the real 14-slice prize wheel from the two live APIs into
+  `src/data/`, and that snapshot is **committed** — a render has to produce the same frames twice,
+  and a video that shipped last week should still rebuild next month, neither of which is true if
+  scenes fetch at render time. Every number is derived, not typed: "1,200+ products" is the measured
+  count rounded *down*, the cashback figures come from the same `earn_percent` the app uses, and
+  `+ VAT` follows every price because VAT is added at checkout.
+- **The closing card cannot promise a store that isn't live.** `stores` in `src/config.js` is
+  `{ android: false, ios: false }` and the card therefore reads "Coming soon to Android & iOS" —
+  true while the Play listing is an internal draft and iOS has no APNs key. Flip a flag the day a
+  listing is public and the wording and buttons change themselves. The buttons are typed pills, not
+  the official Play/App Store badges, which are trademarked artwork with their own rules.
+- **`src/lib/wheel.js` is a third deliberate copy** of the spin geometry (app + store CMS being the
+  other two), for the same reason: the wheel in an advert must be the wheel in the app, down to
+  which slice sits under the pointer at rest. The app's chrome — tab bar, product tile, header — is
+  likewise rebuilt from `mobile/src/components/`, so **a navigation change in the app dates this
+  reel**; re-check it before a re-cut.
+- Event **poster artwork is deliberately not used** (it is the promoters', and an advert is not a
+  listing page) — the cards are drawn from the facts. Icons are originals rather than Ionicons
+  traced by eye, and WhatsApp is named in words rather than approximated as a mark.
+
+## Sign in with Apple (store + app + API)
+
+Two front doors, one account. The iOS app signs in natively (`POST /api/account/apple`); the
+storefront does a full-page trip like Google's (`/api/account/apple/start` → Apple →
+`POST /api/account/apple/callback` → `/auth/apple`). Both end in `completeAppleSignIn` in
+[as_store/server/src/app.js](as_store/server/src/app.js), recognising the customer by
+`customers.apple_sub` (Apple's `sub` is per developer team, so the app and the website see the
+same one). Verification lives in [apple.js](as_store/server/src/apple.js); full detail in
+[as_store/server/README.md](as_store/server/README.md).
+
+- **The website is a separate Apple client** — a Services ID (`APPLE_SERVICES_ID`), not the
+  app's bundle id. Unset, `auth/methods` reports `appleWeb: false` and no web button shows.
+  The app reads `apple`, a separate flag, so nothing web-side can hide the app's button.
+- **Apple returns with a cross-site POST**, so the web state cookie must stay
+  `SameSite=None; Secure` (a Lax one never comes back) and callback redirects must be 303.
+- **A refresh token is revoked by the client that got it** — `apple_refresh_client` (NULL =
+  the app) travels with `apple_refresh_token`, including through account merges. Anything
+  that moves or copies one must move both.
+
+## Checkout requires a mobile number (store + app + API)
+
+Every order carries a number someone can actually be called on, whatever the sign-in was. Google and
+email-code sign-ins bring no mobile with them, so for those customers the checkout field starts empty
+and this is the only thing between that and an undeliverable order.
+
+- The rule lives in `POST /api/orders`: `normalizeMobile(phone)` must resolve, for **signed-in
+  customers too**, not only for guests. That is the one place the website, the app and anything else
+  all pass through.
+- Both checkouts mirror the same normaliser client-side (`isValidMobile` in
+  [as_store/src/lib/orders.js](as_store/src/lib/orders.js) and
+  [mobile/src/lib/format.js](mobile/src/lib/format.js)) purely to save the round trip. Loosen the
+  server rule without loosening these and valid numbers get rejected before they are ever sent.
+- A signed-in account with **no** `customers.mobile` gets the number backfilled from the order, so it
+  is never typed twice. Conditional on the column being empty and on no other account owning it — the
+  number on file is what signs them in, and a delivery contact must not silently rewrite it.
+
+## The shopping assistant is one endpoint, two clients
+
+The AS Store's chat assistant lives in the storefront's own route,
+[as_store/src/app/api/chat/route.js](as_store/src/app/api/chat/route.js): the system
+prompt, three tools pointed at the real catalog, the tool-round budget, the per-IP
+rate limit and the model key, which never leaves that server. The website's
+`ChatWidget` and the app's [assistant screen](mobile/app/assistant.jsx) are both
+**clients of it** — the app POSTs to `<storeWebUrl>/api/chat` rather than the
+store API, because a port into Express would be a second prompt to keep in step
+and a second place to leak a key from. The route takes plain JSON with no cookies
+and no auth, and React Native's fetch has no browser origin, so a mobile client
+needs nothing the web has.
+
+- **Answers are grounded and the products are real rows.** The model returns
+  slugs its tools looked up; both clients render them with their own product tile
+  (live price, working Add to Bag), so a price on screen is never one the model
+  typed. In the app they pass through `mapChatProduct` to rebase the photo host.
+- The website hides the bubble when no key is configured (`aiConfigured()`, checked
+  server-side); the app can't know before asking, so it shows the route's own 503
+  wording instead.
+
+## The Shop tab is the catalog (mobile app)
+
+`/(tabs)/shop` renders [CatalogScreen](mobile/src/components/store/CatalogScreen.jsx) over the whole
+catalog: the product grid with the sort/filter toolbar, and nothing else. It used to be a menu — an
+"All products" card above a wall of category tiles — which made browsing a two-tap errand and gave
+the tab nothing to show but signposts.
+
+- **One component, two routes.** `/category/<slug>` is the same screen scoped to one department, so
+  the fiddly parts (the `getItemLayout` row arithmetic, the per-density cell styles, the prebuilt
+  filter index) exist once. The list heading is optional — the Shop tab hides it, because the nav bar
+  already says Shop and repeating it pushes the first row of products off the screen.
+- **Categories didn't disappear, they became a filter**: the category facet shows on the whole-catalog
+  view only (`showCategory`), and the home tab's `CategoryWall` still deep-links to `/category/<slug>`.
+
+## Search on the home screen (mobile app)
+
+The app's front door opens with a search box that suggests as you type
+([mobile/src/components/home/HomeSearch.jsx](mobile/src/components/home/HomeSearch.jsx)). Before it,
+the only way in was the magnifier in the Shop tab's header — three taps from launch, for a catalogue
+of ~1,400 products nobody browses for something they can already name.
+
+- **One endpoint, two clients.** It calls `GET /api/search/suggest` — the same one the website's
+  search dialog calls — which returns the ranked products **plus** the matching categories and
+  brands in one round trip. Three requests per keystroke is a phone's battery, and two clients
+  ranking the same catalogue by two sets of rules would be two answers to one question. The app's
+  [lib/search.js](mobile/src/lib/search.js) is a deliberate copy of the store's (same `MIN_QUERY`,
+  same tokenizer, same six remembered searches); only the plumbing differs — recents live in
+  AsyncStorage, and caching is React Query's (`useSuggestions`), whose `keepPreviousData` is what
+  stops the panel blanking between one keystroke's results and the next.
+- **The bar and its panel live in the screen's fixed header, not in the scroll.** A dropdown
+  absolutely positioned over the body is clipped on Android, and one that scrolls away with the
+  content is not a dropdown — so the panel is a laid-out block the home content makes room for,
+  capped at 42% of the screen (≤360pt) so the keyboard and it can never meet.
+- **It does not close on blur.** Closing there would unmount the row that the tap causing the blur
+  was headed for. It closes on Cancel, on opening a result, and on Android's back — which
+  `HomeSearch` claims while the panel is up, ahead of Home's "leave the app?" guard
+  ([useConfirmExit](mobile/src/lib/useConfirmExit.js)).
+- A brand has no addressable page in the app (the shop's brand filter isn't a route), so a brand
+  suggestion **runs as a search** instead; `/search` takes `?q=` and starts on the results with the
+  keyboard down. Price-hidden products show their "call for price" label — `money(null)` would print
+  `$0` and undo the flag.
+
+## Add-to-Bag flight (mobile app)
+
+The product photo arcs out of the card and lands on the bag icon
+([mobile/src/components/FlyToCart.jsx](mobile/src/components/FlyToCart.jsx)), with the tab-bar badge
+popping as the count rises. Reanimated only — no native dependency, so it ships as an OTA update.
+
+- **The overlay is mounted above every screen** (in `AppProviders`). It has to be: the image starts
+  inside a virtualized list and ends on the app's chrome, and nothing rendered inside either one can
+  cross that boundary.
+- **The landing spot is registered, and registrations are a stack.** `useCartTarget()` on the tab
+  bar's bag, and again on every `AppHeader` bag (Shop, a category, search) and the product screen's —
+  a screen pushed over the tabs covers the tab bar, so it claims the target while it is up and hands
+  it back. Each call gets its own identity so two screens stack rather than overwrite.
+- **Registered while *focused*, not while mounted.** The tab navigator keeps a tab alive once you
+  have visited it, so a bag that registered on mount would still hold the landing spot from a screen
+  you left three taps ago and the photo would fly to where that bag used to be. The header's bag
+  passes a focus flag (`useFocusEffect`); losing focus unregisters, regaining it re-registers on top.
+  Before the header registered at all, adding from a pushed screen sent the photo past the bottom
+  edge toward a tab bar that wasn't on screen.
+- **The flight is decoration only.** `dispatch(addItem(...))` runs first and unconditionally; leaving
+  the screen mid-flight cannot lose the item, and reduced motion skips the animation entirely.
+- Source views need `collapsable={false}` — Android flattens layout-only views away, and a view that
+  no longer exists cannot be measured.
+
+## Exclusive items (store + app + admin)
+
+A product sold **on its own terms**, outside every store rule — `products.exclusive`, schema in
+[as_store/db/exclusive.sql](as_store/db/exclusive.sql). The first one is **RaiOne**, a software
+licence at **$1 each**, **$5 minimum**, **10,000 maximum**, in steps of **0.01** — so the quantity a
+customer types *is* the amount they pay: someone settling $130 enters 130, someone settling $7.50
+enters 7.5, and Whish collects exactly that.
+
+- **One flag, not four columns**, because the exemptions only make sense together: a licence has
+  nothing to deliver, nothing to tax at the door, and no cash for a driver to collect. `exclusive`
+  turns off **VAT**, the **delivery fee**, **cash on delivery** (Whish Pay only), **AS Wallet**
+  (earns none, spends none) and **Daily Spin vouchers**, and it replaces the 2-per-product bag cap
+  with `min_qty`/`max_qty`. All of it is enforced in `POST /api/orders`, which is the only place
+  both storefronts and the app pass through — the clients merely stop *offering* what the server
+  would refuse.
+- **It is bought on its own.** Mixing one into a bag of physical goods would mean pro-rating every
+  rule above across the lines — VAT on half the subtotal, delivery on the other half, credit earned
+  on part of it — and each of those is a way for the figure on screen to drift from the figure
+  charged. The API refuses the mix (`code: 'exclusive_alone'`, naming the product) and both
+  checkouts say so before the form is filled in.
+- **The order carries its own snapshot** (`orders.exclusive`), like the delivery fee and the VAT
+  rate: `syncOrderWallet` reconciles an order's earnings on every status change, and re-reading the
+  product's flag then would rewrite what an order earned the day someone clears it.
+- **Whish is forced, not demanded.** A `cod` reaching the API is a stale client — every checkout
+  offers only Whish for these — so the order is switched rather than refused; the payment page is
+  what it was trying to reach. Vouchers and `useWallet` arriving on one are **ignored and logged**:
+  nothing is claimed, so nothing has to be given back, and refusing would turn a stale client into a
+  sale that cannot complete at all.
+- **No address is required** for an exclusive order (there is nowhere to deliver to), which is why
+  that check moved below the bag read in `POST /api/orders`. The **mobile number is still mandatory**
+  — see *Checkout requires a mobile number*.
+- **`min_qty`/`max_qty`/`qty_step` are independent of the flag** and useful on any product: null
+  means "follow the store default" (`MAX_ITEM_QTY` = 2, step 1). The API **resolves them to real
+  numbers** for the storefront and the app so neither carries its own copy of the default — but
+  hands the **admin the raw columns**, the same `admin` split the price uses, because the editor
+  writes back what it is shown and a resolved `2` would pin every product it touched to today's
+  default.
+- **A step below 1 makes the quantity an amount, not a count.** That is a separate column from
+  `exclusive` on purpose: `exclusive` is about tax, delivery and payment, `qty_step` is about what a
+  quantity even means for this product, and an exclusive product sold in whole units is perfectly
+  reasonable. `order_items.qty` and both `products.min_qty`/`max_qty` are therefore `NUMERIC(10,2)`
+  — an INTEGER there would truncate 7.5 to 7 and charge fifty cents less than was agreed. **pg
+  returns NUMERIC as a string**, so `orderItemJson` coerces it: `"7.50"` concatenates rather than
+  adds in every client that totals a bag.
+- **`snapQty()` is the one authority on what a quantity becomes** — floor onto the product's grid,
+  then clamp, then settle at two decimals. It **floors, never rounds**, so a snapped quantity is
+  never more than what was asked for (7.5 of a whole-unit product is 7, not 8), and it divides
+  through a `1e6` round because `7.5 / 0.01` is `749.9999999999999` in binary floating point, which
+  would floor to 749 and quietly turn $7.50 into $7.49. Both cart slices and both quantity fields
+  mirror it to *show* a figure early; only the server decides one.
+- **A fractional line counts as one thing in the bag**, not seven and a half — the bag badge and the
+  order notification's `itemCount` count entries when the step is below 1.
+- **Unlisted is a real behaviour, not just an absent row.** RaiOne ships `visible = false`, which
+  keeps it out of the grid, search, the category pages, the sitemap and the Merchant feed — but
+  `loadProduct()` in [as_store/src/lib/catalog.js](as_store/src/lib/catalog.js) 404s every hidden
+  product on purpose (that is how the catalog sync retires one), so **an exclusive product is
+  explicitly excepted there**. That one line is the whole difference between an exclusive link and a
+  404; the API serving the row is not enough, because the page never reaches it. The page is then
+  `noindex, follow` and drops its `Product` markup — a shared link can still be crawled, and feeding
+  Google an Offer for a product deliberately kept out of the Merchant feed would undo the point of
+  keeping it out. **Its slug is case-sensitive** (`WHERE p.slug = $1`), so `/product/RaiOne` works
+  and `/product/raione` does not.
+
+### AS-Punch licence renewal (`/product/RaiOne?renewal=<code>`)
+
+An AS-Punch installation's **Renew now** button opens RaiOne with a code issued by the AS-Punch
+licence server ([server/src/licenseRenewal.js](as_store/server/src/licenseRenewal.js),
+[LicenseRenewalBox.jsx](as_store/src/components/LicenseRenewalBox.jsx)). The page then shows that
+business's monthly amount in a **disabled** field instead of the typed amount and Add to Bag, takes
+name + mobile, and goes straight to Whish — it never touches the bag.
+
+- **The amount is never the browser's.** `POST /api/orders` with `licenseRenewal` resolves the code
+  against the licence server again and prices a single line (price = amount, qty 1) from that
+  answer; the sent quantity is ignored. Only an exclusive product can carry a renewal, so every
+  exemption above (no VAT, delivery, cash, wallet, vouchers) applies. A code that is paid, lapsed,
+  superseded by a price change, or unknown is refused with a sentence the customer can act on.
+- **Paid means reported, and reported means retried.** `markWhishPaid` calls
+  `queueLicenseRenewal`, which reports the payment (HMAC-signed with
+  `LICENSE_SERVER_BILLING_SECRET`) before the customer's order page loads. If the licence server is
+  down the order stays `license_renewal_status = 'pending'` and a worker re-sends it with backoff
+  capped at an hour — indefinitely, because it is money already taken. The notification outbox was
+  not used for this: it gives up after four tries. The licence server is idempotent on the order id.
+- **Without a code RaiOne is exactly what it was** — typed amount, $5 minimum. The RaiOne Systems
+  desktop app sends its customers to this page to pay, so it must stay open.
+- The code is read in the browser (`window.location.search`), and an exclusive product's buy box
+  renders nothing until it has been, so the editable amount never flashes before the fixed one.
+- Unset `LICENSE_SERVER_URL` / `LICENSE_SERVER_BILLING_SECRET` = renewal links say "unavailable";
+  ordinary orders are unaffected. Schema: [db/license_renewal.sql](as_store/db/license_renewal.sql)
+  (columns on `orders`, applied last by `migrate.js`).
+
+### The quantity picker
+
+Pressing **+** is fine over a range of 1–2, absurd over 1–10,000, and cannot reach 7.5 at all — so a
+product whose cap exceeds the store default **or whose step is below 1** (`isBulk()` in both cart
+slices) gets a **typed quantity box** instead:
+[as_store/src/components/QtyField.jsx](as_store/src/components/QtyField.jsx) and
+[mobile/src/components/QtyField.jsx](mobile/src/components/QtyField.jsx), on the product page, in
+the bag, and — on the web — in a [QtyDialog](as_store/src/components/QtyDialog.jsx) that opens from
+the tile's **Add to Bag** so the quantity is chosen *before* the item goes in rather than edited
+afterwards. (The app's tile opens the product screen instead, where the box already lives.)
+
+- The field **holds a raw string while focused** and commits clamped on blur: clamping each
+  keystroke turns "1" into the minimum before the "3" of "130" has been typed, and would eat the
+  "." of "7.5" the moment it was typed.
+- **The arrows still move in whole units** even at a step of 0.01 — nudging $7.50 a cent at a time
+  is not a nudge anyone wants — while the box accepts one decimal point and at most two decimals,
+  because the cent is the smallest thing money has.
+- A **running total** sits beside it (`130 × $1.00 = $130.00`), because where a licence costs $1 the
+  quantity and the amount are the same number and that should be legible before the bag, not after.
+- **The box says what it is asking for.** `qtyLabelOf()` (in both cart slices, worded identically)
+  puts **Amount ($)** above a field whose step is below 1 on a $1 product — where the number typed
+  *is* the dollars — **Amount** on any other fractional product, and **Quantity** on a whole-unit
+  bulk one. A stepper over 1–2 needs no label; a box that takes 5–10,000 does, and leaving it to be
+  inferred from the total underneath leaves the one thing the field is for unsaid. It renders on the
+  product page, in the web's QtyDialog and above the app's footer box — the same word everywhere the
+  same box appears.
+- **Ordinary products are untouched** — one tap, straight to the bag, cap still 2.
+
+## Call for price (store + app + admin)
+
+Per-product flag (`products.call_for_price`) that hides a price and offers a WhatsApp enquiry
+instead — for lines AS may not advertise a price on (Apple hardware). Copy lives in
+`settings.call_for_price_*`; helpers in [as_store/src/lib/callForPrice.jsx](as_store/src/lib/callForPrice.jsx)
+and [mobile/src/lib/callForPrice.js](mobile/src/lib/callForPrice.js).
+
+- **Hiding it means the API stops sending it.** `productJson(row, admin)` nulls
+  `price`/`oldPrice`/`salePercent` unless the caller is an authenticated admin — hiding the number in
+  the UI while still serving it in JSON (to scrapers, to Google) would not be hiding it. The detail
+  routes carry `optionalAuth` for exactly that; the admin's `?all=1` list and the create/update
+  responses pass `admin: true` so the CMS still sees the real price. The price stays in the column —
+  the sales engine, past orders and switching the flag back off all need it.
+- **It must also be unsellable.** `POST /api/orders` rejects any such line with
+  `code: 'call_for_price'`, naming the product. That is the real guard: the storefront hides Add to
+  Bag, but a bag saved before the flag was set still arrives at checkout.
+- Price arithmetic must skip these: `productJsonLd` omits the Offer price (else Google keeps
+  advertising it), and `catalogFilters.js` + the API's `minPrice/maxPrice` exclude them from ranges —
+  a null price otherwise reads as $0 and wins "Price: Low to High".
+- **They sort last everywhere you browse.** `browseOrder` in the store API (`p.call_for_price` first
+  in the ORDER BY) covers the shop, categories, the homepage rows and the app in one place, and
+  `sortProducts` in both `catalogFilters.js` (web **and** mobile) keeps it true after a client-side
+  re-sort. Two deliberate exceptions: a **search** ranks by relevance (someone who typed "iPad Pro"
+  wants the iPad, priced or not), and the **admin** list keeps its own `(sort, id)` order — staff
+  arrange their catalog by hand and a reshuffle there only hides what they are looking for.
+- Marking is manual: a toggle in the product editor and a bulk **Call for price / Show price** pair
+  in the admin products list (`PUT /api/products/bulk/call-for-price`), so filtering to Apple →
+  Laptops and flipping all of them is one click. Nothing is automatic — a brand rule would hide
+  prices on scraper-imported products nobody has looked at yet.
+
+## AS Store homepage (store + admin)
+
+The storefront homepage is the products themselves — one horizontal rail per category under a small
+title, between the nav and the footer, and nothing else. The hero, marketing acts and scroll
+choreography that used to fill it are gone
+([src/app/(store)/page.jsx](as_store/src/app/(store)/page.jsx) +
+[home/HomeRow.jsx](as_store/src/components/home/HomeRow.jsx)).
+
+- **The admin picks the categories**: `categories.show_on_home` (a toggle in `/admin/categories`,
+  ordered by the same `sort` as the rest), the twin of `show_in_nav`. A department's row includes its
+  subcategories' products, because the API's `?category=` already resolves the parent. With nothing
+  ticked the page falls back to the first few categories — a fresh install still has a homepage.
+- **The first row** (newest / featured / one category) and **how many products every row holds** are
+  `settings.homeNew` in `/admin/settings` → Homepage.
+- **Each row asks for only what it shows** (`loadRowProducts` → `/api/products?category=&limit=`),
+  server-rendered — the homepage no longer pulls the whole 1,400-product catalog to slice eight
+  products off it. Products with no photo are skipped, so a row over-fetches to fill.
+- `?sort=newest` on `/api/products` exists for the "newest arrivals" row; every browse order already
+  puts "call for price" products last (see above).
+
+## Catalog sync (store)
+
+`cd as_store && npm run sync-catalog` scrapes the source shop **from your machine**
+(the VPS's IP is blocked, which is the whole reason the script exists), ships the photos
+and `products.json` up, and imports them —
+[scripts/sync-catalog.mjs](as_store/scripts/sync-catalog.mjs) →
+[server/src/import-scrape.js](as_store/server/src/import-scrape.js) →
+`ingestProducts` in [server/src/scraper.js](as_store/server/src/scraper.js). Full detail in
+[as_store/OFFLINE-IMPORT.md](as_store/OFFLINE-IMPORT.md).
+
+- **There is no mobile database.** The app reads the same API and Postgres as the web, so
+  an import is live everywhere the moment it commits — no rebuild, no OTA. `--purge` only
+  clears the *Next.js* storefront cache; the app's own React Query cache is 5 minutes.
+- **A whole-catalog run is a mirror, not an append.** `applyDelist()` hides what the shop
+  has stopped selling (`visible = false` + a `products.delisted_at` stamp) — the import
+  still never deletes a product, because past orders, warranty lookups and photos hang off
+  the row. A product the shop lists again is un-hidden by the next run.
+- `delisted_at` is what makes a hide *ours*, and it is the only thing standing between a
+  nightly sync and someone's manual decision: **hidden + stamped** = we hid it (restorable),
+  **hidden + no stamp** = a person hid it (never touched), **visible + stamped** = a person
+  overrode us (never touched). Anything that changes product visibility automatically must
+  respect those three states.
+- **A partial scrape is indistinguishable from a mass delisting**, so delisting only runs on
+  a `--mode site` scrape with no `--limit`, and only when the file covers ≥ `--delist-floor`
+  (0.5) of what we **still list** from that host. Below it: nothing is hidden, and the run
+  exits 3. Already-archived rows are out of that ratio on purpose — counting them would make
+  the guard refuse for ever once a shop shrinks (pacmax.me went 1787 → 384, which scores 21%
+  against everything ever imported and 100% against what we still list). Scope is by source
+  host, matched with an anchored regex: `LIKE '%//host/%'` needs a slash after the hostname
+  and silently matched **nothing** for a shop on plain WordPress permalinks
+  (`https://pacmax.me?product=slug`), so the mirror reported "on" and hid nothing for months.
+  Hand-made products (`source_url = ''`) and other shops' imports can never be caught.
+- **Identity is `source_url`, then `products.source_sku`.** A shop that deletes and re-creates
+  a product hands it a new url, and a url-only match reads that as a new product — the old row
+  stays live and the catalog carries both (one pacmax rebuild did this 30 times). The SKU
+  survives a re-slug. It is scoped to the same host and treats two matches as no match; it is
+  never shown to a customer and is not `mpn` (that one is staff-owned and goes to Google).
+- Everything else stays additive on purpose: category images are snapshotted and restored,
+  admin-added product images survive, and `--dry-run` names every product it would hide.
+
+## Daily Spin (mobile app + store admin)
+
+A once-per-cooldown prize wheel that lives **only in the mobile app** and is driven entirely from
+the AS Store CMS at `/admin/spin`. Schema in [as_store/db/spin.sql](as_store/db/spin.sql), API in
+[as_store/server/src/spin.js](as_store/server/src/spin.js), admin page in
+[as_store/src/app/admin/spin/page.jsx](as_store/src/app/admin/spin/page.jsx), app screen in
+[mobile/app/spin.jsx](mobile/app/spin.jsx).
+
+- **The server draws the prize**, always. `POST /api/spin` picks a slice (weighted, via
+  `crypto.randomInt`), records it and mints the voucher inside one transaction holding a
+  per-customer advisory lock; the app then animates to the id it was handed. The wheel can never
+  disagree with the award, and a customer who kills the app mid-spin has still won.
+- **Sign-in is required to spin** (`requireCustomer`), but `GET /api/spin` is public so the screen
+  shows the real prizes behind the sign-in prompt. The cooldown is the `spin_spins` log — the next
+  spin is allowed `cooldown_hours` after the customer's last row — so reinstalling, signing out or
+  changing the device clock buys nothing.
+- Tables: `spin_settings` (singleton id=1: copy, `cooldown_hours`, default voucher validity),
+  `spin_prizes` (the slices: `type` `percent|amount|free_delivery|gift|none`, `weight` = odds,
+  `stock`, colour), `spin_spins` (the log **and** the cooldown clock), `vouchers` (what a win is
+  worth — account-bound, single-use, `source` `spin|admin`). `orders` gained
+  `discount_amount`/`voucher_code`/`voucher_id`, snapshotted like the delivery fee and VAT, so
+  total = subtotal + delivery + VAT − discount.
+- **Redemption is real money**: `redeemVoucher()` in `spin.js` is the single place the rules live
+  (status, expiry, minimum order, percent cap) and is called by `POST /api/orders`. It flips the
+  voucher to `used` *before* the order exists — that atomic flip is what stops double-spending —
+  and `releaseVoucher()` gives it back if the order fails, Whish rejects the payment, or an admin
+  cancels the order. `gift` prizes are staff-fulfilled and never touch checkout.
+- The app picks rewards at checkout from `GET /api/vouchers?subtotal=`, which returns each one with
+  `eligible` + the exact `discount` — the client never re-implements the money rules.
+- Geometry lives in `src/lib/wheel.js` in **both** packages (a deliberate copy — the admin preview
+  and the app wheel must land on the same slice). The app needs `react-native-svg`, so a native
+  rebuild is required, not just an OTA update.
+
+## AS Wallet (store credit — store + app + admin)
+
+Spend money, get a percentage back as credit; spend the credit on a later order. Schema in
+[as_store/db/wallet.sql](as_store/db/wallet.sql), API in
+[as_store/server/src/wallet.js](as_store/server/src/wallet.js), CMS at `/admin/wallet`
+([page](as_store/src/app/admin/wallet/page.jsx)), customer pages at `/account/wallet` on the website
+and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. Default:
+**spend $1,000, get $50 back** (`earn_percent` = 5), CMS-editable.
+
+> This **replaced AS Points**. The deal is identical; the unit is the one customers already think in,
+> so there is nothing to convert and nothing to redeem before it can be spent — which is why the
+> redeem screens, `blocksWorth`, and the whole points→voucher path are gone. `wallet.sql` converts
+> any existing `loyalty_ledger` balance to credit at the old rate, once, guarded by a sentinel note.
+> The `loyalty_*` tables are **retained but never read**, like `reservations` on the marketing site.
+
+- **There is no balance column.** A balance is `SUM(wallet_ledger.amount)` — every cent traces to the
+  order that earned it or the order that spent it, and nothing can drift out of step with the history
+  the customer reads. Rows are append-only; a correction is another row (`earn` / `revoke` / `spend` /
+  `refund` / `adjust`).
+- **Earning is reconciled, not appended.** `syncOrderWallet(orderId)` compares what an order *should*
+  have credited against what it already did and writes only the difference, so it is safe to call
+  from anywhere an order changes — it is wired into order creation, `markWhishPaid`, and the admin
+  status route. That is what makes delivered → cancelled → delivered land on the right balance
+  instead of paying twice. `POST /api/admin/wallet/resync` replays it over every order (the way to
+  apply a changed rate to history, or to backfill orders that predate the wallet).
+- Credit lands per `settings.award_on` — `delivered` (default), `confirmed`, or `created` — and a
+  cancellation always takes it back. The basis is the items subtotal minus item discounts **minus
+  whatever the wallet itself paid**: delivery and VAT never earn (a free-delivery voucher therefore
+  doesn't reduce it), and credit must not breed credit.
+- **Spending is a payment, not a discount**, so it comes off *after* VAT — the tax is on the goods
+  whoever's money buys them. `orders.wallet_amount` snapshots it beside the delivery fee and VAT, and
+  total = subtotal + delivery + VAT − discount − wallet. Vouchers are untouched and still apply to
+  the same order: the voucher discounts the goods, the wallet pays what is left.
+- **The debit is claimed before the order exists.** `spendFromWallet()` writes it under a
+  per-customer advisory lock and returns an entry id; checkout then `attachWalletSpend()`s the order
+  onto it, or `releaseWalletSpend()`s it back — the same shape `redeemVoucher`/`releaseVoucher` uses,
+  and the only thing that stops one balance being spent twice from two devices. `refundOrderWallet()`
+  gives it back when an admin cancels; reopening a cancelled order deliberately does **not** re-take
+  it.
+- **Clients ask for the wallet, never for an amount.** `POST /api/orders { useWallet: true }` lets
+  the server decide what `min_order` / `max_percent` / the balance allow, and prices the order from
+  its own figure. `GET /api/wallet?total=` returns that same `spendable` number so a checkout can
+  show it first — the client never re-implements the money rules (the same reason the vouchers list
+  carries its own `discount`).
+- **"Get $N back" appears on the product page and at checkout**, on both platforms
+  ([as_store/src/lib/wallet.js](as_store/src/lib/wallet.js) → `creditFor`, and
+  [mobile/src/components/WalletEarn.jsx](mobile/src/components/WalletEarn.jsx)). Those estimates
+  mirror `walletEarnFor()` on the server exactly — item spend after discounts and after wallet
+  payment, floored to the cent — so a promise made before checkout is the one the server keeps; pass
+  item money only, never delivery or VAT. They render nothing when the wallet is off.
+
+## Backend
+
+See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
+
+Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag +
+`whatsapp_number` used to build the event reservation WhatsApp links),
+`services`, `events` (each has a `ticket_url` — included in the WhatsApp reservation message — plus an
+optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
+synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),
+`categories` (event categories shown as image tiles:
+name/slug/image/sort/visible; events filter by them on the site),
+`banners` (**retained, no longer rendered** — was the homepage slideshow: image/title/subtitle/link/
+active, plus an optional `event_id` → the banner borrowed that event's image/title/link, resolved
+client-side in `lib/api.js`),
+`sections` (admin-created homepage sections: eyebrow/heading/body/image/button/theme/visible),
+`store_banner` (single row, id=1: the homepage AS Store slideshow — enabled/`mode` `random|specific`/
+`per_slide`/`count`/`product_ids` JSONB. Settings only: the products themselves are read live from the
+AS Store API, never copied here),
+`story` + `story_panels` (**retained, no longer rendered** — the image slideshow the store banner
+replaced),
+`popup` (single row, id=1: a one-time announcement/ad popup —
+enabled/title/body/image/link/link_label + `trigger_type` `load|scroll` with
+`delay_seconds`/`scroll_percent`; `updated_at` doubles as the version the
+frontend stores in localStorage to show it once),
+`what_we_do` (single row, id=1: the **Absolute Solution** page copy — about/intro, vision,
+mission, divisions JSONB, plus section headings) and `solutions` (the items listed on that page:
+slug/title/summary/icon/image/intro/outro + an `items` JSONB array of `{title, description}`,
+sort/visible — each renders a homepage "What We Do" card and a `/what-we-do/:slug` detail page),
+`predictor` (single row, id=1: the **Guess the Score game** — enabled/title/subtitle/intro/
+success_message + prize (`prize_title`/`prize_description`/`prize_image_url`/`prize_amount`) +
+`share_url`/`share_message` (the AS Store item players share to enter) + `terms` JSONB (the red
+T&C bullets) + optional `deadline` and a `closed` flag), `predictor_matches` (admin-created matches:
+two teams each with a name + a club logo in `team_a_flag`/`team_b_flag` — uploaded or pasted, with the
+older `team_a_code`/`team_b_code` still resolving a flagcdn.com flag for national teams — plus
+stage/kickoff/sort/visible) and `predictions` (public entries: full_name/mobile + a `picks` JSONB array
+of `{matchId, teamA, teamB, scoreA, scoreB}` + `share_platform`/`share_item`),
+`contact_messages` (the public `/contact` form: name/email/phone/subject/message + a `read` flag —
+stored **and** emailed to staff, listed at `/admin/messages`),
+`wheel_entries` (the **Lucky Draw** pool: draw_number/full_name + `source` `manual|predictor`,
+a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording each spin),
+`reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
+optional sample content via [server/src/seed.js](server/src/seed.js).
+
+The **Guess the Score** game: when enabled in `/admin/predictor` with ≥1 visible match, an animated
+basketball appears in the **middle of the nav bar** ([components/predictor/BasketballButton.jsx](src/components/predictor/BasketballButton.jsx));
+tapping it opens a three-step modal ([components/predictor/PredictorModal.jsx](src/components/predictor/PredictorModal.jsx)):
+**(1)** guess the exact final score of the featured game (club crests + two big score boxes, gold CTA,
+T&C bullets underneath), **(2)** share any item from the AS Store to an Instagram/Facebook story or
+WhatsApp status (the chosen platform + item are stored on the entry), **(3)** full name + mobile →
+a draw ticket. Open-state is shared via [store/predictor.jsx](src/store/predictor.jsx) (provider in
+`Layout.jsx`). Submissions (`POST /api/predictions`) are public but gated by the enabled/closed/deadline
+checks and one active entry per mobile; the admin reads/archives/deletes entries and exports them to Excel.
+
+The **Lucky Draw** wheel (`/admin/wheel` → [admin/pages/WheelAdmin.jsx](src/admin/pages/WheelAdmin.jsx))
+is an **admin-only** tool — there is no public page and every `/api/wheel-entries*` route is
+Bearer-gated. Staff build the pool (type one entry at a time, paste a list, or **Import Guess the
+Score** — which pulls every *active*, non-archived `predictions` row with its `draw_number`, keyed on
+`prediction_id` so re-running refreshes instead of duplicating), then hit Play:
+[components/SpinWheel.jsx](src/admin/components/SpinWheel.jsx) spins a canvas wheel — a live readout of
+the name under the pointer, synthesised prize-wheel ticks (WebAudio, no assets) — and
+[components/WinnerReveal.jsx](src/admin/components/WinnerReveal.jsx) announces the draw number + full
+name over canvas confetti. The winner is drawn **before** the animation via rejection-sampled
+`crypto.getRandomValues` and the final rotation is derived from it, so the reveal can never disagree
+with the result; that geometry lives in [components/wheelMath.js](src/admin/components/wheelMath.js),
+apart from the component so it stays verifiable. Each spin bumps `wins`/`won_at` on the entry
+("Reset winners" clears them for a fresh round).
+
+API responses are **camelCase**; DB columns are snake_case (mapped in [server/src/app.js](server/src/app.js)).
+Public can read content; everything else needs a Bearer token.
+
+**Contact** (`/contact` → [pages/Contact.jsx](src/pages/Contact.jsx), reached from the nav "Contact" item
+and the footer): one-tap WhatsApp / email / Instagram cards next to a message form. `POST /api/contact`
+is public — it validates, throttles (5 per IP / 10 min, plus a honeypot field), inserts into
+`contact_messages`, then fire-and-forget emails the message to staff via
+[server/src/mailer.js](server/src/mailer.js) (`sendContactEmail`, Reply-To = the visitor, so hitting
+Reply answers them; needs `SMTP_*`, and lands in **orders@as.com.lb** unless `CONTACT_NOTIFY_TO`
+overrides it). Storing first means a mail outage
+never loses a lead — staff read them at `/admin/messages`. The channels themselves come from
+`settings.contact_*` (Site Settings → Contact); the page copy defaults live in `content/site.js`
+(`contact.page`).
+
+## Web scraper
+
+The Python e-commerce scraper in [WebScarping/](WebScarping/) (`scrape.py` + `ecom_scraper/`) is
+driven from the admin dashboard, **not** rewritten in Node. [server/src/scraper.js](server/src/scraper.js)
+mounts an admin-only `/api/scrape` router that **spawns `scrape.py` as a subprocess** (no shell —
+args are passed as an array), writes each run to its own folder under `SCRAPE_DIR`, and serves the
+output back for download (`archiver` zips the whole folder, images included).
+
+- Endpoints (all Bearer-auth): `POST /api/scrape` starts a job → `{ id, status, log, files, ... }`;
+  `GET /api/scrape/:id` polls status/log; `GET /api/scrape/:id/files/:name` downloads one export
+  file; `GET /api/scrape/:id/zip` downloads everything. Jobs are tracked **in memory** (lost on
+  restart); only the most recent ~20 run folders are kept.
+- The product-scraping **UI was removed** from the admin: [src/admin/pages/ScraperAdmin.jsx](src/admin/pages/ScraperAdmin.jsx)
+  now only drives the events sync below. The `POST /api/scrape` endpoints, `scrape.py`, and the
+  `startScrape` / `downloadScrapeFile` / `downloadScrapeZip` client helpers are all still in place —
+  nothing in the site calls them, so re-adding a page is enough to bring the tool back.
+- `scrape.py` gained an `--auto <url>` mode (probe → single product vs. crawl) used by the backend;
+  the existing `--url/--urls/--crawl` modes are unchanged.
+- **Events sync** (the only tool in the admin page) — see its own section below.
+- **VPS prereq:** Python 3 + `pip install -r WebScarping/requirements.txt` (and
+  `playwright install chromium` only if the "JavaScript site" / `--render` option is used). Env:
+  `PYTHON_BIN` (default `python3`), `SCRAPER_DIR` (default `../WebScarping`), `SCRAPE_DIR`
+  (default `server/scrapes`).
+
+## Events sync (three ticketing sites → one events page)
+
+`POST /api/scrape/events` runs [WebScarping/events_sync.py](WebScarping/events_sync.py), which
+scrapes **ticketingboxoffice.com**, **tickit.co** and **ihjoz.com** into one `events.json`;
+[server/src/scraper.js](server/src/scraper.js) then imports it. Driven from `/admin/scraper`
+(pick the sites, the country, and whether to clear what the sites have taken down).
+
+- **One module per site** in [WebScarping/event_sources/](WebScarping/event_sources/), each
+  exporting `KEY`/`LABEL`/`fetch(fetcher, limit, country)`. Adding a fourth site means writing one
+  module and listing it in `SOURCES` — the pipeline, the importer and the admin need nothing new
+  beyond its key in `EVENT_SOURCES` (scraper.js) and `SOURCE_INFO` (ScraperAdmin.jsx). `tbo.py`
+  parses the homepage's isotope cards, `tickit.py` calls the JSON API tickit.co's own browser
+  bundle calls, `ihjoz.py` walks `/events/browse`.
+- **Three sites, one category vocabulary.** Ticketing Box Office has editorial categories, ihjoz an
+  event-type dropdown, Tick'it only music genres — left alone that is three near-duplicate tiles for
+  the same thing. [categories.py](WebScarping/event_sources/categories.py) folds every source label
+  into `CANONICAL` **before** it reaches the database, and its names deliberately reuse the ones
+  already in Postgres so their admin-set tile images survive. `ALIASES` is the tuning point;
+  `refine()` improves a vague category from the event's own title, and only a vague one — an
+  editorial tag from the site itself always wins over a keyword.
+- **Two things look like duplicates and need opposite treatment**
+  ([dedupe.py](WebScarping/event_sources/dedupe.py)): a **run** (one show, many nights — Tick'it
+  published a ten-night stand-up run as ten events) is *merged* into one event with ten `dates`,
+  and a **cross-listing** (the same night sold on two sites) is *dropped*, keeping whichever source
+  ranks first in `SOURCES`. Both need an overlapping date to fire, which is what stops two
+  unrelated nights sharing a generic name from being welded together; a run additionally needs the
+  same venue, so a touring show stays several events.
+- **Identity is `(source, external_id)`**, and the importer matches on **every** listing id a run
+  covers (`mergedIds`), not just today's primary — when the first night sells out and the site
+  retires it, the run gets a new primary id, and that is what stops it becoming a second row.
+  Hand-made events (`source = ''`) are never touched by any of this.
+- **A partial crawl looks exactly like a site emptying its calendar**, so `events_sync.py` only sets
+  `complete` when every requested source answered and no `--limit` was given, and the importer only
+  clears no-longer-listed events on a complete run, per source, and only for a source that returned
+  events. Explicitly-named rows (folded nights, cross-listings, past events) are always cleared —
+  the run identified them. Exit codes: 0 complete · 3 partial (imported, nothing pruned) · 1 nothing
+  scraped (nothing changed).
+- **Categories are the admin's.** The importer upserts by slug and never overwrites a name; the tile
+  image is only filled when empty. Rename or re-picture a category at `/admin/categories` and the
+  next sync leaves it alone.
+- **Empty categories hide themselves**, because a tile leading to "nothing here" is worse on both
+  properties than no tile. `categories.auto_hidden_at` is what makes a hide *ours* — the same
+  three-state trick as `products.delisted_at` in the store: **hidden + stamped** = the sync hid it
+  (restored, stamp cleared, the moment events return), **hidden + no stamp** = a person hid it
+  (never touched), **visible + stamped** = a person overrode us (never touched again). "Empty"
+  counts *every* event including hand-made ones, and like pruning it only runs on a complete run —
+  on a partial crawl a category looks empty merely because its source didn't answer. The admin list
+  says when a category was hidden this way, so one vanishing is never a mystery.
+- `--country Lebanon` (the default) keeps Tick'it — which also sells in the Gulf and Europe — to what
+  AS Company's visitors can actually attend. Past events are dropped unless `--include-past`.
+
+## Content flow (frontend)
+
+The site never hard-depends on the backend:
+
+1. [src/content/site.js](src/content/site.js) + [src/data/events.js](src/data/events.js) — **static defaults** (also the fallback if the API is down/empty).
+2. [src/lib/api.js](src/lib/api.js) — HTTP client: public loader (`loadSite`), `whatsappBookingUrl` (builds the pre-filled event reservation links), `auth` (token in localStorage), and `adminApi` (CRUD + `upload`). Maps API JSON → component shapes.
+3. [src/store/content.jsx](src/store/content.jsx) — `ContentProvider` / `useContent()` loads everything once on startup.
+4. Components call `useContent()`; they don't import the static files directly.
+
+To add an editable field: add the column (migrate) → map it in `app.js` → surface it in the admin editor → consume it via `useContent()`.
+
+## Pre-rendering & AI search (as.com.lb)
+
+The marketing site is a React SPA, and AI answer-engine crawlers (GPTBot, ClaudeBot,
+PerplexityBot…) don't run JavaScript — they used to receive an empty `<div id="root">`. So
+`npm run build` now **pre-renders every public route to static HTML**, which the browser then
+**hydrates**: `vite build` → `vite build --ssr src/entry-server.jsx` → `node scripts/prerender.mjs`.
+
+- **What it writes into `dist/`**: `index.html`, `what-we-do.html`, `what-we-do/<slug>.html`,
+  `contact.html` (served extensionless by `cleanUrls` in [vercel.json](vercel.json)); `spa.html`,
+  the plain shell every other URL rewrites to (admin, unknown paths). The rewrite destination is
+  **`/spa`, not `/spa.html`**: under `cleanUrls` the file only exists at its extensionless path,
+  and `/spa.html` 404'd `/admin` and every other non-prerendered URL from 2026-09-30 to 10-01.
+  Also generated: `sitemap.xml`,
+  `robots.txt`, `llms.txt`, **generated** from the same content — there are no hand-kept copies
+  in `public/` any more. The as-website project already runs `npm run build` into `dist/` by
+  default. **Never put build settings (`buildCommand`, `outputDirectory`…) in the root
+  `vercel.json`**: the as-store and as_ticketing builds read it too — on 2026-09-30 an
+  `outputDirectory: "dist"` there failed both Next.js deploys ("output directory dist was not
+  found at as_store/dist").
+- **Content comes from the live API at build time** (`VITE_API_URL`). If it can't be reached the
+  **build fails on purpose** — Vercel keeps the previous, pre-rendered deployment instead of
+  shipping empty shells. `PRERENDER_ALLOW_FALLBACK=1` ships the plain SPA anyway.
+- **One head, two writers.** [src/lib/seo.js](src/lib/seo.js) `routeHead()` is the only place
+  titles, descriptions, canonicals, OpenGraph and JSON-LD come from; the build writes it between
+  the `<!--seo:start-->`/`<!--seo:end-->` markers in `index.html`, and
+  [RouteHead](src/components/RouteHead.jsx) applies the same result on client navigation. The
+  JSON-LD is an `@graph` whose **Organization `@id` (`https://www.as.com.lb/#organization`) is the
+  parent the store's and the ticketing hub's own Organization nodes point at**
+  (`parentOrganization`) — that shared id is what makes three domains read as one company.
+- **The canonical host is `www.as.com.lb`** (`SITE_URL`, overridable with `VITE_SITE_URL`),
+  because that is the one that answers — Vercel's domain settings 308 the bare domain to www. To
+  switch, flip that redirect and the env var together (and `NEXT_PUBLIC_COMPANY_URL` on the store
+  and hub, which build the parent `@id` from it).
+- **Hydration rules** — the first client render must reproduce the build's HTML exactly:
+  - The page ships the content it was built from as `window.__AS_DATA__` (`snapshotOf()` in
+    [entry-server.jsx](src/entry-server.jsx) — **events, banners and categories are left out**,
+    ~120 KB no pre-rendered page shows), and `ContentProvider` starts from it, then refreshes from
+    the API. [main.jsx](src/main.jsx) hydrates only when `window.__AS_PATH__` is the current path.
+  - Use `useReducedMotion` from [src/lib/motion.js](src/lib/motion.js), **never framer-motion's**:
+    theirs reads the media query during hydration, and React does not patch attributes on a
+    mismatch, so reduced-motion visitors would keep every Reveal at `opacity: 0`.
+  - Nothing browser-only or time/random-dependent in render: `window`, `localStorage`,
+    `Math.random()` belong in effects. The footer's `new Date().getFullYear()` carries
+    `suppressHydrationWarning` for the built-in-December case.
+  - The store slideshow's **random** mode re-samples on every API call, so the refresh keeps the
+    pre-rendered first slide and takes the rest fresh (`keepFirstSlide` in `store/content.jsx`) —
+    otherwise the products swap under the visitor a moment after load.
+- **Freshness**: visitors always get current content (the refresh); crawlers get it at the next
+  build. [server/src/rebuild.js](server/src/rebuild.js) calls a **Vercel Deploy Hook**
+  (`SITE_REBUILD_HOOK_URL`) after an admin write to pre-rendered content (debounced 120 s) and
+  daily for the store products. Unset = pages refresh only on deploy.
+- The homepage has a visually hidden `<h1>` (it is three visual panels with no headline) and the
+  What We Do typewriter's words as screen-reader text; the slideshow's first slide loads eagerly —
+  it is the LCP now that the HTML arrives rendered.
+- **`llms.txt` on all three sites** — Markdown briefings for answer engines, each built from what
+  that site already publishes: this one from the content ([src/lib/seoFiles.js](src/lib/seoFiles.js)),
+  the store's from its checkout settings, return policy and catalog
+  ([as_store/src/app/llms.txt/route.js](as_store/src/app/llms.txt/route.js)), the hub's from the
+  live listing ([as_ticketing/src/app/llms.txt/route.js](as_ticketing/src/app/llms.txt/route.js)).
+  Nothing in them is copy that exists only for machines; the shop's address and hours come from the
+  store admin (see *The shop, its hours, and the FAQs*).
+
+## The shop, its hours, and the FAQs (all three sites)
+
+The physical shop — **AS Store, Kferhata, Zgharta, North Lebanon**, open Mon–Fri 9–5 and Sat 9–2
+(owner-confirmed 2026-09-30) — is described in **one place**: the AS Store admin, Settings →
+**Contact** (address) and **Opening hours** (`settings.opening_hours`, JSONB: one key per day,
+`["HH:MM","HH:MM"]` or `null` = closed; schema default = the confirmed week, and a guarded one-time
+`UPDATE` in `as_store/db/schema.sql` refined the old "Zgharta, Lebanon"). Everything else reads it:
+
+- **The store** directly (FAQ, contact page, footer, `llms.txt`, and an `ElectronicsStore` node
+  `https://store.as.com.lb/#shop` with `openingHoursSpecification`, which the `OnlineStore` points at
+  via `hasPOS`).
+- **as.com.lb and the ticketing hub** through the site API's **`GET /api/shop`**
+  ([server/src/app.js](server/src/app.js)) — a server-to-server relay of the store's settings over
+  `STORE_API_URL`, cached 5 min with the last good copy kept, the store-banner pattern. as.com.lb
+  declares the **same `#shop` node** and gives the company that address, so the two sites describe
+  one place. A change of hours in the store admin reaches the pre-rendered as.com.lb pages at the
+  next build (the daily rebuild covers it; the store admin does not fire the site's deploy hook).
+- Wording comes from `lib/hours.js`, a **deliberate copy in all three packages** (store, site, hub —
+  like `search.js`/`wheel.js`): the same week must read identically everywhere. Tested in
+  `as_store/test/hours.test.js`.
+
+**Each site has a `/faq`** whose answers are **assembled from data, never typed**:
+[as_store/src/lib/faq.js](as_store/src/lib/faq.js) (delivery fee/threshold/VAT from the checkout's
+settings, return window from `returnPolicy.js`, delivery estimate from `ShippingReturns`, payment
+methods as `/pages/terms` states them, the wallet only while it is enabled),
+[src/lib/faq.js](src/lib/faq.js) (brand, divisions, solutions, shop, channels), and
+[as_ticketing/src/lib/faq.js](as_ticketing/src/lib/faq.js) (the Reserve → WhatsApp flow, the
+seat-map "request, not a booking" rule, live categories). One list feeds both the page and its
+`FAQPage` JSON-LD, because Google requires the markup to match what the page shows. The address and
+hours questions simply disappear when the store admin has none to state.
+
+## Publish gate (Coming Soon)
+
+- Driven by `settings.published` (toggled in the admin dashboard).
+- `false` → public routes render Coming Soon; `true` → full site.
+- `siteConfig.fallbackPublished` in [src/config/site.js](src/config/site.js) is only used if the API is unreachable.
+- Preview while unpublished: `?preview=1`.
+- `/admin/*` is **never** gated, so you can always log in to publish.
+
+## Structure
+
+```
+vercel.json                # cleanUrls, /events 301s, fallback rewrite -> /spa (no build settings — see above)
+scripts/prerender.mjs      # build step: public routes -> static HTML + sitemap/robots/llms.txt
+WebScarping/               # Python scrapers, spawned by the API:
+                           #   scrape.py + ecom_scraper/  (e-commerce products)
+                           #   events_sync.py + event_sources/  (ticketing events → DB)
+marketing/                 # Remotion studio — the app's Instagram reel (npm run reel)
+server/                    # Express + Postgres API (deployed to the VPS)
+  src/{index,app,db,auth,migrate,seed}.js
+  src/scraper.js           # /api/scrape router — spawns WebScarping/scrape.py, serves output
+  src/rebuild.js           # Vercel Deploy Hook on content edits (pre-rendered site freshness)
+  README.md                # endpoints + deploy guide
+  .env.example             # DATABASE_URL, ADMIN_*, JWT_SECRET, CORS_ORIGIN, PUBLIC_URL
+src/
+  App.jsx                  # routes: /admin/* (auth) + public site (gated); AppRoutes = router-less table
+  main.jsx                 # hydrates a pre-rendered page, else renders from scratch
+  entry-server.jsx         # build-time renderer (StaticRouter) — never shipped to the browser
+  lib/seo.js               # routeHead(): titles, canonicals, OG, JSON-LD — build + client
+  lib/seoFiles.js          # sitemap.xml / robots.txt / llms.txt generators (build only)
+  lib/motion.js            # hydration-safe useReducedMotion
+  config/site.js           # publish fallback + isPreview()
+  content/site.js          # static default copy (+ nav, CTA labels)
+  data/events.js           # static default events
+  lib/api.js               # HTTP client + mappers + auth + adminApi
+  store/content.jsx        # ContentProvider + useContent()
+  lib/flags.js              # country list + flagcdn.com flag URLs (national-team rounds)
+  store/predictor.jsx       # PredictorUIProvider — shares the game modal's open state
+  components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, StoreSearch, BannerCta, SitePopup
+  components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
+  pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact, Faq
+  admin/
+    useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
+    components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
+    pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreBannerAdmin, PopupAdmin, PredictorAdmin, WheelAdmin, MessagesAdmin, ScraperAdmin
+public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
+tailwind.config.js          # brand colors, Inter font, animations
+```
+
+## Env
+
+- Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com` — read at **build** time too (pre-rendering).
+  Optional: `VITE_SITE_URL` (canonical host, default `https://www.as.com.lb`), `PRERENDER_ALLOW_FALLBACK=1`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. `SITE_REBUILD_HOOK_URL` (+ `SITE_REBUILD_DELAY_SECONDS`, `SITE_REBUILD_EVERY_HOURS`) rebuilds the pre-rendered site on content edits. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+
+## Routes
+
+Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`, `/faq`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
+
+The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
+at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles
+(each opens `pages/SolutionDetail.jsx` at `/what-we-do/:slug`), vision & mission, and the company
+divisions. The same solutions populate the homepage **What We Do** card grid (`Home.jsx`), each card
+linking to its detail page. Static defaults / offline fallback live in `content/site.js`
+(`whatWeDo`, `solutions`).
+
+The homepage's **events panel** ([components/TicketingPanel.jsx](src/components/TicketingPanel.jsx))
+shows the **AS Ticketing Hub logo and nothing else**, and opens the ticketing platform. It replaced
+an admin-managed carousel of event artwork: once events moved to `ticketing.as.com.lb` the panel's
+job changed from "show what's on" to "point at where what's on lives", and a rotating gallery would
+have competed with that. The `banners` table and `/admin/banners` are **retained but no longer
+rendered** (like `reservations`) — the page carries a warning saying so, and the slideshow can be
+restored by putting a carousel back in that panel.
+
+The homepage's **store panel** ([components/StoreBanner.jsx](src/components/StoreBanner.jsx), edited at
+`/admin/store-banner`) is a **slideshow of real AS Store products** — two or three cards at a time,
+each opening that product on `store.as.com.lb`. The cards carry a brand, a name, a line of copy and
+the photo, and **never a price**: prices move (sales, the catalog sync, "call for price" lines), the
+store is the one place they are quoted, and a figure printed on the marketing site is a promise this
+site would then have to keep true.
+
+The products are **not copied into this site's database**. `store_banner` (singleton) holds only the
+choice — `mode` `random` (a fresh sample per visit) or `specific` (`product_ids`, in the admin's
+order) plus `per_slide` — and `GET /api/store-banner` fills it in from the AS Store's own API,
+server-to-server via **`STORE_API_URL`** (5-minute in-memory cache, last-good copy kept on failure;
+`http://127.0.0.1:10001` on the VPS, *not* 8081). Going through this API rather than letting the
+browser call the store keeps the site on one origin — no second base URL on Vercel, no cross-domain
+CORS entry on the store API. With no products resolvable the panel falls back to the AS Store logo,
+which is also what a wrong `STORE_API_URL` looks like — the API logs a warning naming the URL it
+tried. `/admin/store-banner` searches the live store catalog to pick products, so there is nothing to
+upload and a product renamed or hidden in the store is renamed or gone here too.
+
+The homepage opens with an **AS Store search box** ([components/StoreSearch.jsx](src/components/StoreSearch.jsx)
++ [lib/storeSearch.js](src/lib/storeSearch.js)), the website's twin of the app's home-screen search:
+recent searches and the store's departments before you type, then products, categories and brands
+suggested as you type, every result opening on `store.as.com.lb` in a new tab.
+
+- **One ranking, three clients.** It asks this API's `GET /api/store-search?q=`, which relays to the
+  store's own `/api/search/suggest` (the endpoint the app and the store's search dialog call) over
+  `STORE_API_URL`, for the banner's one-origin reason; `/api/store-search/categories` feeds the idle
+  panel. `lib/storeSearch.js` is a **deliberate copy** of the store's and the app's `search.js`
+  (same `MIN_QUERY`, tokenizer, six recents) — keep the three in step.
+- **No prices, on purpose** — the banner's rule. The relay maps products down to
+  id/slug/name/brand/category/image before they leave the server, so a price never reaches this
+  site at all. A brand opens the store's `/shop?brand=` filter (the app has no brand page and runs
+  a search instead).
+- The two homepage layouts under it are `relative z-0` stacking layers: the panels' CTA pills are
+  `z-30`, and without that floor they paint over the dropdown. The list carries
+  `data-lenis-prevent` so it scrolls itself rather than the page. It renders nothing while
+  `settings.storeUrl` isn't an http(s) address.
+
+> This replaced the admin-uploaded **image slideshow** (`story` + `story_panels` → `HorizontalStory.jsx`,
+> `/admin/story`). The component and its admin page are deleted and the site no longer fetches either
+> endpoint; the **tables and their `/api/story*` routes are retained** (like `banners` and
+> `reservations`) so the uploaded panels are still there if that idea ever comes back. `/admin/story`
+> now redirects to the new page so old bookmarks still work.
+
+## Brand
+
+`tailwind.config.js`: `as-red` `#A41E22` (`.dark` `#82161A`, `.light` `#C53A3F`), `as-charcoal` `#383F41`, `as-gray` `#B6B7B8`. Font **Inter**.
+
+## Conventions
+
+- **Responsive first** — mobile-first Tailwind; verify ~320px → desktop.
+- JPG logos on white use `mix-blend-multiply`.
+- External links: `target="_blank" rel="noreferrer"`.
+- The **AS Store** button is a placeholder until `settings.storeUrl` is set (renders "Coming soon" while empty).
+- Event images & logo are absolute URLs returned by the API (`/uploads/...` on the VPS).

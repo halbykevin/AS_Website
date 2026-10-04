@@ -12,7 +12,7 @@ const isEventsHref = (href) => href === '/events' || href.startsWith('/events?')
 import { optimizedImage } from '../lib/api'
 
 // Remote support: the website of rAIdesk (formerly AS Desk), its own project outside this repo.
-const REMOTE_SUPPORT_URL = 'https://asdesk.as.com.lb/'
+const REMOTE_SUPPORT_URL = 'https://remote.raione.net/'
 
 export default function Navbar() {
   const { brand, nav, store } = useContent()
