@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEvent, getEvents, getSettings } from '@/lib/api'
-import { bookingUrl, eventDateLabel, eventDays, formatDate, isEventPast } from '@/lib/events'
+import { bookingUrl, eventDateLabel, eventDays, formatDate, isEventPast, reservationNumber } from '@/lib/events'
 import {
   absoluteImage,
   breadcrumbJsonLd,
@@ -81,7 +81,7 @@ export default async function EventPage({ params }) {
   if (!event) notFound()
 
   const past = isEventPast(event)
-  const reserve = past ? '' : bookingUrl(event, settings.whatsappNumber)
+  const reserve = past ? '' : bookingUrl(event, reservationNumber(settings))
   const viaWhatsApp = reserve.startsWith('https://wa.me/')
   const nights = (event.dates || []).filter((d) => d.date)
   const sameCategory = all.filter((e) => e.slug !== event.slug && e.categorySlug === event.categorySlug)
@@ -192,7 +192,7 @@ export default async function EventPage({ params }) {
               renders nothing for everything else (and for a finished event), so
               the aside's plain reserve button stays the fallback everywhere. */}
           {!past && hasSeatmap(event) ? (
-            <SeatMap event={event} whatsappNumber={settings.whatsappNumber} />
+            <SeatMap event={event} whatsappNumber={reservationNumber(settings)} />
           ) : null}
         </div>
 

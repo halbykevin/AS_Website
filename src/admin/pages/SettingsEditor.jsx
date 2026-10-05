@@ -22,7 +22,7 @@ const empty = {
   eventsHeading: '', eventsIntro: '',
   contactHeading: '', contactSubheading: '',
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
-  whatsappNumber: '',
+  whatsappNumber: '', ticketingWhatsappNumber: '',
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
   ticketingUrl: '',
   published: false,
@@ -55,6 +55,7 @@ export default function SettingsEditor() {
           contactEmail: s.contactEmail || '', contactWhatsapp: s.contactWhatsapp || '',
           contactInstagram: s.contactInstagram || '', contactInstagramHandle: s.contactInstagramHandle || '',
           whatsappNumber: s.whatsappNumber || '',
+          ticketingWhatsappNumber: s.ticketingWhatsappNumber || '',
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
           ticketingUrl: s.ticketingUrl || '',
@@ -256,6 +257,12 @@ export default function SettingsEditor() {
           >
             <TextInput value={form.ticketingUrl} onChange={set('ticketingUrl')} placeholder="https://ticketing.as.com.lb" />
           </Field>
+          <Field
+            label="Reservations WhatsApp number"
+            hint="International format, digits only (e.g. 96176123923). The ticketing platform's Reserve buttons and seat requests, and the app's events, open a WhatsApp chat to this number pre-filled with the event. Leave empty to use the company WhatsApp number (Contact)."
+          >
+            <TextInput value={form.ticketingWhatsappNumber} onChange={set('ticketingWhatsappNumber')} placeholder="96176123923" />
+          </Field>
         </div>
       </Card>
       )}
@@ -268,8 +275,8 @@ export default function SettingsEditor() {
           <Field label="Email"><TextInput type="email" value={form.contactEmail} onChange={set('contactEmail')} /></Field>
           <Field label="WhatsApp link"><TextInput value={form.contactWhatsapp} onChange={set('contactWhatsapp')} /></Field>
           <Field
-            label="Event reservations WhatsApp number"
-            hint="International format, digits only (e.g. 9613123456). Event cards & banners open a WhatsApp chat to this number, pre-filled with the event details. Leave empty to keep opening the ticket link."
+            label="Company WhatsApp number"
+            hint="International format, digits only (e.g. 9613123456). The Contact page, the FAQ and search engines show this number. Event reservations use it too unless a reservations number is set under Events; with neither, they open the ticket link."
           >
             <TextInput value={form.whatsappNumber} onChange={set('whatsappNumber')} placeholder="9613123456" />
           </Field>

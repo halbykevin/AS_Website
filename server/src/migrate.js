@@ -363,6 +363,19 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS banner_height NUMERIC(4,1) DEFAULT
 -- exact twin of store_url, and the switch that hands events over to
 -- ticketing.as.com.lb without a code change.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS ticketing_url TEXT DEFAULT '';
+-- The WhatsApp number event reservations go to, when it isn't the company's own
+-- (whatsapp_number, which as.com.lb's Contact page, FAQ and structured data
+-- use). Empty = reservations use whatsapp_number. Seeded once, on the run that
+-- creates the column, with the number the owner asked for on 2026-10-05 — never
+-- again, so an edit in the admin is never overwritten by a later migrate.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'settings' AND column_name = 'ticketing_whatsapp_number') THEN
+    ALTER TABLE settings ADD COLUMN ticketing_whatsapp_number TEXT DEFAULT '';
+    UPDATE settings SET ticketing_whatsapp_number = '96176123923' WHERE id = 1;
+  END IF;
+END $$;
 -- Set when the events sync hides a category because nothing is filed under it
 -- any more. It is what makes a hide OURS: the stamp plus the visible flag tell
 -- the three states apart, the same way products.delisted_at does in the store.

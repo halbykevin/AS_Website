@@ -73,6 +73,16 @@ export function whatsappBookingUrl(number, event) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
+/**
+ * The WhatsApp number reservations go to: the dedicated one when set (Site
+ * Settings → Events), else the company's. Every place the hub names a number to
+ * reserve on goes through here, so the button, the seat request, the FAQ and
+ * the structured data can never point at two different phones.
+ */
+export function reservationNumber(settings) {
+  return settings?.ticketingWhatsappNumber || settings?.whatsappNumber || ''
+}
+
 /** What the "Reserve" button points at: WhatsApp if configured, else the partner. */
 export function bookingUrl(event, whatsappNumber) {
   return whatsappBookingUrl(whatsappNumber, event) || event?.ticketUrl || ''

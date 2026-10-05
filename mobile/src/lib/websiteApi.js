@@ -100,7 +100,10 @@ function mergeSettings(s) {
   return {
     ...d,
     published: Boolean(s.published),
-    whatsappNumber: pick(s.whatsappNumber, ''),
+    // Where event reservations go: the dedicated number when the admin set one,
+    // else the company's — the ticketing hub's reservationNumber(). Nothing else
+    // in the app reads this, so the booking links and the seat map both follow.
+    whatsappNumber: pick(s.ticketingWhatsappNumber, pick(s.whatsappNumber, '')),
     brand: { ...d.brand, name: pick(s.brandName, d.brand.name), legalName: pick(s.legalName, d.brand.legalName), tagline: pick(s.tagline, d.brand.tagline), logo: pick(s.logoUrl, '') },
     hero: { ...d.hero, eyebrow: pick(s.heroEyebrow, d.hero.eyebrow), title: pick(s.heroTitle, d.hero.title), subtitle: pick(s.heroSubtitle, d.hero.subtitle) },
     services: { ...d.services, heading: pick(s.servicesHeading, d.services.heading), subheading: pick(s.servicesSubheading, d.services.subheading) },

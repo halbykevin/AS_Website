@@ -1,6 +1,6 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (the partner's own booking page). A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured reservations number (`settings.ticketing_whatsapp_number`, Site Settings → Events — 76 123 923 since 2026-10-05; empty = the company's `settings.whatsapp_number`, which as.com.lb's Contact page, FAQ and structured data keep using) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (the partner's own booking page). A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
 
 > The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
 > Office" badge and its logo are gone from the footer, `/events`, the event detail page and the
@@ -672,7 +672,7 @@ and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. D
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag +
-`whatsapp_number` used to build the event reservation WhatsApp links),
+`whatsapp_number` — the company WhatsApp — and `ticketing_whatsapp_number`, which event reservation links prefer over it; one `reservationNumber()` in the hub's `lib/events.js` decides),
 `services`, `events` (each has a `ticket_url` — included in the WhatsApp reservation message — plus an
 optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
 synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),

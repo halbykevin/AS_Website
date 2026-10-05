@@ -10,7 +10,7 @@
 // Search and Maps — and that is driven entirely by schema.org/Event markup. No
 // amount of good copy substitutes for it. See eventJsonLd below.
 
-import { eventDateLabel, eventDays } from './events.js'
+import { eventDateLabel, eventDays, reservationNumber } from './events.js'
 
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL || 'https://ticketing.as.com.lb'
@@ -128,7 +128,7 @@ export function isoDateTime(date, time) {
 /** Site-wide Organization + WebSite, rendered once in the root layout. */
 export function organizationJsonLd(settings = {}) {
   const sameAs = [settings.contactInstagram].filter(Boolean)
-  const phone = settings.whatsappNumber || settings.contactWhatsapp
+  const phone = reservationNumber(settings) || settings.contactWhatsapp
   return {
     '@context': 'https://schema.org',
     '@graph': [

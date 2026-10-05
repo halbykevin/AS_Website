@@ -7,7 +7,7 @@
 // but leaves every list, this one included.
 
 import { getCategories, getEvents, getSettings, getShop } from '@/lib/api'
-import { eventDateLabel } from '@/lib/events'
+import { eventDateLabel, reservationNumber } from '@/lib/events'
 import { COMPANY_URL, SITE_NAME, SITE_TAGLINE, SITE_URL } from '@/lib/seo'
 import { hoursSentence } from '@/lib/hours'
 
@@ -22,7 +22,7 @@ const clean = (s) =>
 
 export async function GET() {
   const [events, categories, settings, shop] = await Promise.all([getEvents(), getCategories(), getSettings(), getShop()])
-  const phone = String(settings.whatsappNumber || '').replace(/\D/g, '')
+  const phone = reservationNumber(settings).replace(/\D/g, '')
 
   const out = []
   out.push(`# ${SITE_NAME}`, '', `> ${SITE_TAGLINE}.`, '')

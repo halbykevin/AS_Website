@@ -114,6 +114,9 @@ function mergeSettings(s) {
     // Global WhatsApp number (international digits) used to build event/banner
     // "reserve" links — see whatsappBookingUrl().
     whatsappNumber: pick(s.whatsappNumber, ''),
+    // Where event reservations go when it isn't the company number above —
+    // the ticketing hub and the app read the same setting.
+    ticketingWhatsappNumber: pick(s.ticketingWhatsappNumber, ''),
     // Where the events live (the ticketing platform), or '' to keep them here.
     ticketingUrl: pick(s.ticketingUrl, ''),
     // Browser-tab icon (favicon); applied at runtime in ContentProvider.
@@ -548,7 +551,7 @@ export async function loadSite() {
     // and the detail CTA all open this.
     const mappedEvents = baseEvents.map((e) => ({
       ...e,
-      bookingUrl: whatsappBookingUrl(content.whatsappNumber, e) || e.ticketUrl,
+      bookingUrl: whatsappBookingUrl(content.ticketingWhatsappNumber || content.whatsappNumber, e) || e.ticketUrl,
     }))
     content.banners = Array.isArray(banners)
       ? banners.map(mapBanner).map((b) => resolveBanner(b, mappedEvents)).filter((b) => b.active && b.image)

@@ -10,6 +10,7 @@
 // One function feeds the page and its FAQPage structured data, so the markup
 // is always exactly the questions and answers on screen.
 
+import { reservationNumber } from './events.js'
 import { hoursSentence } from './hours.js'
 
 const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim()
@@ -18,7 +19,7 @@ const listOf = (items) =>
 
 /** [{ id, q, a: [paragraph…], links: [{ href, label }] }] — `a` is plain text. */
 export function hubFaq({ settings = {}, categories = [], shop = null } = {}) {
-  const phone = String(settings.whatsappNumber || '').replace(/\D/g, '')
+  const phone = reservationNumber(settings).replace(/\D/g, '')
   const legal = clean(settings.legalName) || 'Absolute Solutions SAL'
   const hours = hoursSentence(shop?.hours)
   // Catch-all buckets from the sync ("Events", "Other") say nothing as a kind.
