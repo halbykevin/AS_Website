@@ -126,6 +126,38 @@ def from_epoch(seconds: float, tz_offset_minutes: int = 0) -> tuple[str, str]:
     return dt.strftime("%Y-%m-%d"), _fmt_24h(dt.hour, dt.minute)
 
 
+# The sites we list from, and where else they sell. Specific on purpose:
+# "Antoine" alone is a first name (Antoine Dib, accordion), so only the
+# business is matched — Antoine Ticketing and its Librairie Antoine bookshops.
+PARTNERS = re.compile(
+    # Tick'it is written with whatever apostrophe the organiser's keyboard had.
+    r"ticketing\s*box\s*office|\btick['’‘`´]?it\b|\bihjoz\b|antoine\s*ticketing|\btixity\b|"
+    r"librairie\s+antoine|\bantoine\s+(?:librar(?:y|ies)|bookstores?|bookshops?|branch(?:es)?)\b",
+    re.I,
+)
+_SENTENCE = re.compile(r"(?<=[.!?])\s+")
+
+
+def scrub_partners(text: str) -> str:
+    """Drop what sends a visitor to the site we list from.
+
+    Organisers write the box office into their copy — "🎟️ Tickets are now
+    available on Tickit.co", "Réservations à la Librairie Antoine" — and that
+    text would otherwise hand our visitors to the partner from our own pages.
+    A short line that names one goes whole (it is a sales line, often with
+    another phone number in it); in a long paragraph only the sentence does.
+    """
+    out = []
+    for line in (text or "").split("\n"):
+        if not PARTNERS.search(line):
+            out.append(line)
+        elif len(line) > 160:
+            kept = [s for s in _SENTENCE.split(line) if not PARTNERS.search(s)]
+            if kept:
+                out.append(" ".join(kept))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
 def excerpt(text: str, limit: int = 140) -> str:
     line = clean(strip_html(text))
     return line[: limit - 3] + "…" if len(line) > limit else line

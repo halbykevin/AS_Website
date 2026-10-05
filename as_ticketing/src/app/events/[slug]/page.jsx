@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEvent, getEvents, getSettings } from '@/lib/api'
-import { bookingUrl, eventDateLabel, eventDays, formatDate, isEventPast, reservationNumber } from '@/lib/events'
+import { bookingUrl, eventDateLabel, eventDays, formatDate, isEventPast, nightBookingUrl, reservationNumber } from '@/lib/events'
 import {
   absoluteImage,
   breadcrumbJsonLd,
@@ -82,7 +82,7 @@ export default async function EventPage({ params }) {
 
   const past = isEventPast(event)
   const reserve = past ? '' : bookingUrl(event, reservationNumber(settings))
-  const viaWhatsApp = reserve.startsWith('https://wa.me/')
+  const nightReserve = (night) => (past ? '' : nightBookingUrl(event, night, reservationNumber(settings)))
   const nights = (event.dates || []).filter((d) => d.date)
   const sameCategory = all.filter((e) => e.slug !== event.slug && e.categorySlug === event.categorySlug)
   // A finished event's page still has visitors arriving from search, so it must
@@ -93,7 +93,7 @@ export default async function EventPage({ params }) {
     ? `More ${event.categoryName}`
     : 'What’s on next'
 
-  const jsonLd = eventJsonLd(event, { bookingUrl: reserve, past })
+  const jsonLd = eventJsonLd(event, { past })
   const crumbs = breadcrumbJsonLd(
     [
       { name: 'Events', url: '/events' },
@@ -148,7 +148,10 @@ export default async function EventPage({ params }) {
       </div>
 
       <div className="mx-auto grid max-w-5xl gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1fr_20rem]">
-        <div>
+        {/* min-w-0: a 1fr track never shrinks below its content, and a wide
+            hall in the seat map is wider than this column until it has scaled
+            itself to fit — without this it pushes the reserve card off-screen. */}
+        <div className="min-w-0">
           <div className="grid gap-3 sm:grid-cols-2">
             <Info label="Date" value={eventDateLabel(event)} dateTime={eventDays(event)[0]} />
             <Info label="Time" value={event.time} />
@@ -171,9 +174,11 @@ export default async function EventPage({ params }) {
                       {d.time ? <span className="text-as-charcoal/50"> · {d.time}</span> : null}
                       {d.venue ? <span className="text-as-charcoal/50"> · {d.venue}</span> : null}
                     </span>
-                    {d.url && !past ? (
-                      <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-as-red transition hover:text-as-red-light">
-                        Tickets →
+                    {/* Our WhatsApp for that night — never `d.url`, which is
+                        the partner's own page for it. */}
+                    {nightReserve(d) ? (
+                      <a href={nightReserve(d)} target="_blank" rel="noreferrer" className="text-sm font-semibold text-as-red transition hover:text-as-red-light">
+                        Reserve →
                       </a>
                     ) : null}
                   </li>
@@ -217,7 +222,7 @@ export default async function EventPage({ params }) {
                 rel="noreferrer"
                 className="mt-5 block rounded-full bg-as-red px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light"
               >
-                {viaWhatsApp ? 'Reserve on WhatsApp' : 'Get tickets'}
+                Reserve on WhatsApp
               </a>
             ) : (
               <p className="mt-5 rounded-xl bg-as-gray/10 px-4 py-4 text-center text-sm text-as-charcoal/60">

@@ -1,7 +1,23 @@
 # AS Company Website
 
-Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set it falls back to the event's `ticket_url` (the partner's own booking page). A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
+Website for **AS Company (Absolute Solutions SAL)** — market leader in telecommunication and electronics in Lebanon since 2008. The site showcases what AS Company does and promotes **upcoming events**. Clicking an event (banner or card) opens a **pre-filled WhatsApp chat** to the admin-configured number (`settings.whatsapp_number`) so visitors reserve over WhatsApp; if no number is set the page says "contact us" — it **never** falls back to the event's `ticket_url`. See *No visitor is ever sent to a partner* below. A built-in **admin dashboard** lets staff edit all content, manage events, and run an **events sync** that pulls what's on from Lebanon's ticketing sites into the site.
 
+> **No visitor is ever sent to a partner.** The sites we list from — Antoine Ticketing, Ticketing
+> Box Office, Tick'it, ihjoz — are where AS buys tickets; a visitor handed to one has been handed to
+> the competition. So `ticket_url` and each night's `dates[].url` are **internal**: staff read them in
+> the admin, the seat-map readers fetch from them, and `hasSeatmap()` reads their host — and nothing
+> ever renders them as a link or text. Concretely: the Reserve button is our WhatsApp or "contact
+> us", never the partner (hub `bookingUrl()`, site `whatsappBookingUrl`, app `eventBookingUrl`);
+> the pre-filled WhatsApp message carries title/date/venue but **not** the partner link (it is typed
+> on the visitor's phone, one tap from buying there); each night of a run gets "Reserve →" on our
+> WhatsApp (`nightBookingUrl`), not "Tickets →" to the partner; the `Event` JSON-LD's
+> `offers.url` is **our own page** (Google renders it as a "Tickets" button in search); the
+> seat-map API's "empty" answer carries no `url`; and the events sync drops partner sales lines from
+> descriptions (`scrub_partners` in `WebScarping/event_sources/common.py` — "🎟️ tickit.co",
+> "Réservations à la Librairie Antoine"; it matches the businesses, never a bare "Antoine", which is a
+> first name). Still from the partners, by design or for now: event **images** are loaded from their
+> CDNs, and the public `/api/events` JSON still includes `ticketUrl` (the clients need its host).
+>
 > The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
 > Office" badge and its logo are gone from the footer, `/events`, the event detail page and the
 > mobile app, and `public/ticketing-box-office.png` + the `ticketing` block in `content/site.js`
@@ -53,7 +69,7 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
   visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
   reservation, worded the same way.
-- **Seat picking, on three of the four sources** (Antoine Ticketing has no reader yet). An event whose partner publishes a hall
+- **Seat picking, on all four sources.** An event whose partner publishes a hall
   gets a live seat map on its page: `GET /api/events/:slug/seatmap`
   ([server/src/seatmap.js](server/src/seatmap.js)) routes to one reader per site
   in [server/src/seatmap/](server/src/seatmap/) and the hub draws the answer
@@ -68,6 +84,12 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
     their own bundle calls — **Tick'it has no seats to pick** ("free seating
     within your selected zone" is their own wording), so the zone is the choice
     and inventing seat numbers there would be inventing a promise.
+    `antoine.js` reads Tixity's seating plan (each seat's x/y, row, number,
+    category, live status) and **rebuilds the hall as rows** like `tbo.js` —
+    a block's row A plus its angled wings rejoin as one row; free-seating
+    categories are zones, and Metro Al Madina's table zones are drawn from the
+    plan's rectangles. The hub's and the app's `hasSeatmap()` gate on a host
+    list that must name every source with a reader.
   - **A partner's drawing is served, not redrawn**, because 82 tables called
     V1…VII 25 mean nothing as a list and where they sit is the question being
     asked. That puts third-party markup in our DOM, so
@@ -673,7 +695,7 @@ See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy 
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag +
 `whatsapp_number` used to build the event reservation WhatsApp links),
-`services`, `events` (each has a `ticket_url` — included in the WhatsApp reservation message — plus an
+`services`, `events` (each has a `ticket_url` — internal: admin, seat-map readers, never shown to a visitor — plus an
 optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
 synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),
 `categories` (event categories shown as image tiles:

@@ -1,6 +1,6 @@
 // Live seat maps for the events our sync lists.
 //
-// All three ticketing sites publish, to an anonymous browser, everything needed
+// All four ticketing sites publish, to an anonymous browser, everything needed
 // to draw the hall an event is playing in and what is still free in it. So this
 // reads that on demand and hands the ticketing hub a map it can draw, and the
 // visitor picks their seats and sends them to us on WhatsApp.
@@ -8,8 +8,9 @@
 //   ticketingboxoffice.com  every seat is an <input> in the page → seatmap/tbo.js
 //   ihjoz.com               an SVG of the room + a table of blocks → seatmap/ihjoz.js
 //   tickit.co               an SVG of the room + zones from their API → seatmap/tickit.js
+//   antoineticketing.com    a seating plan of coordinates + categories → seatmap/antoine.js
 //
-// The three answer in one shape (see the route below) so the hub has one thing
+// The four answer in one shape (see the route below) so the hub has one thing
 // to render: an optional drawing, optional rows of numbered seats, and the
 // zones. What each source can fill in differs and that is real, not a gap —
 // tickit sells zones with free seating inside them, so there are no seats to
@@ -33,6 +34,7 @@ import { hostOf } from './seatmap/http.js'
 import * as tbo from './seatmap/tbo.js'
 import * as ihjoz from './seatmap/ihjoz.js'
 import * as tickit from './seatmap/tickit.js'
+import * as antoine from './seatmap/antoine.js'
 
 export const seatmapRouter = express.Router()
 
@@ -42,7 +44,7 @@ export const seatmapRouter = express.Router()
 // one source without turning off the rest.
 const ENABLED = process.env.SEATMAP_ENABLED !== '0'
 
-const ALL = [tbo, ihjoz, tickit]
+const ALL = [tbo, ihjoz, tickit, antoine]
 const ONLY = String(process.env.SEATMAP_SOURCES || '')
   .split(',')
   .map((s) => s.trim().toLowerCase())
@@ -151,7 +153,9 @@ seatmapRouter.get('/:slug/seatmap', async (req, res, next) => {
     if (!cached && (data.rows.length || data.zones.length)) cacheSet(key, data)
 
     if (!data.rows.length && !data.zones.length) {
-      return res.json({ available: false, reason: 'empty', url: found.url })
+      // No `url` here: this endpoint is public, and the partner's page for the
+      // night is exactly what a visitor must never be handed.
+      return res.json({ available: false, reason: 'empty' })
     }
     // A minute is how long the cached copy lives; let a CDN or browser hold it
     // for the same span rather than re-asking on every keystroke of a resize.

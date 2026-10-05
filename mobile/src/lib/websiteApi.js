@@ -174,7 +174,7 @@ export async function loadWebsiteContent() {
 
     const mappedEvents = (Array.isArray(events) ? events.map(mapEvent) : []).map(e => ({
       ...e,
-      bookingUrl: whatsappBookingUrl(content.whatsappNumber, e) || e.ticketUrl,
+      bookingUrl: whatsappBookingUrl(content.whatsappNumber, e),
       dateLabel: eventDateLabel(e)
     }));
 

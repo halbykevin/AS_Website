@@ -264,8 +264,11 @@ export function eventDateText(ev) {
 
 // Build a WhatsApp "click to chat" link for an event: opens a chat with the
 // admin-configured number, pre-filled with the event details so the visitor
-// just hits send. Returns '' when no number is set, so callers can fall back to
-// the original ticket link. The mapped event carries title/date/venue/ticketUrl.
+// just hits send. Returns '' when no number is set — and nothing falls back to
+// the partner's link then: no visitor is ever sent to the site we list from.
+// That is also why `ticketUrl` is not in the message: it is typed out on the
+// visitor's phone, one tap from buying there directly. Staff identify the event
+// by title, date and venue, and have the partner link in the admin.
 export function whatsappBookingUrl(number, event) {
   const digits = String(number || '').replace(/\D/g, '')
   if (!digits || !event) return ''
@@ -274,7 +277,6 @@ export function whatsappBookingUrl(number, event) {
     event.title && `🎫 ${event.title}`,
     eventDateLabel(event) && `📅 ${eventDateLabel(event)}`,
     location && `📍 ${location}`,
-    event.ticketUrl && `🔗 ${event.ticketUrl}`,
   ].filter(Boolean)
   const message = [
     "Hello👋 I'd like more details about this event:",
@@ -284,6 +286,12 @@ export function whatsappBookingUrl(number, event) {
     'Is it still available, and how can I reserve a spot?',
   ].join('\n')
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+}
+
+// The same chat, for one night of a run rather than the whole run.
+export function nightBookingUrl(number, event, night) {
+  if (!night?.date) return ''
+  return whatsappBookingUrl(number, { ...event, date: night.date, time: night.time, dates: [night] })
 }
 
 // A banner can be "driven" by an event: it then borrows the event's image,
@@ -299,9 +307,9 @@ function resolveBanner(banner, events) {
     image: banner.image || ev.image,
     title: banner.title || ev.title,
     subtitle: banner.subtitle || dateLabel || [ev.venue, ev.city].filter(Boolean).join(', ') || ev.excerpt,
-    // Borrow the event's reserve link (WhatsApp when configured, else its ticket
-    // URL); a link the admin typed on the banner still wins.
-    link: banner.link || ev.bookingUrl || ev.ticketUrl || `/events/${ev.id}`,
+    // Borrow the event's reserve link (our WhatsApp), else its page here —
+    // never the partner's ticket URL. A link the admin typed still wins.
+    link: banner.link || ev.bookingUrl || `/events/${ev.id}`,
   }
 }
 
@@ -546,12 +554,15 @@ export async function loadSite() {
       }
     }
     const baseEvents = Array.isArray(events) && events.length ? events.map(mapEvent) : defaultEvents
-    // Attach a "reserve" link to every event: a pre-filled WhatsApp chat when a
-    // number is configured, otherwise the original ticket URL. Cards, banners
-    // and the detail CTA all open this.
+    // Attach a "reserve" link to every event, and to every night of a run: a
+    // pre-filled WhatsApp chat when a number is configured, otherwise nothing
+    // (the page then says "contact us"). Never the partner's ticket URL.
+    // Cards, banners and the detail page all open these.
+    const reserveNumber = content.ticketingWhatsappNumber || content.whatsappNumber
     const mappedEvents = baseEvents.map((e) => ({
       ...e,
-      bookingUrl: whatsappBookingUrl(content.ticketingWhatsappNumber || content.whatsappNumber, e) || e.ticketUrl,
+      bookingUrl: whatsappBookingUrl(reserveNumber, e),
+      dates: (e.dates || []).map((d) => ({ ...d, bookingUrl: nightBookingUrl(reserveNumber, e, d) })),
     }))
     content.banners = Array.isArray(banners)
       ? banners.map(mapBanner).map((b) => resolveBanner(b, mappedEvents)).filter((b) => b.active && b.image)

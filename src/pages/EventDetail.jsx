@@ -70,9 +70,11 @@ export default function EventDetail() {
                         </p>
                       )}
                     </div>
-                    {d.url && (
+                    {/* Our WhatsApp for that night — never `d.url`, the
+                        partner's own page for it. */}
+                    {d.bookingUrl && (
                       <a
-                        href={d.url}
+                        href={d.bookingUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="shrink-0 rounded-full bg-as-red px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-as-red-light"

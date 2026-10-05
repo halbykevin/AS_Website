@@ -50,8 +50,12 @@ export function isEventPast(ev) {
 
 /**
  * A WhatsApp "click to chat" link, pre-filled with the event so the visitor
- * only has to hit send. Returns '' when no number is configured, so callers
- * fall back to the partner's own booking page.
+ * only has to hit send. Returns '' when no number is configured.
+ *
+ * The partner's link (`ticketUrl`) is deliberately NOT in the message. It is
+ * typed out on the visitor's own phone, where it is one tap from buying from
+ * the partner directly; the title, date and venue identify the event for our
+ * staff, who have the partner's link in the admin.
  */
 export function whatsappBookingUrl(number, event) {
   const digits = String(number || '').replace(/\D/g, '')
@@ -61,7 +65,6 @@ export function whatsappBookingUrl(number, event) {
     event.title && `🎫 ${event.title}`,
     eventDateLabel(event) && `📅 ${eventDateLabel(event)}`,
     location && `📍 ${location}`,
-    event.ticketUrl && `🔗 ${event.ticketUrl}`,
   ].filter(Boolean)
   const message = [
     "Hello👋 I'd like more details about this event:",
@@ -83,7 +86,19 @@ export function reservationNumber(settings) {
   return settings?.ticketingWhatsappNumber || settings?.whatsappNumber || ''
 }
 
-/** What the "Reserve" button points at: WhatsApp if configured, else the partner. */
+/**
+ * What the "Reserve" button points at: our WhatsApp, or nothing.
+ *
+ * Never the partner's page — not even with no number configured. A visitor
+ * sent to the site we list from has been handed to the competition; the page
+ * says "contact us" instead.
+ */
 export function bookingUrl(event, whatsappNumber) {
-  return whatsappBookingUrl(whatsappNumber, event) || event?.ticketUrl || ''
+  return whatsappBookingUrl(whatsappNumber, event)
+}
+
+/** The same chat, for one night of a run rather than the whole run. */
+export function nightBookingUrl(event, night, whatsappNumber) {
+  if (!night?.date) return ''
+  return whatsappBookingUrl(whatsappNumber, { ...event, date: night.date, time: night.time, dates: [night] })
 }

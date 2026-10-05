@@ -7,11 +7,12 @@ import { isNumberedSeat, money, seatmapSectionUrl, seatmapUrl, seatPlace, whatsa
 // The seat picker: the partner's own hall, live, with what is still free — pick
 // yours and send them to us on WhatsApp.
 //
-// Three sites feed it and they sell three different things, so the screen has
+// Four sites feed it and they sell three different things, so the screen has
 // to be able to be three shapes without becoming three components:
 //
 //   ticketingboxoffice.com  numbered seats for the whole hall, drawn as a grid
-//                           rebuilt from their page
+//   antoineticketing.com    rebuilt from their page / their seating plan (and
+//                           Antoine's table zones as a drawing, like tickit's)
 //   ihjoz.com               a drawing of the room: some blocks are numbered
 //                           seats (tap one to open its grid), the rest are
 //                           zones and tables sold whole
@@ -37,6 +38,11 @@ const SEAT = 22
 const SEAT_GAP = 4
 const ROW = 26
 const LABEL = 34
+// The "Stage" strip above the rows, and the space under it. Part of the
+// drawing's height: left out, the last row hangs below the box and under the
+// line of text that follows it.
+const STAGE = 22
+const STAGE_GAP = 8
 
 // rgb(190,190,190) — what the box office paints a sold seat, matched so a taken
 // seat still reads as a seat.
@@ -156,7 +162,7 @@ export default function SeatMap({ event, whatsappNumber }) {
     const widest = rows.reduce((m, r) => Math.max(m, r.seats.length), 0)
     return LABEL * 2 + widest * (SEAT + SEAT_GAP)
   }, [rows])
-  const mapHeight = rows.length * ROW + 8
+  const mapHeight = STAGE + STAGE_GAP + rows.length * ROW + 8
 
   // Fit the whole hall on screen first — you can't choose a seat in a room you
   // can't see — then let people zoom in to tap precisely.
@@ -346,7 +352,10 @@ export default function SeatMap({ event, whatsappNumber }) {
               <div ref={boxRef} className="overflow-x-auto pb-2">
                 <div style={{ width: mapWidth * scale, height: mapHeight * scale }}>
                   <div style={{ width: mapWidth, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                    <div className="mb-2 rounded-md bg-as-ink py-1 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-white/80">
+                    <div
+                      className="flex items-center justify-center rounded-md bg-as-ink text-[10px] font-bold uppercase tracking-[0.3em] text-white/80"
+                      style={{ height: STAGE, marginBottom: STAGE_GAP }}
+                    >
                       Stage
                     </div>
                     {/* Centred, not left-aligned. A theatre fans out — this

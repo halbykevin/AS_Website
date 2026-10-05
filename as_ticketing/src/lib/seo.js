@@ -201,7 +201,7 @@ function placeOf(event, night = {}) {
  * price per tier and the sync never scrapes it — and a fabricated 0 would be a
  * misrepresentation in the one place Google checks against reality.
  */
-export function eventJsonLd(event, { bookingUrl = '', past = false } = {}) {
+export function eventJsonLd(event, { past = false } = {}) {
   if (!event) return null
   const url = absoluteUrl(`/events/${event.slug}`)
   const image = absoluteImage(event.imageUrl)
@@ -232,7 +232,10 @@ export function eventJsonLd(event, { bookingUrl = '', past = false } = {}) {
       : {
           offers: {
             '@type': 'Offer',
-            url: night.url || event.ticketUrl || bookingUrl || url,
+            // Our own page, never the partner's: Google turns this into a
+            // "Tickets" button in search results, and that button must land
+            // here, where the reservation is ours.
+            url,
             availability: 'https://schema.org/InStock',
           },
         }),

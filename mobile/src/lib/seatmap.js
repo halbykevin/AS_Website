@@ -31,11 +31,11 @@ export const seatmapUrl = (slug, night) => `${WEBSITE_API_URL}/api/events/${enco
 export const seatmapSectionUrl = (slug, sid, night) =>
   `${WEBSITE_API_URL}/api/events/${encodeURIComponent(slug)}/seatmap/sections/${encodeURIComponent(sid)}${nightQuery(night)}`;
 
-// The three partners the sync pulls from all publish their hall to an anonymous
+// The four partners the sync pulls from all publish their hall to an anonymous
 // browser, and the API has a reader for each. Anything else — a hand-made
-// event, a fourth site — has no map, and asking would be a wasted request on
-// most of the calendar.
-const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co)$/i;
+// event, a fifth site — has no map, and asking would be a wasted request on
+// most of the calendar. Keep in step with the hub's lib/seatmap.js.
+const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co|antoineticketing\.com)$/i;
 
 const hostOf = url => {
   const m = String(url || '').match(/^https?:\/\/([^/?#]+)/i);

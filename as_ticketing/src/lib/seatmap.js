@@ -33,11 +33,11 @@ export function seatmapSectionUrl(slug, sid, night) {
   return `${API}/api/events/${encodeURIComponent(slug)}/seatmap/sections/${encodeURIComponent(sid)}${nightQuery(night)}`
 }
 
-// The three partners the sync pulls from all publish their hall to an anonymous
+// The four partners the sync pulls from all publish their hall to an anonymous
 // browser, and server/src/seatmap/ has a reader for each. Anything else — a
-// hand-made event, a fourth site — has no map, and asking would be a wasted
-// request on most of the calendar.
-const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co)$/i
+// hand-made event, a fifth site — has no map, and asking would be a wasted
+// request on most of the calendar. Keep in step with HOSTS in those readers.
+const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co|antoineticketing\.com)$/i
 
 export function hasSeatmap(event) {
   const urls = [event?.ticketUrl, ...(event?.dates || []).map((d) => d?.url)].filter(Boolean)

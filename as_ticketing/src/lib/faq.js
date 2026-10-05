@@ -50,7 +50,7 @@ export function hubFaq({ settings = {}, categories = [], shop = null } = {}) {
       : {
           id: 'reserve',
           q: 'How do I reserve tickets?',
-          a: ['Open the event and follow its Reserve link to the event’s booking page.'],
+          a: ['Contact AS Company and our team will reserve your spot for you.'],
         },
   ]
 

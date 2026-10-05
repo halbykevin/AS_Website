@@ -34,7 +34,7 @@ import sys
 
 from event_sources import BY_KEY, SOURCES, dedupe
 from event_sources import categories as cats
-from event_sources.common import Fetcher, excerpt, slugify
+from event_sources.common import Fetcher, excerpt, scrub_partners, slugify
 
 for _s in (sys.stdout, sys.stderr):
     try:
@@ -45,8 +45,10 @@ for _s in (sys.stdout, sys.stderr):
 
 def _finish(event: dict) -> dict:
     """Fill the derived fields every event needs before the clean-up runs."""
-    if not event.get("excerpt"):
-        event["excerpt"] = excerpt(event.get("description", ""))
+    # Before the excerpt, which is cut from the description: a partner named in
+    # the first lines would otherwise survive in the card text.
+    event["description"] = scrub_partners(event.get("description", ""))
+    event["excerpt"] = excerpt(event["description"])
     event["categoryName"] = cats.refine(event.get("categoryName") or cats.FALLBACK,
                                         event.get("title", ""))
     event.setdefault("alsoOn", [])

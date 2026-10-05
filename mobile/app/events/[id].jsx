@@ -34,9 +34,10 @@ export default function EventDetailScreen() {
   const past = isEventPast(event);
   const multiDay = Array.isArray(event.dates) && event.dates.length > 1;
 
+  // Our WhatsApp only. `ticketUrl` is the partner's page and is never opened:
+  // no one is sent to the site we list the event from.
   const reserve = () => {
-    const url = event.bookingUrl || event.ticketUrl;
-    if (url) openUrl(url);
+    if (event.bookingUrl) openUrl(event.bookingUrl);
   };
 
   return (
@@ -45,7 +46,7 @@ export default function EventDetailScreen() {
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background }}>
-          <Button label={past ? 'Event has ended' : 'Reserve on WhatsApp'} icon={past ? undefined : 'whatsapp'} onPress={reserve} disabled={past || !(event.bookingUrl || event.ticketUrl)} fullWidth size="lg" />
+          <Button label={past ? 'Event has ended' : 'Reserve on WhatsApp'} icon={past ? undefined : 'whatsapp'} onPress={reserve} disabled={past || !event.bookingUrl} fullWidth size="lg" />
         </View>
       }
     >
