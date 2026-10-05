@@ -124,30 +124,82 @@ export default function OrderDetailScreen() {
 
   const stepIndex = STEPS.indexOf(order.status);
   const online = order.paymentMethod === PAYMENT_WHISH;
+  const goBack = () => (account?.customer ? router.replace('/orders') : router.replace('/'));
+
+  const awaitingCard = (
+    <Card style={{ gap: theme.spacing.md, backgroundColor: theme.alpha(theme.colors.accent, 0.12) }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        {checking ? <ActivityIndicator color={theme.colors.primary} /> : <Icon name="info" size={24} color={theme.colors.primary} />}
+        <View style={{ flex: 1 }}>
+          <Text variant="title">{checking ? 'Confirming your payment…' : paymentFailed ? 'Payment not completed' : 'Waiting for payment'}</Text>
+          <Text variant="caption" muted style={{ marginTop: 2 }}>
+            {checking ? 'Checking with Whish. This only takes a moment.' : 'Your order is saved. Finish the payment to confirm it — nothing is charged until you do.'}
+          </Text>
+        </View>
+      </View>
+      {!checking ? (
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          {order.collectUrl ? <Button label="Complete payment" onPress={resumePayment} loading={resuming} size="sm" style={{ flex: 1 }} /> : null}
+          <Button label="Check again" variant="ghost" size="sm" onPress={() => recheck(2)} style={{ flex: 1 }} />
+        </View>
+      ) : null}
+    </Card>
+  );
+
+  // A licence (an exclusive product — as_store/db/exclusive.sql) has nothing to
+  // ship, so there is nothing to track: no status bar, no delivery card. The
+  // screen is the payment's result and nothing else.
+  if (order.exclusive) {
+    const renewal = order.licenseRenewal;
+    const renewalLine = !renewal
+      ? ''
+      : renewal.status === 'applied'
+        ? `Your AS-Punch licence is renewed${renewal.newExpiresAt ? ` until ${formatDateTime(renewal.newExpiresAt)}` : ''}.`
+        : renewal.status === 'refused'
+          ? "We couldn't apply it to your licence automatically — our team has been alerted and will sort it out with you."
+          : 'Your AS-Punch licence is being renewed. This usually takes a few seconds.';
+    return (
+      <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
+        <Header title="Payment" onBack={goBack} />
+        <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
+          {order.paymentStatus === 'paid' ? (
+            <Card style={{ alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.alpha(theme.colors.success, 0.08) }}>
+              <Icon name="checkCircle" size={40} color={theme.colors.success} />
+              <Text variant="h2" center>
+                Payment successful
+              </Text>
+              <Text variant="body" muted center>
+                Thank you — we've received your payment of {money(orderTotal(order))} for {order.items?.[0]?.name || 'your licence'}.
+              </Text>
+              {renewalLine ? (
+                <Text variant="callout" center>
+                  {renewalLine}
+                </Text>
+              ) : null}
+              <Text variant="caption" faint center style={{ marginTop: 4 }}>
+                Reference #{order.id}
+              </Text>
+            </Card>
+          ) : order.status === 'cancelled' ? (
+            <Text variant="h3" center>
+              This payment was cancelled.
+            </Text>
+          ) : (
+            awaitingCard
+          )}
+          <Button label="Back to the store" variant="ghost" onPress={() => router.replace('/')} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={['top']} contentStyle={{ paddingHorizontal: 0 }}>
-      <Header title={`Order #${order.id}`} onBack={() => (account?.customer ? router.replace('/orders') : router.replace('/'))} />
+      <Header title={`Order #${order.id}`} onBack={goBack} />
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
         {online ? (
           awaiting ? (
-            <Card style={{ gap: theme.spacing.md, backgroundColor: theme.alpha(theme.colors.accent, 0.12) }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-                {checking ? <ActivityIndicator color={theme.colors.primary} /> : <Icon name="info" size={24} color={theme.colors.primary} />}
-                <View style={{ flex: 1 }}>
-                  <Text variant="title">{checking ? 'Confirming your payment…' : paymentFailed ? 'Payment not completed' : 'Waiting for payment'}</Text>
-                  <Text variant="caption" muted style={{ marginTop: 2 }}>
-                    {checking ? 'Checking with Whish. This only takes a moment.' : 'Your order is saved. Finish the payment to confirm it — nothing is charged until you do.'}
-                  </Text>
-                </View>
-              </View>
-              {!checking ? (
-                <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-                  {order.collectUrl ? <Button label="Complete payment" onPress={resumePayment} loading={resuming} size="sm" style={{ flex: 1 }} /> : null}
-                  <Button label="Check again" variant="ghost" size="sm" onPress={() => recheck(2)} style={{ flex: 1 }} />
-                </View>
-              ) : null}
-            </Card>
+            awaitingCard
           ) : fromPayment ? (
             <Card style={{ alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.alpha(theme.colors.success, 0.08) }}>
               <Icon name="checkCircle" size={40} color={theme.colors.success} />

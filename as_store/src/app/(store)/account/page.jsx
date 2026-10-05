@@ -137,9 +137,14 @@ function OrdersList() {
                     {orderDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
                   </p>
                 </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClasses(o.status)}`}>
-                  {statusMeta(o.status).label}
-                </span>
+                {/* A paid licence has no delivery stage to report — it is just paid. */}
+                {o.exclusive && o.paymentStatus === 'paid' ? (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Paid</span>
+                ) : (
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClasses(o.status)}`}>
+                    {statusMeta(o.status).label}
+                  </span>
+                )}
                 <span className="w-20 text-right font-medium text-as-ink">{money(orderTotal(o))}</span>
                 <Icon name="chevronRight" className="h-4 w-4 text-as-ink/30" />
               </Link>

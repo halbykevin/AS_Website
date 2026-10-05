@@ -659,6 +659,9 @@ const orderJson = (r) => ({
   paymentStatus: r.payment_status || "unpaid",
   currency: r.currency || "USD",
   collectUrl: r.whish_collect_url || "", // hosted Whish page, for resuming an unpaid payment
+  // A licence, not a parcel (db/exclusive.sql): nothing ships, so the clients
+  // show a payment result instead of a delivery to track.
+  exclusive: Boolean(r.exclusive),
   // An AS-Punch licence renewal and where it stands — null on every other order.
   licenseRenewal: licenseRenewalJson(r),
   customerId: r.customer_id,

@@ -56,7 +56,12 @@ export default function OrdersScreen() {
             <Card key={o.id} onPress={() => router.push(`/orders/${o.id}`)} style={{ gap: theme.spacing.sm }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text variant="title">Order #{o.id}</Text>
-                <Badge label={ORDER_STATUS_LABEL[o.status] || o.status} tone={STATUS_TONE[o.status] || 'neutral'} />
+                {/* A paid licence has no delivery stage to report — it is just paid. */}
+                {o.exclusive && o.paymentStatus === 'paid' ? (
+                  <Badge label="Paid" tone="success" />
+                ) : (
+                  <Badge label={ORDER_STATUS_LABEL[o.status] || o.status} tone={STATUS_TONE[o.status] || 'neutral'} />
+                )}
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <View>

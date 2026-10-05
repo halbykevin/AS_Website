@@ -179,6 +179,8 @@ export default function OrderPage({ params }) {
     )
   }
 
+  if (order.exclusive) return <LicencePaymentResult order={order} failed={failed} />
+
   return (
     <section className="bg-white pb-24 pt-28 sm:pt-32">
       <div className="mx-auto w-full max-w-3xl px-6">
@@ -337,6 +339,57 @@ export default function OrderPage({ params }) {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+  )
+}
+
+// A licence (an exclusive product — db/exclusive.sql) has nothing to ship, so
+// there is nothing to track: no status timeline, no delivery card. The page is
+// the payment's result and nothing else — the same whether the customer came
+// from the RaiOne page or from an AS-Punch "Renew now" link.
+function LicencePaymentResult({ order, failed }) {
+  const paid = order.paymentStatus === 'paid'
+  const product = order.items?.[0]?.name || 'your licence'
+
+  return (
+    <section className="bg-white pb-24 pt-28 sm:pt-32">
+      <div className="mx-auto w-full max-w-lg px-6 text-center">
+        {paid ? (
+          <>
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <Icon name="check" className="h-8 w-8" />
+            </span>
+            <h1 className="mt-5 text-3xl font-semibold tracking-apple text-as-ink">Payment successful</h1>
+            <p className="mt-2 text-as-ink/60">
+              Thank you — we’ve received your payment of {money(orderTotal(order))} for {product}.
+            </p>
+            {order.licenseRenewal && (
+              <div className="text-left">
+                <LicenseRenewalStatus renewal={order.licenseRenewal} />
+              </div>
+            )}
+            <p className="mt-6 text-xs text-as-ink/40">Reference #{order.id}</p>
+          </>
+        ) : order.status === 'cancelled' ? (
+          <h1 className="text-2xl font-semibold tracking-apple text-as-ink">This payment was cancelled</h1>
+        ) : (
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-amber-50 p-6 text-amber-800">
+            <Icon name="box" className="h-7 w-7" />
+            <p className="font-semibold">{failed ? 'Payment not completed' : 'Confirming your payment…'}</p>
+            <p className="text-sm text-amber-700/80">
+              {failed
+                ? 'Your payment wasn’t completed. You can finish paying below.'
+                : 'This can take a few seconds. If it doesn’t update on its own, use the button to finish paying.'}
+            </p>
+            {order.collectUrl && (
+              <a href={order.collectUrl} className="pill mt-1">Complete payment</a>
+            )}
+          </div>
+        )}
+        <Link href="/" className="link-cta mt-6 justify-center">
+          Back to the store <Icon name="chevronRight" className="h-4 w-4" />
+        </Link>
       </div>
     </section>
   )

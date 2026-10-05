@@ -406,6 +406,11 @@ enters 7.5, and Whish collects exactly that.
 - **No address is required** for an exclusive order (there is nowhere to deliver to), which is why
   that check moved below the bag read in `POST /api/orders`. The **mobile number is still mandatory**
   — see *Checkout requires a mobile number*.
+- **Nothing to track.** `orderJson` carries the `exclusive` snapshot, and on it the order page (web
+  `account/orders/[id]`, app `orders/[id]`) is a **payment result only** — success, amount, the
+  AS-Punch renewal outcome, a reference — with no status timeline and no delivery card; the order
+  lists read "Paid", and the confirmation email drops "Track your order". Same for a typed-amount
+  RaiOne purchase and an AS-Punch renewal link.
 - **`min_qty`/`max_qty`/`qty_step` are independent of the flag** and useful on any product: null
   means "follow the store default" (`MAX_ITEM_QTY` = 2, step 1). The API **resolves them to real
   numbers** for the storefront and the app so neither carries its own copy of the default — but

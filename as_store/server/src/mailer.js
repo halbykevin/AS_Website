@@ -170,15 +170,16 @@ function orderBody(order, { intro, trackUrl }) {
     </table>
 
     <div style="margin-top:16px;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-size:14px;color:${INK}">
-      <strong>Delivery</strong><br/>
+      <strong>${order.exclusive ? 'Your details' : 'Delivery'}</strong><br/>
       ${esc(order.fullName)}<br/>
-      ${esc(order.phone)}${order.email ? `<br/>${esc(order.email)}` : ''}<br/>
-      ${esc(order.address)}${order.city ? `, ${esc(order.city)}` : ''}
+      ${esc(order.phone)}${order.email ? `<br/>${esc(order.email)}` : ''}
+      ${order.address ? `<br/>${esc(order.address)}${order.city ? `, ${esc(order.city)}` : ''}` : ''}
       ${order.notes ? `<br/><span style="color:${MUTED}">“${esc(order.notes)}”</span>` : ''}
     </div>
 
     ${
-      trackUrl
+      // A licence (exclusive order) ships nothing, so there is nothing to track.
+      trackUrl && !order.exclusive
         ? `<p style="margin:24px 0 0;text-align:center">
              <a href="${trackUrl}" style="display:inline-block;background:${RED};color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-size:14px;font-weight:600">Track your order</a>
            </p>`
@@ -257,10 +258,14 @@ export async function sendOrderEmails(order, trackToken) {
       t.sendMail({
         from: FROM,
         to: order.email,
-        subject: `Your AS Store order #${order.id} — received`,
+        subject: order.exclusive
+          ? `Your AS Store payment #${order.id} — received`
+          : `Your AS Store order #${order.id} — received`,
         html: emailShell(
           orderBody(order, {
-            intro: `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. ${esc(pay.customerLine)}`,
+            intro: order.exclusive
+              ? `Hi ${esc(order.fullName || 'there')}, thank you! ${esc(pay.customerLine)}`
+              : `Hi ${esc(order.fullName || 'there')}, thanks for your order! We've received it and will confirm it shortly. ${esc(pay.customerLine)}`,
             trackUrl,
           }),
         ),
