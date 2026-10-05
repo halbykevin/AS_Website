@@ -11,7 +11,7 @@ const nextConfig = {
   outputFileTracingRoot: appRoot,
   images: {
     // Same call as the store: the Vercel image optimizer is off, so next/image
-    // serves the source directly. Event photos come from three ticketing CDNs
+    // serves the source directly. Event photos come from four ticketing CDNs
     // we don't control, and none of them is worth an optimization quota.
     unoptimized: true,
     remotePatterns: [

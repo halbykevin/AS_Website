@@ -185,7 +185,7 @@ const makeExcerpt = (desc) => {
 
 // Every source key the scraper knows about. Kept here (rather than derived from
 // the run) so a source that failed this time still has its rows left alone.
-const EVENT_SOURCES = ['ticketingboxoffice', 'tickit', 'ihjoz']
+const EVENT_SOURCES = ['ticketingboxoffice', 'tickit', 'ihjoz', 'antoineticketing']
 
 async function uniqueSlug(base, extId) {
   const slug = base || 'event'

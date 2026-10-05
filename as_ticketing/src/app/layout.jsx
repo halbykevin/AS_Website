@@ -88,11 +88,12 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
       <head>
-        {/* The three ticketing partners each serve event photos from their own
+        {/* The four ticketing partners each serve event photos from their own
             CDN, and those images are the largest thing on every page. */}
         <link rel="preconnect" href="https://cdn.ticketingboxoffice.com" crossOrigin="" />
         <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossOrigin="" />
         <link rel="preconnect" href="https://images-ihjoz-com.s3.amazonaws.com" crossOrigin="" />
+        <link rel="preconnect" href="https://tixity.antoineticketing.com" crossOrigin="" />
         {/* Organization + WebSite, once for the whole property. Every Event on
             every page points its `organizer` at the @id declared here rather
             than restating the company, so Google reads one publisher across the

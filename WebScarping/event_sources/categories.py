@@ -1,9 +1,10 @@
-"""One category vocabulary for three ticketing sites.
+"""One category vocabulary for four ticketing sites.
 
 Each source names things its own way — Ticketing Box Office has editorial
 categories ("Theatrical plays"), ihjoz has an event-type dropdown ("concert"),
-and Tick'it only has music genres ("Afro House", "Comedy"). Left alone that
-would give the site three near-duplicate tiles for the same thing, so every
+Antoine Ticketing a product type ("movies"), and Tick'it only has music genres
+("Afro House", "Comedy"). Left alone that would give the site four
+near-duplicate tiles for the same thing, so every
 source label is folded into the canonical list below **before** it reaches the
 database.
 
@@ -86,21 +87,39 @@ ALIASES = {
     "live music": "Concerts",
     "stand-up": "Comedy",
     "stand up": "Comedy",
+
+    # --- Antoine Ticketing (its product `type` keys; "theater" and "sports"
+    # are already above). Kids listings are storytimes and trivia at fairs. ---
+    "music": "Concerts",
+    "movies": "Cinema",
+    "kids": "Activities",
+    "exhibits": "Events",
+    "seminars": "Events",
+}
+
+# Labels whose meaning depends on who sent them, checked before ALIASES. To
+# Tick'it "Dance" is a genre of club music; to Antoine it is a stage
+# performance, so a shared alias would misfile one or the other.
+BY_SOURCE = {
+    "antoineticketing": {"dance": "Ballet and Dance"},
 }
 
 # Every other Tick'it genre lands here rather than becoming its own tile.
 GENRE_DEFAULT = "Parties & Clubbing"
 
 
-def canonical(label: str, *, genre: bool = False) -> str:
+def canonical(label: str, *, genre: bool = False, source: str = "") -> str:
     """Fold one source label into the canonical vocabulary.
 
     `genre=True` marks a Tick'it music genre, so an unknown label becomes a club
-    night instead of the generic catch-all.
+    night instead of the generic catch-all. `source` picks up that site's
+    entries in BY_SOURCE.
     """
     key = (label or "").strip().lower()
     if not key:
         return FALLBACK
+    if key in BY_SOURCE.get(source, {}):
+        return BY_SOURCE[source][key]
     if key in ALIASES:
         return ALIASES[key]
     for name in CANONICAL:

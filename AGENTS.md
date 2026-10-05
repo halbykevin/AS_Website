@@ -53,7 +53,7 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   `whatsappBookingUrl` (like `wheel.js` across the spin packages). They must stay in step: a
   visitor arriving from `as.com.lb` and one landing here directly have to be offered the same
   reservation, worded the same way.
-- **Seat picking, on all three sources.** An event whose partner publishes a hall
+- **Seat picking, on three of the four sources** (Antoine Ticketing has no reader yet). An event whose partner publishes a hall
   gets a live seat map on its page: `GET /api/events/:slug/seatmap`
   ([server/src/seatmap.js](server/src/seatmap.js)) routes to one reader per site
   in [server/src/seatmap/](server/src/seatmap/) and the hub draws the answer
@@ -772,33 +772,47 @@ output back for download (`archiver` zips the whole folder, images included).
   `PYTHON_BIN` (default `python3`), `SCRAPER_DIR` (default `../WebScarping`), `SCRAPE_DIR`
   (default `server/scrapes`).
 
-## Events sync (three ticketing sites → one events page)
+## Events sync (four ticketing sites → one events page)
 
 `POST /api/scrape/events` runs [WebScarping/events_sync.py](WebScarping/events_sync.py), which
-scrapes **ticketingboxoffice.com**, **tickit.co** and **ihjoz.com** into one `events.json`;
-[server/src/scraper.js](server/src/scraper.js) then imports it. Driven from `/admin/scraper`
-(pick the sites, the country, and whether to clear what the sites have taken down).
+scrapes **ticketingboxoffice.com**, **tickit.co**, **ihjoz.com** and **antoineticketing.com** into
+one `events.json`; [server/src/scraper.js](server/src/scraper.js) then imports it. Driven from
+`/admin/scraper` (pick the sites, the country, and whether to clear what the sites have taken down).
 
 - **One module per site** in [WebScarping/event_sources/](WebScarping/event_sources/), each
-  exporting `KEY`/`LABEL`/`fetch(fetcher, limit, country)`. Adding a fourth site means writing one
+  exporting `KEY`/`LABEL`/`fetch(fetcher, limit, country)`. Adding another site means writing one
   module and listing it in `SOURCES` — the pipeline, the importer and the admin need nothing new
   beyond its key in `EVENT_SOURCES` (scraper.js) and `SOURCE_INFO` (ScraperAdmin.jsx). `tbo.py`
   parses the homepage's isotope cards, `tickit.py` calls the JSON API tickit.co's own browser
-  bundle calls, `ihjoz.py` walks `/events/browse`.
-- **Three sites, one category vocabulary.** Ticketing Box Office has editorial categories, ihjoz an
-  event-type dropdown, Tick'it only music genres — left alone that is three near-duplicate tiles for
-  the same thing. [categories.py](WebScarping/event_sources/categories.py) folds every source label
-  into `CANONICAL` **before** it reaches the database, and its names deliberately reuse the ones
-  already in Postgres so their admin-set tile images survive. `ALIASES` is the tuning point;
-  `refine()` improves a vague category from the event's own title, and only a vague one — an
-  editorial tag from the site itself always wins over a keyword.
+  bundle calls, `ihjoz.py` walks `/events/browse`, `antoine.py` pages through the public Tixity API
+  antoineticketing.com's bundle calls (`showSubs=true&extended=true` returns every night and the
+  description inline, so the whole calendar is ~8 requests). A newcomer joins `SOURCES` **last**:
+  the winner of a cross-listing keeps its row, so a show already on the site keeps its slug and URL.
+- **Four sites, one category vocabulary.** Ticketing Box Office has editorial categories, ihjoz an
+  event-type dropdown, Antoine a product type, Tick'it only music genres — left alone that is four
+  near-duplicate tiles for the same thing. [categories.py](WebScarping/event_sources/categories.py)
+  folds every source label into `CANONICAL` **before** it reaches the database, and its names
+  deliberately reuse the ones already in Postgres so their admin-set tile images survive. `ALIASES`
+  is the tuning point; `BY_SOURCE` holds the few labels whose meaning depends on the site ("dance"
+  is club music to Tick'it and a stage performance to Antoine). `refine()` improves a vague
+  category from the event's own title, and only a vague one — an editorial tag from the site
+  itself always wins over a keyword.
 - **Two things look like duplicates and need opposite treatment**
-  ([dedupe.py](WebScarping/event_sources/dedupe.py)): a **run** (one show, many nights — Tick'it
-  published a ten-night stand-up run as ten events) is *merged* into one event with ten `dates`,
-  and a **cross-listing** (the same night sold on two sites) is *dropped*, keeping whichever source
-  ranks first in `SOURCES`. Both need an overlapping date to fire, which is what stops two
-  unrelated nights sharing a generic name from being welded together; a run additionally needs the
-  same venue, so a touring show stays several events.
+  ([dedupe.py](WebScarping/event_sources/dedupe.py), tested in
+  [WebScarping/tests/](WebScarping/tests/test_dedupe.py) — `python -m unittest discover tests`):
+  a **run** (one show, many nights — Tick'it published a ten-night stand-up run as ten events) is
+  *merged* into one event with ten `dates`, and a **cross-listing** (the same show sold on two
+  sites) is *dropped*, keeping whichever source ranks first in `SOURCES` — and any night only the
+  dropped listing sells **moves onto the kept one** with its own booking link, so dropping a
+  duplicate never loses a date (each `dates[].url` books where that night is sold, which is also
+  what the seat map reads). A cross-listing is recognised three ways: same night + near-identical
+  title; same night + same venue + the same words in any order, spelling-tolerant ("Rula Korban -
+  Chi Tayeb" = "Chi Tayib … by Rula Korban"); or no shared night + same venue + near-identical title
+  (one run with its nights split between sites). Every rule needs a shared night or a shared venue
+  on top of the title, which is what stops two unrelated events sharing a generic name from being
+  welded together; the looser two only join *different* sites, and a touring show (different
+  venues) stays several events. Venues match by containment of their telling words ("Theatre
+  Tournesol" = "Tournesol Tayouneh"); titles are folded first (case, accents; Arabic survives).
 - **Identity is `(source, external_id)`**, and the importer matches on **every** listing id a run
   covers (`mergedIds`), not just today's primary — when the first night sells out and the site
   retires it, the run gets a new primary id, and that is what stops it becoming a second row.

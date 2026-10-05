@@ -1,7 +1,7 @@
 // Everything this app shows comes from the marketing site's API — the same one
 // as.com.lb reads. There is no database here, and deliberately no admin: events
 // and categories are managed once, at as.com.lb/admin, and the events sync
-// (three ticketing sites -> Postgres) keeps them current for both properties.
+// (four ticketing sites -> Postgres) keeps them current for both properties.
 
 import { cache } from 'react'
 

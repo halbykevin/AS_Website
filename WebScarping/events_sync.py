@@ -3,16 +3,17 @@
 the AS Company API ingests into Postgres.
 
 Sources live in event_sources/ (one module each: ticketingboxoffice.com,
-tickit.co, ihjoz.com). This script runs them, folds their different category
-vocabularies into one (categories.py), then puts everything through the same
-three-step clean-up (dedupe.py):
+tickit.co, ihjoz.com, antoineticketing.com). This script runs them, folds their
+different category vocabularies into one (categories.py), then puts everything
+through the same three-step clean-up (dedupe.py):
 
   1. runs       - one show playing many nights becomes ONE event, many dates
   2. past       - anything whose last night has been and gone is dropped
-  3. cross-list - the same event sold on two sites is kept once
+  3. cross-list - the same event sold on two sites is kept once, with every
+                  night either site sells
 
   python events_sync.py --out events.json
-  python events_sync.py --out events.json --sources tickit,ihjoz --limit 5
+  python events_sync.py --out events.json --sources tickit,antoineticketing --limit 5
   python events_sync.py --out events.json --country ""          # every country
 
 Progress goes to stdout (the admin dashboard streams it as the job log); the
@@ -129,8 +130,8 @@ def main(argv=None) -> int:
                       fh, ensure_ascii=False, indent=2)
         return 1
 
-    # 1. One show over many nights is one event. Ticketing Box Office already
-    #    groups them; Tick'it and ihjoz publish every night as its own listing.
+    # 1. One show over many nights is one event. Ticketing Box Office and Antoine
+    #    already group them; Tick'it and ihjoz publish every night on its own.
     all_events, runs = dedupe.merge_runs(all_events)
     print("\n=== Runs ===")
     print(f"  {runs} extra night(s) folded into a multi-date event" if runs
@@ -154,8 +155,10 @@ def main(argv=None) -> int:
     kept, dropped = dedupe.collapse(all_events, order)
     print("\n=== Cross-listed ===")
     for d in dropped:
+        moved = f", +{d['nightsAdded']} night(s) moved over" if d["nightsAdded"] else ""
         print(f"  - {d['source']}: {d['title']}"
-              f"  ==  {d['duplicateOf']['source']}: {d['duplicateOf']['title']}")
+              f"  ==  {d['duplicateOf']['source']}: {d['duplicateOf']['title']}"
+              f"  ({d['rule']}{moved})")
     if not dropped:
         print("  none")
 

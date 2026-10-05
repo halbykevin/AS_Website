@@ -176,7 +176,7 @@ Expo Application Services (EAS, by Expo): builds the app, delivers over-the-air 
 
 Apple Push Notification service: order status and promotional notifications, with the customer's permission.
 
-Event listings: collected from publicly published event calendars in Lebanon (ticketingboxoffice.com, tickit.co, ihjoz.com) and shown as listings with date and venue. The app sells no tickets.
+Event listings: collected from publicly published event calendars in Lebanon (ticketingboxoffice.com, tickit.co, ihjoz.com, antoineticketing.com) and shown as listings with date and venue. The app sells no tickets.
 
 The app contains no advertising SDK, no analytics SDK, no cross-app tracking and no advertising identifier, which is why it presents no App Tracking Transparency prompt. Our App Privacy declaration and our privacy policy at https://store.as.com.lb/pages/privacy describe the same data collection.
 

@@ -154,15 +154,16 @@ the redirect out in the same change or the marketing site will link to an
 
 An event that is sold with a hall behind it gets a live seat map on its page:
 the real room, what is still free, priced — you pick what you want and send it
-to us on WhatsApp. **All three sources the sync pulls from are read**, and each
-publishes something different to an anonymous browser, so the panel has to be
-able to be three shapes without becoming three components:
+to us on WhatsApp. **Three of the four sources the sync pulls from are read**,
+and each publishes something different to an anonymous browser, so the panel has
+to be able to be three shapes without becoming three components:
 
 | Source | What they publish | What the panel shows |
 |---|---|---|
 | ticketingboxoffice.com | every seat as an `<input>` in the event page | the whole hall as a grid we rebuild, plus their zone list |
 | ihjoz.com | an SVG of the room + a table of what is on sale in each block | their drawing; tap a **seated** block to open its numbered seats, tap a **table** to take it whole |
 | tickit.co | an SVG of the room + zones from their JSON API | their drawing and a priced zone list — see below |
+| antoineticketing.com | not read yet | nothing — the plain Reserve button. A night of theirs folded into another site's run (see the events sync) still books where it is sold |
 
 **Tick'it has no seat to pick, and that is their product, not a gap in ours.**
 Their own ticket note reads "free seating within your selected zone, allocated

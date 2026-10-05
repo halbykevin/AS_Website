@@ -8,6 +8,7 @@ const SOURCE_INFO = {
   ticketingboxoffice: { label: 'Ticketing Box Office', note: 'Concerts, theatre, ballet, sports' },
   tickit: { label: "Tick'it", note: 'Nightlife, parties and comedy' },
   ihjoz: { label: 'ihjoz', note: 'Concerts, festivals, workshops, activities' },
+  antoineticketing: { label: 'Antoine Ticketing', note: 'Theatre, music, cinema, kids' },
 }
 const ALL_SOURCES = Object.keys(SOURCE_INFO)
 
