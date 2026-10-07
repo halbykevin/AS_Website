@@ -863,6 +863,20 @@ one `events.json`; [server/src/scraper.js](server/src/scraper.js) then imports i
   says when a category was hidden this way, so one vanishing is never a mystery.
 - `--country Lebanon` (the default) keeps Tick'it — which also sells in the Gulf and Europe — to what
   AS Company's visitors can actually attend. Past events are dropped unless `--include-past`.
+- **It can run itself every morning** (`/admin/scraper` → "Sync automatically every day", default
+  07:00 **Beirut time** whatever zone the VPS keeps; ships **off**).
+  [server/src/eventSyncSchedule.js](server/src/eventSyncSchedule.js) is a minute ticker inside the
+  API, not cron: it claims `event_sync_schedule.next_run_at` and moves it to the next morning in
+  **one UPDATE**, so a run fires once even with two API processes, and a run missed while the API
+  was down **catches up once** when it is back. The page's sites/country/prune now **save as you
+  change them** into that same row and the morning run uses them, so unticking a site keeps it out
+  of tomorrow's run too (sites are stored as the ones *left out*, so a new source joins on its own).
+  Only one sync runs at a time — `POST /api/scrape/events` hands back the running one.
+- **Every run is in `event_sync_runs`** (manual or scheduled: outcome, per-site answers, counts,
+  the log's tail; newest 60 kept), shown as **History** on the same page — Success, Partial (a site
+  didn't answer, so nothing was delisted) or Failed. A run the API was restarted under is closed
+  out as "Interrupted" at the next boot. Endpoints: `GET /api/scrape/events/status`,
+  `PUT /api/scrape/events/schedule`, `GET /api/scrape/events/runs[/:id]`.
 
 ## Content flow (frontend)
 

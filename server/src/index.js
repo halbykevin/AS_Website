@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { app } from './app.js'
 import { mailEnabled } from './mailer.js'
 import { rebuildEnabled, startRebuildSchedule } from './rebuild.js'
+import { startEventsSchedule } from './scraper.js'
 
 const port = process.env.PORT || 8080
 app.listen(port, () => {
@@ -17,4 +18,5 @@ app.listen(port, () => {
       : '[rebuild] SITE_REBUILD_HOOK_URL not set — pre-rendered pages refresh only on deploy'
   )
   startRebuildSchedule()
+  startEventsSchedule()
 })

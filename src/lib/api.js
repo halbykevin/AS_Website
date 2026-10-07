@@ -687,6 +687,11 @@ export const adminApi = {
   startScrape: (data) => request('/api/scrape', { method: 'POST', body: data, authed: true }),
   startEventsScrape: (data) => request('/api/scrape/events', { method: 'POST', body: data || {}, authed: true }),
   getScrape: (id) => request(`/api/scrape/${id}`, { authed: true }),
+  getEventsSync: () => request('/api/scrape/events/status', { authed: true }),
+  saveEventsSync: (data) =>
+    request('/api/scrape/events/schedule', { method: 'PUT', body: data, authed: true }),
+  listEventsSyncRuns: () => request('/api/scrape/events/runs', { authed: true }),
+  getEventsSyncRun: (id) => request(`/api/scrape/events/runs/${id}`, { authed: true }),
 
   upload: async (file) => {
     const form = new FormData()

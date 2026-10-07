@@ -406,6 +406,42 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS events_source_ext ON events(source, external_id) WHERE source <> '';
 
+-- The events sync's standing configuration (single row, id=1): which sites it
+-- reads, the country filter, whether it prunes, and the daily run. Manual and
+-- scheduled runs share it, so unticking a site in the admin keeps it out of the
+-- morning run too. Sites are stored as the ones LEFT OUT, so a newly added
+-- source joins without anyone ticking it. run_at is HH:MM, Beirut time;
+-- next_run_at is the clock the API's minute ticker claims (NULL = off).
+CREATE TABLE IF NOT EXISTS event_sync_schedule (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  run_at TEXT NOT NULL DEFAULT '07:00',
+  skipped_sources JSONB NOT NULL DEFAULT '[]'::jsonb,
+  country TEXT NOT NULL DEFAULT 'Lebanon',
+  prune BOOLEAN NOT NULL DEFAULT true,
+  next_run_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT event_sync_schedule_singleton CHECK (id = 1)
+);
+INSERT INTO event_sync_schedule (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Every events sync, manual or scheduled, with its outcome — the admin's
+-- history. id is the run's folder under SCRAPE_DIR. status: running | done |
+-- error; a done run whose summary says complete=false was partial (a site did
+-- not answer, nothing was pruned). The log is the tail of the scraper's output.
+CREATE TABLE IF NOT EXISTS event_sync_runs (
+  id UUID PRIMARY KEY,
+  triggered_by TEXT NOT NULL DEFAULT 'manual',
+  status TEXT NOT NULL DEFAULT 'running',
+  options JSONB NOT NULL DEFAULT '{}'::jsonb,
+  summary JSONB,
+  error TEXT,
+  log TEXT NOT NULL DEFAULT '',
+  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS event_sync_runs_started ON event_sync_runs(started_at DESC);
+
 -- Contact form submissions from the public /contact page. Emailed to the staff
 -- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.
 CREATE TABLE IF NOT EXISTS contact_messages (

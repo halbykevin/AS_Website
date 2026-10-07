@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { ZipArchive } from 'archiver'
 import { requireAuth } from './auth.js'
 import { query } from './db.js'
+import { SCHEDULE_TZ, isRunAt, nextRunAfter, startSchedule } from './eventSyncSchedule.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -90,6 +91,7 @@ function jobView(job) {
   return {
     id: job.id,
     kind: job.kind || 'products',
+    triggeredBy: job.triggeredBy,
     status: job.status,
     log: job.log,
     error: job.error,
@@ -377,14 +379,68 @@ async function ingestEvents(jsonPath, { prune = true } = {}) {
   }
 }
 
-function startEventsJob(opts) {
+// ---- Run history ------------------------------------------------------------
+// Every events sync is written to event_sync_runs as it starts and again when it
+// ends, so the admin can see when the last one ran and how it went — including
+// the morning runs nobody watched, and across API restarts (the in-memory
+// `jobs` above are only for following a run live).
+const KEEP_RUNS = 60
+const RUN_LOG_CAP = 64_000
+
+function recordRunStart(job, options) {
+  return query(
+    'INSERT INTO event_sync_runs (id, triggered_by, options) VALUES ($1, $2, $3)',
+    [job.id, job.triggeredBy, JSON.stringify(options)]
+  ).catch((err) => console.warn(`[events-sync] could not record run ${job.id}: ${err.message}`))
+}
+
+async function recordRunEnd(job) {
+  if (job.recorded) return
+  job.recorded = true
+  try {
+    await job.recording // the INSERT, which a fast failure could otherwise overtake
+    await query(
+      `UPDATE event_sync_runs SET status = $2, summary = $3, error = $4, log = $5, finished_at = now()
+        WHERE id = $1`,
+      [job.id, job.status, job.summary ? JSON.stringify(job.summary) : null, job.error,
+       job.log.slice(-RUN_LOG_CAP)]
+    )
+    await query(
+      `DELETE FROM event_sync_runs
+        WHERE id IN (SELECT id FROM event_sync_runs ORDER BY started_at DESC OFFSET $1)`,
+      [KEEP_RUNS]
+    )
+  } catch (err) {
+    console.warn(`[events-sync] could not record the end of run ${job.id}: ${err.message}`)
+  }
+}
+
+// Per-site results from a run that imported nothing, so its history row can
+// still say which sites failed and why.
+function readSourceReport(jsonPath) {
+  try {
+    const { sources } = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+    return sources && typeof sources === 'object' ? sources : null
+  } catch {
+    return null
+  }
+}
+
+function runningEventsJob() {
+  for (const job of jobs.values()) {
+    if (job.kind === 'events' && job.status === 'running') return job
+  }
+  return null
+}
+
+function startEventsJob(opts, triggeredBy = 'manual') {
   const id = randomUUID()
   const outDir = path.join(SCRAPE_DIR, id)
   fs.mkdirSync(outDir, { recursive: true })
   const jsonPath = path.join(outDir, 'events.json')
 
   const job = {
-    id, kind: 'events', status: 'running', log: '', error: null,
+    id, kind: 'events', triggeredBy, status: 'running', log: '', error: null,
     createdAt: Date.now(), files: [], imageCount: 0, summary: null, proc: null,
   }
   jobs.set(id, job)
@@ -399,9 +455,19 @@ function startEventsJob(opts) {
     args.push('--sources', sources.join(','))
   }
   // '' means every country; anything else is passed through as the filter.
-  args.push('--country', opts.country === undefined ? 'Lebanon' : String(opts.country))
+  const country = opts.country === undefined ? 'Lebanon' : String(opts.country)
+  args.push('--country', country)
   if (Math.floor(num(opts.limit, 0)) > 0) args.push('--limit', String(Math.floor(opts.limit)))
   if (opts.includePast) args.push('--include-past')
+  const prune = opts.prune !== false
+
+  job.recording = recordRunStart(job, {
+    sources: sources.length ? sources : EVENT_SOURCES, country, prune,
+  })
+  const finish = () => {
+    pruneJobs()
+    recordRunEnd(job)
+  }
 
   const proc = spawn(PYTHON_BIN, args, { cwd: SCRAPER_DIR, windowsHide: true })
   job.proc = proc
@@ -417,10 +483,11 @@ function startEventsJob(opts) {
       ? `Could not run "${PYTHON_BIN}". Install Python and the scraper deps, or set PYTHON_BIN.`
       : err.message
     job.log += `\n[error] ${job.error}\n`
+    if (!proc.pid) recordRunEnd(job) // never started, so 'close' may not follow
   })
   proc.on('close', async (code) => {
     job.proc = null
-    if (job.status === 'error') return pruneJobs()
+    if (job.status === 'error') return finish()
     // 3 = at least one site answered but not all of them. Worth importing (the
     // JSON says the run was partial, so nothing gets pruned), not worth failing.
     if (code !== 0 && code !== 3) {
@@ -428,11 +495,13 @@ function startEventsJob(opts) {
       job.error = code === 1
         ? 'No events could be scraped — every source failed. Nothing was changed.'
         : `Scraper exited with code ${code}`
-      return pruneJobs()
+      const report = readSourceReport(jsonPath)
+      if (report) job.summary = { sources: report, complete: false }
+      return finish()
     }
     job.log += '\nImporting into the database…\n'
     try {
-      const s = await ingestEvents(jsonPath, { prune: opts.prune !== false })
+      const s = await ingestEvents(jsonPath, { prune })
       job.summary = s
       job.log +=
         `Imported: ${s.created} new, ${s.updated} updated ` +
@@ -451,10 +520,59 @@ function startEventsJob(opts) {
       job.error = 'Import failed: ' + err.message
       job.log += `\n[import error] ${err.message}\n`
     }
-    pruneJobs()
+    finish()
   })
   return job
 }
+
+// ---- The daily sync -----------------------------------------------------------
+const scheduleJson = (r) => ({
+  enabled: r.enabled,
+  runAt: r.run_at,
+  sources: EVENT_SOURCES.filter((k) => !(r.skipped_sources || []).includes(k)),
+  country: r.country,
+  prune: r.prune,
+  nextRunAt: r.enabled ? r.next_run_at : null,
+  timezone: SCHEDULE_TZ,
+})
+
+const runJson = (r) => ({
+  id: r.id,
+  triggeredBy: r.triggered_by,
+  status: r.status,
+  options: r.options,
+  summary: r.summary,
+  error: r.error,
+  startedAt: r.started_at,
+  finishedAt: r.finished_at,
+  ...(r.log === undefined ? {} : { log: r.log }),
+})
+
+/** Call once at startup: closes out what the last process left open, then starts the daily run. */
+export function startEventsSchedule() {
+  // finished_at stays empty: when it stopped is unknown, and the time of this
+  // restart would read as a duration.
+  query(
+    `UPDATE event_sync_runs
+        SET status = 'error',
+            error = 'Interrupted — the API restarted while this sync was running.'
+      WHERE status = 'running'`
+  ).catch(() => {}) // table not migrated yet: the ticker says so once
+
+  startSchedule((s) => {
+    if (runningEventsJob()) {
+      console.log('[events-sync] daily sync skipped — a sync was already running')
+      return
+    }
+    const skipped = Array.isArray(s.skipped_sources) ? s.skipped_sources : []
+    const sources = EVENT_SOURCES.filter((k) => !skipped.includes(k))
+    if (!sources.length) return // the admin refuses this; an empty list would mean "every site"
+    startEventsJob({ sources, country: s.country, prune: s.prune }, 'schedule')
+    console.log(`[events-sync] daily sync started (${sources.join(', ')})`)
+  })
+}
+
+const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
 
 export const scraperRouter = express.Router()
 scraperRouter.use(requireAuth)
@@ -463,9 +581,70 @@ scraperRouter.use(requireAuth)
 // the run: { sources: ['tickit'], country: 'Lebanon', limit, delay, prune,
 // includePast } — all optional, defaults are every source, Lebanon, prune on.
 scraperRouter.post('/events', (req, res) => {
+  // One at a time: two imports running together race to insert the same new
+  // events. Hand back the one already going so the page can follow it.
+  const running = runningEventsJob()
+  if (running) return res.json({ ...jobView(running), alreadyRunning: true })
   const job = startEventsJob(req.body || {})
   res.status(201).json(jobView(job))
 })
+
+// The page's opening state: the saved settings, and a sync already under way (a
+// morning run, or one started from another tab) so the page can follow it.
+scraperRouter.get('/events/status', ah(async (req, res) => {
+  const { rows } = await query('SELECT * FROM event_sync_schedule WHERE id = 1')
+  if (!rows[0]) return res.status(500).json({ error: 'Run the migration first (npm run migrate).' })
+  const running = runningEventsJob()
+  res.json({ schedule: scheduleJson(rows[0]), running: running ? jobView(running) : null })
+}))
+
+// Save the sync's settings — the sites, country and pruning every run uses, and
+// the daily run. { enabled, runAt: 'HH:MM', sources: [...], country, prune }
+scraperRouter.put('/events/schedule', ah(async (req, res) => {
+  const b = req.body || {}
+  const sources = (Array.isArray(b.sources) ? b.sources : [])
+    .map(String)
+    .filter((s) => EVENT_SOURCES.includes(s))
+  if (!sources.length) return res.status(400).json({ error: 'Pick at least one site to sync from.' })
+  const runAt = String(b.runAt || '07:00')
+  if (!isRunAt(runAt)) return res.status(400).json({ error: 'The time must be HH:MM, e.g. 07:00.' })
+  const enabled = Boolean(b.enabled)
+  // The clock is only reset when the daily run itself changes: ticking a site at
+  // 07:00:30 must not push a run that is due this minute to tomorrow.
+  const { rows } = await query(
+    `UPDATE event_sync_schedule
+        SET enabled = $1, run_at = $2, skipped_sources = $3, country = $4, prune = $5,
+            next_run_at = CASE
+              WHEN NOT $1 THEN NULL
+              WHEN enabled AND run_at = $2 AND next_run_at IS NOT NULL THEN next_run_at
+              ELSE $6::timestamptz END,
+            updated_at = now()
+      WHERE id = 1
+      RETURNING *`,
+    [enabled, runAt, JSON.stringify(EVENT_SOURCES.filter((k) => !sources.includes(k))),
+     b.country === undefined ? 'Lebanon' : String(b.country).trim().slice(0, 60),
+     b.prune !== false, nextRunAfter(runAt)]
+  )
+  if (!rows[0]) return res.status(500).json({ error: 'Run the migration first (npm run migrate).' })
+  res.json(scheduleJson(rows[0]))
+}))
+
+// The history, newest first — without the logs, which are fetched one at a time.
+scraperRouter.get('/events/runs', ah(async (req, res) => {
+  const { rows } = await query(
+    `SELECT id, triggered_by, status, options, summary, error, started_at, finished_at
+       FROM event_sync_runs ORDER BY started_at DESC LIMIT $1`,
+    [KEEP_RUNS]
+  )
+  res.json(rows.map(runJson))
+}))
+
+scraperRouter.get('/events/runs/:id', ah(async (req, res) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'Run not found' })
+  const { rows } = await query('SELECT * FROM event_sync_runs WHERE id = $1', [req.params.id])
+  if (!rows[0]) return res.status(404).json({ error: 'Run not found' })
+  res.json(runJson(rows[0]))
+}))
 
 // Start a scrape. Returns the initial job view; the client polls GET /:id.
 scraperRouter.post('/', (req, res) => {
