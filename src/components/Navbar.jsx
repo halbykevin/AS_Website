@@ -11,9 +11,6 @@ import EventsLink from './EventsLink.jsx'
 const isEventsHref = (href) => href === '/events' || href.startsWith('/events?')
 import { optimizedImage } from '../lib/api'
 
-// Remote support: the website of rAIdesk (formerly AS Desk), its own project outside this repo.
-const REMOTE_SUPPORT_URL = 'https://remote.raione.net/'
-
 export default function Navbar() {
   const { brand, nav, store } = useContent()
   const logoH = Number(brand.logoSize) || 48
@@ -100,7 +97,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop nav — the red CTAs lead, then the content links. From lg up:
-            three pills plus five links don't fit a 768px tablet without wrapping,
+            the pills plus five links don't fit a 768px tablet without wrapping,
             so tablets get the mobile menu. */}
         <div className="hidden items-center gap-8 lg:flex">
           <div className="flex items-center gap-3">
@@ -111,14 +108,6 @@ export default function Navbar() {
               className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
             >
               Store
-            </a>
-            <a
-              href={REMOTE_SUPPORT_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md"
-            >
-              Remote Support
             </a>
             <EventsLink className="rounded-full bg-as-red px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light hover:shadow-md">
               Browse Events
@@ -183,14 +172,6 @@ export default function Navbar() {
               className="rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
             >
               Store
-            </a>
-            <a
-              href={REMOTE_SUPPORT_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white"
-            >
-              Remote Support
             </a>
             <EventsLink className="mt-2 rounded-full bg-as-red px-5 py-2.5 text-center text-sm font-semibold text-white">
               Browse Events
