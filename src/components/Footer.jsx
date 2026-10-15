@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useContent } from '../store/content.jsx'
 import EventsLink from './EventsLink.jsx'
+import AppBadges from './AppBadges.jsx'
 import { hoursSentence } from '../lib/hours.js'
 
 export default function Footer() {
@@ -24,6 +25,7 @@ export default function Footer() {
                 {hours && <>Open {hours}</>}
               </p>
             )}
+            <AppBadges className="mt-5" />
           </div>
 
           {/* Explore */}

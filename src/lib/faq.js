@@ -14,6 +14,7 @@
 
 import { eventsHref } from '../components/EventsLink.jsx'
 import { hoursSentence } from './hours.js'
+import { appListings, APP_SUMMARY } from './apps.js'
 
 const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim()
 const stripDot = (s) => clean(s).replace(/[.\s]+$/, '')
@@ -112,6 +113,18 @@ export function siteFaq(c) {
           : `Find the event on AS Ticketing Hub (${hostOf(ticketing)}) — each event page links to where you can book.`,
       ],
       links: [{ href: ticketing, label: 'Browse events' }],
+    })
+  }
+
+  const listings = appListings(c)
+  if (listings.length) {
+    items.push({
+      id: 'app',
+      q: `Does ${name} have an app?`,
+      a: [
+        `Yes — the ${name} app is on ${listOf(listings.map((l) => `${l.inSentence} (${l.platforms})`))}. ${APP_SUMMARY}`,
+      ],
+      links: listings.map((l) => ({ href: l.href, label: l.label, external: true })),
     })
   }
 

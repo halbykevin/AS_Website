@@ -63,6 +63,8 @@ const settingsJson = (r) => ({
   storeTitle: r.store_title, storeEyebrow: r.store_eyebrow,
   storeDescription: r.store_description, storeUrl: r.store_url,
   ticketingUrl: r.ticketing_url || '',
+  // The app's store listings; '' = that download badge is hidden.
+  appStoreUrl: r.app_store_url || '', playStoreUrl: r.play_store_url || '',
   published: r.published,
 })
 const serviceJson = (r) => ({ id: r.id, title: r.title, description: r.description, icon: r.icon, sort: r.sort })
@@ -210,7 +212,9 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        store_title=$23, store_eyebrow=$24, store_description=$25, store_url=$26,
        published=$27, whatsapp_number=$28, favicon_url=$29, logo_size=$30,
        banner_height=$31, logo_size_desktop=$32, ticketing_url=$33,
-       ticketing_whatsapp_number=COALESCE($34, ticketing_whatsapp_number), updated_at=now()
+       ticketing_whatsapp_number=COALESCE($34, ticketing_whatsapp_number),
+       app_store_url=COALESCE($35, app_store_url), play_store_url=COALESCE($36, play_store_url),
+       updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
       b.brandName || '', b.legalName || '', b.tagline || '', b.logoUrl || '',
@@ -230,6 +234,9 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       // Absent = keep it: an admin page loaded before this field existed must
       // not blank the reservation number by saving the rest of the settings.
       b.ticketingWhatsappNumber == null ? null : String(b.ticketingWhatsappNumber).trim(),
+      // Same rule for the app listings, which a stale admin tab would blank.
+      b.appStoreUrl == null ? null : String(b.appStoreUrl).trim(),
+      b.playStoreUrl == null ? null : String(b.playStoreUrl).trim(),
     ]
   )
   res.json(settingsJson(rows[0]))

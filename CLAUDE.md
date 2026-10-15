@@ -699,7 +699,8 @@ and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. D
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
 
 Postgres tables: `settings` (single row, id=1, holds global content + the `published` flag +
-`whatsapp_number` — the company WhatsApp — and `ticketing_whatsapp_number`, which event reservation links prefer over it; one `reservationNumber()` in the hub's `lib/events.js` decides),
+`whatsapp_number` — the company WhatsApp — and `ticketing_whatsapp_number`, which event reservation links prefer over it; one `reservationNumber()` in the hub's `lib/events.js` decides;
+and `app_store_url`/`play_store_url` — see *App download badges*),
 `services`, `events` (each has a `ticket_url` — internal: admin, seat-map readers, never shown to a visitor — plus an
 optional `category_id` → `categories`; multi-day events carry a `dates` JSONB array, and
 synced rows carry `source`/`external_id` for idempotent re-sync — see **Events sync**),
@@ -982,6 +983,27 @@ seat-map "request, not a booking" rule, live categories). One list feeds both th
 `FAQPage` JSON-LD, because Google requires the markup to match what the page shows. The address and
 hours questions simply disappear when the store admin has none to state.
 
+## App download badges (as.com.lb)
+
+The mobile app's two store listings (live since 2026-10-12) are linked from the **footer** (every
+page), a card on **`/contact`**, a **"Does AS Company have an app?"** FAQ entry (and its
+`FAQPage` markup), and a *Mobile app* section in `llms.txt`.
+
+- **Admin-editable**: Site Settings → **Mobile app** (`settings.app_store_url` /
+  `play_store_url`, seeded once by `migrate.js` with the live listings). Empty = that badge,
+  its FAQ mention and its llms.txt line all disappear. The PUT treats an *absent* field as
+  "keep" (`COALESCE`), like `ticketing_whatsapp_number`, so an admin tab opened before the
+  fields existed cannot blank them.
+- **One decider**: [src/lib/apps.js](src/lib/apps.js) `appListings()` — the badges
+  ([AppBadges.jsx](src/components/AppBadges.jsx)), the FAQ and llms.txt all ask it which
+  listings exist, so they cannot disagree.
+- **The badges are Apple's and Google's own artwork** (`public/badges/`, unmodified vectors,
+  both 135×40 on screen — the same height, which both sets of guidelines ask for). Don't recolour,
+  crop or redraw them; that's what the guidelines forbid. `public/app-icon.png` is the app's
+  store icon at 128px, for the contact card.
+- The Android package (`lb.com.as.company`) and the iOS bundle id (`lb.com.as.store`) differ on
+  purpose — see `mobile/APPSTORE.md`. The App Store link uses the numeric Apple ID, not either.
+
 ## Publish gate (Coming Soon)
 
 - Driven by `settings.published` (toggled in the admin dashboard).
@@ -1026,7 +1048,7 @@ src/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
     components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
     pages/                  # SettingsEditor, BannersAdmin, SectionsAdmin, ServicesAdmin, WhatWeDoAdmin, EventsAdmin, CategoriesAdmin, StoreBannerAdmin, PopupAdmin, PredictorAdmin, WheelAdmin, MessagesAdmin, ScraperAdmin
-public/                     # ASCompanyLogo.jpg, as-store-logo.png, ticketing-box-office.png
+public/                     # ASCompanyLogo.jpg, as-store-logo.png, app-icon.png, badges/ (App Store + Google Play)
 tailwind.config.js          # brand colors, Inter font, animations
 ```
 

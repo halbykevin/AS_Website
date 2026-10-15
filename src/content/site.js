@@ -221,6 +221,15 @@ export const store = {
   cta: 'Visit AS Store',
 }
 
+// The AS Company mobile app's store listings, shown as download badges in the
+// footer, on the contact page and in the FAQ. The live values are the
+// `appStoreUrl` / `playStoreUrl` site settings; these are only the offline
+// fallback. An empty one hides that badge.
+export const apps = {
+  ios: 'https://apps.apple.com/lb/app/as-company/id6813355139',
+  android: 'https://play.google.com/store/apps/details?id=lb.com.as.company',
+}
+
 // AS Store showcase — the eye-catching product strip at the very top of the
 // homepage. Each item links to the AS Store (or the "coming soon" page while
 // store.url is empty). Fully editable from the admin panel later; these are the

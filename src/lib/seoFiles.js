@@ -8,6 +8,7 @@
 
 import { SITE_URL, absoluteUrl, prerenderRoutes, normalizePath } from './seo.js'
 import { hoursSentence } from './hours.js'
+import { appListings, APP_SUMMARY } from './apps.js'
 
 const STORE_FALLBACK = 'https://store.as.com.lb'
 const TICKETING_FALLBACK = 'https://ticketing.as.com.lb'
@@ -100,6 +101,14 @@ export function llmsTxt(c) {
   )
   out.push('')
 
+  const listings = appListings(c)
+  if (listings.length) {
+    out.push('## Mobile app', '')
+    out.push(`The ${name} app. ${APP_SUMMARY}`, '')
+    for (const l of listings) out.push(`- [${l.store} (${l.platforms})](${l.href})`)
+    out.push('')
+  }
+
   if (ww.enabled !== false && (ww.title || solutions.length)) {
     out.push(`## ${clean(ww.title) || 'What We Do'}`, '')
     for (const p of ww.intro || []) if (clean(p)) out.push(clean(p), '')
@@ -143,7 +152,10 @@ export function llmsTxt(c) {
 
   out.push('## Contact', '')
   out.push(`- [Contact page](${absoluteUrl('/contact')}): WhatsApp, email, Instagram and a message form.`)
-  out.push(`- [FAQ](${absoluteUrl('/faq')}): location, opening hours, solutions, shopping, events and contact.`)
+  out.push(
+    `- [FAQ](${absoluteUrl('/faq')}): location, opening hours, solutions, shopping, events, ` +
+      `${listings.length ? 'the app ' : ''}and contact.`,
+  )
   if (contact.email) out.push(`- Email: ${contact.email}`)
   if (phone) out.push(`- WhatsApp: +${phone} (https://wa.me/${phone})`)
   if (isHttp(contact.instagram)) {

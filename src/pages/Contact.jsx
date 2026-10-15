@@ -5,14 +5,17 @@ import { useContent } from '../store/content.jsx'
 import { sendContactMessage, whatsappContactUrl } from '../lib/api.js'
 import { contact as contactDefaults } from '../content/site.js'
 import EventsLink from '../components/EventsLink.jsx'
+import AppBadges from '../components/AppBadges.jsx'
 import { hoursLines } from '../lib/hours.js'
+import { appListings } from '../lib/apps.js'
 
 // The public contact page: three one-tap channels (WhatsApp, Instagram, email)
 // and a message form that posts to /api/contact — the API stores the message and
 // emails it to the staff inbox. Reached from the "Contact" nav item and footer.
 export default function Contact() {
-  const { contact, brand, whatsappNumber, shop } = useContent()
+  const { contact, brand, whatsappNumber, shop, apps } = useContent()
   const hours = hoursLines(shop?.hours)
+  const hasApp = appListings({ apps }).length > 0
   const copy = { ...contactDefaults.page, ...(contact.page || {}) }
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '', website: '' })
@@ -115,6 +118,31 @@ export default function Contact() {
                 hint="See what's new, and DM us anytime."
                 icon={<InstagramIcon className="h-6 w-6" />}
               />
+            )}
+
+            {/* Not a ChannelCard: it has two destinations, one per store. */}
+            {hasApp && (
+              <div className="rounded-2xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+                <div className="flex items-center gap-4">
+                  <img
+                    src="/app-icon.png"
+                    alt=""
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 shrink-0 rounded-xl border border-black/[0.06]"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold uppercase tracking-[0.14em] text-as-charcoal/45">
+                      Our app
+                    </span>
+                    <span className="mt-0.5 block text-base font-bold text-as-charcoal">Get the {brand.name} app</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-as-charcoal/50">
+                      Shop AS Store, track your orders and find events — on your phone.
+                    </span>
+                  </span>
+                </div>
+                <AppBadges className="mt-4" />
+              </div>
             )}
 
             <div className="rounded-2xl border border-black/[0.06] bg-as-charcoal/[0.03] p-5 sm:p-6">

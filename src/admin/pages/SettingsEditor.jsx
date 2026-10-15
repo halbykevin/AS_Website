@@ -13,6 +13,7 @@ const SECTIONS = [
   { value: 'events', label: 'Events' },
   { value: 'contact', label: 'Contact' },
   { value: 'store', label: 'AS Store' },
+  { value: 'app', label: 'Mobile app' },
 ]
 
 const empty = {
@@ -25,6 +26,7 @@ const empty = {
   whatsappNumber: '', ticketingWhatsappNumber: '',
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
   ticketingUrl: '',
+  appStoreUrl: '', playStoreUrl: '',
   published: false,
 }
 
@@ -59,6 +61,7 @@ export default function SettingsEditor() {
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
           ticketingUrl: s.ticketingUrl || '',
+          appStoreUrl: s.appStoreUrl || '', playStoreUrl: s.playStoreUrl || '',
           published: Boolean(s.published),
         })
       }
@@ -296,6 +299,25 @@ export default function SettingsEditor() {
           <Field label="Description"><TextArea value={form.storeDescription} onChange={set('storeDescription')} /></Field>
           <Field label="Store URL" hint="Leave empty to show the button as “Coming soon”.">
             <TextInput value={form.storeUrl} onChange={set('storeUrl')} placeholder="https://store.yourdomain.com" />
+          </Field>
+        </div>
+      </Card>
+      )}
+
+      {section === 'app' && (
+      <Card title="Mobile app">
+        <div className="space-y-4">
+          <Field
+            label="App Store link"
+            hint="The app's App Store listing. Shown as a “Download on the App Store” badge in the footer and on the Contact page, and in the FAQ. Leave empty to hide it."
+          >
+            <TextInput value={form.appStoreUrl} onChange={set('appStoreUrl')} placeholder="https://apps.apple.com/lb/app/as-company/id6813355139" />
+          </Field>
+          <Field
+            label="Google Play link"
+            hint="The app's Google Play listing, shown the same way as a “Get it on Google Play” badge. Leave empty to hide it."
+          >
+            <TextInput value={form.playStoreUrl} onChange={set('playStoreUrl')} placeholder="https://play.google.com/store/apps/details?id=lb.com.as.company" />
           </Field>
         </div>
       </Card>

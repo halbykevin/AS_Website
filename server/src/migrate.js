@@ -376,6 +376,23 @@ BEGIN
     UPDATE settings SET ticketing_whatsapp_number = '96176123923' WHERE id = 1;
   END IF;
 END $$;
+-- The mobile app's store listings, shown as download badges (footer, contact
+-- page, FAQ). Empty = that badge is hidden. Seeded once, on the run that
+-- creates the columns, with the listings live since 2026-10-12 — never again,
+-- so clearing one in the admin stays cleared.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'settings' AND column_name = 'app_store_url') THEN
+    ALTER TABLE settings ADD COLUMN app_store_url TEXT DEFAULT '';
+    UPDATE settings SET app_store_url = 'https://apps.apple.com/lb/app/as-company/id6813355139' WHERE id = 1;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'settings' AND column_name = 'play_store_url') THEN
+    ALTER TABLE settings ADD COLUMN play_store_url TEXT DEFAULT '';
+    UPDATE settings SET play_store_url = 'https://play.google.com/store/apps/details?id=lb.com.as.company' WHERE id = 1;
+  END IF;
+END $$;
 -- Set when the events sync hides a category because nothing is filed under it
 -- any more. It is what makes a hide OURS: the stamp plus the visible flag tell
 -- the three states apart, the same way products.delisted_at does in the store.

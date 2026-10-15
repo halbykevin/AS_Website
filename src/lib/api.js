@@ -79,6 +79,7 @@ export const defaultContent = {
   solutions: defaults.solutions,
   eventsSection: defaults.eventsSection,
   store: defaults.store,
+  apps: defaults.apps,
   storeShowcase: defaults.storeShowcase,
   about: defaults.about,
   contact: defaults.contact,
@@ -121,6 +122,12 @@ function mergeSettings(s) {
     ticketingUrl: pick(s.ticketingUrl, ''),
     // Browser-tab icon (favicon); applied at runtime in ContentProvider.
     faviconUrl: pick(s.faviconUrl, ''),
+    // The app's store listings. Not `pick`: '' is the admin hiding a badge, and
+    // only an API that predates the fields (undefined) falls back to the defaults.
+    apps: {
+      ios: s.appStoreUrl ?? d.apps.ios,
+      android: s.playStoreUrl ?? d.apps.android,
+    },
     brand: {
       ...d.brand,
       name: pick(s.brandName, d.brand.name),
