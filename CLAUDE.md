@@ -132,7 +132,8 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
 - **Where an event comes from.** Every card and event page names its source, and
   `/events?source=<slug>` filters by it — a second row of chips under the
   categories, each with a count under the current category and search, that
-  carry the category and `q` along (and vice versa).
+  carry the category and `q` along (and vice versa). On a phone both rows become
+  two dropdowns under "Filter by" ([FilterSelects.jsx](as_ticketing/src/components/FilterSelects.jsx)).
   [as_ticketing/src/lib/sources.js](as_ticketing/src/lib/sources.js) is the one
   list: **AS Company** (`events.source = ''`, i.e. made by hand in the admin —
   always shown in the filter, even at 0, as the slot for AS's own events), then

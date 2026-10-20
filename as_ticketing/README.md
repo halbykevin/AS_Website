@@ -106,6 +106,11 @@ thing and filed under another.
   the current category and search, and a chip at 0 dims rather than disappears,
   so the row doesn't jump about. The category and source rows carry each other's
   choice and `q`, like the tabs carry the search.
+- **On a phone the rows become two dropdowns** under "Filter by"
+  ([`FilterSelects.jsx`](src/components/FilterSelects.jsx)): two rows of chips
+  only fit there by scrolling sideways, cut off at the edge with the active chip
+  often out of sight. It is a real GET form (a `<noscript>` Apply button), and
+  with JavaScript a change navigates at once without scrolling back to the top.
 - **A name, not a link.** The partner's page is still never shown or linked
   (see the repo's CLAUDE.md, *No visitor is ever sent to a partner*); Reserve is
   still our WhatsApp.
