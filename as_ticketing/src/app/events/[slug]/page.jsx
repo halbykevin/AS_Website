@@ -12,7 +12,10 @@ import {
 } from '@/lib/seo'
 import EventCard from '@/components/EventCard'
 import SeatMap from '@/components/SeatMap'
+import SourceDot from '@/components/SourceDot'
 import { hasSeatmap } from '@/lib/seatmap'
+import { listingHref } from '@/lib/listing'
+import { sourceOf } from '@/lib/sources'
 
 /**
  * Pre-render every event that exists at build time. These pages are the whole
@@ -81,6 +84,7 @@ export default async function EventPage({ params }) {
   if (!event) notFound()
 
   const past = isEventPast(event)
+  const source = sourceOf(event)
   const reserve = past ? '' : bookingUrl(event, reservationNumber(settings))
   const nightReserve = (night) => (past ? '' : nightBookingUrl(event, night, reservationNumber(settings)))
   const nights = (event.dates || []).filter((d) => d.date)
@@ -133,6 +137,16 @@ export default async function EventPage({ params }) {
                 className="inline-block rounded-full bg-as-red px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-as-red-light"
               >
                 {event.categoryName}
+              </Link>
+            ) : null}
+            {source ? (
+              <Link
+                href={listingHref({ source: source.slug })}
+                title={`More from ${source.name}`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/90 transition hover:bg-white/25"
+              >
+                <SourceDot source={source} onDark />
+                {source.name}
               </Link>
             ) : null}
             {past ? (

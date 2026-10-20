@@ -1,10 +1,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { eventDateLabel, eventDays } from '@/lib/events'
+import { AS_COMPANY, sourceOf } from '@/lib/sources'
+import SourceDot from './SourceDot'
 
 export default function EventCard({ event, priority = false }) {
   const days = eventDays(event)
   const nights = days.length
+  const source = sourceOf(event)
 
   return (
     <Link
@@ -47,12 +50,25 @@ export default function EventCard({ event, priority = false }) {
             {[event.venue, event.city].filter(Boolean).join(', ')}
           </p>
         )}
-        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-as-red">
-          Details
-          <svg className="h-4 w-4 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </span>
+        <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-as-red">
+            Details
+            <svg className="h-4 w-4 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </span>
+          {source ? (
+            <span
+              title={`Source: ${source.name}`}
+              className={`inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                source === AS_COMPANY ? 'bg-as-red/10 text-as-red' : 'bg-as-charcoal/[0.06] text-as-charcoal/65'
+              }`}
+            >
+              <SourceDot source={source} />
+              <span className="truncate">{source.name}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
     </Link>
   )

@@ -9,13 +9,17 @@ import {
   jsonLdScript,
   metaDescription,
 } from '@/lib/seo'
+import { listingHref } from '@/lib/listing'
+import { SOURCES, sourceBySlug, sourceOf } from '@/lib/sources'
 import EventCard from '@/components/EventCard'
 import EventSearch from '@/components/EventSearch'
-import CategoryFilter from '@/components/CategoryFilter'
+import EventFilters from '@/components/EventFilters'
 
 /** A query long enough to be a search and short enough to be a title. */
 const readQuery = (params) =>
   typeof params?.q === 'string' ? params.q.trim().replace(/\s+/g, ' ').slice(0, 80) : ''
+
+const readSource = (params) => (typeof params?.source === 'string' ? params.source : '')
 
 /**
  * Each category filter is a page in its own right in Google's eyes — someone
@@ -32,11 +36,16 @@ const readQuery = (params) =>
  * has. `follow` keeps the links live, and the canonical points at the search
  * URL itself rather than at /events: a noindexed page canonicalising to another
  * one is how you talk Google into dropping the page it points at.
+ *
+ * A `source` view is noindexed the same way: it is the same events cut another
+ * way, and a page per ticketing site would only compete with the category
+ * pages — and rank us for the partners' own names.
  */
 export async function generateMetadata({ searchParams }) {
   const params = await searchParams
   const active = typeof params?.category === 'string' ? params.category : ''
   const q = readQuery(params)
+  const sourceSlug = readSource(params)
 
   if (q) {
     return {
@@ -44,7 +53,21 @@ export async function generateMetadata({ searchParams }) {
       description: metaDescription(
         `Events in Lebanon matching “${q}” — dates, venues and how to reserve, gathered from every box office by ${SITE_NAME}.`,
       ),
-      alternates: { canonical: `/events?q=${encodeURIComponent(q)}` },
+      alternates: { canonical: listingHref({ category: active, source: sourceSlug, q }) },
+      robots: { index: false, follow: true },
+    }
+  }
+
+  if (sourceSlug) {
+    const source = sourceBySlug(sourceSlug)
+    const categoryName = active ? (await getCategories()).find((c) => c.slug === active)?.name : ''
+    if (!source) return { title: 'What’s on in Lebanon', robots: { index: false, follow: true } }
+    return {
+      title: `${categoryName || 'Events'} from ${source.name}`,
+      description: metaDescription(
+        `Upcoming ${categoryName ? `${categoryName.toLowerCase()} ` : ''}events in Lebanon from ${source.name} — dates, venues and how to reserve with ${SITE_NAME}.`,
+      ),
+      alternates: { canonical: listingHref({ category: active, source: source.slug }) },
       robots: { index: false, follow: true },
     }
   }
@@ -75,6 +98,9 @@ export default async function EventsPage({ searchParams }) {
   const params = await searchParams
   const active = typeof params?.category === 'string' ? params.category : ''
   const q = readQuery(params)
+  // An unknown source is ignored rather than emptying the page; its metadata
+  // has already noindexed the URL.
+  const source = sourceBySlug(readSource(params))
 
   const [events, categories, index] = await Promise.all([
     getEvents(),
@@ -86,21 +112,36 @@ export default async function EventsPage({ searchParams }) {
   // The server searches descriptions too, so this can legitimately return an
   // event the suggestion dropdown didn't offer — a support act named in the
   // blurb and nowhere else. See lib/search.js.
-  const shown = searchEvents(inCategory, q)
+  const matching = searchEvents(inCategory, q)
+  const shown = source ? matching.filter((e) => sourceOf(e) === source) : matching
   const activeName = categories.find((c) => c.slug === active)?.name
+
+  // Every site the calendar has something from, plus AS Company's own events
+  // always — each counted under the current category and search.
+  const listed = new Set(events.map(sourceOf))
+  const sources = SOURCES.filter((s) => !s.key || listed.has(s)).map((s) => ({
+    ...s,
+    count: matching.filter((e) => sourceOf(e) === s).length,
+  }))
 
   const path = activeName ? `/events?category=${active}` : '/events'
   const heading = q
     ? `Results for “${q}”`
-    : activeName
-      ? `${activeName} in Lebanon`
-      : 'What’s on in Lebanon'
+    : source
+      ? `${activeName || 'Events'} from ${source.name}`
+      : activeName
+        ? `${activeName} in Lebanon`
+        : 'What’s on in Lebanon'
+  // " in Comedy", " from Antoine Ticketing" — whichever filters are on.
+  const scope = [activeName && ` in ${activeName}`, source && ` from ${source.name}`]
+    .filter(Boolean)
+    .join('')
 
-  // No structured data on a search page. It is noindexed by design, and feeding
-  // an ItemList of the same events under a URL Google is told to ignore only
-  // adds a second, weaker description of pages it already has.
-  const list = q ? null : eventListJsonLd(shown, { name: heading, url: path })
-  const crumbs = q
+  // No structured data on a search or a source page. Both are noindexed by
+  // design, and feeding an ItemList of the same events under a URL Google is
+  // told to ignore only adds a second, weaker description of pages it already has.
+  const list = q || source ? null : eventListJsonLd(shown, { name: heading, url: path })
+  const crumbs = q || source
     ? null
     : breadcrumbJsonLd(
         activeName
@@ -125,10 +166,10 @@ export default async function EventsPage({ searchParams }) {
           </h1>
           <p className="mt-4 max-w-2xl text-base text-white/60">
             {q
-              ? `${shown.length} event${shown.length === 1 ? '' : 's'} match your search${
-                  activeName ? ` in ${activeName}` : ''
-                }.`
-              : activeName
+              ? `${shown.length} event${shown.length === 1 ? '' : 's'} match your search${scope}.`
+              : source
+                ? `Upcoming ${activeName ? `${activeName.toLowerCase()} ` : ''}events from ${source.name} — dates, venues and how to reserve.`
+                : activeName
                 ? `Every upcoming ${activeName.toLowerCase()} event across Lebanon — dates, venues and how to reserve.`
                 : 'Concerts, comedy, theatre, festivals and nights out across Lebanon — gathered from every box office, in one place.'}
           </p>
@@ -142,15 +183,21 @@ export default async function EventsPage({ searchParams }) {
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-        <CategoryFilter categories={categories} active={active} query={q} />
+        <EventFilters
+          categories={categories}
+          sources={sources}
+          category={active}
+          source={source?.slug || ''}
+          query={q}
+        />
 
         {shown.length === 0 ? (
           <div className="py-24 text-center">
             <p className="text-as-charcoal/50">
               {q
-                ? `Nothing matches “${q}”${activeName ? ` in ${activeName}` : ''}.`
-                : activeName
-                  ? `Nothing in ${activeName} right now — check back soon.`
+                ? `Nothing matches “${q}”${scope}.`
+                : scope
+                  ? `Nothing${scope} right now — check back soon.`
                   : 'No events scheduled right now — check back soon.'}
             </p>
             {q ? (

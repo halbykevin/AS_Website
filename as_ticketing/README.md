@@ -85,6 +85,34 @@ All of it is [`src/lib/search.js`](src/lib/search.js) plus
   navigation and become a way to narrow it; dropping `q` on the tap meant to
   refine it would silently throw the search away.
 
+## Where an event comes from
+
+Every card carries a small pill naming the event's source, the event page a chip
+beside its category, and `/events` has a **Source** row of chips under the
+categories (`?source=<slug>`). All three ask `sourceOf()` in
+[`src/lib/sources.js`](src/lib/sources.js), so an event can't be labelled one
+thing and filed under another.
+
+- **The list is fixed, in this order:** AS Company, Ticketing Box Office,
+  Antoine Ticketing, Tick'it, ihjoz. **AS Company** is an event made by hand in
+  the admin (`events.source = ''`); its chip is always there, even at 0, as the
+  slot for AS's own events. A partner's chip appears once the calendar has
+  something from it. A sync site this list doesn't name gets no label at all —
+  better than a raw key on a card — so a new source needs a row here.
+- **It reads the API's `source` field**, the sync's site key. An API from before
+  that field is read from the `ticketUrl` host instead, so the labels are right
+  whichever side deploys first.
+- **Counts follow the other filters.** Each chip counts what it would show under
+  the current category and search, and a chip at 0 dims rather than disappears,
+  so the row doesn't jump about. The category and source rows carry each other's
+  choice and `q`, like the tabs carry the search.
+- **A name, not a link.** The partner's page is still never shown or linked
+  (see the repo's CLAUDE.md, *No visitor is ever sent to a partner*); Reserve is
+  still our WhatsApp.
+- **Source views are `noindex, follow`**, self-canonical, out of the sitemap and
+  without structured data: the same events cut another way, and a page per
+  partner would only compete with the category pages and rank us for their names.
+
 ## SEO
 
 Search is how someone finds an event they don't yet know exists, so it is a

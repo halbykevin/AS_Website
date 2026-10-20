@@ -74,6 +74,9 @@ const eventJson = (r) => ({
   status: r.status, excerpt: r.excerpt, description: r.description, sort: r.sort,
   categoryId: r.category_id, categorySlug: r.category_slug || '', categoryName: r.category_name || '',
   dates: Array.isArray(r.dates) ? r.dates : [],
+  // The sync's site key ('antoineticketing', 'tickit'…); '' = made by hand in
+  // the admin. The ticketing hub labels and filters events by it.
+  source: r.source || '',
 })
 const bannerJson = (r) => ({
   id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,

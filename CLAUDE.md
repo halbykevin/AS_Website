@@ -21,8 +21,13 @@ Website for **AS Company (Absolute Solutions SAL)** — market leader in telecom
 > The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
 > Office" badge and its logo are gone from the footer, `/events`, the event detail page and the
 > mobile app, and `public/ticketing-box-office.png` + the `ticketing` block in `content/site.js`
-> were deleted with them. Partner names survive only in the admin's sync page, where they name a
-> data source. The banner slider is expected to gain a logo + slogan later — nothing is there now.
+> were deleted with them. The banner slider is expected to gain a logo + slogan later — nothing is
+> there now.
+>
+> **Exception since 2026-10-20 (owner's call): the ticketing hub names each event's source**, as
+> plain text — a pill on the card, a chip on the event page, and a *Source* filter on `/events`
+> (see *Where an event comes from* below). It is a name, never a link or a logo, and reserving is
+> still our WhatsApp. as.com.lb and the mobile app still show no partner names.
 
 > The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
 
@@ -124,6 +129,19 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   dropdown never says "nothing found": its last row is always *see all results*.
   A `?q=` page is `noindex, follow` with a self-canonical and no structured data
   — an infinite query space rearranging pages Google already has.
+- **Where an event comes from.** Every card and event page names its source, and
+  `/events?source=<slug>` filters by it — a second row of chips under the
+  categories, each with a count under the current category and search, that
+  carry the category and `q` along (and vice versa).
+  [as_ticketing/src/lib/sources.js](as_ticketing/src/lib/sources.js) is the one
+  list: **AS Company** (`events.source = ''`, i.e. made by hand in the admin —
+  always shown in the filter, even at 0, as the slot for AS's own events), then
+  Ticketing Box Office, Antoine Ticketing, Tick'it, ihjoz. `sourceOf()` reads the
+  API's `source` field (added to `eventJson` for this) and falls back to the
+  `ticketUrl` host on an API without it. A fifth sync site needs a row there or
+  its events go unlabelled. A source view is `noindex, follow`, out of the
+  sitemap, with no structured data — the same events cut another way, and a page
+  per partner would rank us for their names.
 - **Search is a feature here, not a chore** — it is how someone finds an event they
   didn't know existed. [as_ticketing/src/lib/seo.js](as_ticketing/src/lib/seo.js) is the
   one place canonicals, OpenGraph and JSON-LD derive from. The load-bearing piece is
