@@ -18,9 +18,13 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | PUT | `/api/settings` | admin | Update settings |
 | GET | `/api/services` | — | List services |
 | POST/PUT/DELETE | `/api/services[/:id]` | admin | Manage services |
-| GET | `/api/events` | — | List events |
-| GET | `/api/events/:slug` | — | One event |
-| POST/PUT/DELETE | `/api/events[/:id]` | admin | Manage events |
+| GET | `/api/events` | — | List published events (`?all=1` + admin token: drafts too) |
+| GET | `/api/events/:slug` | — | One published event |
+| POST/PUT/DELETE | `/api/events[/:id]` | admin | Manage events — a new one is created as a **draft** |
+| PUT | `/api/events/:id/publish` | admin | `{ published }` — put an event live or take it down; tells the ticketing hub at once (`hubRefreshed` in the answer) |
+| GET | `/api/events/:slug/seatmap` | — | The hall for the ticketing hub's seat picker: a partner's, read live, or — for an event AS hosts — the published map from `event_seatmaps` (`source: 'as'`, with `grid`) |
+| GET | `/api/hosted-events` | admin | Every AS-hosted event's seat map, summarised (published, total / sold / available) |
+| GET/PUT/DELETE | `/api/hosted-events/:id/seatmap` | admin | One hosted event's seat map: `{ published, layout }` — tiers, seats, stage/entrance/standing areas. PUT re-checks the layout (`hostedSeatmap.js`) and refuses a synced event (409) |
 | GET | `/api/banners` | — | List homepage banners (slideshow) |
 | POST/PUT/DELETE | `/api/banners[/:id]` | admin | Manage banners |
 | GET | `/api/sections` | — | List custom homepage sections |

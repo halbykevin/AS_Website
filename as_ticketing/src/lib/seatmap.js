@@ -35,11 +35,13 @@ export function seatmapSectionUrl(slug, sid, night) {
 
 // The four partners the sync pulls from all publish their hall to an anonymous
 // browser, and server/src/seatmap/ has a reader for each. Anything else — a
-// hand-made event, a fifth site — has no map, and asking would be a wasted
-// request on most of the calendar. Keep in step with HOSTS in those readers.
+// fifth site — has no map, and asking would be a wasted request on most of the
+// calendar. Keep in step with HOSTS in those readers.
 const SOURCES = /(^|\.)(ticketingboxoffice\.com|ihjoz\.com|tickit\.co|antoineticketing\.com)$/i
 
 export function hasSeatmap(event) {
+  // An event AS hosts, whose map was drawn and published in the admin.
+  if (event?.hasSeatmap) return true
   const urls = [event?.ticketUrl, ...(event?.dates || []).map((d) => d?.url)].filter(Boolean)
   return urls.some((u) => SOURCES.test(hostOf(u)))
 }

@@ -611,10 +611,21 @@ export const adminApi = {
   updateService: (id, data) => request(`/api/services/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteService: (id) => request(`/api/services/${id}`, { method: 'DELETE', authed: true }),
 
-  listEvents: () => request('/api/events'),
+  // ?all=1 includes drafts (events not yet published), which only the admin sees.
+  listEvents: () => request('/api/events?all=1', { authed: true }),
+  publishEvent: (id, published) =>
+    request(`/api/events/${id}/publish`, { method: 'PUT', body: { published }, authed: true }),
   createEvent: (data) => request('/api/events', { method: 'POST', body: data, authed: true }),
   updateEvent: (id, data) => request(`/api/events/${id}`, { method: 'PUT', body: data, authed: true }),
   deleteEvent: (id) => request(`/api/events/${id}`, { method: 'DELETE', authed: true }),
+
+  // Seat maps of the events AS Company hosts (server/src/hostedSeatmap.js).
+  listSeatmaps: () => request('/api/hosted-events', { authed: true }),
+  getSeatmap: (eventId) => request(`/api/hosted-events/${eventId}/seatmap`, { authed: true }),
+  saveSeatmap: (eventId, data) =>
+    request(`/api/hosted-events/${eventId}/seatmap`, { method: 'PUT', body: data, authed: true }),
+  deleteSeatmap: (eventId) =>
+    request(`/api/hosted-events/${eventId}/seatmap`, { method: 'DELETE', authed: true }),
 
   listBanners: () => request('/api/banners'),
   createBanner: (data) => request('/api/banners', { method: 'POST', body: data, authed: true }),

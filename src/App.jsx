@@ -25,6 +25,7 @@ const SettingsEditor = lazy(() => import('./admin/pages/SettingsEditor.jsx'))
 const ServicesAdmin = lazy(() => import('./admin/pages/ServicesAdmin.jsx'))
 const WhatWeDoAdmin = lazy(() => import('./admin/pages/WhatWeDoAdmin.jsx'))
 const EventsAdmin = lazy(() => import('./admin/pages/EventsAdmin.jsx'))
+const SeatmapEditor = lazy(() => import('./admin/pages/SeatmapEditor.jsx'))
 const BannersAdmin = lazy(() => import('./admin/pages/BannersAdmin.jsx'))
 const CategoriesAdmin = lazy(() => import('./admin/pages/CategoriesAdmin.jsx'))
 const StoreBannerAdmin = lazy(() => import('./admin/pages/StoreBannerAdmin.jsx'))
@@ -83,6 +84,7 @@ export function AppRoutes() {
             <Route path="services" element={<ServicesAdmin />} />
             <Route path="what-we-do" element={<WhatWeDoAdmin />} />
             <Route path="events" element={<EventsAdmin />} />
+            <Route path="events/:id/seatmap" element={<SeatmapEditor />} />
             <Route path="categories" element={<CategoriesAdmin />} />
             <Route path="store-banner" element={<StoreBannerAdmin />} />
             {/* The store panel used to be an uploaded image slideshow edited

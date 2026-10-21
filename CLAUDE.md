@@ -713,6 +713,57 @@ and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. D
   payment, floored to the cent — so a promise made before checkout is the one the server keeps; pass
   item money only, never delivery or VAT. They render nothing when the wallet is off.
 
+## AS-hosted events: seat maps & tickets (admin + API + hub)
+
+Events AS Company hosts itself — made by hand in `/admin/events`, `events.source = ''` (the
+"AS Company" source on the hub) — get a seat map, ticket prices and stock of their own. The
+Events page opens on **Hosted by AS** (the synced ones are a second tab), and each hosted
+event has **Seat map & tickets** → `/admin/events/:id/seatmap`
+([SeatmapEditor.jsx](src/admin/pages/SeatmapEditor.jsx)). First version, built 2026-10-20 —
+the owner will refine the details.
+
+- **The hall is a grid.** Seats sit on cells; the **stage, entrances and standing areas** are
+  rectangles over cells. Tools: paint seats (click one, drag a block), mark sold / held /
+  available, drag a stage / entrance / standing area, select an area to rename, move, resize,
+  re-price or delete it, erase; Undo (Ctrl+Z). **Quick layout** generates a whole hall (rows ×
+  seats, aisles, stage in front or behind, a door) to adjust from.
+- **Ticket types** (name, price, colour; USD or LBP) price every seat and standing area.
+  Availability is per seat (`free` | `sold` | `held` — held is kept off sale) and, for a
+  standing area, `capacity − sold`. The **Tickets** table totals sold, held, available and
+  sold value per type; the events list shows "N of M tickets available" per event.
+- **Rows are lettered from the stage outwards** (row A nearest it; from the top with no stage),
+  seats numbered 1… left to right; a row can be renamed by clicking its letter. That rule lives
+  in `rowLabels()` in [server/src/hostedSeatmap.js](server/src/hostedSeatmap.js), mirrored in
+  [seatmapLayout.js](src/admin/components/seatmapLayout.js) for the live preview — keep them in step.
+- **Stored in `event_seatmaps`** (one row per event, cascades with it: `published` + `layout`
+  JSONB). The server is the authority: `sanitizeLayout()` clamps the grid (≤ 80 × 60), drops
+  off-grid / duplicate seats, unknown ticket types and bad colours, and caps standing sales at
+  capacity, on every save. A synced event refuses a map (409) — its hall is the partner's.
+- **An event made here starts as a draft** (`events.published = false`; existing and synced rows
+  default to live). Drafts are out of every public read — `/api/events`, `/api/events/:slug`, the
+  seat map — so as.com.lb, the app and the hub never see one; the admin's list asks for them with
+  `?all=1`, which needs the token. **Publish** / **Unpublish** (the events list and the editor's
+  header; `PUT /api/events/:id/publish`) flips it, and the editor's Publish saves unsaved map
+  changes first. **Publish means live now**: the API calls the hub's `POST /api/revalidate`
+  ([server/src/hubRevalidate.js](server/src/hubRevalidate.js) →
+  [as_ticketing/src/app/api/revalidate/route.js](as_ticketing/src/app/api/revalidate/route.js)),
+  which drops every cached read of the site API (all tagged `site-api`) — on publish/unpublish,
+  on an edit or delete of a live event, and on a live event's seat-map save. It needs
+  `HUB_REVALIDATE_URL` + `HUB_REVALIDATE_SECRET` on the VPS and the same secret as
+  `REVALIDATE_SECRET` on the hub's Vercel project; unset or failing, the change still saves and
+  the hub catches up within its 5-minute cache (the admin says which happened).
+- **Seat picking is a separate switch** (`event_seatmaps.published`, "Seat picking on the
+  ticketing hub", on by default): off, a live event shows just the Reserve on WhatsApp button.
+  `eventJson` carries `hasSeatmap` (seat picking on and a map exists), which
+  the hub's `hasSeatmap()` accepts alongside its partner host list, and
+  `GET /api/events/:slug/seatmap` answers a hosted event from the database (`source: 'as'`,
+  the partner shape plus `grid`) — outside `SEATMAP_ENABLED`/`SEATMAP_SOURCES`, which exist
+  for the partners. The hub's `GridHall` draws it; picks go to WhatsApp like any other.
+- **Still a request, not a booking.** Nothing marks a seat sold but staff: confirm the WhatsApp
+  request, then mark the seats sold (or raise a standing area's *Sold*) and save. The mobile
+  app's seat map does not draw AS halls yet (its `hasSeatmap()` is host-only), so it shows the
+  plain reserve button for them.
+
 ## Backend
 
 See [server/README.md](server/README.md) for endpoints + full VPS/Vercel deploy steps.
@@ -754,6 +805,7 @@ of `{matchId, teamA, teamB, scoreA, scoreB}` + `share_platform`/`share_item`),
 stored **and** emailed to staff, listed at `/admin/messages`),
 `wheel_entries` (the **Lucky Draw** pool: draw_number/full_name + `source` `manual|predictor`,
 a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording each spin),
+`event_seatmaps` (the seat map + tickets of an AS-hosted event — see *AS-hosted events*),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -1075,12 +1127,12 @@ tailwind.config.js          # brand colors, Inter font, animations
 
 - Frontend (Vercel): `VITE_API_URL=https://api.yourdomain.com` — read at **build** time too (pre-rendering).
   Optional: `VITE_SITE_URL` (canonical host, default `https://www.as.com.lb`), `PRERENDER_ALLOW_FALLBACK=1`.
-- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. `SITE_REBUILD_HOOK_URL` (+ `SITE_REBUILD_DELAY_SECONDS`, `SITE_REBUILD_EVERY_HOURS`) rebuilds the pre-rendered site on content edits. Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
+- Backend ([server/.env](server/.env.example)): DB URL, admin email/password, JWT secret, CORS origins, public URL, upload dir. `STORE_API_URL` — where the AS Store API lives, for the homepage store banner's product cards (`http://127.0.0.1:10001` on the VPS, `http://localhost:8081` in dev). `SEATMAP_ENABLED=0` disables the ticketing hub's seat maps; `SEATMAP_SOURCES=tbo,ihjoz` keeps only the sources named. `SITE_REBUILD_HOOK_URL` (+ `SITE_REBUILD_DELAY_SECONDS`, `SITE_REBUILD_EVERY_HOURS`) rebuilds the pre-rendered site on content edits. `HUB_REVALIDATE_URL` + `HUB_REVALIDATE_SECRET` refresh the ticketing hub the moment an event is published or edited (the hub's Vercel project holds the same secret as `REVALIDATE_SECRET`). Scraper (optional): `PYTHON_BIN`, `SCRAPER_DIR`, `SCRAPE_DIR`.
 
 ## Routes
 
 Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`, `/faq`
-Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
+Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/events/:id/seatmap` (Seat map & tickets), `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited
 at `/admin/what-we-do`) presents the **Absolute Solution** division: about copy, the solution tiles

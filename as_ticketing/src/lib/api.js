@@ -15,9 +15,14 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 // hammering the API on every visit.
 const REVALIDATE = 300
 
+// Every read carries this tag, so the site API can drop them all the moment an
+// event is published or changed (app/api/revalidate) rather than waiting out
+// REVALIDATE — "Publish" in the admin has to mean live now.
+export const API_TAG = 'site-api'
+
 async function get(path, fallback) {
   try {
-    const res = await fetch(`${API}${path}`, { next: { revalidate: REVALIDATE } })
+    const res = await fetch(`${API}${path}`, { next: { revalidate: REVALIDATE, tags: [API_TAG] } })
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
     return await res.json()
   } catch (err) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDate } from '@/lib/events'
 import { isNumberedSeat, money, seatmapSectionUrl, seatmapUrl, seatPlace, whatsappSeatsUrl } from '@/lib/seatmap'
 
@@ -19,6 +19,9 @@ import { isNumberedSeat, money, seatmapSectionUrl, seatmapUrl, seatPlace, whatsa
 //   tickit.co               a drawing of the room, zones only — their seating
 //                           is "free within your zone", so there is no seat to
 //                           pick and pretending otherwise would be a lie
+//   AS Company (source 'as') a hall drawn in our own admin: seats on a grid with
+//                           the stage, entrances and standing areas where they
+//                           are (`grid`, server/src/hostedSeatmap.js)
 //
 // The one thing this must never imply is that picking holds anything. It
 // doesn't: only the partner's system can hold a seat, and between this fetch
@@ -87,7 +90,9 @@ export default function SeatMap({ event, whatsappNumber }) {
   )
   // The whole row, not its date: two shows in one day are two halls.
   const [night, setNight] = useState(nights[0] || null)
-  const date = night?.date || ''
+  // A one-night event made in the admin has its date but no `dates` list; the
+  // request still has to say which night it is for.
+  const date = night?.date || event?.date || ''
   const [state, setState] = useState({ status: 'loading', data: null })
   const [selected, setSelected] = useState(new Map())
   const [qty, setQty] = useState(new Map())
@@ -156,13 +161,18 @@ export default function SeatMap({ event, whatsappNumber }) {
   const currency = block.data?.currency || data?.currency || 'USD'
   const tiers = (openSid ? block.data?.tiers : data?.tiers) || []
   const totals = (openSid ? block.data?.totals : data?.totals) || { seats: 0, available: 0 }
+  // Our own hall (an event AS hosts): drawn from the grid, not from rows.
+  const grid = (!openSid && data?.grid) || null
+  const hosted = data?.source === 'as'
+  const hasSeats = rows.length > 0 || Boolean(grid?.seats?.length)
 
   // Widest row decides the drawing width; everything else follows from it.
   const mapWidth = useMemo(() => {
+    if (grid) return LABEL * 2 + grid.cols * (SEAT + SEAT_GAP)
     const widest = rows.reduce((m, r) => Math.max(m, r.seats.length), 0)
     return LABEL * 2 + widest * (SEAT + SEAT_GAP)
-  }, [rows])
-  const mapHeight = STAGE + STAGE_GAP + rows.length * ROW + 8
+  }, [rows, grid])
+  const mapHeight = grid ? grid.rows * ROW + 8 : STAGE + STAGE_GAP + rows.length * ROW + 8
 
   // Fit the whole hall on screen first — you can't choose a seat in a room you
   // can't see — then let people zoom in to tap precisely.
@@ -268,10 +278,12 @@ export default function SeatMap({ event, whatsappNumber }) {
               night's single General Admission line is a promise of a choice
               that isn't there. */}
           <h2 className="text-base font-extrabold text-as-charcoal">
-            {rows.length ? 'Choose your seats' : map ? 'Choose your area' : 'Tickets'}
+            {hasSeats ? 'Choose your seats' : map || grid ? 'Choose your area' : 'Tickets'}
           </h2>
           <p className="mt-0.5 text-xs text-as-charcoal/55">
-            Live availability from the ticket office — pick what you want and send it to us on WhatsApp.
+            {hosted
+              ? 'Live availability — pick what you want and send it to us on WhatsApp.'
+              : 'Live availability from the ticket office — pick what you want and send it to us on WhatsApp.'}
           </p>
         </div>
         <button
@@ -319,7 +331,7 @@ export default function SeatMap({ event, whatsappNumber }) {
         />
       )}
 
-      {(rows.length > 0 || (openSid && block.status === 'loading')) && (
+      {(rows.length > 0 || grid || (openSid && block.status === 'loading')) && (
         <div className="border-t border-black/5 px-5 py-4">
           {openSid && (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -352,6 +364,19 @@ export default function SeatMap({ event, whatsappNumber }) {
               <div ref={boxRef} className="overflow-x-auto pb-2">
                 <div style={{ width: mapWidth * scale, height: mapHeight * scale }}>
                   <div style={{ width: mapWidth, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+                    {grid ? (
+                      <GridHall
+                        grid={grid}
+                        currency={currency}
+                        isPicked={(seat) => selected.has(keyOf(seat))}
+                        full={full}
+                        onSeat={(seat) => toggle({ label: seat.row, section: seat.section }, seat)}
+                        zones={data?.zones || []}
+                        pickedZoneIds={pickedZoneIds}
+                        onZone={(zone) => setZone(zone, qty.get(zone.id) ? 0 : zone.min || 1)}
+                      />
+                    ) : (
+                    <>
                     <div
                       className="flex items-center justify-center rounded-md bg-as-ink text-[10px] font-bold uppercase tracking-[0.3em] text-white/80"
                       style={{ height: STAGE, marginBottom: STAGE_GAP }}
@@ -378,6 +403,7 @@ export default function SeatMap({ event, whatsappNumber }) {
                             key={seat.id}
                             seat={seat}
                             row={row}
+                            currency={currency}
                             picked={selected.has(keyOf(seat))}
                             disabled={full && !selected.has(keyOf(seat))}
                             onClick={() => toggle(row, seat)}
@@ -385,14 +411,21 @@ export default function SeatMap({ event, whatsappNumber }) {
                         ))}
                       </div>
                     ))}
+                    </>
+                    )}
                   </div>
                 </div>
               </div>
 
               <p className="mt-1 text-[11px] text-as-charcoal/45">
-                {totals.available} of {totals.seats} seats free
-                {rows[0]?.section ? ` in ${[...new Set(rows.map((r) => r.section))].filter(Boolean).join(', ')}` : ''}
-                {' · '}scroll sideways to see the whole hall
+                {totals.seats > 0 && (
+                  <>
+                    {totals.available} of {totals.seats} seats free
+                    {rows[0]?.section ? ` in ${[...new Set(rows.map((r) => r.section))].filter(Boolean).join(', ')}` : ''}
+                    {' · '}
+                  </>
+                )}
+                scroll sideways to see the whole hall
               </p>
             </>
           )}
@@ -414,8 +447,8 @@ export default function SeatMap({ event, whatsappNumber }) {
           zones={zones}
           qty={qty}
           currency={currency}
-          hasRows={rows.length > 0}
-          hasMap={Boolean(map)}
+          hasRows={hasSeats}
+          hasMap={Boolean(map || grid)}
           onChange={setZone}
         />
       )}
@@ -473,17 +506,18 @@ export default function SeatMap({ event, whatsappNumber }) {
           </>
         ) : (
           <p className="text-sm text-as-charcoal/55">
-            {rows.length
+            {hasSeats
               ? `Tap the seats you want${zones.length ? ', or pick an area' : ''}.`
-              : map
+              : map || grid
                 ? 'Tap an area on the map, or pick one from the list.'
                 : 'Choose how many tickets you want.'}
           </p>
         )}
         {/* The honest bit, and it stays. */}
         <p className="mt-3 text-[11px] leading-relaxed text-as-charcoal/45">
-          Seats aren’t held until we confirm. We check with the ticket office and reply on WhatsApp —
-          if one has just gone, we’ll offer you the closest we can get.
+          {hosted
+            ? 'Seats aren’t held until we confirm. We reply on WhatsApp to confirm your tickets — if one has just gone, we’ll offer you the closest we can get.'
+            : 'Seats aren’t held until we confirm. We check with the ticket office and reply on WhatsApp — if one has just gone, we’ll offer you the closest we can get.'}
           {full && ' You can request up to ' + MAX_SEATS + ' seats at a time.'}
     </p>
   </footer>
@@ -641,14 +675,14 @@ function ZoneList({ zones, qty, currency, hasRows, hasMap, onChange }) {
   )
 }
 
-function Seat({ seat, row, picked, disabled, onClick }) {
+function Seat({ seat, row, currency, picked, disabled, onClick }) {
   if (seat.state === 'gap') {
     return <span aria-hidden style={{ width: SEAT + SEAT_GAP, height: SEAT }} className="shrink-0" />
   }
   const sold = seat.state === 'sold'
   const label = `${seatPlace({ section: row.section, row: row.label })}${
     isNumberedSeat(seat.num) ? `, seat ${seat.num}` : ''
-  } — ${sold ? 'sold' : money(seat.price)}`
+  } — ${sold ? 'sold' : money(seat.price, currency)}`
   return (
     <span className="shrink-0" style={{ width: SEAT + SEAT_GAP, height: SEAT }}>
       <button
@@ -680,13 +714,112 @@ function Seat({ seat, row, picked, disabled, onClick }) {
   )
 }
 
+/**
+ * A hall AS Company drew in its own admin: seats on a grid, with the stage, the
+ * entrances and any standing areas where they really are — the one kind of map
+ * that knows where the doors are. Same seat buttons and the same picked/full
+ * rules as the partners' rows; a standing area is a zone, picked from the
+ * drawing or the list below it.
+ */
+function GridHall({ grid, currency, isPicked, full, onSeat, zones, pickedZoneIds, onZone }) {
+  const step = SEAT + SEAT_GAP
+  const zoneById = new Map(zones.map((z) => [z.id, z]))
+  const box = (a) => ({
+    left: LABEL + a.c * step,
+    top: a.r * ROW,
+    width: a.w * step - SEAT_GAP,
+    height: a.h * ROW - (ROW - SEAT),
+    // A door down the side of the hall is one column wide: run its name down it.
+    ...(a.h > a.w * 1.5 ? { writingMode: 'vertical-rl' } : {}),
+  })
+
+  return (
+    <div className="relative" style={{ width: LABEL * 2 + grid.cols * step, height: grid.rows * ROW }}>
+      {grid.rowLabels.map(({ r, label }) => (
+        <Fragment key={r}>
+          <span
+            className="absolute text-right text-[10px] font-semibold text-as-charcoal/40"
+            style={{ left: 0, top: r * ROW, width: LABEL - 6, lineHeight: `${SEAT}px` }}
+          >
+            {label}
+          </span>
+          <span
+            className="absolute text-[10px] font-semibold text-as-charcoal/40"
+            style={{ left: LABEL + grid.cols * step + 4, top: r * ROW, lineHeight: `${SEAT}px` }}
+          >
+            {label}
+          </span>
+        </Fragment>
+      ))}
+
+      {grid.areas.map((a) => {
+        if (a.kind === 'stage') {
+          return (
+            <div
+              key={a.id}
+              className="absolute flex items-center justify-center overflow-hidden rounded-md bg-as-ink text-[10px] font-bold uppercase tracking-[0.3em] text-white/80"
+              style={box(a)}
+            >
+              {a.label}
+            </div>
+          )
+        }
+        if (a.kind === 'entrance') {
+          return (
+            <div
+              key={a.id}
+              className="absolute flex items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-emerald-600/70 bg-emerald-50 text-center text-[9px] font-bold uppercase leading-tight tracking-wider text-emerald-700"
+              style={box(a)}
+            >
+              {a.label}
+            </div>
+          )
+        }
+        const zone = zoneById.get(a.id)
+        const on = pickedZoneIds.has(a.id)
+        return (
+          <button
+            key={a.id}
+            type="button"
+            disabled={!zone?.inStock}
+            onClick={() => zone && onZone(zone)}
+            aria-pressed={on}
+            aria-label={`${a.label} — ${zone?.inStock ? money(zone.price, currency) : 'sold out'}`}
+            className={`absolute flex flex-col items-center justify-center overflow-hidden rounded-md text-center text-[10px] font-semibold leading-tight transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              on ? 'ring-2 ring-as-charcoal ring-offset-1' : 'hover:brightness-95'
+            }`}
+            style={{ ...box(a), background: `${a.color}26`, border: `2px solid ${a.color}`, color: a.color }}
+          >
+            <span className="font-bold">{a.label}</span>
+            {zone && <span>{zone.inStock ? money(zone.price, currency) : 'sold out'}</span>}
+          </button>
+        )
+      })}
+
+      {grid.seats.map((seat) => (
+        <div key={seat.id} className="absolute" style={{ left: LABEL + seat.c * step, top: seat.r * ROW }}>
+          <Seat
+            seat={seat}
+            row={{ label: seat.row, section: seat.section }}
+            currency={currency}
+            picked={isPicked(seat)}
+            disabled={full && !isPicked(seat)}
+            onClick={() => onSeat(seat)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Legend({ tiers = [], currency }) {
   if (!tiers.length) return null
   return (
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-as-charcoal/60">
       {tiers.map((t) => (
-        <li key={t.price} className="inline-flex items-center gap-1.5">
+        <li key={`${t.name || ''}|${t.price}`} className="inline-flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-[3px]" style={{ background: t.color || '#A41E22' }} />
+          {t.name ? `${t.name} · ` : ''}
           {money(t.price, currency)}
           {t.seats > 0 && <span className="text-as-charcoal/35">({t.available})</span>}
         </li>

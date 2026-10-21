@@ -8,6 +8,8 @@ import { query } from './db.js'
 import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
 import { seatmapRouter } from './seatmap.js'
+import { hostedRouter } from './hostedSeatmap.js'
+import { revalidateHub } from './hubRevalidate.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
 import { imageResizer } from './images.js'
@@ -77,6 +79,11 @@ const eventJson = (r) => ({
   // The sync's site key ('antoineticketing', 'tickit'…); '' = made by hand in
   // the admin. The ticketing hub labels and filters events by it.
   source: r.source || '',
+  // An AS-hosted event with a published seat map (event_seatmaps). The hub
+  // offers seat picking on it the way it does for a partner's hall.
+  hasSeatmap: Boolean(r.has_seatmap),
+  // false = a draft, only ever in the admin's ?all=1 list.
+  published: r.published !== false,
 })
 const bannerJson = (r) => ({
   id: r.id, title: r.title, subtitle: r.subtitle, imageUrl: r.image_url,
@@ -277,16 +284,24 @@ app.delete('/api/services/:id', requireAuth, ah(async (req, res) => {
 
 // ========================= Events =========================
 // Join the category so the public list/detail carry its slug + name.
-const EVENTS_SELECT = `SELECT e.*, c.slug AS category_slug, c.name AS category_name
+const EVENTS_SELECT = `SELECT e.*, c.slug AS category_slug, c.name AS category_name,
+    EXISTS (SELECT 1 FROM event_seatmaps m WHERE m.event_id = e.id AND m.published) AS has_seatmap
   FROM events e LEFT JOIN categories c ON c.id = e.category_id`
 
-app.get('/api/events', ah(async (req, res) => {
-  const { rows } = await query(`${EVENTS_SELECT} ORDER BY e.sort ASC, e.date ASC, e.id ASC`)
+// Drafts (events.published = false) are left out of every public read. The
+// admin's list asks for them with ?all=1, which needs the admin's token.
+const adminWhenAll = (req, res, next) => (req.query.all === '1' ? requireAuth(req, res, next) : next())
+
+app.get('/api/events', adminWhenAll, ah(async (req, res) => {
+  const drafts = req.query.all === '1'
+  const { rows } = await query(
+    `${EVENTS_SELECT} ${drafts ? '' : 'WHERE e.published'} ORDER BY e.sort ASC, e.date ASC, e.id ASC`
+  )
   res.json(rows.map(eventJson))
 }))
 
 app.get('/api/events/:slug', ah(async (req, res) => {
-  const { rows } = await query(`${EVENTS_SELECT} WHERE e.slug=$1`, [req.params.slug])
+  const { rows } = await query(`${EVENTS_SELECT} WHERE e.slug=$1 AND e.published`, [req.params.slug])
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
   res.json(eventJson(rows[0]))
 }))
@@ -298,13 +313,25 @@ const eventParams = (b) => [
   b.categoryId ? Number(b.categoryId) : null,
 ]
 
+// An event made here starts as a draft: it goes live when Publish is pressed
+// (PUT /api/events/:id/publish), not the moment the form is first saved.
 app.post('/api/events', requireAuth, ah(async (req, res) => {
   const { rows } = await query(
-    `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort, category_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO events (title, slug, date, time, venue, city, image_url, ticket_url, status, excerpt, description, sort, category_id, published)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false) RETURNING *`,
     eventParams(req.body || {})
   )
   res.status(201).json(eventJson(rows[0]))
+}))
+
+// Publish / unpublish. The hub is told at once, and the answer says whether it
+// heard — `hubRefreshed: true` means its next visitor sees the change.
+app.put('/api/events/:id/publish', requireAuth, ah(async (req, res) => {
+  const published = req.body?.published !== false
+  const { rows } = await query('UPDATE events SET published=$1 WHERE id=$2 RETURNING *', [published, req.params.id])
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  const refreshed = await revalidateHub(published ? 'publish' : 'unpublish')
+  res.json({ ...eventJson(rows[0]), hubRefreshed: refreshed })
 }))
 
 app.put('/api/events/:id', requireAuth, ah(async (req, res) => {
@@ -316,11 +343,14 @@ app.put('/api/events/:id', requireAuth, ah(async (req, res) => {
     [...p, req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Not found' })
+  // A live event's edit should be live too; a draft's has nothing to refresh.
+  if (rows[0].published) revalidateHub('event edit')
   res.json(eventJson(rows[0]))
 }))
 
 app.delete('/api/events/:id', requireAuth, ah(async (req, res) => {
-  await query('DELETE FROM events WHERE id=$1', [req.params.id])
+  const { rows } = await query('DELETE FROM events WHERE id=$1 RETURNING published', [req.params.id])
+  if (rows[0]?.published) revalidateHub('event delete')
   res.status(204).end()
 }))
 
@@ -1354,6 +1384,8 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
 // ========================= Web scraper =========================
 // Admin-only: run the Python e-commerce scraper and download its output.
 app.use('/api/scrape', scraperRouter)
+// Admin-only: the seat maps of the events AS Company hosts (hostedSeatmap.js).
+app.use('/api/hosted-events', requireAuth, hostedRouter)
 // GET /api/events/:slug/seatmap — the live hall for a box-office event. Mounted
 // after the /api/events routes above so it can't shadow them.
 app.use('/api/events', seatmapRouter)

@@ -35,6 +35,7 @@ import * as tbo from './seatmap/tbo.js'
 import * as ihjoz from './seatmap/ihjoz.js'
 import * as tickit from './seatmap/tickit.js'
 import * as antoine from './seatmap/antoine.js'
+import { loadHostedSeatmap } from './hostedSeatmap.js'
 
 export const seatmapRouter = express.Router()
 
@@ -99,7 +100,7 @@ function cacheSet(key, data) {
  */
 async function resolve(slug, wantedDate, wantedTime) {
   const { rows } = await query(
-    'SELECT id, slug, title, venue, city, ticket_url, dates FROM events WHERE slug = $1',
+    'SELECT id, slug, title, venue, city, ticket_url, dates, source FROM events WHERE slug = $1 AND published',
     [slug],
   )
   const ev = rows[0]
@@ -133,12 +134,25 @@ function reasonFor(err) {
 //     zones: [{ id, name, price, inStock, min, max }],
 //     tiers: [{ price, color, seats, available }],
 //     totals:{ seats, available } }
+//
+// An event AS Company hosts answers from our own database instead (see
+// hostedSeatmap.js): the same shape plus `grid`, source 'as'. It is not behind
+// SEATMAP_ENABLED/SEATMAP_SOURCES — those switches exist for the partners.
 seatmapRouter.get('/:slug/seatmap', async (req, res, next) => {
   try {
-    if (!ENABLED) return res.json({ available: false, reason: 'disabled' })
-
     const found = await resolve(req.params.slug, req.query.date, req.query.time)
     if (!found) return res.status(404).json({ error: 'Not found' })
+
+    if (!found.event.source) {
+      const hosted = await loadHostedSeatmap(found.event.id)
+      if (hosted) {
+        // Staff mark seats sold as they confirm them; a short cache keeps that visible.
+        res.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=30')
+        return res.json({ available: true, source: 'as', date: found.date, ...hosted })
+      }
+    }
+
+    if (!ENABLED) return res.json({ available: false, reason: 'disabled' })
 
     const source = sourceFor(found.url)
     if (!source) {

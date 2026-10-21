@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { adminApi, isEventPast } from '../../lib/api.js'
 import { Card, Field, TextInput, TextArea, Select, Button, Banner, PageHeader, SegmentedControl } from '../ui.jsx'
 
@@ -12,8 +13,23 @@ const blank = {
   imageUrl: '', ticketUrl: '', status: 'open', excerpt: '', description: '', sort: 0, categoryId: '',
 }
 
+// Events AS Company hosts are made here by hand (source ''); the rest come in
+// from the ticketing sites with the events sync. Only a hosted event gets a seat
+// map and ticket stock of its own — a synced one's hall is the partner's.
+// Where a live event can be looked at. Site Settings → Events → ticketing URL
+// when set, the production hub otherwise.
+const HUB_URL = 'https://ticketing.as.com.lb'
+
+const VIEWS = [
+  { value: 'hosted', label: 'Hosted by AS' },
+  { value: 'synced', label: 'Ticketing sites' },
+]
+
 export default function EventsAdmin() {
   const [items, setItems] = useState([])
+  const [view, setView] = useState('hosted')
+  const [maps, setMaps] = useState(new Map())
+  const [hubUrl, setHubUrl] = useState(HUB_URL)
   const [categories, setCategories] = useState([])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(blank)
@@ -25,9 +41,16 @@ export default function EventsAdmin() {
 
   async function load() {
     try {
-      const [events, cats] = await Promise.all([adminApi.listEvents(), adminApi.listCategories()])
+      const [events, cats, seatmaps, settings] = await Promise.all([
+        adminApi.listEvents(),
+        adminApi.listCategories(),
+        adminApi.listSeatmaps().catch(() => []),
+        adminApi.getSettings().catch(() => ({})),
+      ])
+      if (/^https?:\/\//.test(settings.ticketingUrl || '')) setHubUrl(settings.ticketingUrl.replace(/\/$/, ''))
       setItems(events)
       setCategories(cats)
+      setMaps(new Map(seatmaps.map((m) => [m.eventId, m])))
     } catch {
       setMsg({ kind: 'error', text: 'Could not load events.' })
     }
@@ -65,15 +88,45 @@ export default function EventsAdmin() {
         imageUrl = up.url
       }
       const payload = { ...form, imageUrl, sort: Number(form.sort) }
-      if (editing === 'new') await adminApi.createEvent(payload)
+      const created = editing === 'new'
+      if (created) await adminApi.createEvent(payload)
       else await adminApi.updateEvent(editing, payload)
       setEditing(null)
       await load()
-      setMsg({ kind: 'success', text: 'Saved.' })
+      setMsg({
+        kind: 'success',
+        text: created
+          ? 'Saved as a draft — add its seat map and tickets, then press Publish to put it live.'
+          : 'Saved.',
+      })
     } catch (err) {
       setMsg({ kind: 'error', text: 'Save failed: ' + (err?.message || 'error') })
     } finally {
       setSaving(false)
+    }
+  }
+
+  // A draft is invisible everywhere (hub, as.com.lb, the app); Publish puts it
+  // live and the API tells the hub at once, so it is there on the next visit.
+  async function publish(r, published) {
+    const ask = published
+      ? `Publish “${r.title}”? It goes live on the ticketing hub straight away.`
+      : `Unpublish “${r.title}”? It disappears from the ticketing hub and the app until you publish it again.`
+    if (!confirm(ask)) return
+    setMsg(null)
+    try {
+      const res = await adminApi.publishEvent(r.id, published)
+      await load()
+      setMsg({
+        kind: 'success',
+        text: !published
+          ? `“${r.title}” is unpublished.`
+          : res.hubRefreshed
+            ? `“${r.title}” is live.`
+            : `“${r.title}” is published — the ticketing hub shows it within 5 minutes.`,
+      })
+    } catch (err) {
+      setMsg({ kind: 'error', text: (published ? 'Publish' : 'Unpublish') + ' failed: ' + (err?.message || 'error') })
     }
   }
 
@@ -83,11 +136,24 @@ export default function EventsAdmin() {
     await load()
   }
 
+  const hosted = items.filter((r) => !r.source)
+  const shown = view === 'hosted' ? hosted : items.filter((r) => r.source)
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Events"
-        actions={!editing && <Button onClick={startNew}>+ New event</Button>}
+        description="Events AS Company hosts are created here, with their seat map and tickets. The rest come from the ticketing sites (Web Scraper)."
+        actions={!editing && <Button onClick={startNew}>+ New AS event</Button>}
+      />
+
+      <SegmentedControl
+        value={view}
+        onChange={setView}
+        options={VIEWS.map((v) => ({
+          value: v.value,
+          label: `${v.label} (${v.value === 'hosted' ? hosted.length : items.length - hosted.length})`,
+        }))}
       />
 
       {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
@@ -152,12 +218,17 @@ export default function EventsAdmin() {
       )}
 
       <Card>
-        {items.length === 0 ? (
-          <p className="text-sm text-as-charcoal/50">No events yet.</p>
+        {shown.length === 0 ? (
+          <p className="text-sm text-as-charcoal/50">
+            {view === 'hosted'
+              ? 'No events hosted by AS yet — “+ New AS event” creates one, then add its seat map and tickets.'
+              : 'No events from the ticketing sites.'}
+          </p>
         ) : (
           <ul className="divide-y divide-black/5">
-            {items.map((r) => {
+            {shown.map((r) => {
               const past = isEventPast(r)
+              const map = maps.get(r.id)
               return (
               <li
                 key={r.id}
@@ -174,6 +245,16 @@ export default function EventsAdmin() {
                   <div className="min-w-0">
                     <p className="flex items-center gap-2 font-semibold text-as-charcoal">
                       <span className="truncate">{r.title}</span>
+                      {!r.published && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                          Draft
+                        </span>
+                      )}
+                      {!r.source && r.published && !past && (
+                        <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-800">
+                          Live
+                        </span>
+                      )}
                       {past && (
                         <span className="shrink-0 rounded-full bg-as-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                           Past
@@ -183,10 +264,35 @@ export default function EventsAdmin() {
                     <p className={`truncate text-sm ${past ? 'text-as-red/80' : 'text-as-charcoal/55'}`}>
                       {(r.date || 'no date')} · {r.venue} · {r.status}
                     </p>
+                    {!r.source && <SeatmapStatus map={map} />}
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  {!r.published && (
+                    <Button onClick={() => publish(r, true)} className="px-3 py-1.5">Publish</Button>
+                  )}
+                  {r.published && !r.source && (
+                    <a
+                      href={`${hubUrl}/events/${r.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-sm font-semibold text-as-charcoal shadow-sm transition hover:border-as-red/30 hover:text-as-red"
+                    >
+                      View ↗
+                    </a>
+                  )}
+                  {!r.source && (
+                    <Link
+                      to={`/admin/events/${r.id}/seatmap`}
+                      className="rounded-full bg-as-charcoal px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-charcoal/85"
+                    >
+                      Seat map & tickets
+                    </Link>
+                  )}
                   <Button variant="ghost" onClick={() => startEdit(r)} className="px-3 py-1.5">Edit</Button>
+                  {r.published && !r.source && (
+                    <Button variant="ghost" onClick={() => publish(r, false)} className="px-3 py-1.5">Unpublish</Button>
+                  )}
                   <Button variant="danger" onClick={() => remove(r)} className="px-3 py-1.5">Delete</Button>
                 </div>
               </li>
@@ -196,5 +302,16 @@ export default function EventsAdmin() {
         )}
       </Card>
     </div>
+  )
+}
+
+/** One line under a hosted event: its tickets, and whether the hub offers seat picking. */
+function SeatmapStatus({ map }) {
+  if (!map) return <p className="mt-0.5 text-xs text-as-charcoal/40">No seat map yet</p>
+  return (
+    <p className="mt-0.5 text-xs text-as-charcoal/55">
+      {map.available} of {map.total} tickets available · {map.sold} sold
+      {!map.published && <span className="text-amber-700"> · seat picking off</span>}
+    </p>
   )
 }

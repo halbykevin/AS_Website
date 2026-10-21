@@ -421,6 +421,10 @@ ALTER TABLE banners ADD COLUMN IF NOT EXISTS focal_y INTEGER DEFAULT 50;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS source TEXT DEFAULT '';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id TEXT DEFAULT '';
+-- false = a draft: kept out of every public read (/api/events, /api/events/:slug,
+-- the seat map) until someone presses Publish in the admin. Existing rows and
+-- synced events default to live; an event made by hand starts as a draft.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT true;
 CREATE UNIQUE INDEX IF NOT EXISTS events_source_ext ON events(source, external_id) WHERE source <> '';
 
 -- The events sync's standing configuration (single row, id=1): which sites it
@@ -458,6 +462,17 @@ CREATE TABLE IF NOT EXISTS event_sync_runs (
   finished_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS event_sync_runs_started ON event_sync_runs(started_at DESC);
+
+-- The seat map of an event AS Company hosts (events.source = ''), drawn at
+-- /admin/events: a grid of seats plus the stage, entrances and standing areas,
+-- priced by ticket type, with what is sold. Shape and rules in
+-- src/hostedSeatmap.js. published = the hub shows it; a draft stays here.
+CREATE TABLE IF NOT EXISTS event_seatmaps (
+  event_id INTEGER PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  published BOOLEAN NOT NULL DEFAULT false,
+  layout JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 
 -- Contact form submissions from the public /contact page. Emailed to the staff
 -- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.

@@ -19,6 +19,16 @@ both properties at once. That is why there is a `src/lib/api.js` here and no
 `server/`: a second copy of the sync, or a second admin, would be two things to
 keep in step for no gain.
 
+**Every read is cached for five minutes and tagged `site-api`**
+([`src/lib/api.js`](src/lib/api.js)). When an event is published, unpublished
+or edited in the admin, the site API calls `POST /api/revalidate`
+([`src/app/api/revalidate/route.js`](src/app/api/revalidate/route.js)) and the
+tag is dropped, so the change is on the next request rather than up to five
+minutes later — "Publish" has to mean live. It takes `Bearer REVALIDATE_SECRET`
+(a server-only env var on this Vercel project, equal to `HUB_REVALIDATE_SECRET`
+on the VPS); without it the endpoint refuses and the five-minute clock still
+applies. Drafts never reach this app at all: the API leaves them out.
+
 The store is the opposite case — products, orders, customers and the wallet
 exist nowhere else, so `as_store` earns its own API. Ticketing does not.
 
@@ -197,6 +207,16 @@ able to be three shapes without becoming three components:
 | ihjoz.com | an SVG of the room + a table of what is on sale in each block | their drawing; tap a **seated** block to open its numbered seats, tap a **table** to take it whole |
 | tickit.co | an SVG of the room + zones from their JSON API | their drawing and a priced zone list — see below |
 | antoineticketing.com | a Tixity seating plan (every seat's position, row, number, category, live status) + each night's categories with prices and free counts | numbered seats rebuilt as a grid like the box office's; free-seating categories as zones; Metro Al Madina's table zones as a drawing built from the plan's rectangles |
+| **AS Company** (events AS hosts) | a hall drawn in our own admin and stored in our database (`grid`, source `as`) | seats on a grid with the **stage, entrances and standing areas where they were drawn**; a standing area is a zone with its own count left |
+
+**AS's own halls** come from `/admin/events` → *Seat map & tickets* (see the
+repo's CLAUDE.md, *AS-hosted events*). The endpoint answers them from Postgres
+in the same shape as a partner's plus `grid`, and `GridHall` in
+[`SeatMap.jsx`](src/components/SeatMap.jsx) draws it. `hasSeatmap()` says yes
+to them through the event's `hasSeatmap` flag, since there is no partner host to
+recognise. The wording drops "from the ticket office" for these — we are the
+ticket office — and the request is still a request: staff mark seats sold in the
+admin as they confirm them.
 
 **Antoine's hall is rebuilt from coordinates**, because the plan is data, not a
 picture: a row letter belongs to a block, so row A is a centre run and two
