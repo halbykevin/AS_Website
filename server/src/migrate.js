@@ -474,6 +474,50 @@ CREATE TABLE IF NOT EXISTS event_seatmaps (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Tickets booked on an AS-hosted event's seat map (src/bookings.js). A booking
+-- holds its seats for 24 hours as 'reserved' — paid online (Whish) or in cash
+-- at AS Company — and is 'expired' (seats released) if it isn't paid in time.
+-- seats/zones are a snapshot of what was booked and at what price; total is
+-- the server's figure, never the browser's. token guards the customer's page.
+CREATE TABLE IF NOT EXISTS ticket_bookings (
+  id SERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  token TEXT NOT NULL,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  email TEXT NOT NULL,
+  seats JSONB NOT NULL DEFAULT '[]'::jsonb,
+  zones JSONB NOT NULL DEFAULT '[]'::jsonb,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  total NUMERIC(12,2) NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  status TEXT NOT NULL DEFAULT 'reserved',
+  payment_method TEXT NOT NULL DEFAULT 'cash',
+  whish_collect_url TEXT,
+  whish_started_at TIMESTAMPTZ,
+  needs_attention TEXT NOT NULL DEFAULT '',
+  expires_at TIMESTAMPTZ NOT NULL,
+  paid_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
+  expiry_emailed_at TIMESTAMPTZ,
+  ip TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ticket_bookings_event ON ticket_bookings(event_id, status);
+CREATE INDEX IF NOT EXISTS ticket_bookings_expiry ON ticket_bookings(expires_at) WHERE status = 'reserved';
+
+-- The seats a live (reserved or paid) booking holds — one row per seat. The
+-- primary key is what makes a double booking impossible: two people pressing
+-- Reserve on the same seat at the same moment, one INSERT wins and the other
+-- is refused. Rows go when a booking expires or is cancelled.
+CREATE TABLE IF NOT EXISTS ticket_booking_seats (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  seat_id TEXT NOT NULL,
+  booking_id INTEGER NOT NULL REFERENCES ticket_bookings(id) ON DELETE CASCADE,
+  PRIMARY KEY (event_id, seat_id)
+);
+
 -- Contact form submissions from the public /contact page. Emailed to the staff
 -- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.
 CREATE TABLE IF NOT EXISTS contact_messages (

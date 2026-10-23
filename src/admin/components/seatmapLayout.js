@@ -29,16 +29,24 @@ export function rowLabels(layout) {
   return labels
 }
 
-/** Per ticket type: seats, standing places, sold, held, available, and the totals. */
-export function summarize(layout) {
+/**
+ * Per ticket type: seats, standing places, sold (by hand or a paid booking),
+ * reserved (booked, awaiting payment), held, available, and the totals.
+ * `booked` is seat id -> 'reserved' | 'paid'; `bookedZones` is area id ->
+ * { reserved, paid } — both from the server, which knows the bookings.
+ */
+export function summarize(layout, booked = {}, bookedZones = {}) {
   const byTier = new Map(
-    layout.tiers.map((t) => [t.id, { ...t, seats: 0, standing: 0, sold: 0, held: 0, available: 0 }]),
+    layout.tiers.map((t) => [t.id, { ...t, seats: 0, standing: 0, sold: 0, reserved: 0, held: 0, available: 0 }]),
   )
   for (const s of layout.seats) {
     const t = byTier.get(s.tier)
     if (!t) continue
     t.seats += 1
-    if (s.status === 'sold') t.sold += 1
+    const b = booked[cellKey(s.r, s.c)]
+    if (b === 'paid') t.sold += 1
+    else if (b) t.reserved += 1
+    else if (s.status === 'sold') t.sold += 1
     else if (s.status === 'held') t.held += 1
     else t.available += 1
   }
@@ -48,9 +56,11 @@ export function summarize(layout) {
     if (!t) continue
     const capacity = Number(a.capacity) || 0
     const sold = Math.min(capacity, Number(a.sold) || 0)
+    const z = bookedZones[a.id] || {}
     t.standing += capacity
-    t.sold += sold
-    t.available += Math.max(0, capacity - sold)
+    t.sold += Math.min(capacity, sold + (z.paid || 0))
+    t.reserved += z.reserved || 0
+    t.available += Math.max(0, capacity - sold - (z.paid || 0) - (z.reserved || 0))
   }
   const tiers = [...byTier.values()].map((t) => ({ ...t, total: t.seats + t.standing }))
   const sum = (k) => tiers.reduce((n, t) => n + t[k], 0)
@@ -58,6 +68,7 @@ export function summarize(layout) {
     tiers,
     total: sum('total'),
     sold: sum('sold'),
+    reserved: sum('reserved'),
     held: sum('held'),
     available: sum('available'),
     soldValue: tiers.reduce((n, t) => n + t.sold * t.price, 0),

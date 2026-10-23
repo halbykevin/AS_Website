@@ -55,6 +55,12 @@ export default function SeatmapEditor() {
   const [msg, setMsg] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
+  // What visitors have booked: seat id -> 'reserved' | 'paid', standing area
+  // id -> { reserved, paid }, and the bookings themselves. Read from the
+  // server, never edited here — a booked seat is managed from its booking.
+  const [booked, setBooked] = useState({})
+  const [bookedZones, setBookedZones] = useState({})
+  const [bookings, setBookings] = useState([])
   const gridRef = useRef(null)
   // The drag lives in a ref as well as in state: a quick click releases before
   // React has re-rendered with the press, and the release must still see it.
@@ -70,12 +76,28 @@ export default function SeatmapEditor() {
         setLayout(data.layout)
         setPublished(data.published)
         setUpdatedAt(data.updatedAt)
+        setBooked(data.booked || {})
+        setBookedZones(data.bookedZones || {})
         setTier(data.layout.tiers[0]?.id || '')
       })
       .catch((err) => alive && setLoadError(err?.message || 'Could not load the seat map.'))
+    adminApi.listBookings(id).then((list) => alive && setBookings(list)).catch(() => {})
     return () => {
       alive = false
     }
+  }, [id])
+
+  // Bookings arrive while the page is open: refresh them, and which seats they
+  // hold, every 30 seconds — without touching the map being edited.
+  const refreshBookings = async () => {
+    const [list, map] = await Promise.all([adminApi.listBookings(id), adminApi.getSeatmap(id)])
+    setBookings(list)
+    setBooked(map.booked || {})
+    setBookedZones(map.bookedZones || {})
+  }
+  useEffect(() => {
+    const t = setInterval(() => refreshBookings().catch(() => {}), 30_000)
+    return () => clearInterval(t)
   }, [id])
 
   // Every edit goes through here, so it can be undone.
@@ -118,7 +140,10 @@ export default function SeatmapEditor() {
   }, [dirty])
 
   const labels = useMemo(() => (layout ? rowLabels(layout) : new Map()), [layout])
-  const summary = useMemo(() => (layout ? summarize(layout) : null), [layout])
+  const summary = useMemo(
+    () => (layout ? summarize(layout, booked, bookedZones) : null),
+    [layout, booked, bookedZones],
+  )
   // Seat numbers, 1… left to right within each row — what a ticket will say.
   const numbers = useMemo(() => {
     const out = new Map()
@@ -196,6 +221,11 @@ export default function SeatmapEditor() {
   function apply(rect) {
     const single = rect.w === 1 && rect.h === 1
     const inRect = (s) => covers(rect, s.r, s.c)
+    // A seat someone has booked is theirs: no tool moves, re-prices or frees it.
+    const isBooked = (r, c) => Boolean(booked[cellKey(r, c)])
+    const bookedIn = layout.seats.filter((s) => inRect(s) && isBooked(s.r, s.c))
+    const sayBooked = () =>
+      setMsg({ kind: 'warning', text: 'Booked seats can’t be changed here — manage them from their booking in Bookings below.' })
 
     if (tool === 'select') {
       const hit = [...layout.areas].reverse().find((a) => covers(a, rect.r, rect.c))
@@ -208,6 +238,7 @@ export default function SeatmapEditor() {
       if (single) {
         const k = cellKey(rect.r, rect.c)
         const seat = seats.get(k)
+        if (seat && isBooked(seat.r, seat.c)) return sayBooked()
         if (seat && seat.tier === activeTier.id) seats.delete(k)
         else if (seat) seats.set(k, { ...seat, tier: activeTier.id })
         else if (!blocked(rect.r, rect.c)) seats.set(k, { r: rect.r, c: rect.c, tier: activeTier.id, status: 'free' })
@@ -215,7 +246,7 @@ export default function SeatmapEditor() {
       } else {
         for (let r = rect.r; r < rect.r + rect.h; r++) {
           for (let c = rect.c; c < rect.c + rect.w; c++) {
-            if (blocked(r, c)) continue
+            if (blocked(r, c) || isBooked(r, c)) continue
             const seat = seats.get(cellKey(r, c))
             seats.set(cellKey(r, c), seat ? { ...seat, tier: activeTier.id } : { r, c, tier: activeTier.id, status: 'free' })
           }
@@ -226,21 +257,26 @@ export default function SeatmapEditor() {
     }
 
     if (tool === 'status') {
-      if (!layout.seats.some(inRect)) return
-      change({ ...layout, seats: layout.seats.map((s) => (inRect(s) ? { ...s, status: mark } : s)) })
+      const touch = (s) => inRect(s) && !isBooked(s.r, s.c)
+      if (!layout.seats.some(touch)) return bookedIn.length ? sayBooked() : undefined
+      change({ ...layout, seats: layout.seats.map((s) => (touch(s) ? { ...s, status: mark } : s)) })
       return
     }
 
     if (tool === 'erase') {
-      const seats = layout.seats.filter((s) => !inRect(s))
-      const areas = layout.areas.filter((a) => !overlaps(a, rect))
-      if (seats.length === layout.seats.length && areas.length === layout.areas.length) return
+      const seats = layout.seats.filter((s) => !inRect(s) || isBooked(s.r, s.c))
+      const areas = layout.areas.filter((a) => !overlaps(a, rect) || bookedZones[a.id])
+      if (seats.length === layout.seats.length && areas.length === layout.areas.length) {
+        return bookedIn.length ? sayBooked() : undefined
+      }
       if (!areas.some((a) => a.id === selected)) setSelected('')
       change({ ...layout, seats, areas })
       return
     }
 
-    // stage / entrance / standing: a new rectangle, clearing the seats under it.
+    // stage / entrance / standing: a new rectangle, clearing the seats under it
+    // — never over booked ones.
+    if (bookedIn.length) return sayBooked()
     const created = {
       id: newId('a', layout.areas.map((a) => a.id)),
       kind: tool,
@@ -258,6 +294,10 @@ export default function SeatmapEditor() {
     change({ ...layout, areas: layout.areas.map((a) => (a.id === aid ? { ...a, ...patch } : a)) })
 
   function removeArea(aid) {
+    if (bookedZones[aid]) {
+      setMsg({ kind: 'warning', text: 'This standing area has bookings — cancel them in Bookings below before deleting it.' })
+      return
+    }
     change({ ...layout, areas: layout.areas.filter((a) => a.id !== aid) })
     setSelected('')
   }
@@ -322,10 +362,14 @@ export default function SeatmapEditor() {
     setSaving(true)
     setMsg(null)
     try {
-      const data = await adminApi.saveSeatmap(id, { layout, published })
+      // baseUpdatedAt: the version this page loaded. If someone saved since,
+      // the server refuses rather than let this page undo their changes.
+      const data = await adminApi.saveSeatmap(id, { layout, published, baseUpdatedAt: updatedAt })
       setLayout(data.layout)
       setPublished(data.published)
       setUpdatedAt(data.updatedAt)
+      setBooked(data.booked || {})
+      setBookedZones(data.bookedZones || {})
       setDirty(false)
       setMsg({
         kind: 'success',
@@ -421,6 +465,18 @@ export default function SeatmapEditor() {
       </Card>
 
       <Card title="Ticket types">
+        {/* The one place prices are set. A section is priced by giving it a
+            ticket type and painting its seats in that type on the map. */}
+        <p className="mb-3 text-sm text-as-charcoal/60">
+          Each ticket type is a price. To price a section — say <strong>$30</strong> a seat — add a type for it here
+          (name it, set its price), then on the map below pick that type under <em>Seats</em> and click its seats, or
+          drag over the whole section at once. A standing area takes its price from the type you give it.
+        </p>
+        <div className="mb-1 hidden gap-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-as-charcoal/45 sm:flex">
+          <span className="w-10">Colour</span>
+          <span className="min-w-[10rem] flex-1">Name</span>
+          <span className="w-32">Price ({layout.currency === 'USD' ? '$' : layout.currency})</span>
+        </div>
         <div className="space-y-2">
           {layout.tiers.map((t) => {
             const counts = summary.tiers.find((x) => x.id === t.id)
@@ -441,16 +497,22 @@ export default function SeatmapEditor() {
                     aria-label="Ticket type name"
                   />
                 </div>
-                <div className="w-32">
-                  <TextInput
+                <label className="relative block w-32">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-as-charcoal/45">
+                    {layout.currency === 'USD' ? '$' : 'LBP'}
+                  </span>
+                  <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={t.price}
                     onChange={(e) => updateTier(t.id, { price: e.target.value === '' ? 0 : Number(e.target.value) })}
                     aria-label={`Price of ${t.name}`}
+                    className={`w-full rounded-lg border border-black/10 bg-white py-2.5 pr-3 text-sm text-as-charcoal outline-none transition focus:border-as-red focus:ring-2 focus:ring-as-red/20 ${
+                      layout.currency === 'USD' ? 'pl-7' : 'pl-11'
+                    }`}
                   />
-                </div>
+                </label>
                 <span className="w-36 text-xs text-as-charcoal/55">
                   {counts?.total || 0} tickets · {counts?.available || 0} available
                 </span>
@@ -488,6 +550,10 @@ export default function SeatmapEditor() {
         tiers={layout.tiers}
         defaultTier={activeTier.id}
         onGenerate={(opts) => {
+          if (Object.keys(booked).length || Object.keys(bookedZones).length) {
+            setMsg({ kind: 'warning', text: 'This map has bookings, so it can’t be replaced — adjust it on the map instead.' })
+            return
+          }
           if (!empty && !confirm('Replace the current map with a new layout? (Undo brings it back.)')) return
           change({ ...layout, ...generateHall(opts), rowNames: {} })
           setSelected('')
@@ -578,7 +644,13 @@ export default function SeatmapEditor() {
                   <AreaBox key={a.id} area={a} tier={tierById.get(a.tier)} selected={a.id === selected} currency={currency} />
                 ))}
                 {layout.seats.map((s) => (
-                  <SeatDot key={cellKey(s.r, s.c)} seat={s} tier={tierById.get(s.tier)} num={numbers.get(cellKey(s.r, s.c))} />
+                  <SeatDot
+                    key={cellKey(s.r, s.c)}
+                    seat={s}
+                    tier={tierById.get(s.tier)}
+                    num={numbers.get(cellKey(s.r, s.c))}
+                    booking={booked[cellKey(s.r, s.c)]}
+                  />
                 ))}
                 {preview && (
                   <div
@@ -606,6 +678,15 @@ export default function SeatmapEditor() {
       <Card title="Tickets">
         <Summary summary={summary} currency={currency} />
       </Card>
+
+      <Bookings
+        bookings={bookings}
+        onChanged={(text) => {
+          setMsg({ kind: 'success', text })
+          refreshBookings().catch(() => {})
+        }}
+        onError={(text) => setMsg({ kind: 'error', text })}
+      />
 
       <SaveBar
         saving={saving}
@@ -638,10 +719,17 @@ function formatMoney(amount, currency) {
   return currency === 'USD' ? `$${value}` : `${value} ${currency}`
 }
 
-function SeatDot({ seat, tier, num }) {
-  const sold = seat.status === 'sold'
-  const held = seat.status === 'held'
+// A booking outranks the admin's own mark: reserved (awaiting payment) and
+// paid seats are drawn as such whatever the seat's status says.
+const RESERVED = '#F59E0B'
+const PAID = '#383F41'
+
+function SeatDot({ seat, tier, num, booking }) {
+  const sold = !booking && seat.status === 'sold'
+  const held = !booking && seat.status === 'held'
   const color = tier?.color || COLORS[0]
+  const fill = booking === 'paid' ? PAID : booking ? RESERVED : sold ? SOLD : held ? 'white' : color
+  const state = booking === 'paid' ? ' · booked, paid' : booking ? ' · reserved, awaiting payment' : sold ? ' · sold' : held ? ' · held' : ''
   return (
     <div
       className="pointer-events-none absolute flex items-center justify-center rounded-[5px] text-[9px] font-bold leading-none"
@@ -650,11 +738,11 @@ function SeatDot({ seat, tier, num }) {
         top: seat.r * CELL + 3,
         width: CELL - 6,
         height: CELL - 6,
-        background: sold ? SOLD : held ? 'white' : color,
+        background: fill,
         color: sold ? '#6B7280' : held ? color : 'white',
         boxShadow: held ? `inset 0 0 0 2px ${color}` : undefined,
       }}
-      title={`${tier?.name || ''} · seat ${num}${sold ? ' · sold' : held ? ' · held' : ''}`}
+      title={`${tier?.name || ''} · seat ${num}${state}`}
     >
       {sold ? '×' : num}
     </div>
@@ -682,7 +770,7 @@ function AreaBox({ area, tier, selected, currency }) {
   if (area.kind === 'entrance') {
     return (
       <div
-        className={`${base} border-2 border-dashed border-emerald-600 bg-emerald-50 text-[9px] font-bold uppercase tracking-wider text-emerald-700${ring}`}
+        className={`${base} border-2 border-dashed border-emerald-600 bg-emerald-50 text-[8px] font-bold uppercase text-emerald-700${ring}`}
         style={box}
       >
         {area.label}
@@ -716,6 +804,12 @@ function Legend() {
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="h-3 w-3 rounded-[3px]" style={{ background: SOLD }} /> sold
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="h-3 w-3 rounded-[3px]" style={{ background: RESERVED }} /> reserved
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="h-3 w-3 rounded-[3px]" style={{ background: PAID }} /> booked &amp; paid
       </span>
     </span>
   )
@@ -862,6 +956,7 @@ function Summary({ summary, currency }) {
             <th className="py-2 pr-3 font-semibold">Price</th>
             <th className="py-2 pr-3 text-right font-semibold">Tickets</th>
             <th className="py-2 pr-3 text-right font-semibold">Sold</th>
+            <th className="py-2 pr-3 text-right font-semibold">Reserved</th>
             <th className="py-2 pr-3 text-right font-semibold">Held</th>
             <th className="py-2 pr-3 text-right font-semibold">Available</th>
             <th className="py-2 text-right font-semibold">Sold value</th>
@@ -884,6 +979,7 @@ function Summary({ summary, currency }) {
               <td className="py-2 pr-3">{formatMoney(t.price, currency)}</td>
               <td className="py-2 pr-3 text-right tabular-nums">{t.total}</td>
               <td className="py-2 pr-3 text-right tabular-nums">{t.sold}</td>
+              <td className="py-2 pr-3 text-right tabular-nums">{t.reserved}</td>
               <td className="py-2 pr-3 text-right tabular-nums">{t.held}</td>
               <td className="py-2 pr-3 text-right font-semibold tabular-nums text-as-charcoal">{t.available}</td>
               <td className="py-2 text-right tabular-nums">{formatMoney(t.sold * t.price, currency)}</td>
@@ -895,6 +991,7 @@ function Summary({ summary, currency }) {
             <td className="py-2 pr-3" colSpan={2}>Total</td>
             <td className="py-2 pr-3 text-right tabular-nums">{summary.total}</td>
             <td className="py-2 pr-3 text-right tabular-nums">{summary.sold}</td>
+            <td className="py-2 pr-3 text-right tabular-nums">{summary.reserved}</td>
             <td className="py-2 pr-3 text-right tabular-nums">{summary.held}</td>
             <td className="py-2 pr-3 text-right tabular-nums">{summary.available}</td>
             <td className="py-2 text-right tabular-nums">{formatMoney(summary.soldValue, currency)}</td>
@@ -902,5 +999,186 @@ function Summary({ summary, currency }) {
         </tfoot>
       </table>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- bookings ---
+
+const BOOKING_VIEWS = [
+  { value: 'reserved', label: 'Waiting for payment' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'closed', label: 'Expired & cancelled' },
+  { value: 'all', label: 'All' },
+]
+const STATUS_STYLE = {
+  reserved: 'bg-amber-100 text-amber-800',
+  paid: 'bg-green-100 text-green-800',
+  expired: 'bg-as-charcoal/10 text-as-charcoal/60',
+  cancelled: 'bg-as-red/10 text-as-red',
+}
+const STATUS_LABEL = { reserved: 'Reserved', paid: 'Paid', expired: 'Expired', cancelled: 'Cancelled' }
+const inView = (b, view) =>
+  view === 'all' ? true : view === 'closed' ? b.status === 'expired' || b.status === 'cancelled' : b.status === view
+
+const beirut = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString('en-GB', {
+        timeZone: 'Asia/Beirut', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      })
+    : ''
+
+function timeLeft(iso) {
+  const ms = new Date(iso) - Date.now()
+  if (ms <= 0) return 'time is up'
+  const h = Math.floor(ms / 3.6e6)
+  const m = Math.floor((ms % 3.6e6) / 6e4)
+  return h ? `${h}h ${m}m left` : `${m}m left`
+}
+
+function bookingWhen(b) {
+  if (b.status === 'reserved') {
+    return `held until ${beirut(b.expiresAt)} (${timeLeft(b.expiresAt)})${b.onlineStarted ? ' · started paying online' : ''}`
+  }
+  if (b.status === 'paid') return `paid ${beirut(b.paidAt)} · ${b.paymentMethod === 'whish' ? 'online (Whish)' : b.paymentMethod}`
+  if (b.status === 'expired') return `expired ${beirut(b.expiresAt)}`
+  return `cancelled ${beirut(b.cancelledAt)}`
+}
+
+/**
+ * Every booking made from this map. Staff take cash at the shop and mark it
+ * paid here (the customer gives their code), cancel what won't be paid, and
+ * resend a lost email. Seats come back on sale the moment a booking is
+ * cancelled or its 24 hours run out.
+ */
+function Bookings({ bookings, onChanged, onError }) {
+  const waiting = bookings.filter((b) => b.status === 'reserved').length
+  const [view, setView] = useState('')
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(0)
+  const current = view || (waiting ? 'reserved' : 'all')
+
+  const needle = q.trim().toLowerCase().replace(/[\s-]+/g, '')
+  const digits = needle.replace(/\D/g, '')
+  const matches = (b) =>
+    !needle ||
+    b.code.toLowerCase().replace(/-/g, '').includes(needle) ||
+    b.name.toLowerCase().replace(/\s+/g, '').includes(needle) ||
+    (digits.length >= 3 && b.mobile.includes(digits)) ||
+    b.email.toLowerCase().includes(needle)
+  const shown = bookings.filter((b) => inView(b, current) && matches(b))
+
+  async function act(b, kind) {
+    const ask = {
+      paid: `Mark ${b.code} as paid in cash (${formatMoney(b.total, b.currency)})? ${b.name} gets their confirmation email.`,
+      cancel: `Cancel ${b.code}? Its seats go back on sale${b.status === 'paid' ? ' — refund the customer separately' : ''}.`,
+      resend: `Send ${b.name} their ${STATUS_LABEL[b.status].toLowerCase()} email again?`,
+    }[kind]
+    if (!confirm(ask)) return
+    setBusy(b.id)
+    try {
+      if (kind === 'paid') await adminApi.markBookingPaid(b.id)
+      else if (kind === 'cancel') await adminApi.cancelBooking(b.id)
+      else await adminApi.resendBookingEmail(b.id)
+      onChanged(
+        kind === 'paid'
+          ? `${b.code} is paid.`
+          : kind === 'cancel'
+            ? `${b.code} is cancelled — its seats are free.`
+            : 'Email sent.',
+      )
+    } catch (err) {
+      onError(err?.message || 'That didn’t work.')
+    } finally {
+      setBusy(0)
+    }
+  }
+
+  return (
+    <Card title={`Bookings${bookings.length ? ` (${bookings.length})` : ''}`}>
+      {!bookings.length ? (
+        <p className="text-sm text-as-charcoal/50">
+          No bookings yet. When visitors book on the ticketing hub they appear here — reserved seats are held for 24
+          hours until they pay online or in cash at AS Company.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SegmentedControl
+              value={current}
+              onChange={setView}
+              options={BOOKING_VIEWS.map((v) => ({
+                value: v.value,
+                label: `${v.label} (${bookings.filter((b) => inView(b, v.value)).length})`,
+              }))}
+            />
+            <div className="w-full sm:w-64">
+              <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Code, name, mobile or email" />
+            </div>
+          </div>
+
+          {shown.length === 0 ? (
+            <p className="text-sm text-as-charcoal/50">Nothing here.</p>
+          ) : (
+            <ul className="divide-y divide-black/5">
+              {shown.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-as-charcoal">{b.code}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLE[b.status]}`}
+                      >
+                        {STATUS_LABEL[b.status]}
+                      </span>
+                      <span className="text-sm font-semibold text-as-charcoal">{formatMoney(b.total, b.currency)}</span>
+                    </p>
+                    <p className="text-sm text-as-charcoal">
+                      {b.name} ·{' '}
+                      <a href={`https://wa.me/${b.mobile}`} target="_blank" rel="noreferrer" className="hover:text-as-red">
+                        +{b.mobile}
+                      </a>{' '}
+                      ·{' '}
+                      <a href={`mailto:${b.email}`} className="hover:text-as-red">
+                        {b.email}
+                      </a>
+                    </p>
+                    <p className="text-xs text-as-charcoal/60">
+                      {[
+                        b.seats.map((s) => `${s.row}${s.num}`).join(', '),
+                        ...b.zones.map((z) => `${z.qty} × ${z.name}`),
+                        bookingWhen(b),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {b.needsAttention && <p className="text-xs font-semibold text-as-red">⚠ {b.needsAttention}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {(b.status === 'reserved' || b.status === 'expired') && (
+                      <Button onClick={() => act(b, 'paid')} disabled={busy === b.id} className="px-3 py-1.5">
+                        Paid in cash
+                      </Button>
+                    )}
+                    {(b.status === 'reserved' || b.status === 'paid') && (
+                      <Button
+                        variant="danger"
+                        onClick={() => act(b, 'cancel')}
+                        disabled={busy === b.id}
+                        className="px-3 py-1.5"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={() => act(b, 'resend')} disabled={busy === b.id} className="px-3 py-1.5">
+                      Resend email
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }

@@ -214,9 +214,21 @@ repo's CLAUDE.md, *AS-hosted events*). The endpoint answers them from Postgres
 in the same shape as a partner's plus `grid`, and `GridHall` in
 [`SeatMap.jsx`](src/components/SeatMap.jsx) draws it. `hasSeatmap()` says yes
 to them through the event's `hasSeatmap` flag, since there is no partner host to
-recognise. The wording drops "from the ticket office" for these — we are the
-ticket office — and the request is still a request: staff mark seats sold in the
-admin as they confirm them.
+recognise.
+
+**And they are sold here, not requested.** Where a partner's hall ends in
+"Request on WhatsApp", ours ends in **Book these** → name, mobile, email →
+*Reserve for 24h · pay at AS Company* or *Buy now* (Whish)
+([`BookingForm` in SeatMap.jsx](src/components/SeatMap.jsx),
+[`src/lib/bookings.js`](src/lib/bookings.js)). The seats are held the moment the
+API says 201 and nobody else can take them; a 409 sends the visitor back to the
+map with the taken seat greyed out. While the map is open it re-reads the hall
+every 20 seconds and lets go of anything someone else booked. After booking the
+visitor lands on `/bookings/<code>?t=<token>` — their reservation, the code to
+give at the counter, *Pay online*, and the shop's address and hours for cash —
+which is private: rendered per request, noindex, no Referer. The rules (24-hour
+hold, expiry, Whish verification, limits) live in the API; see the repo's
+CLAUDE.md, *AS-hosted events*.
 
 **Antoine's hall is rebuilt from coordinates**, because the plan is data, not a
 picture: a row letter belongs to a block, so row A is a centre run and two

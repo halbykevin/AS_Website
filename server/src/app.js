@@ -9,6 +9,7 @@ import { login, requireAuth } from './auth.js'
 import { scraperRouter } from './scraper.js'
 import { seatmapRouter } from './seatmap.js'
 import { hostedRouter } from './hostedSeatmap.js'
+import { adminBookingsRouter, bookingsRouter, setShopSource } from './bookings.js'
 import { revalidateHub } from './hubRevalidate.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
@@ -667,6 +668,9 @@ async function storeShop() {
   })()
   return shopCache.promise
 }
+
+// The ticket emails' "pay in cash at …" line names the same shop.
+setShopSource(storeShop)
 
 // 200 with nulls when the store is unreachable and nothing is cached: the
 // pages then simply leave the address and hours out rather than failing.
@@ -1384,8 +1388,13 @@ app.post('/api/uploads', requireAuth, upload.single('file'), (req, res) => {
 // ========================= Web scraper =========================
 // Admin-only: run the Python e-commerce scraper and download its output.
 app.use('/api/scrape', scraperRouter)
-// Admin-only: the seat maps of the events AS Company hosts (hostedSeatmap.js).
+// Admin-only: the seat maps of the events AS Company hosts (hostedSeatmap.js)
+// and the bookings made from them (bookings.js).
 app.use('/api/hosted-events', requireAuth, hostedRouter)
+app.use('/api/hosted-events', requireAuth, adminBookingsRouter)
+// Public: book tickets on a hosted event, the customer's booking page, and
+// Whish's callback/return for ticket payments (bookings.js).
+app.use('/api', bookingsRouter)
 // GET /api/events/:slug/seatmap — the live hall for a box-office event. Mounted
 // after the /api/events routes above so it can't shadow them.
 app.use('/api/events', seatmapRouter)

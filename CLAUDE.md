@@ -759,10 +759,47 @@ the owner will refine the details.
   `GET /api/events/:slug/seatmap` answers a hosted event from the database (`source: 'as'`,
   the partner shape plus `grid`) — outside `SEATMAP_ENABLED`/`SEATMAP_SOURCES`, which exist
   for the partners. The hub's `GridHall` draws it; picks go to WhatsApp like any other.
-- **Still a request, not a booking.** Nothing marks a seat sold but staff: confirm the WhatsApp
-  request, then mark the seats sold (or raise a standing area's *Sold*) and save. The mobile
-  app's seat map does not draw AS halls yet (its `hasSeatmap()` is host-only), so it shows the
-  plain reserve button for them.
+- **These are real bookings, not WhatsApp requests** (since 2026-10-21 —
+  [server/src/bookings.js](server/src/bookings.js)). On an AS event the hub's seat map ends in
+  **Book these** → name, mobile, email → **Reserve for 24h · pay at AS Company** or
+  **Buy now** (Whish). Partner events keep the WhatsApp request flow — we can't hold their seats.
+  - **A reservation holds its seats for 24 hours** (`ticket_bookings`, status `reserved`), then
+    **expires on its own** and the seats go back on sale — swept every minute
+    (`startBookingsSchedule`) and before every availability read, so a seat is free the moment
+    its time is up. A payment started on Whish gets an hour's grace, and the sweep asks Whish
+    before releasing one.
+  - **Two people can never book the same seat.** Every booking runs in a transaction that locks
+    the event's `event_seatmaps` row (`SELECT … FOR UPDATE`), and each held seat is a row in
+    `ticket_booking_seats` whose primary key is `(event_id, seat_id)` — the lock serialises, the
+    key guarantees. Tested: ten simultaneous bookings of one seat → one 201, nine 409 "Seat A1
+    was just taken by someone else". The hub also re-reads the map every 20 s and drops a picked
+    seat someone else booked. Standing areas are counted under the same lock.
+  - **Prices are the server's**, from the layout at booking time, snapshotted into the booking
+    (`seats`/`zones`/`total`). Limits: 10 tickets per booking, 2 unpaid reservations per mobile per
+    event, 6 bookings per IP per 10 min, a honeypot field.
+  - **Online payment reuses the store's Whish account**: `server/src/whish.js` is a deliberate
+    copy of `as_store/server/src/whish.js` (keep in step), reading the same `WHISH_*` values from
+    the site API's `.env`. Ticket payments use **externalIds from 700,000,000 up** — Whish knows a
+    payment only by that id, and the store's are its order ids, so the ranges must never meet.
+    **Paid means Whish said so** (`getCollectStatus`), on the callback, the return redirect, the
+    booking page and the sweep — never the browser's word. "Buy now" is offered only when Whish is
+    configured and `PUBLIC_URL`/`TICKETING_PUBLIC_URL` are public https (`onlinePaymentReady()`).
+  - **Cash at AS Company**: staff find the booking by its code (`AS-XXXXXX`, no 0/O/1/I/L) in the
+    editor's **Bookings** panel and press **Paid in cash**; **Cancel** frees the seats (a paid
+    booking's refund is by hand). A payment that lands after a booking expired takes its seats back
+    if still free, otherwise it stays paid and is flagged `needs_attention` for staff.
+  - **Emails** ([mailer.js](server/src/mailer.js)): the customer gets *reserved* (with the hold's
+    end, the code, how to pay, the shop from `/api/shop`), *paid*, *expired* and *cancelled*; the
+    staff inbox (`CONTACT_NOTIFY_TO`) gets every new reservation and payment. WhatsApp
+    notifications are the next step, not built.
+  - **The customer's page** is `ticketing.as.com.lb/bookings/<code>?t=<token>` — the token is
+    what makes it theirs (the code alone shows nothing); noindex, no-store, `no-referrer`.
+  - In the editor, booked seats show reserved (amber) / paid (dark) and **no tool touches them**;
+    the API refuses a save that would remove a booked seat or standing area, and refuses a save
+    from a page loaded before someone else's save (`baseUpdatedAt`), which is what stopped a stale
+    tab from quietly un-selling seats.
+  - The mobile app's seat map does not draw AS halls yet (its `hasSeatmap()` is host-only), so it
+    shows the plain reserve button for them.
 
 ## Backend
 
@@ -806,6 +843,8 @@ stored **and** emailed to staff, listed at `/admin/messages`),
 `wheel_entries` (the **Lucky Draw** pool: draw_number/full_name + `source` `manual|predictor`,
 a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording each spin),
 `event_seatmaps` (the seat map + tickets of an AS-hosted event — see *AS-hosted events*),
+`ticket_bookings` + `ticket_booking_seats` (bookings made from those maps — 24-hour holds, cash or
+Whish; the second table's `(event_id, seat_id)` key is what makes a double booking impossible),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 

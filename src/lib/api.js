@@ -626,6 +626,14 @@ export const adminApi = {
     request(`/api/hosted-events/${eventId}/seatmap`, { method: 'PUT', body: data, authed: true }),
   deleteSeatmap: (eventId) =>
     request(`/api/hosted-events/${eventId}/seatmap`, { method: 'DELETE', authed: true }),
+  // Tickets booked from those maps (server/src/bookings.js).
+  listBookings: (eventId) => request(`/api/hosted-events/${eventId}/bookings`, { authed: true }),
+  markBookingPaid: (bookingId) =>
+    request(`/api/hosted-events/bookings/${bookingId}/paid`, { method: 'POST', authed: true }),
+  cancelBooking: (bookingId) =>
+    request(`/api/hosted-events/bookings/${bookingId}/cancel`, { method: 'POST', authed: true }),
+  resendBookingEmail: (bookingId) =>
+    request(`/api/hosted-events/bookings/${bookingId}/resend`, { method: 'POST', authed: true }),
 
   listBanners: () => request('/api/banners'),
   createBanner: (data) => request('/api/banners', { method: 'POST', body: data, authed: true }),

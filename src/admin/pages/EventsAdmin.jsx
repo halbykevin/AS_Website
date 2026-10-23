@@ -311,6 +311,7 @@ function SeatmapStatus({ map }) {
   return (
     <p className="mt-0.5 text-xs text-as-charcoal/55">
       {map.available} of {map.total} tickets available · {map.sold} sold
+      {map.reserved > 0 && <span className="font-semibold text-amber-700"> · {map.reserved} reserved, awaiting payment</span>}
       {!map.published && <span className="text-amber-700"> · seat picking off</span>}
     </p>
   )

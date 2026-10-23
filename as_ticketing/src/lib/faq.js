@@ -68,8 +68,12 @@ export function hubFaq({ settings = {}, categories = [], shop = null } = {}) {
         id: 'confirmed',
         q: 'Is my seat confirmed as soon as I send the message?',
         a: [
-          'Not yet — a seat map choice is a request, not a booking. Seats are not held until we confirm them with ' +
-            'the ticket office and reply on WhatsApp, and if a seat has gone in the meantime we will tell you.',
+          'For events sold by other box offices, not yet — a seat map choice is a request, not a booking. Seats ' +
+            'are not held until we confirm them with the ticket office and reply on WhatsApp, and if a seat has gone ' +
+            'in the meantime we will tell you.',
+          'For events AS Company hosts itself, yes: booking holds your seats for 24 hours, and no one else can take ' +
+            'them. Pay online right away, or in cash at AS Company with your booking code — a reservation that is ' +
+            'not paid in time is released automatically. Your booking code arrives by email.',
         ],
       },
     )

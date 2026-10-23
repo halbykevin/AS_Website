@@ -3,6 +3,7 @@ import { app } from './app.js'
 import { mailEnabled } from './mailer.js'
 import { rebuildEnabled, startRebuildSchedule } from './rebuild.js'
 import { startEventsSchedule } from './scraper.js'
+import { startBookingsSchedule } from './bookings.js'
 
 const port = process.env.PORT || 8080
 app.listen(port, () => {
@@ -19,4 +20,5 @@ app.listen(port, () => {
   )
   startRebuildSchedule()
   startEventsSchedule()
+  startBookingsSchedule()
 })

@@ -85,6 +85,8 @@ export default async function EventPage({ params }) {
 
   const past = isEventPast(event)
   const source = sourceOf(event)
+  // An event AS hosts with its seat map on: sold right here, not over WhatsApp.
+  const bookable = !past && !event.source && event.hasSeatmap
   const reserve = past ? '' : bookingUrl(event, reservationNumber(settings))
   const nightReserve = (night) => (past ? '' : nightBookingUrl(event, night, reservationNumber(settings)))
   const nights = (event.dates || []).filter((d) => d.date)
@@ -229,6 +231,28 @@ export default async function EventPage({ params }) {
               >
                 See what’s on now
               </Link>
+            ) : bookable ? (
+              // An event AS hosts is booked on this page, from the seat map
+              // below: the seats are held the moment you book.
+              <>
+                <a
+                  href="#seats"
+                  className="mt-5 block rounded-full bg-as-red px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light"
+                >
+                  Choose your seats
+                </a>
+                <p className="mt-3 text-center text-xs leading-relaxed text-as-charcoal/50">
+                  Booked seats are held for 24 hours — pay online or in cash at AS Company.
+                  {reserve ? (
+                    <>
+                      {' '}
+                      <a href={reserve} target="_blank" rel="noreferrer" className="font-semibold text-as-red hover:underline">
+                        Questions? WhatsApp us
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              </>
             ) : reserve ? (
               <a
                 href={reserve}

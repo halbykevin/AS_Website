@@ -1,8 +1,10 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/events'
 import { isNumberedSeat, money, seatmapSectionUrl, seatmapUrl, seatPlace, whatsappSeatsUrl } from '@/lib/seatmap'
+import { bookingPath, createBooking } from '@/lib/bookings'
 
 // The seat picker: the partner's own hall, live, with what is still free — pick
 // yours and send them to us on WhatsApp.
@@ -217,6 +219,7 @@ export default function SeatMap({ event, whatsappNumber }) {
       else if (next.size < MAX_SEATS) {
         next.set(key, {
           id: key,
+          seatId: seat.id,
           num: seat.num,
           price: seat.price,
           row: row.label,
@@ -257,6 +260,43 @@ export default function SeatMap({ event, whatsappNumber }) {
     currency,
   })
 
+  // An event AS hosts is sold right here: picked seats are booked (held for
+  // 24 hours) instead of asked about on WhatsApp. `booking` comes with the map.
+  const bookable = Boolean(data?.booking)
+  const [checkout, setCheckout] = useState(false)
+  const [notice, setNotice] = useState('')
+
+  // Someone else may book while this page is open: re-read the hall every 20
+  // seconds, so a seat they took greys out here without anyone pressing Refresh.
+  useEffect(() => {
+    if (!bookable) return
+    const t = setInterval(() => load(), 20_000)
+    return () => clearInterval(t)
+  }, [bookable, load])
+
+  // …and let go of anything picked here that is no longer free.
+  useEffect(() => {
+    if (!bookable || !grid) return
+    const free = new Set(grid.seats.filter((s) => s.state === 'free').map((s) => s.id))
+    const gone = [...selected.values()].filter((s) => !free.has(s.seatId))
+    if (gone.length) {
+      setSelected((prev) => {
+        const next = new Map(prev)
+        for (const s of gone) next.delete(s.id)
+        return next
+      })
+      setNotice(
+        `${gone.length > 1 ? 'Seats' : 'Seat'} ${gone.map((s) => `${s.row}${s.num}`).join(', ')} ${
+          gone.length > 1 ? 'were' : 'was'
+        } just booked by someone else.`,
+      )
+    }
+    for (const z of data?.zones || []) {
+      if ((qty.get(z.id) || 0) > z.left) setZone(z, z.left)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
   // Nothing at all until we know there is a hall — not even a skeleton.
   //
   // hasSeatmap() only rules out the events sold somewhere we can't read; on the
@@ -271,7 +311,7 @@ export default function SeatMap({ event, whatsappNumber }) {
   const zones = data?.zones || []
 
   return (
-    <section className="mt-10 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+    <section id="seats" className="mt-10 scroll-mt-24 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-5 py-4">
         <div>
           {/* Say what is actually on offer. "Choose your area" over a club
@@ -281,9 +321,11 @@ export default function SeatMap({ event, whatsappNumber }) {
             {hasSeats ? 'Choose your seats' : map || grid ? 'Choose your area' : 'Tickets'}
           </h2>
           <p className="mt-0.5 text-xs text-as-charcoal/55">
-            {hosted
-              ? 'Live availability — pick what you want and send it to us on WhatsApp.'
-              : 'Live availability from the ticket office — pick what you want and send it to us on WhatsApp.'}
+            {bookable
+              ? 'Live availability — pick your seats and book them here.'
+              : hosted
+                ? 'Live availability — pick what you want and send it to us on WhatsApp.'
+                : 'Live availability from the ticket office — pick what you want and send it to us on WhatsApp.'}
           </p>
         </div>
         <button
@@ -454,6 +496,11 @@ export default function SeatMap({ event, whatsappNumber }) {
       )}
 
       <footer className="border-t border-black/5 bg-black/[0.02] px-5 py-4">
+        {notice && (
+          <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+            {notice}
+          </p>
+        )}
         {count > 0 ? (
           <>
             <ul className="mb-3 flex flex-wrap gap-1.5">
@@ -490,7 +537,20 @@ export default function SeatMap({ event, whatsappNumber }) {
                 {' · '}
                 {money(total, currency)}
               </p>
-              {reserve ? (
+              {bookable ? (
+                !checkout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotice('')
+                      setCheckout(true)
+                    }}
+                    className="rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light"
+                  >
+                    Book these
+                  </button>
+                )
+              ) : reserve ? (
                 <a
                   href={reserve}
                   target="_blank"
@@ -503,6 +563,22 @@ export default function SeatMap({ event, whatsappNumber }) {
                 <span className="text-xs text-as-charcoal/50">Contact us to reserve these.</span>
               )}
             </div>
+            {bookable && checkout && (
+              <BookingForm
+                event={event}
+                booking={data.booking}
+                seats={seatsChosen}
+                zones={zonesChosen}
+                total={total}
+                currency={currency}
+                onCancel={() => setCheckout(false)}
+                onConflict={(message) => {
+                  setNotice(message)
+                  setCheckout(false)
+                  load()
+                }}
+              />
+            )}
           </>
         ) : (
           <p className="text-sm text-as-charcoal/55">
@@ -515,10 +591,14 @@ export default function SeatMap({ event, whatsappNumber }) {
         )}
         {/* The honest bit, and it stays. */}
         <p className="mt-3 text-[11px] leading-relaxed text-as-charcoal/45">
-          {hosted
-            ? 'Seats aren’t held until we confirm. We reply on WhatsApp to confirm your tickets — if one has just gone, we’ll offer you the closest we can get.'
-            : 'Seats aren’t held until we confirm. We check with the ticket office and reply on WhatsApp — if one has just gone, we’ll offer you the closest we can get.'}
-          {full && ' You can request up to ' + MAX_SEATS + ' seats at a time.'}
+          {bookable
+            ? `Booking holds your seats for ${data.booking.holdHours} hours. ${
+                data.booking.online ? 'Pay online now, or in cash at AS Company' : 'Pay in cash at AS Company'
+              } — a reservation that isn’t paid in time is released automatically.`
+            : hosted
+              ? 'Seats aren’t held until we confirm. We reply on WhatsApp to confirm your tickets — if one has just gone, we’ll offer you the closest we can get.'
+              : 'Seats aren’t held until we confirm. We check with the ticket office and reply on WhatsApp — if one has just gone, we’ll offer you the closest we can get.'}
+          {full && ` You can ${bookable ? 'book' : 'request'} up to ${MAX_SEATS} seats at a time.`}
     </p>
   </footer>
     </section>
@@ -715,6 +795,142 @@ function Seat({ seat, row, currency, picked, disabled, onClick }) {
 }
 
 /**
+ * Booking an AS-hosted event: who is coming, then one of two ways to pay —
+ * online now (Whish, when the API has it configured) or in cash at AS Company
+ * within the hold. Either way the seats are held from this moment; the server
+ * re-checks every one and answers 409 if someone got there first, which sends
+ * the visitor back to the map with that seat greyed out.
+ */
+function BookingForm({ event, booking, seats, zones, total, currency, onCancel, onConflict }) {
+  const router = useRouter()
+  const [form, setForm] = useState({ name: '', mobile: '', email: '', website: '' })
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const free = total === 0
+
+  async function submit(payment) {
+    setBusy(payment)
+    setError('')
+    try {
+      const res = await createBooking(event.slug, {
+        ...form,
+        payment,
+        seats: seats.map((s) => s.seatId),
+        zones: zones.map((z) => ({ id: z.id, qty: z.qty })),
+      })
+      // Straight to Whish's page; the booking page if paying later (or free).
+      if (res.collectUrl) return window.location.assign(res.collectUrl)
+      router.push(`${bookingPath(res.code, res.token)}${res.onlineError ? '&online=unavailable' : ''}`)
+    } catch (err) {
+      setBusy('')
+      if (err.status === 409 && err.reload) return onConflict(err.message)
+      setError(err.message)
+    }
+  }
+
+  const input =
+    'w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm text-as-charcoal outline-none transition focus:border-as-red focus:ring-2 focus:ring-as-red/20'
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit(e.nativeEvent.submitter?.value === 'whish' ? 'whish' : 'cash')
+      }}
+      className="mt-4 space-y-3 rounded-2xl bg-white p-4 ring-1 ring-black/10"
+    >
+      <h3 className="text-sm font-extrabold text-as-charcoal">Your details</h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-as-charcoal/60">Full name</span>
+          <input required minLength={2} maxLength={80} autoComplete="name" value={form.name} onChange={set('name')} className={input} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-as-charcoal/60">Mobile</span>
+          <input
+            required
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="03 123 456"
+            value={form.mobile}
+            onChange={set('mobile')}
+            className={input}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-as-charcoal/60">Email</span>
+          <input required type="email" autoComplete="email" value={form.email} onChange={set('email')} className={input} />
+        </label>
+      </div>
+      {/* A field people never see — bots fill it in and are quietly dropped. */}
+      <input
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        value={form.website}
+        onChange={set('website')}
+        className="hidden"
+        aria-hidden="true"
+      />
+
+      {error && <p className="rounded-xl bg-as-red/10 px-3 py-2 text-sm font-semibold text-as-red">{error}</p>}
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        {free ? (
+          <button
+            type="submit"
+            value="cash"
+            disabled={Boolean(busy)}
+            className="rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light disabled:opacity-60"
+          >
+            {busy ? 'Booking…' : 'Get your tickets'}
+          </button>
+        ) : (
+          <>
+            {booking.online && (
+              <button
+                type="submit"
+                value="whish"
+                disabled={Boolean(busy)}
+                className="rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light disabled:opacity-60"
+              >
+                {busy === 'whish' ? 'Opening payment…' : `Buy now · ${money(total, currency)}`}
+              </button>
+            )}
+            <button
+              type="submit"
+              value="cash"
+              disabled={Boolean(busy)}
+              className={`rounded-full px-6 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
+                booking.online
+                  ? 'text-as-charcoal ring-1 ring-black/15 hover:text-as-red hover:ring-as-red/30'
+                  : 'bg-as-red text-white shadow-sm hover:bg-as-red-light'
+              }`}
+            >
+              {busy === 'cash' ? 'Reserving…' : `Reserve for ${booking.holdHours}h · pay at AS Company`}
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={Boolean(busy)}
+          className="text-sm font-semibold text-as-charcoal/50 transition hover:text-as-red sm:ml-auto"
+        >
+          Back
+        </button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-as-charcoal/45">
+        We email your booking code and use your details only for this booking.
+        {booking.online && !free ? ' Buy now takes you to Whish to pay securely.' : ''}
+      </p>
+    </form>
+  )
+}
+
+/**
  * A hall AS Company drew in its own admin: seats on a grid, with the stage, the
  * entrances and any standing areas where they really are — the one kind of map
  * that knows where the doors are. Same seat buttons and the same picked/full
@@ -768,7 +984,7 @@ function GridHall({ grid, currency, isPicked, full, onSeat, zones, pickedZoneIds
           return (
             <div
               key={a.id}
-              className="absolute flex items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-emerald-600/70 bg-emerald-50 text-center text-[9px] font-bold uppercase leading-tight tracking-wider text-emerald-700"
+              className="absolute flex items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-emerald-600/70 bg-emerald-50 text-center text-[8px] font-bold uppercase leading-tight text-emerald-700"
               style={box(a)}
             >
               {a.label}
