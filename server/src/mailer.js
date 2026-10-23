@@ -288,9 +288,10 @@ function cashLine(shop) {
 /**
  * The customer's email for one moment of a booking: 'reserved', 'paid',
  * 'expired' or 'cancelled'. `b` is the booking as bookings.js shapes it, with
- * `link` to its page on the ticketing hub.
+ * `link` to its page on the ticketing hub. A 'paid' email carries the tickets
+ * PDF in `attachments` (tickets.js) when it could be drawn.
  */
-export async function sendBookingEmail(kind, b, shop = null) {
+export async function sendBookingEmail(kind, b, shop = null, attachments = []) {
   if (!mailEnabled() || !b?.email) return { skipped: true }
   const hi = `<p style="margin:0 0 6px;font-size:15px;color:${INK}">Hi ${esc(b.name || 'there')},</p>`
   const para = (html) => `<p style="margin:0;font-size:15px;line-height:1.6;color:${INK}">${html}</p>`
@@ -322,7 +323,13 @@ export async function sendBookingEmail(kind, b, shop = null) {
     inner = `
       <h2 style="margin:0 0 14px;font-size:20px;color:${INK}">You're in! ✅</h2>
       ${hi}
-      ${para('Your tickets are paid and confirmed. Show your booking code at the entrance.')}
+      ${para(
+        attachments.length
+          ? `Your tickets are paid and confirmed — they're attached to this email, one per ${
+              (b.zones || []).length ? 'place' : 'seat'
+            }, each with its own QR code. Show them at the entrance, on your phone or printed.`
+          : 'Your tickets are paid and confirmed — open your booking below to see them, with the QR code to show at the entrance.',
+      )}
       ${eventBlock(b)}
       ${ticketRows(b)}
       ${codeBadge(b.code)}
@@ -354,6 +361,7 @@ export async function sendBookingEmail(kind, b, shop = null) {
     replyTo: CONTACT_TO,
     subject,
     html: emailShell(inner, 'AS Ticketing'),
+    attachments,
   })
 }
 

@@ -634,6 +634,9 @@ export const adminApi = {
     request(`/api/hosted-events/bookings/${bookingId}/cancel`, { method: 'POST', authed: true }),
   resendBookingEmail: (bookingId) =>
     request(`/api/hosted-events/bookings/${bookingId}/resend`, { method: 'POST', authed: true }),
+  // Sold in person at AS Company: paid in cash, tickets issued at once.
+  counterSale: (eventId, data) =>
+    request(`/api/hosted-events/${eventId}/counter-sale`, { method: 'POST', body: data, authed: true }),
 
   listBanners: () => request('/api/banners'),
   createBanner: (data) => request('/api/banners', { method: 'POST', body: data, authed: true }),
@@ -728,11 +731,24 @@ export const adminApi = {
 
 // Download an authed file (the API requires a Bearer token, so we can't use a
 // plain <a href>): fetch it as a blob and trigger a browser download.
-async function downloadAuthed(path, filename) {
+async function downloadAuthed(path, filename, { method = 'GET', body } = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { Authorization: `Bearer ${auth.token()}` },
+    method,
+    headers: {
+      Authorization: `Bearer ${auth.token()}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
   })
-  if (!res.ok) throw new Error('Download failed')
+  if (!res.ok) {
+    let message = 'Download failed'
+    try {
+      message = (await res.json()).error || message
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message)
+  }
   const blob = await res.blob()
   const objectUrl = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -749,3 +765,11 @@ export const downloadScrapeFile = (id, name) =>
 
 export const downloadScrapeZip = (id) =>
   downloadAuthed(`/api/scrape/${id}/zip`, `scrape-${id}.zip`)
+
+// A paid booking's tickets, one PDF page per seat (server/src/tickets.js).
+export const downloadBookingTickets = (booking) =>
+  downloadAuthed(`/api/hosted-events/bookings/${booking.id}/tickets.pdf`, `AS-Tickets-${booking.code}.pdf`)
+
+// A watermarked sample ticket from the design on screen, saved or not.
+export const downloadTicketPreview = (eventId, ticket) =>
+  downloadAuthed(`/api/hosted-events/${eventId}/ticket-preview`, 'ticket-preview.pdf', { method: 'POST', body: { ticket } })

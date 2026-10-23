@@ -12,6 +12,7 @@ import { query } from './db.js'
 import { revalidateHub } from './hubRevalidate.js'
 import { emptyLayout, publicSeatmap, rowLabels, sanitizeLayout, seatId, summarize } from './seatLayout.js'
 import { HOLD_HOURS, MAX_TICKETS, expireBookings, liveHolds, onlinePaymentReady } from './bookings.js'
+import { ticketDesign } from './tickets.js'
 
 export const hostedRouter = express.Router()
 
@@ -52,6 +53,8 @@ const mapJson = (eventId, row, holds) => {
     booked: Object.fromEntries(holds.seats),
     bookedZones: Object.fromEntries(holds.zones),
     summary: summarize(layout, holds),
+    // The printed ticket's picture and Arabic venue name (tickets.js).
+    ticket: ticketDesign(row?.ticket),
   }
 }
 
@@ -107,6 +110,9 @@ hostedRouter.put('/:id/seatmap', async (req, res, next) => {
     if (ev.source) return res.status(409).json({ error: 'Only events AS Company hosts can have a seat map here.' })
     const layout = sanitizeLayout(req.body?.layout)
     const published = Boolean(req.body?.published)
+    // Absent = keep what is stored: a tab opened before tickets had a design
+    // must not blank it.
+    const ticket = req.body?.ticket === undefined ? null : JSON.stringify(ticketDesign(req.body.ticket))
 
     const current = await query('SELECT updated_at FROM event_seatmaps WHERE event_id = $1', [ev.id])
     // Saved from a page opened before someone else's save: storing it would
@@ -135,11 +141,12 @@ hostedRouter.put('/:id/seatmap', async (req, res, next) => {
     }
 
     const { rows } = await query(
-      `INSERT INTO event_seatmaps (event_id, published, layout, updated_at)
-       VALUES ($1, $2, $3, now())
-       ON CONFLICT (event_id) DO UPDATE SET published = $2, layout = $3, updated_at = now()
+      `INSERT INTO event_seatmaps (event_id, published, layout, ticket, updated_at)
+       VALUES ($1, $2, $3, COALESCE($4::jsonb, '{}'::jsonb), now())
+       ON CONFLICT (event_id) DO UPDATE
+         SET published = $2, layout = $3, ticket = COALESCE($4::jsonb, event_seatmaps.ticket), updated_at = now()
        RETURNING *`,
-      [ev.id, published, JSON.stringify(layout)],
+      [ev.id, published, JSON.stringify(layout), ticket],
     )
     // `hasSeatmap` on the event list follows this, so a live event's hub page
     // has to hear about it now.

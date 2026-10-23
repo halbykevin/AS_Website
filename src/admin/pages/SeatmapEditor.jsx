@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { adminApi } from '../../lib/api.js'
+import { adminApi, downloadBookingTickets, downloadTicketPreview } from '../../lib/api.js'
 import { Banner, Button, Card, Field, PageHeader, SaveBar, SegmentedControl, Select, TextInput, Toggle } from '../ui.jsx'
 import {
   COLORS,
@@ -17,8 +17,11 @@ import {
 // The seat map and tickets of an event AS Company hosts: draw the hall on a
 // grid (seats, stage, entrances, standing areas), price it by ticket type, and
 // keep what is sold up to date. Saved to /api/hosted-events/:id/seatmap; the
-// ticketing hub draws the published one for visitors to pick from and request
-// on WhatsApp. The server re-checks everything on save (hostedSeatmap.js).
+// ticketing hub draws the published one for visitors to book from. The server
+// re-checks everything on save (hostedSeatmap.js).
+//
+// Staff also sell here, in person: the "Sell at counter" tool picks seats on
+// the map and issues their tickets as a PDF to print (bookings.js, tickets.js).
 
 const CELL = 26
 const SOLD = '#BEBEBE'
@@ -31,6 +34,7 @@ const TOOLS = [
   { value: 'standing', label: 'Standing area', hint: 'Drag a rectangle for a standing or free-seating area, then set how many tickets it has.' },
   { value: 'select', label: 'Select', hint: 'Click a stage, entrance or area to rename, move, re-price or delete it.' },
   { value: 'erase', label: 'Erase', hint: 'Click or drag to remove seats and areas.' },
+  { value: 'sell', label: 'Sell at counter', hint: 'For someone buying in person at AS Company: click their seats (or drag over a block) — free ones, or ones you already marked sold or held — then fill in their name below. They pay cash, and the tickets download ready to print.' },
 ]
 const MARKS = [
   { value: 'sold', label: 'Sold' },
@@ -61,6 +65,10 @@ export default function SeatmapEditor() {
   const [booked, setBooked] = useState({})
   const [bookedZones, setBookedZones] = useState({})
   const [bookings, setBookings] = useState([])
+  // Seats picked with "Sell at counter" — a sale in the making, not an edit.
+  const [sale, setSale] = useState(() => new Set())
+  // The printed ticket's picture and Arabic venue name; saved with the map.
+  const [ticket, setTicket] = useState({ imageUrl: '', venueAr: '' })
   const gridRef = useRef(null)
   // The drag lives in a ref as well as in state: a quick click releases before
   // React has re-rendered with the press, and the release must still see it.
@@ -79,6 +87,7 @@ export default function SeatmapEditor() {
         setBooked(data.booked || {})
         setBookedZones(data.bookedZones || {})
         setTier(data.layout.tiers[0]?.id || '')
+        setTicket(data.ticket || { imageUrl: '', venueAr: '' })
       })
       .catch((err) => alive && setLoadError(err?.message || 'Could not load the seat map.'))
     adminApi.listBookings(id).then((list) => alive && setBookings(list)).catch(() => {})
@@ -233,6 +242,23 @@ export default function SeatmapEditor() {
       return
     }
 
+    // Picking seats to sell changes nothing on the map: a click toggles one,
+    // a drag adds a block. A seat a booking holds isn't for sale.
+    if (tool === 'sell') {
+      const keys = layout.seats.filter((s) => inRect(s) && !isBooked(s.r, s.c)).map((s) => cellKey(s.r, s.c))
+      if (!keys.length) {
+        if (bookedIn.length) setMsg({ kind: 'warning', text: 'That seat is already booked — see Bookings below.' })
+        return
+      }
+      setSale((prev) => {
+        const next = new Set(prev)
+        if (single && next.has(keys[0])) next.delete(keys[0])
+        else keys.forEach((k) => next.add(k))
+        return next
+      })
+      return
+    }
+
     if (tool === 'seat') {
       const seats = new Map(layout.seats.map((s) => [cellKey(s.r, s.c), s]))
       if (single) {
@@ -364,9 +390,10 @@ export default function SeatmapEditor() {
     try {
       // baseUpdatedAt: the version this page loaded. If someone saved since,
       // the server refuses rather than let this page undo their changes.
-      const data = await adminApi.saveSeatmap(id, { layout, published, baseUpdatedAt: updatedAt })
+      const data = await adminApi.saveSeatmap(id, { layout, published, ticket, baseUpdatedAt: updatedAt })
       setLayout(data.layout)
       setPublished(data.published)
+      setTicket(data.ticket)
       setUpdatedAt(data.updatedAt)
       setBooked(data.booked || {})
       setBookedZones(data.bookedZones || {})
@@ -418,6 +445,12 @@ export default function SeatmapEditor() {
   const empty = !layout.seats.length && !layout.areas.some((a) => a.kind === 'standing')
   const preview = drag ? rectOf(drag.from, drag.to) : null
   const currency = layout.currency
+  // The seats picked to sell, named as their tickets will name them. One that
+  // gets booked online meanwhile simply drops out.
+  const picked = layout.seats
+    .filter((s) => sale.has(cellKey(s.r, s.c)) && !booked[cellKey(s.r, s.c)])
+    .map((s) => ({ id: cellKey(s.r, s.c), r: s.r, row: labels.get(s.r), num: numbers.get(cellKey(s.r, s.c)), tier: s.tier, status: s.status }))
+    .sort((a, b) => a.r - b.r || a.num - b.num)
 
   return (
     <div className="space-y-6">
@@ -562,7 +595,15 @@ export default function SeatmapEditor() {
 
       <Card title="Map">
         <div className="space-y-3">
-          <SegmentedControl value={tool} onChange={(v) => { setTool(v); if (v !== 'select') setSelected('') }} options={TOOLS} />
+          <SegmentedControl
+            value={tool}
+            onChange={(v) => {
+              setTool(v)
+              if (v !== 'select') setSelected('')
+              if (v !== 'sell') setSale(new Set())
+            }}
+            options={TOOLS}
+          />
           <p className="text-xs text-as-charcoal/55">{TOOLS.find((t) => t.value === tool)?.hint}</p>
 
           {(tool === 'seat' || tool === 'standing') && (
@@ -650,6 +691,7 @@ export default function SeatmapEditor() {
                     tier={tierById.get(s.tier)}
                     num={numbers.get(cellKey(s.r, s.c))}
                     booking={booked[cellKey(s.r, s.c)]}
+                    picked={tool === 'sell' && sale.has(cellKey(s.r, s.c))}
                   />
                 ))}
                 {preview && (
@@ -663,6 +705,29 @@ export default function SeatmapEditor() {
           </div>
         </div>
       </Card>
+
+      {tool === 'sell' && (
+        <CounterSale
+          eventId={id}
+          layout={layout}
+          picked={picked}
+          bookedZones={bookedZones}
+          dirty={dirty}
+          onUnpick={(key) =>
+            setSale((prev) => {
+              const next = new Set(prev)
+              next.delete(key)
+              return next
+            })
+          }
+          onSold={(text) => {
+            setSale(new Set())
+            setMsg({ kind: 'success', text })
+            refreshBookings().catch(() => {})
+          }}
+          onError={(text) => setMsg({ kind: 'error', text })}
+        />
+      )}
 
       {area && (
         <AreaInspector
@@ -678,6 +743,16 @@ export default function SeatmapEditor() {
       <Card title="Tickets">
         <Summary summary={summary} currency={currency} />
       </Card>
+
+      <PrintedTicket
+        eventId={id}
+        ticket={ticket}
+        onChange={(next) => {
+          setTicket(next)
+          setDirty(true)
+        }}
+        onError={(text) => setMsg({ kind: 'error', text })}
+      />
 
       <Bookings
         bookings={bookings}
@@ -724,12 +799,14 @@ function formatMoney(amount, currency) {
 const RESERVED = '#F59E0B'
 const PAID = '#383F41'
 
-function SeatDot({ seat, tier, num, booking }) {
+function SeatDot({ seat, tier, num, booking, picked }) {
   const sold = !booking && seat.status === 'sold'
   const held = !booking && seat.status === 'held'
   const color = tier?.color || COLORS[0]
   const fill = booking === 'paid' ? PAID : booking ? RESERVED : sold ? SOLD : held ? 'white' : color
   const state = booking === 'paid' ? ' · booked, paid' : booking ? ' · reserved, awaiting payment' : sold ? ' · sold' : held ? ' · held' : ''
+  // Picked to sell at the counter: ringed, whatever its colour.
+  const rings = [held && `inset 0 0 0 2px ${color}`, picked && '0 0 0 2px white, 0 0 0 4px #1C1C1C'].filter(Boolean)
   return (
     <div
       className="pointer-events-none absolute flex items-center justify-center rounded-[5px] text-[9px] font-bold leading-none"
@@ -740,9 +817,10 @@ function SeatDot({ seat, tier, num, booking }) {
         height: CELL - 6,
         background: fill,
         color: sold ? '#6B7280' : held ? color : 'white',
-        boxShadow: held ? `inset 0 0 0 2px ${color}` : undefined,
+        boxShadow: rings.length ? rings.join(', ') : undefined,
+        zIndex: picked ? 1 : undefined,
       }}
-      title={`${tier?.name || ''} · seat ${num}${state}`}
+      title={`${tier?.name || ''} · seat ${num}${state}${picked ? ' · picked to sell' : ''}`}
     >
       {sold ? '×' : num}
     </div>
@@ -1002,6 +1080,235 @@ function Summary({ summary, currency }) {
   )
 }
 
+// ------------------------------------------------------------ the counter ---
+
+/**
+ * Someone buying in person at AS Company: the seats picked on the map, any
+ * standing places, and who they are. Paid in cash there and then — the
+ * booking is made paid, its tickets download as one PDF to print, and an email
+ * (if given) gets them too. Sold from the saved map, so unsaved edits wait.
+ */
+function CounterSale({ eventId, layout, picked, bookedZones, dirty, onUnpick, onSold, onError }) {
+  const [form, setForm] = useState({ name: '', mobile: '', email: '' })
+  const [qty, setQty] = useState({})
+  const [busy, setBusy] = useState(false)
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const tiers = new Map(layout.tiers.map((t) => [t.id, t]))
+  const currency = layout.currency
+  const standing = layout.areas.filter((a) => a.kind === 'standing' && a.capacity > 0)
+  const left = (a) => {
+    const z = bookedZones[a.id] || {}
+    return Math.max(0, a.capacity - a.sold - (z.reserved || 0) - (z.paid || 0))
+  }
+  const zones = standing
+    .map((a) => ({ id: a.id, qty: Math.min(Math.max(0, Math.floor(Number(qty[a.id]) || 0)), left(a)), price: tiers.get(a.tier)?.price || 0 }))
+    .filter((z) => z.qty > 0)
+  const count = picked.length + zones.reduce((n, z) => n + z.qty, 0)
+  const total = picked.reduce((n, s) => n + (tiers.get(s.tier)?.price || 0), 0) + zones.reduce((n, z) => n + z.qty * z.price, 0)
+
+  async function sell(e) {
+    e.preventDefault()
+    const name = form.name.trim()
+    if (!confirm(`Sell ${count} ticket${count > 1 ? 's' : ''} to ${name} for ${formatMoney(total, currency)}, paid in cash?`)) return
+    setBusy(true)
+    try {
+      const booking = await adminApi.counterSale(eventId, {
+        ...form,
+        seats: picked.map((s) => s.id),
+        zones: zones.map(({ id, qty }) => ({ id, qty })),
+      })
+      setForm({ name: '', mobile: '', email: '' })
+      setQty({})
+      const printed = await downloadBookingTickets(booking).then(
+        () => true,
+        () => false,
+      )
+      onSold(
+        `${booking.code} — ${count} ticket${count > 1 ? 's' : ''} sold to ${booking.name}. ` +
+          (printed ? 'The tickets have downloaded — print them for the customer.' : 'Download its tickets from Bookings below.') +
+          (booking.email ? ` They're emailed to ${booking.email} too.` : ''),
+      )
+    } catch (err) {
+      onError(err?.message || 'The sale didn’t go through.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card title="Sell at the counter">
+      <form onSubmit={sell} className="space-y-4">
+        {dirty && <Banner kind="warning">Save your map changes first — tickets are sold from the saved map.</Banner>}
+
+        {picked.length ? (
+          <div className="flex flex-wrap gap-2">
+            {picked.map((s) => {
+              const t = tiers.get(s.tier)
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onUnpick(s.id)}
+                  title="Remove from this sale"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-as-charcoal ring-1 ring-black/15 transition hover:ring-as-red/40"
+                >
+                  <span className="h-3 w-3 rounded-[3px]" style={{ background: t?.color }} />
+                  {s.row}
+                  {s.num} · {t?.name} · {formatMoney(t?.price, currency)}
+                  {s.status !== 'free' && <span className="font-normal text-as-charcoal/50">(marked {s.status})</span>}
+                  <span className="text-as-charcoal/40">×</span>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-as-charcoal/55">
+            Click the customer’s seats on the map above{standing.length ? ', or add standing tickets below' : ''}.
+          </p>
+        )}
+
+        {standing.length > 0 && (
+          <div className="space-y-2">
+            {standing.map((a) => {
+              const t = tiers.get(a.tier)
+              return (
+                <label key={a.id} className="flex flex-wrap items-center gap-3 text-sm text-as-charcoal">
+                  <span className="min-w-[10rem] font-semibold">{a.label}</span>
+                  <span className="text-as-charcoal/55">
+                    {formatMoney(t?.price, currency)} · {left(a)} left
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={left(a)}
+                    value={qty[a.id] ?? ''}
+                    placeholder="0"
+                    onChange={(e) => setQty((q) => ({ ...q, [a.id]: e.target.value }))}
+                    className="w-20 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm"
+                    aria-label={`${a.label} tickets`}
+                  />
+                </label>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Customer’s name" hint="Printed on every ticket.">
+            <TextInput required minLength={2} maxLength={80} value={form.name} onChange={set('name')} />
+          </Field>
+          <Field label="Mobile" hint="Optional.">
+            <TextInput type="tel" value={form.mobile} onChange={set('mobile')} placeholder="03 123 456" />
+          </Field>
+          <Field label="Email" hint="Optional — they get the tickets there too.">
+            <TextInput type="email" value={form.email} onChange={set('email')} />
+          </Field>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-4">
+          <p className="text-sm text-as-charcoal">
+            {count ? (
+              <>
+                {count} ticket{count > 1 ? 's' : ''} · <strong>{formatMoney(total, currency)}</strong> in cash
+              </>
+            ) : (
+              <span className="text-as-charcoal/50">Nothing picked yet.</span>
+            )}
+          </p>
+          <Button type="submit" disabled={busy || dirty || !count} className="px-5 py-2.5">
+            {busy ? 'Issuing…' : 'Sell & download tickets'}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
+/**
+ * The event's printed ticket: the picture in its left panel and the venue's
+ * Arabic name. Everything else on it comes from the event and the seat.
+ */
+function PrintedTicket({ eventId, ticket, onChange, onError }) {
+  const [uploading, setUploading] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+
+  async function upload(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      const up = await adminApi.upload(file)
+      onChange({ ...ticket, imageUrl: up.url })
+    } catch (err) {
+      onError('Upload failed: ' + (err?.message || 'error'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function preview() {
+    setPreviewing(true)
+    try {
+      await downloadTicketPreview(eventId, ticket)
+    } catch (err) {
+      onError('Preview failed: ' + (err?.message || 'error'))
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  return (
+    <Card
+      title="Printed ticket"
+      actions={
+        <Button variant="ghost" onClick={preview} disabled={previewing} className="px-4 py-2">
+          {previewing ? 'Preparing…' : 'Preview ticket'}
+        </Button>
+      }
+    >
+      <p className="mb-4 text-sm text-as-charcoal/60">
+        Every paid booking gets one ticket per seat — a PDF with its own QR code, emailed to the customer, on their
+        booking page, and under <em>Bookings</em> below to print. A reservation gets none until it is paid, and
+        cancelling a booking cancels its tickets: scanned at the door, the code says whose ticket it is and whether it
+        is still valid.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Picture" hint="The panel down the ticket’s left side. Empty = the event’s own picture. A tall poster fits best.">
+          <div className="flex items-center gap-3">
+            {ticket.imageUrl && (
+              <img src={ticket.imageUrl} alt="" className="h-20 w-[3.2rem] rounded object-cover ring-1 ring-black/10" />
+            )}
+            <label className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold text-as-charcoal ring-1 ring-black/15 transition hover:text-as-red">
+              {uploading ? 'Uploading…' : ticket.imageUrl ? 'Replace' : 'Upload'}
+              <input type="file" accept="image/*" onChange={upload} disabled={uploading} className="hidden" />
+            </label>
+            {ticket.imageUrl && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...ticket, imageUrl: '' })}
+                className="text-sm font-semibold text-as-charcoal/50 hover:text-as-red"
+              >
+                Use the event’s picture
+              </button>
+            )}
+          </div>
+        </Field>
+        <Field label="Venue in Arabic" hint="Optional — printed in red beside the venue’s name.">
+          <TextInput
+            dir="rtl"
+            maxLength={60}
+            value={ticket.venueAr}
+            onChange={(e) => onChange({ ...ticket, venueAr: e.target.value })}
+            placeholder="مسرح ميلاد الغزال – زغرتا"
+          />
+        </Field>
+      </div>
+    </Card>
+  )
+}
+
 // ---------------------------------------------------------------- bookings ---
 
 const BOOKING_VIEWS = [
@@ -1039,16 +1346,19 @@ function bookingWhen(b) {
   if (b.status === 'reserved') {
     return `held until ${beirut(b.expiresAt)} (${timeLeft(b.expiresAt)})${b.onlineStarted ? ' · started paying online' : ''}`
   }
-  if (b.status === 'paid') return `paid ${beirut(b.paidAt)} · ${b.paymentMethod === 'whish' ? 'online (Whish)' : b.paymentMethod}`
+  if (b.status === 'paid') {
+    const how = b.channel === 'counter' ? 'cash at the counter' : b.paymentMethod === 'whish' ? 'online (Whish)' : b.paymentMethod
+    return `paid ${beirut(b.paidAt)} · ${how}`
+  }
   if (b.status === 'expired') return `expired ${beirut(b.expiresAt)}`
   return `cancelled ${beirut(b.cancelledAt)}`
 }
 
 /**
  * Every booking made from this map. Staff take cash at the shop and mark it
- * paid here (the customer gives their code), cancel what won't be paid, and
- * resend a lost email. Seats come back on sale the moment a booking is
- * cancelled or its 24 hours run out.
+ * paid here (the customer gives their code), cancel what won't be paid,
+ * resend a lost email, and print a paid booking's tickets. Seats come back on
+ * sale the moment a booking is cancelled or its 24 hours run out.
  */
 function Bookings({ bookings, onChanged, onError }) {
   const waiting = bookings.filter((b) => b.status === 'reserved').length
@@ -1088,6 +1398,17 @@ function Bookings({ bookings, onChanged, onError }) {
       )
     } catch (err) {
       onError(err?.message || 'That didn’t work.')
+    } finally {
+      setBusy(0)
+    }
+  }
+
+  async function download(b) {
+    setBusy(b.id)
+    try {
+      await downloadBookingTickets(b)
+    } catch (err) {
+      onError(err?.message || 'The tickets didn’t download.')
     } finally {
       setBusy(0)
     }
@@ -1133,14 +1454,23 @@ function Bookings({ bookings, onChanged, onError }) {
                       <span className="text-sm font-semibold text-as-charcoal">{formatMoney(b.total, b.currency)}</span>
                     </p>
                     <p className="text-sm text-as-charcoal">
-                      {b.name} ·{' '}
-                      <a href={`https://wa.me/${b.mobile}`} target="_blank" rel="noreferrer" className="hover:text-as-red">
-                        +{b.mobile}
-                      </a>{' '}
-                      ·{' '}
-                      <a href={`mailto:${b.email}`} className="hover:text-as-red">
-                        {b.email}
-                      </a>
+                      {b.name}
+                      {b.mobile && (
+                        <>
+                          {' · '}
+                          <a href={`https://wa.me/${b.mobile}`} target="_blank" rel="noreferrer" className="hover:text-as-red">
+                            +{b.mobile}
+                          </a>
+                        </>
+                      )}
+                      {b.email && (
+                        <>
+                          {' · '}
+                          <a href={`mailto:${b.email}`} className="hover:text-as-red">
+                            {b.email}
+                          </a>
+                        </>
+                      )}
                     </p>
                     <p className="text-xs text-as-charcoal/60">
                       {[
@@ -1154,6 +1484,11 @@ function Bookings({ bookings, onChanged, onError }) {
                     {b.needsAttention && <p className="text-xs font-semibold text-as-red">⚠ {b.needsAttention}</p>}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    {b.status === 'paid' && (
+                      <Button onClick={() => download(b)} disabled={busy === b.id} className="px-3 py-1.5">
+                        Download tickets
+                      </Button>
+                    )}
                     {(b.status === 'reserved' || b.status === 'expired') && (
                       <Button onClick={() => act(b, 'paid')} disabled={busy === b.id} className="px-3 py-1.5">
                         Paid in cash
@@ -1169,9 +1504,11 @@ function Bookings({ bookings, onChanged, onError }) {
                         Cancel
                       </Button>
                     )}
-                    <Button variant="ghost" onClick={() => act(b, 'resend')} disabled={busy === b.id} className="px-3 py-1.5">
-                      Resend email
-                    </Button>
+                    {b.email && (
+                      <Button variant="ghost" onClick={() => act(b, 'resend')} disabled={busy === b.id} className="px-3 py-1.5">
+                        Resend email
+                      </Button>
+                    )}
                   </div>
                 </li>
               ))}

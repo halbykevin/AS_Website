@@ -800,6 +800,35 @@ the owner will refine the details.
     tab from quietly un-selling seats.
   - The mobile app's seat map does not draw AS halls yet (its `hasSeatmap()` is host-only), so it
     shows the plain reserve button for them.
+- **A paid booking gets tickets; a reservation never does** (since 2026-10-23 —
+  [server/src/tickets.js](server/src/tickets.js), drawn by [ticketPdf.js](server/src/ticketPdf.js)).
+  One per seat or standing place, in the `tickets` table, issued the moment a booking is paid
+  (online, cash, counter or free) and again on first read if that failed (`ensureTickets` is
+  idempotent). The customer gets them as a PDF attached to the *paid* email and as QR codes +
+  a download on their booking page; staff get **Download tickets** in Bookings.
+  - **The design is AS Ticketing's own** (`as_ticketing/as-ticket-generator/ticket.py`, same
+    200 × 80 mm layout) redrawn as a vector PDF with pdfkit: fonts and the trimmed logo live in
+    `server/assets/tickets/`. The left panel is the event's picture unless the editor's
+    **Printed ticket** card sets another, which also takes the venue's Arabic name; *Preview
+    ticket* renders a watermarked sample whose QR is deliberately not a ticket. Arabic is laid
+    out a word at a time (`visualWords`) because fontkit reverses digits inside an RTL run.
+  - **The QR code is `AST1:<serial>:<secret>` and nothing else.** The serial is printed; the
+    secret (random, ~79 bits) is printed nowhere, and is what makes a code unforgeable. Holder,
+    seat and validity are looked up at the door, never read from the code — a ticket can be
+    cancelled after it was printed. Upper case + digits only, so it stays a coarse QR version 2.
+  - **Cancelling voids, never deletes**, so a scan says "cancelled" rather than "unknown". A seat
+    gets a ticket only while its booking holds it (`ticket_booking_seats`) — the late-payment
+    edge case in `markPaid` can't print a second ticket for one chair.
+  - `POST /api/hosted-events/tickets/verify` answers `valid | void | unknown` with the ticket's
+    details — read-only, the foundation for the **door-scanning portal** (not built yet). That
+    portal adds admitting someone (a `checked_in_at`, refusing a second scan) on top.
+- **Sell at the counter** (the seat map editor's last tool): staff pick a walk-in customer's seats
+  and standing places, type a name (mobile/email optional), and `POST /:id/counter-sale` makes a
+  booking paid in cash on the spot (`ticket_bookings.channel = 'counter'`) whose PDF downloads to
+  print. It may sell a seat marked **sold or held by hand** — that is how someone who paid at the
+  shop before tickets existed gets one — but never a seat a booking holds. A standing area's
+  hand-counted *sold* stays out of what the counter can sell; lower it on the map first. It sells
+  from the saved map, so it waits while the editor has unsaved changes.
 
 ## Backend
 
@@ -845,6 +874,7 @@ a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording eac
 `event_seatmaps` (the seat map + tickets of an AS-hosted event — see *AS-hosted events*),
 `ticket_bookings` + `ticket_booking_seats` (bookings made from those maps — 24-hour holds, cash or
 Whish; the second table's `(event_id, seat_id)` key is what makes a double booking impossible),
+`tickets` (one per admission of a paid booking: printed serial + QR secret, voided on cancel),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 

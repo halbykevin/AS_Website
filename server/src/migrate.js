@@ -518,6 +518,39 @@ CREATE TABLE IF NOT EXISTS ticket_booking_seats (
   PRIMARY KEY (event_id, seat_id)
 );
 
+-- Where a booking was made: 'online' on the ticketing hub, or 'counter' — sold
+-- in person at AS Company by staff, from the seat map in the admin.
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'online';
+
+-- An event's own touches on its printed ticket: { imageUrl, venueAr } (src/tickets.js).
+ALTER TABLE event_seatmaps ADD COLUMN IF NOT EXISTS ticket JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- The tickets of a paid booking, one per admission: a seat, or one place in a
+-- standing area (src/tickets.js). serial is printed on the ticket; secret is
+-- only in its QR code (AST1:<serial>:<secret>), which is what makes a code
+-- unforgeable. Issued when the booking is paid; voided, never deleted, when it
+-- is cancelled, so a scanner can tell a cancelled ticket from one we never
+-- issued. section/row/seat are what was printed — renaming a row later doesn't
+-- rewrite a ticket already in someone's hand.
+CREATE TABLE IF NOT EXISTS tickets (
+  id SERIAL PRIMARY KEY,
+  serial TEXT UNIQUE NOT NULL,
+  secret TEXT NOT NULL,
+  booking_id INTEGER NOT NULL REFERENCES ticket_bookings(id) ON DELETE CASCADE,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  seat_id TEXT,
+  zone_id TEXT,
+  section TEXT NOT NULL DEFAULT '',
+  row_label TEXT NOT NULL DEFAULT '',
+  seat_num TEXT NOT NULL DEFAULT '',
+  price NUMERIC(12,2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'valid',
+  voided_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS tickets_booking ON tickets(booking_id);
+CREATE INDEX IF NOT EXISTS tickets_event ON tickets(event_id, status);
+
 -- Contact form submissions from the public /contact page. Emailed to the staff
 -- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.
 CREATE TABLE IF NOT EXISTS contact_messages (

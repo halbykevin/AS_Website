@@ -24,13 +24,18 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | PUT | `/api/events/:id/publish` | admin | `{ published }` — put an event live or take it down; tells the ticketing hub at once (`hubRefreshed` in the answer) |
 | GET | `/api/events/:slug/seatmap` | — | The hall for the ticketing hub's seat picker: a partner's, read live, or — for an event AS hosts — the published map from `event_seatmaps` (`source: 'as'`, with `grid`) |
 | GET | `/api/hosted-events` | admin | Every AS-hosted event's seat map, summarised (published, total / sold / available) |
-| GET/PUT/DELETE | `/api/hosted-events/:id/seatmap` | admin | One hosted event's seat map: `{ published, layout, baseUpdatedAt }` — tiers, seats, stage/entrance/standing areas. PUT re-checks the layout (`seatLayout.js`), refuses a synced event, a stale page and the removal of a booked seat (409) |
+| GET/PUT/DELETE | `/api/hosted-events/:id/seatmap` | admin | One hosted event's seat map: `{ published, layout, ticket, baseUpdatedAt }` — tiers, seats, stage/entrance/standing areas, and the printed ticket's `{ imageUrl, venueAr }` (absent = kept). PUT re-checks the layout (`seatLayout.js`), refuses a synced event, a stale page and the removal of a booked seat (409) |
 | POST | `/api/events/:slug/bookings` | — | Book seats/standing tickets on a hosted event `{ seats, zones, name, mobile, email, payment: cash\|whish }` → `{ code, token, link, collectUrl? }`; held 24 h. 409 if a seat was just taken (`taken`) |
-| GET | `/api/bookings/:code?t=` | — | The customer's booking (token required) — re-checks Whish if a payment was started |
+| GET | `/api/bookings/:code?t=` | — | The customer's booking (token required) — re-checks Whish if a payment was started; a paid one carries `tickets` (serial, seat, QR code as SVG) |
+| GET | `/api/bookings/:code/tickets.pdf?t=` | — | A paid booking's tickets, one PDF page each (409 until paid) |
 | POST | `/api/bookings/:code/pay?t=` | — | Start (or resume) the Whish payment for a reservation → `{ collectUrl }` |
 | GET | `/api/bookings/whish/callback`, `/whish/return` | — | Whish's server callback and the customer's way back; both ask Whish for the status before marking anything paid |
 | GET | `/api/hosted-events/:id/bookings` | admin | Every booking on a hosted event |
-| POST | `/api/hosted-events/bookings/:id/paid` · `/cancel` · `/resend` | admin | Cash received · cancel (seats freed) · send the customer's email again |
+| POST | `/api/hosted-events/bookings/:id/paid` · `/cancel` · `/resend` | admin | Cash received · cancel (seats freed, tickets voided) · send the customer's email again |
+| POST | `/api/hosted-events/:id/counter-sale` | admin | Sold in person at AS Company `{ seats, zones, name, mobile?, email? }` → the booking, paid in cash with its tickets issued. May sell seats marked sold/held by hand, never one a booking holds (409) |
+| GET | `/api/hosted-events/bookings/:id/tickets.pdf` | admin | A paid booking's tickets, to print |
+| POST | `/api/hosted-events/:id/ticket-preview` | admin | A watermarked sample ticket from `{ ticket: { imageUrl, venueAr } }` (saved or not) |
+| POST | `/api/hosted-events/tickets/verify` | admin | What a scanned QR code is: `{ code }` → `{ result: valid\|void\|unknown, ticket? }` (holder, seat, booking, event). Read-only — for the door portal |
 | GET | `/api/banners` | — | List homepage banners (slideshow) |
 | POST/PUT/DELETE | `/api/banners[/:id]` | admin | Manage banners |
 | GET | `/api/sections` | — | List custom homepage sections |

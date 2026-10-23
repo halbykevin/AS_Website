@@ -32,6 +32,10 @@ export const createBooking = (slug, body) =>
 
 export const bookingPath = (code, token) => `/bookings/${encodeURIComponent(code)}?t=${encodeURIComponent(token)}`
 
+/** A paid booking's tickets as one PDF, straight from the API (token-guarded like the page). */
+export const ticketsPdfUrl = (code, token) =>
+  `${API}/api/bookings/${encodeURIComponent(code)}/tickets.pdf?t=${encodeURIComponent(token)}`
+
 /** The booking as its owner sees it, or null. Server-side, never cached. */
 export async function getBooking(code, token) {
   try {

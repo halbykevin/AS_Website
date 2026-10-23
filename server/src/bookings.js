@@ -5,6 +5,11 @@
 // (Whish, the same merchant account as store.as.com.lb) or in cash at AS
 // Company, where staff mark the booking paid in the admin. A reservation that
 // isn't paid in time expires and its seats go back on sale on their own.
+// Staff can also sell seats in person at the counter, from the seat map in the
+// admin: a booking that is paid the moment it is made.
+//
+// Paid, a booking gets its tickets (tickets.js): a PDF with a QR code per
+// seat, emailed to the customer and on their booking page.
 //
 // Nobody can book a seat someone else holds — not even at the same instant.
 // Every booking is made inside a transaction that locks the event's seat map
@@ -24,9 +29,12 @@ import { pool, query } from './db.js'
 import { NO_HOLDS, sanitizeLayout, seatIndex, zoneLeft } from './seatLayout.js'
 import { createPayment, getCollectStatus, whishEnabled } from './whish.js'
 import { sendBookingEmail, sendBookingStaffEmail } from './mailer.js'
+import { bookingPdf, ensureTickets, previewPdf, ticketCards, verifyTicket, voidTickets } from './tickets.js'
 
 export const HOLD_HOURS = 24
 export const MAX_TICKETS = 10
+// A school or a family buying at the shop counter can take more at once.
+const MAX_COUNTER_TICKETS = 50
 // Unpaid reservations one mobile number may have open on one event at once —
 // enough for a family booking twice, not enough to sit on a hall for a day.
 const MAX_OPEN_PER_MOBILE = 2
@@ -201,6 +209,7 @@ const adminBookingJson = (b) => ({
   needsAttention: b.needs_attention || '',
   cancelledAt: b.cancelled_at,
   onlineStarted: Boolean(b.whish_started_at),
+  channel: b.channel || 'online',
 })
 
 const forEmail = (b) => ({
@@ -217,11 +226,20 @@ export function setShopSource(fn) {
   getShop = fn
 }
 
+// The tickets ride along with the "paid" email. If they can't be drawn, the
+// email still goes — its link leads to the booking page, which shows them.
+const ticketAttachment = (b) =>
+  bookingPdf(b.id)
+    .then((pdf) => (pdf ? [{ filename: pdf.filename, content: pdf.buffer, contentType: 'application/pdf' }] : []))
+    .catch((e) => {
+      console.error(`[bookings] ${b.code}: tickets PDF for the email:`, e?.message || e)
+      return []
+    })
+
 function mail(kind, b, { staff = false } = {}) {
   const payload = forEmail(b)
-  getShop()
-    .catch(() => null)
-    .then((shop) => sendBookingEmail(kind, payload, shop))
+  Promise.all([getShop().catch(() => null), kind === 'paid' ? ticketAttachment(b) : []])
+    .then(([shop, attachments]) => sendBookingEmail(kind, payload, shop, attachments))
     .catch((e) => console.error(`[bookings] ${kind} email for ${b.code}:`, e?.message || e))
   if (staff) {
     sendBookingStaffEmail(kind, payload).catch((e) =>
@@ -326,6 +344,9 @@ export async function markPaid(bookingId, method) {
   }
   const full = await loadBooking('b.id = $1', [paid.id])
   console.log(`[bookings] ${full.code}: PAID (${method})${full.needs_attention ? ` — ${full.needs_attention}` : ''}`)
+  // The payment stands whatever happens here; a failed issue is retried the
+  // first time anyone asks for the tickets.
+  await ensureTickets(full.id).catch((e) => console.error(`[bookings] ${full.code}: issuing tickets:`, e?.message || e))
   mail('paid', full, { staff: true })
   return { changed: true, booking: full }
 }
@@ -358,8 +379,14 @@ const seatLabel = (s) => `${s.row}${s.num}`
  * Hold the requested seats and standing tickets for one customer, all or
  * nothing, under the event's lock. Prices come from the layout, never from
  * the request.
+ *
+ * `counter`: staff selling in person at AS Company. The booking is paid on the
+ * spot, whether or not the hub's seat picking is on, and staff may sell a seat
+ * they had marked sold or held by hand — that is how someone who bought at the
+ * shop before tickets existed gets one. A seat a live booking holds is still
+ * nobody else's to sell.
  */
-async function createBooking(ev, input) {
+async function createBooking(ev, input, { counter = false } = {}) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -367,7 +394,8 @@ async function createBooking(ev, input) {
       'SELECT layout, published FROM event_seatmaps WHERE event_id = $1 FOR UPDATE',
       [ev.id],
     )
-    if (!map.rows[0]?.published) throw new Refusal(409, 'Online booking isn’t open for this event.')
+    if (!map.rows[0]) throw new Refusal(409, 'This event has no seat map yet.')
+    if (!counter && !map.rows[0].published) throw new Refusal(409, 'Online booking isn’t open for this event.')
     await expireBookings(db(client), ev.id)
 
     const layout = sanitizeLayout(map.rows[0].layout)
@@ -379,15 +407,17 @@ async function createBooking(ev, input) {
     for (const id of input.seats) {
       const s = index.get(id)
       if (!s) throw new Refusal(409, 'The seat map has changed — please pick your seats again.', { reload: true })
-      if (s.status !== 'free' || holds.seats.has(id)) taken.push(s)
+      if (holds.seats.has(id) || (!counter && s.status !== 'free')) taken.push(s)
       else seats.push({ id, row: s.row, num: s.num, tier: s.tierInfo.name, price: s.tierInfo.price })
     }
     if (taken.length) {
+      const which = `${taken.length > 1 ? 'Seats' : 'Seat'} ${taken.map(seatLabel).join(', ')}`
+      const were = taken.length > 1 ? 'were' : 'was'
       throw new Refusal(
         409,
-        `${taken.length > 1 ? 'Seats' : 'Seat'} ${taken.map(seatLabel).join(', ')} ${
-          taken.length > 1 ? 'were' : 'was'
-        } just taken by someone else — please pick another.`,
+        counter
+          ? `${which} ${taken.length > 1 ? 'are' : 'is'} already booked — pick another.`
+          : `${which} ${were} just taken by someone else — please pick another.`,
         { taken: taken.map((s) => s.id) },
       )
     }
@@ -398,9 +428,13 @@ async function createBooking(ev, input) {
       if (!area) throw new Refusal(409, 'The seat map has changed — please choose again.', { reload: true })
       const left = zoneLeft(area, holds)
       if (want.qty > left) {
+        // Places counted as sold by hand are already out of `left`: to print
+        // tickets for them, staff lower that count on the map first.
+        const byHand =
+          counter && area.sold ? ` ${area.sold} are marked sold by hand — lower that on the map to print tickets for them.` : ''
         throw new Refusal(
           409,
-          left ? `Only ${left} ${area.label} ticket${left > 1 ? 's are' : ' is'} left.` : `${area.label} is sold out.`,
+          (left ? `Only ${left} ${area.label} ticket${left > 1 ? 's are' : ' is'} left.` : `${area.label} is sold out.`) + byHand,
           { reload: true },
         )
       }
@@ -408,15 +442,17 @@ async function createBooking(ev, input) {
       zones.push({ id: area.id, name: area.label, qty: want.qty, price: tier.price })
     }
 
-    const open = await client.query(
-      `SELECT count(*)::int AS n FROM ticket_bookings WHERE event_id = $1 AND mobile = $2 AND status = 'reserved'`,
-      [ev.id, input.mobile],
-    )
-    if (open.rows[0].n >= MAX_OPEN_PER_MOBILE) {
-      throw new Refusal(
-        429,
-        'This mobile number already has reservations waiting for payment for this event — pay or let one expire first.',
+    if (!counter) {
+      const open = await client.query(
+        `SELECT count(*)::int AS n FROM ticket_bookings WHERE event_id = $1 AND mobile = $2 AND status = 'reserved'`,
+        [ev.id, input.mobile],
       )
+      if (open.rows[0].n >= MAX_OPEN_PER_MOBILE) {
+        throw new Refusal(
+          429,
+          'This mobile number already has reservations waiting for payment for this event — pay or let one expire first.',
+        )
+      }
     }
 
     const total =
@@ -425,6 +461,7 @@ async function createBooking(ev, input) {
       ) / 100
     const quantity = seats.length + zones.reduce((n, z) => n + z.qty, 0)
     const free = total === 0
+    const paidNow = free || counter
 
     let code = newCode()
     for (let i = 0; i < 5; i++) {
@@ -435,13 +472,14 @@ async function createBooking(ev, input) {
     const ins = await client.query(
       `INSERT INTO ticket_bookings
          (code, token, event_id, full_name, mobile, email, seats, zones, quantity, total, currency,
-          status, payment_method, expires_at, paid_at, ip)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now() + interval '${HOLD_HOURS} hours', $14, $15)
+          status, payment_method, expires_at, paid_at, ip, channel)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now() + interval '${HOLD_HOURS} hours', $14, $15, $16)
        RETURNING *`,
       [
         code, newToken(), ev.id, input.name, input.mobile, input.email,
         JSON.stringify(seats), JSON.stringify(zones), quantity, total, layout.currency,
-        free ? 'paid' : 'reserved', free ? 'free' : input.payment, free ? new Date() : null, input.ip,
+        paidNow ? 'paid' : 'reserved', free ? 'free' : counter ? 'cash' : input.payment, paidNow ? new Date() : null,
+        input.ip, counter ? 'counter' : 'online',
       ],
     )
     const booking = ins.rows[0]
@@ -465,6 +503,30 @@ async function createBooking(ev, input) {
   }
 }
 
+/** What a request asks for: seat ids, and standing areas by quantity. */
+function parsePicks(body) {
+  const seats = [...new Set((Array.isArray(body.seats) ? body.seats : []).map((s) => String(s).slice(0, 16)))]
+  const zoneQty = new Map()
+  for (const z of Array.isArray(body.zones) ? body.zones : []) {
+    const qty = Math.floor(Number(z?.qty))
+    const id = String(z?.id || '').slice(0, 24)
+    if (id && qty > 0) zoneQty.set(id, (zoneQty.get(id) || 0) + qty)
+  }
+  const zones = [...zoneQty].map(([id, qty]) => ({ id, qty }))
+  return { seats, zones, count: seats.length + zones.reduce((n, z) => n + z.qty, 0) }
+}
+
+const cleanName = (raw) => String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+
+function sendPdf(res, pdf) {
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${pdf.filename}"`,
+    'Cache-Control': 'no-store',
+  })
+  res.send(pdf.buffer)
+}
+
 // ------------------------------------------------------- public routes ---
 
 // POST /api/events/:slug/bookings
@@ -477,22 +539,14 @@ bookingsRouter.post(
     if (String(b.website || '').trim()) return res.status(201).json({ ok: true }) // honeypot
     if (throttled(req.ip)) return res.status(429).json({ error: 'Too many bookings from here — please try again in a few minutes.' })
 
-    const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+    const name = cleanName(b.name)
     const mobile = normalizeMobile(b.mobile)
     const email = normalizeEmail(b.email)
     if (name.length < 2) return res.status(400).json({ error: 'Please enter your full name.' })
     if (!mobile) return res.status(400).json({ error: 'Please enter a valid mobile number.' })
     if (!email) return res.status(400).json({ error: 'Please enter a valid email address — your tickets are sent there.' })
 
-    const seats = [...new Set((Array.isArray(b.seats) ? b.seats : []).map((s) => String(s).slice(0, 16)))]
-    const zoneQty = new Map()
-    for (const z of Array.isArray(b.zones) ? b.zones : []) {
-      const qty = Math.floor(Number(z?.qty))
-      const id = String(z?.id || '').slice(0, 24)
-      if (id && qty > 0) zoneQty.set(id, (zoneQty.get(id) || 0) + qty)
-    }
-    const zones = [...zoneQty].map(([id, qty]) => ({ id, qty }))
-    const count = seats.length + zones.reduce((n, z) => n + z.qty, 0)
+    const { seats, zones, count } = parsePicks(b)
     if (!count) return res.status(400).json({ error: 'Pick at least one seat or ticket.' })
     if (count > MAX_TICKETS) return res.status(400).json({ error: `You can book up to ${MAX_TICKETS} tickets at a time.` })
 
@@ -519,6 +573,9 @@ bookingsRouter.post(
 
     const full = await loadBooking('b.id = $1', [booking.id])
     console.log(`[bookings] ${full.code}: ${full.status} — ${full.quantity} ticket(s), ${full.total} ${full.currency}, ${payment}`)
+    if (full.status === 'paid') {
+      await ensureTickets(full.id).catch((e) => console.error(`[bookings] ${full.code}: issuing tickets:`, e?.message || e))
+    }
     mail(full.status === 'paid' ? 'paid' : 'reserved', full, { staff: true })
 
     let collectUrl = ''
@@ -587,7 +644,19 @@ bookingsRouter.get(
       b = await loadBooking('b.id = $1', [b.id])
     }
     res.set('Cache-Control', 'no-store')
-    res.json(bookingJson(b))
+    res.json({ ...bookingJson(b), tickets: b.status === 'paid' ? await ticketCards(b.id) : [] })
+  }),
+)
+
+// GET /api/bookings/:code/tickets.pdf?t=<token> — a paid booking's tickets.
+bookingsRouter.get(
+  '/bookings/:code/tickets.pdf',
+  ah(async (req, res) => {
+    const b = await bookingFor(req)
+    if (!b) return res.status(404).json({ error: 'Booking not found' })
+    const pdf = b.status === 'paid' ? await bookingPdf(b.id) : null
+    if (!pdf) return res.status(409).json({ error: 'Tickets are issued once a booking is paid.' })
+    sendPdf(res, pdf)
   }),
 )
 
@@ -651,6 +720,7 @@ adminBookingsRouter.post(
     )
     if (!rows[0]) return res.status(409).json({ error: 'Only a reserved or paid booking can be cancelled.' })
     await query('DELETE FROM ticket_booking_seats WHERE booking_id = $1', [rows[0].id])
+    await voidTickets(rows[0].id)
     const b = await loadBooking('b.id = $1', [rows[0].id])
     console.log(`[bookings] ${b.code}: cancelled by staff`)
     mail('cancelled', b)
@@ -666,6 +736,77 @@ adminBookingsRouter.post(
     const kind = { reserved: 'reserved', paid: 'paid', expired: 'expired', cancelled: 'cancelled' }[b.status]
     mail(kind, b)
     res.json({ ok: true })
+  }),
+)
+
+// POST /api/hosted-events/:id/counter-sale
+//   { seats: [seatId], zones: [{ id, qty }], name, mobile?, email? }
+// Someone buying in person at AS Company: a booking paid in cash on the spot,
+// its tickets issued at once for staff to print. Mobile and email are optional
+// — given an email, the customer gets their tickets there too.
+adminBookingsRouter.post(
+  '/:id/counter-sale',
+  ah(async (req, res) => {
+    const b = req.body || {}
+    const name = cleanName(b.name)
+    const mobile = b.mobile ? normalizeMobile(b.mobile) : ''
+    const email = b.email ? normalizeEmail(b.email) : ''
+    if (name.length < 2) return res.status(400).json({ error: 'Enter the customer’s name — it is printed on the tickets.' })
+    if (b.mobile && !mobile) return res.status(400).json({ error: 'That mobile number doesn’t look right — fix it or leave it empty.' })
+    if (b.email && !email) return res.status(400).json({ error: 'That email doesn’t look right — fix it or leave it empty.' })
+
+    const { seats, zones, count } = parsePicks(b)
+    if (!count) return res.status(400).json({ error: 'Pick at least one seat or ticket.' })
+    if (count > MAX_COUNTER_TICKETS) {
+      return res.status(400).json({ error: `Up to ${MAX_COUNTER_TICKETS} tickets at a time — split a bigger order in two.` })
+    }
+
+    const { rows } = await query(`SELECT id, slug, title FROM events WHERE id = $1 AND source = ''`, [Number(req.params.id) || 0])
+    if (!rows[0]) return res.status(404).json({ error: 'Event not found' })
+    let booking
+    try {
+      booking = await createBooking(rows[0], { seats, zones, name, mobile, email, ip: '' }, { counter: true })
+    } catch (err) {
+      if (err instanceof Refusal) return res.status(err.status).json({ error: err.message, ...err.extra })
+      throw err
+    }
+    await ensureTickets(booking.id)
+    const full = await loadBooking('b.id = $1', [booking.id])
+    console.log(`[bookings] ${full.code}: sold at the counter — ${full.quantity} ticket(s), ${full.total} ${full.currency}`)
+    if (email) mail('paid', full)
+    res.status(201).json(adminBookingJson(full))
+  }),
+)
+
+// GET /api/hosted-events/bookings/:bid/tickets.pdf — to print or resend by hand.
+adminBookingsRouter.get(
+  '/bookings/:bid/tickets.pdf',
+  ah(async (req, res) => {
+    const pdf = await bookingPdf(Number(req.params.bid) || 0)
+    if (!pdf) return res.status(409).json({ error: 'Only a paid booking has tickets.' })
+    sendPdf(res, pdf)
+  }),
+)
+
+// POST /api/hosted-events/:id/ticket-preview { ticket: { imageUrl, venueAr } }
+// A watermarked sample, from the design on screen — saved or not.
+adminBookingsRouter.post(
+  '/:id/ticket-preview',
+  ah(async (req, res) => {
+    const pdf = await previewPdf(Number(req.params.id) || 0, req.body?.ticket)
+    if (!pdf) return res.status(404).json({ error: 'Event not found' })
+    sendPdf(res, pdf)
+  }),
+)
+
+// POST /api/hosted-events/tickets/verify { code } — what a scanned QR code is:
+// { result: 'valid' | 'void' | 'unknown', ticket? }. Read-only; the door
+// portal builds admitting someone on top of it.
+adminBookingsRouter.post(
+  '/tickets/verify',
+  ah(async (req, res) => {
+    res.set('Cache-Control', 'no-store')
+    res.json(await verifyTicket(req.body?.code))
   }),
 )
 

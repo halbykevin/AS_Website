@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { getShop } from '@/lib/api'
-import { getBooking } from '@/lib/bookings'
+import { getBooking, ticketsPdfUrl } from '@/lib/bookings'
 import { formatDate } from '@/lib/events'
 import { hoursSentence } from '@/lib/hours'
 import { money } from '@/lib/seatmap'
@@ -74,7 +74,9 @@ export default async function BookingPage({ params, searchParams }) {
         </h1>
         <p className="mt-2 text-sm leading-relaxed opacity-80">
           {b.status === 'paid' &&
-            'Your tickets are paid and confirmed — show your booking code at the entrance. We’ve emailed it to you too.'}
+            `Your tickets are paid and confirmed — show their QR codes at the entrance.${
+              b.email ? ' We’ve emailed them to you too.' : ''
+            }`}
           {b.status === 'reserved' &&
             `Held for you until ${beirut(b.expiresAt)} (Beirut time). Pay before then to keep them — if it isn’t paid in time, the seats are released automatically.`}
           {b.status === 'expired' && 'It wasn’t paid in time, so its seats were released. You can book again while seats last.'}
@@ -97,6 +99,45 @@ export default async function BookingPage({ params, searchParams }) {
         <p className="text-xs font-semibold uppercase tracking-widest text-as-charcoal/45">Booking code</p>
         <p className="mt-1 font-mono text-3xl font-extrabold tracking-[0.15em] text-as-red">{b.code}</p>
       </div>
+
+      {b.status === 'paid' && b.tickets?.length > 0 && (
+        <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-extrabold text-as-charcoal">
+              Your ticket{b.tickets.length > 1 ? 's' : ''}
+            </h2>
+            <a
+              href={ticketsPdfUrl(b.code, token)}
+              className="inline-flex items-center gap-2 rounded-full bg-as-red px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" /></svg>
+              Download (PDF)
+            </a>
+          </div>
+          <p className="mt-1 text-sm text-as-charcoal/60">
+            One QR code per person — show it at the entrance, on your phone or printed.
+          </p>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {b.tickets.map((t) => (
+              <li key={t.serial} className="flex items-center gap-4 rounded-xl p-3 ring-1 ring-black/10">
+                {/* The API's own QR drawing, as an image so nothing in it can run. */}
+                <img
+                  src={`data:image/svg+xml;utf8,${encodeURIComponent(t.qr)}`}
+                  alt={`QR code of ticket ${t.serial}`}
+                  className="h-28 w-28 shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-as-charcoal">
+                    {t.standing ? t.section : `Row ${t.row} · Seat ${t.seat}`}
+                  </p>
+                  {!t.standing && <p className="text-xs text-as-charcoal/55">{t.section}</p>}
+                  <p className="mt-1.5 font-mono text-xs text-as-charcoal/55">{t.serial}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
         <h2 className="text-lg font-extrabold text-as-charcoal">{b.event.title}</h2>
