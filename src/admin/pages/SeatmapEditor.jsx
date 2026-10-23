@@ -69,6 +69,8 @@ export default function SeatmapEditor() {
   const [sale, setSale] = useState(() => new Set())
   // The printed ticket's picture and Arabic venue name; saved with the map.
   const [ticket, setTicket] = useState({ imageUrl: '', venueAr: '' })
+  // Whether the server sends paid bookings their tickets on WhatsApp.
+  const [whatsappOn, setWhatsappOn] = useState(false)
   const gridRef = useRef(null)
   // The drag lives in a ref as well as in state: a quick click releases before
   // React has re-rendered with the press, and the release must still see it.
@@ -88,6 +90,7 @@ export default function SeatmapEditor() {
         setBookedZones(data.bookedZones || {})
         setTier(data.layout.tiers[0]?.id || '')
         setTicket(data.ticket || { imageUrl: '', venueAr: '' })
+        setWhatsappOn(Boolean(data.whatsapp))
       })
       .catch((err) => alive && setLoadError(err?.message || 'Could not load the seat map.'))
     adminApi.listBookings(id).then((list) => alive && setBookings(list)).catch(() => {})
@@ -713,6 +716,7 @@ export default function SeatmapEditor() {
           picked={picked}
           bookedZones={bookedZones}
           dirty={dirty}
+          whatsappOn={whatsappOn}
           onUnpick={(key) =>
             setSale((prev) => {
               const next = new Set(prev)
@@ -756,6 +760,7 @@ export default function SeatmapEditor() {
 
       <Bookings
         bookings={bookings}
+        whatsappOn={whatsappOn}
         onChanged={(text) => {
           setMsg({ kind: 'success', text })
           refreshBookings().catch(() => {})
@@ -1088,7 +1093,7 @@ function Summary({ summary, currency }) {
  * booking is made paid, its tickets download as one PDF to print, and an email
  * (if given) gets them too. Sold from the saved map, so unsaved edits wait.
  */
-function CounterSale({ eventId, layout, picked, bookedZones, dirty, onUnpick, onSold, onError }) {
+function CounterSale({ eventId, layout, picked, bookedZones, dirty, whatsappOn, onUnpick, onSold, onError }) {
   const [form, setForm] = useState({ name: '', mobile: '', email: '' })
   const [qty, setQty] = useState({})
   const [busy, setBusy] = useState(false)
@@ -1124,10 +1129,14 @@ function CounterSale({ eventId, layout, picked, bookedZones, dirty, onUnpick, on
         () => true,
         () => false,
       )
+      const copies = [
+        booking.email && `emailed to ${booking.email}`,
+        whatsappOn && booking.mobile && `sent on WhatsApp to +${booking.mobile}`,
+      ].filter(Boolean)
       onSold(
         `${booking.code} — ${count} ticket${count > 1 ? 's' : ''} sold to ${booking.name}. ` +
           (printed ? 'The tickets have downloaded — print them for the customer.' : 'Download its tickets from Bookings below.') +
-          (booking.email ? ` They're emailed to ${booking.email} too.` : ''),
+          (copies.length ? ` They're ${copies.join(' and ')} too.` : ''),
       )
     } catch (err) {
       onError(err?.message || 'The sale didn’t go through.')
@@ -1198,7 +1207,7 @@ function CounterSale({ eventId, layout, picked, bookedZones, dirty, onUnpick, on
           <Field label="Customer’s name" hint="Printed on every ticket.">
             <TextInput required minLength={2} maxLength={80} value={form.name} onChange={set('name')} />
           </Field>
-          <Field label="Mobile" hint="Optional.">
+          <Field label="Mobile" hint={whatsappOn ? 'Optional — they get the tickets on WhatsApp.' : 'Optional.'}>
             <TextInput type="tel" value={form.mobile} onChange={set('mobile')} placeholder="03 123 456" />
           </Field>
           <Field label="Email" hint="Optional — they get the tickets there too.">
@@ -1360,7 +1369,7 @@ function bookingWhen(b) {
  * resend a lost email, and print a paid booking's tickets. Seats come back on
  * sale the moment a booking is cancelled or its 24 hours run out.
  */
-function Bookings({ bookings, onChanged, onError }) {
+function Bookings({ bookings, whatsappOn, onChanged, onError }) {
   const waiting = bookings.filter((b) => b.status === 'reserved').length
   const [view, setView] = useState('')
   const [q, setQ] = useState('')
@@ -1382,19 +1391,23 @@ function Bookings({ bookings, onChanged, onError }) {
       paid: `Mark ${b.code} as paid in cash (${formatMoney(b.total, b.currency)})? ${b.name} gets their confirmation email.`,
       cancel: `Cancel ${b.code}? Its seats go back on sale${b.status === 'paid' ? ' — refund the customer separately' : ''}.`,
       resend: `Send ${b.name} their ${STATUS_LABEL[b.status].toLowerCase()} email again?`,
+      whatsapp: `Send ${b.name} their tickets on WhatsApp (+${b.mobile})?`,
     }[kind]
     if (!confirm(ask)) return
     setBusy(b.id)
     try {
       if (kind === 'paid') await adminApi.markBookingPaid(b.id)
       else if (kind === 'cancel') await adminApi.cancelBooking(b.id)
+      else if (kind === 'whatsapp') await adminApi.sendBookingWhatsApp(b.id)
       else await adminApi.resendBookingEmail(b.id)
       onChanged(
         kind === 'paid'
           ? `${b.code} is paid.`
           : kind === 'cancel'
             ? `${b.code} is cancelled — its seats are free.`
-            : 'Email sent.',
+            : kind === 'whatsapp'
+              ? `Tickets sent on WhatsApp to +${b.mobile}.`
+              : 'Email sent.',
       )
     } catch (err) {
       onError(err?.message || 'That didn’t work.')
@@ -1482,11 +1495,22 @@ function Bookings({ bookings, onChanged, onError }) {
                         .join(' · ')}
                     </p>
                     {b.needsAttention && <p className="text-xs font-semibold text-as-red">⚠ {b.needsAttention}</p>}
+                    {b.status === 'paid' && b.whatsapp?.status === 'sent' && (
+                      <p className="text-xs text-green-700">✓ Tickets sent on WhatsApp {beirut(b.whatsapp.at)}</p>
+                    )}
+                    {b.status === 'paid' && b.whatsapp?.status === 'failed' && (
+                      <p className="text-xs font-semibold text-as-red">⚠ WhatsApp not sent — {b.whatsapp.error}</p>
+                    )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {b.status === 'paid' && (
                       <Button onClick={() => download(b)} disabled={busy === b.id} className="px-3 py-1.5">
                         Download tickets
+                      </Button>
+                    )}
+                    {b.status === 'paid' && b.mobile && whatsappOn && (
+                      <Button variant="ghost" onClick={() => act(b, 'whatsapp')} disabled={busy === b.id} className="px-3 py-1.5">
+                        {b.whatsapp?.status === 'sent' ? 'Resend on WhatsApp' : 'Send on WhatsApp'}
                       </Button>
                     )}
                     {(b.status === 'reserved' || b.status === 'expired') && (

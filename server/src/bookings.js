@@ -9,7 +9,8 @@
 // admin: a booking that is paid the moment it is made.
 //
 // Paid, a booking gets its tickets (tickets.js): a PDF with a QR code per
-// seat, emailed to the customer and on their booking page.
+// seat, emailed to the customer, sent on WhatsApp (ticketsWhatsApp.js) and on
+// their booking page.
 //
 // Nobody can book a seat someone else holds — not even at the same instant.
 // Every booking is made inside a transaction that locks the event's seat map
@@ -30,6 +31,7 @@ import { NO_HOLDS, sanitizeLayout, seatIndex, zoneLeft } from './seatLayout.js'
 import { createPayment, getCollectStatus, whishEnabled } from './whish.js'
 import { sendBookingEmail, sendBookingStaffEmail } from './mailer.js'
 import { bookingPdf, ensureTickets, previewPdf, ticketCards, verifyTicket, voidTickets } from './tickets.js'
+import { sendTicketsWhatsApp, ticketsWhatsAppEnabled } from './ticketsWhatsApp.js'
 
 export const HOLD_HOURS = 24
 export const MAX_TICKETS = 10
@@ -210,6 +212,7 @@ const adminBookingJson = (b) => ({
   cancelledAt: b.cancelled_at,
   onlineStarted: Boolean(b.whish_started_at),
   channel: b.channel || 'online',
+  whatsapp: { status: b.whatsapp_status || '', at: b.whatsapp_at, error: b.whatsapp_error || '' },
 })
 
 const forEmail = (b) => ({
@@ -246,6 +249,12 @@ function mail(kind, b, { staff = false } = {}) {
       console.error(`[bookings] staff ${kind} email for ${b.code}:`, e?.message || e),
     )
   }
+}
+
+// …and on WhatsApp, once paid. Never awaited: the outcome is logged and kept
+// on the booking, where staff see it and can send again.
+function whatsappTickets(b) {
+  if (ticketsWhatsAppEnabled() && b.mobile) sendTicketsWhatsApp(b.id).catch(() => {})
 }
 
 // ----------------------------------------------------------- payments ---
@@ -348,6 +357,7 @@ export async function markPaid(bookingId, method) {
   // first time anyone asks for the tickets.
   await ensureTickets(full.id).catch((e) => console.error(`[bookings] ${full.code}: issuing tickets:`, e?.message || e))
   mail('paid', full, { staff: true })
+  whatsappTickets(full)
   return { changed: true, booking: full }
 }
 
@@ -575,6 +585,7 @@ bookingsRouter.post(
     console.log(`[bookings] ${full.code}: ${full.status} — ${full.quantity} ticket(s), ${full.total} ${full.currency}, ${payment}`)
     if (full.status === 'paid') {
       await ensureTickets(full.id).catch((e) => console.error(`[bookings] ${full.code}: issuing tickets:`, e?.message || e))
+      whatsappTickets(full)
     }
     mail(full.status === 'paid' ? 'paid' : 'reserved', full, { staff: true })
 
@@ -774,7 +785,26 @@ adminBookingsRouter.post(
     const full = await loadBooking('b.id = $1', [booking.id])
     console.log(`[bookings] ${full.code}: sold at the counter — ${full.quantity} ticket(s), ${full.total} ${full.currency}`)
     if (email) mail('paid', full)
+    whatsappTickets(full)
     res.status(201).json(adminBookingJson(full))
+  }),
+)
+
+// POST /api/hosted-events/bookings/:bid/whatsapp — send a paid booking its
+// tickets on WhatsApp now (again, or for the first time). Waits for Meta's
+// answer, so staff see a refusal — "not a WhatsApp number" — there and then.
+adminBookingsRouter.post(
+  '/bookings/:bid/whatsapp',
+  ah(async (req, res) => {
+    if (!ticketsWhatsAppEnabled()) return res.status(503).json({ error: 'WhatsApp isn’t set up on the server yet.' })
+    const id = Number(req.params.bid) || 0
+    try {
+      const result = await sendTicketsWhatsApp(id)
+      if (result.skipped) return res.status(409).json({ error: `Nothing sent — ${result.skipped}.` })
+    } catch (err) {
+      return res.status(502).json({ error: err?.message || 'WhatsApp didn’t take the message.' })
+    }
+    res.json(adminBookingJson(await loadBooking('b.id = $1', [id])))
   }),
 )
 

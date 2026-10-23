@@ -522,6 +522,14 @@ CREATE TABLE IF NOT EXISTS ticket_booking_seats (
 -- in person at AS Company by staff, from the seat map in the admin.
 ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'online';
 
+-- The tickets sent on WhatsApp once paid (src/ticketsWhatsApp.js): the last
+-- attempt's outcome — '' never tried, 'sent' (accepted by WhatsApp) or
+-- 'failed' with Meta's reason — and the message id WhatsApp gave it.
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS whatsapp_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS whatsapp_at TIMESTAMPTZ;
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS whatsapp_error TEXT NOT NULL DEFAULT '';
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS whatsapp_message_id TEXT;
+
 -- An event's own touches on its printed ticket: { imageUrl, venueAr } (src/tickets.js).
 ALTER TABLE event_seatmaps ADD COLUMN IF NOT EXISTS ticket JSONB NOT NULL DEFAULT '{}'::jsonb;
 

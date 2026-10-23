@@ -34,6 +34,7 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | POST | `/api/hosted-events/bookings/:id/paid` · `/cancel` · `/resend` | admin | Cash received · cancel (seats freed, tickets voided) · send the customer's email again |
 | POST | `/api/hosted-events/:id/counter-sale` | admin | Sold in person at AS Company `{ seats, zones, name, mobile?, email? }` → the booking, paid in cash with its tickets issued. May sell seats marked sold/held by hand, never one a booking holds (409) |
 | GET | `/api/hosted-events/bookings/:id/tickets.pdf` | admin | A paid booking's tickets, to print |
+| POST | `/api/hosted-events/bookings/:id/whatsapp` | admin | Send a paid booking its tickets on WhatsApp now; 502 with Meta's reason if refused, 503 if WhatsApp isn't set up |
 | POST | `/api/hosted-events/:id/ticket-preview` | admin | A watermarked sample ticket from `{ ticket: { imageUrl, venueAr } }` (saved or not) |
 | POST | `/api/hosted-events/tickets/verify` | admin | What a scanned QR code is: `{ code }` → `{ result: valid\|void\|unknown, ticket? }` (holder, seat, booking, event). Read-only — for the door portal |
 | GET | `/api/banners` | — | List homepage banners (slideshow) |

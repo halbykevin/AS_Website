@@ -13,6 +13,7 @@ import { revalidateHub } from './hubRevalidate.js'
 import { emptyLayout, publicSeatmap, rowLabels, sanitizeLayout, seatId, summarize } from './seatLayout.js'
 import { HOLD_HOURS, MAX_TICKETS, expireBookings, liveHolds, onlinePaymentReady } from './bookings.js'
 import { ticketDesign } from './tickets.js'
+import { ticketsWhatsAppEnabled } from './ticketsWhatsApp.js'
 
 export const hostedRouter = express.Router()
 
@@ -55,6 +56,8 @@ const mapJson = (eventId, row, holds) => {
     summary: summarize(layout, holds),
     // The printed ticket's picture and Arabic venue name (tickets.js).
     ticket: ticketDesign(row?.ticket),
+    // Whether paid bookings get their tickets on WhatsApp (ticketsWhatsApp.js).
+    whatsapp: ticketsWhatsAppEnabled(),
   }
 }
 

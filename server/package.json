@@ -13,7 +13,8 @@
     "deploy:site": "node ../scripts/deploy.mjs --app site",
     "deploy:store": "node ../scripts/deploy.mjs --app store",
     "deploy:setup": "node ../scripts/deploy.mjs --remote --setup",
-    "deploy:vps": "bash ../deploy.sh"
+    "deploy:vps": "bash ../deploy.sh",
+    "whatsapp:tickets-template": "node scripts/whatsapp-tickets-template.mjs"
   },
   "dependencies": {
     "archiver": "^8.0.0",

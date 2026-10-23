@@ -634,6 +634,9 @@ export const adminApi = {
     request(`/api/hosted-events/bookings/${bookingId}/cancel`, { method: 'POST', authed: true }),
   resendBookingEmail: (bookingId) =>
     request(`/api/hosted-events/bookings/${bookingId}/resend`, { method: 'POST', authed: true }),
+  // A paid booking's tickets on WhatsApp, now (server/src/ticketsWhatsApp.js).
+  sendBookingWhatsApp: (bookingId) =>
+    request(`/api/hosted-events/bookings/${bookingId}/whatsapp`, { method: 'POST', authed: true }),
   // Sold in person at AS Company: paid in cash, tickets issued at once.
   counterSale: (eventId, data) =>
     request(`/api/hosted-events/${eventId}/counter-sale`, { method: 'POST', body: data, authed: true }),
