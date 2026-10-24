@@ -326,6 +326,9 @@ export function routeHead(pathname, c) {
   if (path === '/admin' || path.startsWith('/admin/')) {
     return { ...base, title: `Admin — ${name}`, description: '', canonical: '', robots: 'noindex, nofollow', jsonLd: null }
   }
+  if (path === '/door') {
+    return { ...base, title: 'Door scanner — AS Ticketing', description: '', canonical: '', robots: 'noindex, nofollow', jsonLd: null }
+  }
 
   // Unpublished: every route renders Coming Soon. Say so, and point everything
   // at the homepage rather than letting N identical pages compete.

@@ -820,8 +820,37 @@ the owner will refine the details.
     gets a ticket only while its booking holds it (`ticket_booking_seats`) — the late-payment
     edge case in `markPaid` can't print a second ticket for one chair.
   - `POST /api/hosted-events/tickets/verify` answers `valid | void | unknown` with the ticket's
-    details — read-only, the foundation for the **door-scanning portal** (not built yet). That
-    portal adds admitting someone (a `checked_in_at`, refusing a second scan) on top.
+    details — read-only, for the admin; the door below admits.
+- **The door scanner** (since 2026-10-24) — `www.as.com.lb/door`
+  ([src/door/Door.jsx](src/door/Door.jsx), API [server/src/door.js](server/src/door.js)), a page
+  in the site's SPA outside the publish gate, phone-first, no app to install.
+  - **Door staff never get the admin.** Each event's *Seat map & tickets* page has a **Door
+    scanning** card that makes a **six-digit PIN** (`event_doors`; two live doors never share
+    one, because the PIN alone picks the event) plus a QR code opening the page, the live
+    "N of M in" with a per-gate split, and the scan log. The PIN gets a **door token** signed with
+    its **own key** derived from `JWT_SECRET` — `requireAuth` checks only the signature, so a
+    shared key would have made every door phone an admin. It ends the day after the event's last
+    night (≥ 12 h from when it was made); **New PIN** or **Turn off** bumps `event_doors.version`
+    and signs every phone out. PIN tries: 10 per IP per hour.
+  - **Admitting is one UPDATE** that needs the ticket valid and `checked_in_at` empty, so three
+    gates scanning one screenshot at once let one person in (tested). Answers: admitted ·
+    already (when, which gate) · void (cancelled) · other_event (which event — never whose) ·
+    unknown (nothing more). The door sees seat, section and name, never the buyer's mobile.
+    **Undo** within 15 minutes. A **typed ticket number** (QR won't scan) is looked up first and
+    admitted only after staff check the name — the number is printed in plain sight, the secret
+    isn't. A handheld scanner gun "types" the QR text into the same box and works as a scan.
+  - **Offline fallback** ([doorClient.js](src/door/doorClient.js)): every phone keeps the event's
+    guest list, refreshed each minute online, with each code as a **SHA-256 fingerprint only**
+    (a lost phone can't print tickets). With no signal it decides from that list, says OFFLINE,
+    queues the admit and syncs on reconnect (`POST /api/door/sync`, admitted as of the phone's
+    time). A ticket another gate let in meanwhile comes back a **conflict** — logged, shown on the
+    phone, never hidden. The same admit re-sent (a lost answer, or two syncs racing) is a repeat,
+    not a conflict; the page also runs one sync at a time.
+  - Camera: `BarcodeDetector` where the browser has it (Chrome/Android), else **jsQR** on a
+    downscaled frame, lazy-loaded (iPhone). Read ~8×/s; a code held in view is read once.
+  - Every scan of every outcome is a `ticket_scans` row (method `scan | manual | offline |
+    manual-offline | undo`). Hand-marked "sold" seats have no tickets, so nobody can scan in on
+    them — sell them at the counter first.
   - **On WhatsApp too** ([server/src/ticketsWhatsApp.js](server/src/ticketsWhatsApp.js)): every
     move to *paid* (Whish, cash at the shop, counter, free) with a mobile sends a **UTILITY
     template whose document header is the tickets PDF** (uploaded to `/{phone}/media` first),
@@ -891,7 +920,9 @@ a `prediction_id` back-link for imported rows, and `wins`/`won_at` recording eac
 `event_seatmaps` (the seat map + tickets of an AS-hosted event — see *AS-hosted events*),
 `ticket_bookings` + `ticket_booking_seats` (bookings made from those maps — 24-hour holds, cash or
 Whish; the second table's `(event_id, seat_id)` key is what makes a double booking impossible),
-`tickets` (one per admission of a paid booking: printed serial + QR secret, voided on cancel),
+`tickets` (one per admission of a paid booking: printed serial + QR secret, voided on cancel,
+`checked_in_at`/`checked_in_gate` once admitted), `event_doors` (an event's door PIN) +
+`ticket_scans` (every scan at the door),
 `reservations` (legacy/retained, not used by the app). Created by [server/src/migrate.js](server/src/migrate.js);
 optional sample content via [server/src/seed.js](server/src/seed.js).
 
@@ -1201,6 +1232,7 @@ src/
   components/               # Layout, Navbar, Footer, Icon, EventCard, TicketingPanel, EventsLink, CategoryTiles, StoreBanner, StoreSearch, BannerCta, SitePopup
   components/predictor/      # Basketball, BasketballButton (nav), PredictorModal (Guess the Score game)
   pages/                    # ComingSoon, Home, Events (filter by ?category=slug), EventDetail, WhatWeDo, SolutionDetail, Contact, Faq
+  door/                     # the ticket scanner at /door: Door.jsx, doorClient.js (API + offline list/queue), camera.js
   admin/
     useAuth.js, RequireAuth.jsx, Login.jsx, AdminLayout.jsx, ui.jsx
     components/             # FocalPicker, SpinWheel + WinnerReveal + wheelMath (Lucky Draw)
@@ -1218,6 +1250,7 @@ tailwind.config.js          # brand colors, Inter font, animations
 ## Routes
 
 Public (gated): `/`, `/what-we-do`, `/what-we-do/:slug`, `/events`, `/events/:id`, `/contact`, `/faq`
+Door (not gated, own PIN): `/door` — the ticket scanner, see *AS-hosted events*.
 Admin (not gated): `/admin/login`, `/admin` (Settings), `/admin/banners`, `/admin/sections`, `/admin/services`, `/admin/what-we-do`, `/admin/events`, `/admin/events/:id/seatmap` (Seat map & tickets), `/admin/categories`, `/admin/store-banner` (Store Slideshow), `/admin/popup`, `/admin/predictor`, `/admin/wheel` (Lucky Draw), `/admin/messages`, `/admin/scraper`
 
 The **What We Do** page (`/what-we-do`, `what_we_do` + `solutions` tables → `pages/WhatWeDo.jsx`, edited

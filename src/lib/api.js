@@ -637,6 +637,11 @@ export const adminApi = {
   // A paid booking's tickets on WhatsApp, now (server/src/ticketsWhatsApp.js).
   sendBookingWhatsApp: (bookingId) =>
     request(`/api/hosted-events/bookings/${bookingId}/whatsapp`, { method: 'POST', authed: true }),
+  // The door scanner of a hosted event (server/src/door.js): its PIN, the
+  // live count and the scan log. action: 'create' | 'new-pin' | 'on' | 'off'.
+  getDoor: (eventId) => request(`/api/hosted-events/${eventId}/door`, { authed: true }),
+  updateDoor: (eventId, action) =>
+    request(`/api/hosted-events/${eventId}/door`, { method: 'POST', body: { action }, authed: true }),
   // Sold in person at AS Company: paid in cash, tickets issued at once.
   counterSale: (eventId, data) =>
     request(`/api/hosted-events/${eventId}/counter-sale`, { method: 'POST', body: data, authed: true }),

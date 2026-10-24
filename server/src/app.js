@@ -10,6 +10,7 @@ import { scraperRouter } from './scraper.js'
 import { seatmapRouter } from './seatmap.js'
 import { hostedRouter } from './hostedSeatmap.js'
 import { adminBookingsRouter, bookingsRouter, setShopSource } from './bookings.js'
+import { adminDoorRouter, doorRouter } from './door.js'
 import { revalidateHub } from './hubRevalidate.js'
 import { whatsappEnabled, sendTemplate } from './whatsapp.js'
 import { mailEnabled, sendPredictionEmail, sendContactEmail } from './mailer.js'
@@ -1392,6 +1393,9 @@ app.use('/api/scrape', scraperRouter)
 // and the bookings made from them (bookings.js).
 app.use('/api/hosted-events', requireAuth, hostedRouter)
 app.use('/api/hosted-events', requireAuth, adminBookingsRouter)
+app.use('/api/hosted-events', requireAuth, adminDoorRouter)
+// The door scanner (door.js): its own PIN login and door tokens, never the admin's.
+app.use('/api/door', doorRouter)
 // Public: book tickets on a hosted event, the customer's booking page, and
 // Whish's callback/return for ticket payments (bookings.js).
 app.use('/api', bookingsRouter)

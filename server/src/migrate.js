@@ -559,6 +559,42 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS tickets_booking ON tickets(booking_id);
 CREATE INDEX IF NOT EXISTS tickets_event ON tickets(event_id, status);
 
+-- Admitted at the door (src/door.js): when, and at which gate. Set by one
+-- UPDATE that requires it to be empty, so one ticket lets one person in.
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checked_in_gate TEXT NOT NULL DEFAULT '';
+
+-- Door access for an event's scanner: a six-digit PIN door staff enter at
+-- www.as.com.lb/door. version goes up whenever the PIN changes or access is
+-- turned off, which signs out every phone holding a door token for it. Two
+-- live doors never share a PIN, because the PIN alone picks the event.
+CREATE TABLE IF NOT EXISTS event_doors (
+  event_id INTEGER PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  pin TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  expires_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS event_doors_live_pin ON event_doors(pin) WHERE enabled;
+
+-- Every scan at the door, whatever it found: admitted | already | void |
+-- unknown | other_event | undone | conflict (two offline phones admitted one
+-- ticket). method: scan | manual | offline | manual-offline | undo.
+-- scanned_at is when it happened at the door — an offline phone's own clock.
+CREATE TABLE IF NOT EXISTS ticket_scans (
+  id BIGSERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+  serial TEXT NOT NULL DEFAULT '',
+  result TEXT NOT NULL,
+  gate TEXT NOT NULL DEFAULT '',
+  method TEXT NOT NULL DEFAULT 'scan',
+  scanned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ticket_scans_event ON ticket_scans(event_id, scanned_at DESC);
+
 -- Contact form submissions from the public /contact page. Emailed to the staff
 -- inbox on arrival (see mailer.js) and kept here so nothing is lost if mail fails.
 CREATE TABLE IF NOT EXISTS contact_messages (

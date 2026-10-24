@@ -45,6 +45,7 @@ export function robotsTxt() {
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /door
 
 Sitemap: ${SITE_URL}/sitemap.xml
 `

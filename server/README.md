@@ -36,6 +36,11 @@ Browser ──► Vercel (website) ──► https://api.yourdomain.com (this se
 | GET | `/api/hosted-events/bookings/:id/tickets.pdf` | admin | A paid booking's tickets, to print |
 | POST | `/api/hosted-events/bookings/:id/whatsapp` | admin | Send a paid booking its tickets on WhatsApp now; 502 with Meta's reason if refused, 503 if WhatsApp isn't set up |
 | POST | `/api/hosted-events/:id/ticket-preview` | admin | A watermarked sample ticket from `{ ticket: { imageUrl, venueAr } }` (saved or not) |
+| GET/POST | `/api/hosted-events/:id/door` | admin | The event's door: PIN, live count, gates, scan log. POST `{ action: create \| new-pin \| on \| off }` (new PIN / off signs every phone out) |
+| POST | `/api/door/login` | — | `{ pin, gate }` → a door token for that one event (10 tries per IP per hour) |
+| GET | `/api/door/state` · `/api/door/list` | door | Counts · the guest list for offline use (codes as SHA-256 fingerprints only) |
+| POST | `/api/door/scan` | door | `{ code }` or `{ serial, manual: true }` → `admitted \| already \| void \| unknown \| other_event` |
+| POST | `/api/door/lookup` · `/undo` · `/sync` | door | A typed number before admitting · take back an admit (15 min) · offline admits (`conflict` if another gate was first) |
 | POST | `/api/hosted-events/tickets/verify` | admin | What a scanned QR code is: `{ code }` → `{ result: valid\|void\|unknown, ticket? }` (holder, seat, booking, event). Read-only — for the door portal |
 | GET | `/api/banners` | — | List homepage banners (slideshow) |
 | POST/PUT/DELETE | `/api/banners[/:id]` | admin | Manage banners |

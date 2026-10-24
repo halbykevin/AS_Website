@@ -34,6 +34,8 @@ const PopupAdmin = lazy(() => import('./admin/pages/PopupAdmin.jsx'))
 const PredictorAdmin = lazy(() => import('./admin/pages/PredictorAdmin.jsx'))
 const WheelAdmin = lazy(() => import('./admin/pages/WheelAdmin.jsx'))
 const MessagesAdmin = lazy(() => import('./admin/pages/MessagesAdmin.jsx'))
+// The ticket scanner at an event's door — its own PIN, not the admin login.
+const Door = lazy(() => import('./door/Door.jsx'))
 
 // The public website, gated behind the publish flag.
 function PublicSite() {
@@ -96,6 +98,9 @@ export function AppRoutes() {
             <Route path="messages" element={<MessagesAdmin />} />
             <Route path="scraper" element={<ScraperAdmin />} />
           </Route>
+
+          {/* Door scanner — like the admin, never behind the publish gate */}
+          <Route path="/door" element={<Door />} />
 
           {/* Public website */}
           <Route path="/*" element={<PublicSite />} />

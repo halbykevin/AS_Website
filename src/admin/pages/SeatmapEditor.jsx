@@ -758,6 +758,8 @@ export default function SeatmapEditor() {
         onError={(text) => setMsg({ kind: 'error', text })}
       />
 
+      <DoorCard eventId={id} onError={(text) => setMsg({ kind: 'error', text })} />
+
       <Bookings
         bookings={bookings}
         whatsappOn={whatsappOn}
@@ -1314,6 +1316,155 @@ function PrintedTicket({ eventId, ticket, onChange, onError }) {
           />
         </Field>
       </div>
+    </Card>
+  )
+}
+
+// -------------------------------------------------------------------- door ---
+
+const SCAN_LOOK = {
+  admitted: ['Admitted', 'bg-green-100 text-green-800'],
+  already: ['Already used', 'bg-red-100 text-red-700'],
+  void: ['Cancelled ticket', 'bg-red-100 text-red-700'],
+  unknown: ['Not valid', 'bg-red-100 text-red-700'],
+  other_event: ['Other event', 'bg-amber-100 text-amber-800'],
+  conflict: ['Admitted twice', 'bg-red-100 text-red-700'],
+  undone: ['Undone', 'bg-as-charcoal/10 text-as-charcoal/60'],
+}
+const SCAN_METHOD = { manual: 'typed in', offline: 'offline', 'manual-offline': 'typed in, offline' }
+const beirutTime = (iso) =>
+  iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Beirut', hour: '2-digit', minute: '2-digit' }) : ''
+
+/**
+ * The event's door: the PIN staff enter at www.as.com.lb/door to scan
+ * tickets (server/src/door.js), and what is happening there — how many are
+ * in, at which gate, and every scan.
+ */
+function DoorCard({ eventId, onError }) {
+  const [data, setData] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    const load = () => adminApi.getDoor(eventId).then((d) => alive && setData(d)).catch(() => {})
+    load()
+    const timer = setInterval(load, 15_000)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [eventId])
+
+  async function act(action) {
+    const ask = {
+      'new-pin': 'Make a new PIN? Every phone at the door is signed out and needs the new one.',
+      off: 'Turn door access off? Every phone at the door is signed out.',
+    }[action]
+    if (ask && !confirm(ask)) return
+    setBusy(true)
+    try {
+      setData(await adminApi.updateDoor(eventId, action))
+    } catch (err) {
+      onError(err?.message || 'That didn’t work.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!data) return null
+  const d = data.door
+  const { admitted, total } = data.stats
+  const pct = total ? Math.round((admitted / total) * 100) : 0
+
+  return (
+    <Card title="Door scanning">
+      {!d ? (
+        <div className="space-y-3">
+          <p className="text-sm text-as-charcoal/60">
+            On the night, staff scan each ticket’s QR code with their phone at <strong>{data.url.replace(/^https?:\/\//, '')}</strong>.
+            Set up a door PIN for this event — they enter it there instead of the admin password, and it only opens this event.
+          </p>
+          <Button onClick={() => act('create')} disabled={busy} className="px-4 py-2">
+            Set up door scanning
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-start gap-5">
+            <img
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(data.qr)}`}
+              alt={`QR code that opens ${data.url}`}
+              className="h-32 w-32 shrink-0 rounded-lg ring-1 ring-black/10"
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-as-charcoal/45">Door PIN</p>
+              <p className={`font-mono text-4xl font-extrabold tracking-[0.3em] ${d.live ? 'text-as-charcoal' : 'text-as-charcoal/30 line-through'}`}>
+                {d.pin}
+              </p>
+              <p className="text-sm text-as-charcoal/60">
+                {d.live
+                  ? <>On the phone at the door, scan this code (or open <strong>{data.url.replace(/^https?:\/\//, '')}</strong>) and enter the PIN. It works until {beirut(d.expiresAt)}.</>
+                  : d.enabled
+                    ? 'This PIN has run out — the event is over. Turn door access on again to open it for another 12 hours.'
+                    : 'Door access is off — no phone can scan for this event.'}
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {d.enabled && d.live ? (
+                  <>
+                    <Button variant="ghost" onClick={() => act('new-pin')} disabled={busy} className="px-3 py-1.5">
+                      New PIN
+                    </Button>
+                    <Button variant="danger" onClick={() => act('off')} disabled={busy} className="px-3 py-1.5">
+                      Turn off
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={() => act('on')} disabled={busy} className="px-3 py-1.5">
+                    Turn door access on
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-semibold text-as-charcoal">
+                {admitted} of {total} tickets in
+              </p>
+              <p className="text-xs text-as-charcoal/50">{pct}%</p>
+            </div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-as-charcoal/10">
+              <div className="h-full rounded-full bg-green-600 transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            {data.gates.length > 0 && (
+              <p className="mt-2 text-xs text-as-charcoal/55">{data.gates.map((g) => `${g.gate}: ${g.admitted}`).join(' · ')}</p>
+            )}
+          </div>
+
+          {data.scans.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-as-charcoal/45">Latest scans</p>
+              <ul className="max-h-80 divide-y divide-black/5 overflow-y-auto">
+                {data.scans.map((s, i) => {
+                  const [label, tone] = SCAN_LOOK[s.result] || [s.result, 'bg-as-charcoal/10 text-as-charcoal/60']
+                  return (
+                    <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2 text-sm">
+                      <span className="w-12 shrink-0 tabular-nums text-as-charcoal/50">{beirutTime(s.at)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tone}`}>{label}</span>
+                      <span className="font-medium text-as-charcoal">{s.label || s.serial || '—'}</span>
+                      {s.holder && <span className="text-as-charcoal/60">{s.holder}</span>}
+                      <span className="text-xs text-as-charcoal/40">
+                        {[s.gate, SCAN_METHOD[s.method]].filter(Boolean).join(' · ')}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   )
 }

@@ -120,6 +120,16 @@ async function freshSerials(client, n) {
   return [...out]
 }
 
+/** Every paid booking of an event with its tickets issued — what the door's guest list needs. */
+export async function ensureEventTickets(eventId) {
+  const { rows } = await query(
+    `SELECT b.id FROM ticket_bookings b
+      WHERE b.event_id = $1 AND b.status = 'paid' AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.booking_id = b.id)`,
+    [eventId],
+  )
+  for (const r of rows) await ensureTickets(r.id)
+}
+
 /** A cancelled booking's tickets stop working — and say so when scanned. */
 export const voidTickets = (bookingId) =>
   query(`UPDATE tickets SET status = 'void', voided_at = now() WHERE booking_id = $1 AND status = 'valid'`, [bookingId])
@@ -144,47 +154,69 @@ export async function ticketCards(bookingId) {
 
 // ---------------------------------------------------------- the door ---
 
+const TICKET_ROW = `SELECT t.*, b.code AS booking_code, b.full_name, b.mobile, b.status AS booking_status, b.payment_method,
+            b.channel, b.paid_at, e.title, e.slug, e.date, e.time, e.venue, e.city
+       FROM tickets t JOIN ticket_bookings b ON b.id = t.booking_id JOIN events e ON e.id = t.event_id`
+
+/** The ticket a scanned QR code belongs to — or null for anything we didn't issue. */
+export async function ticketFromCode(code) {
+  const m = QR_FORMAT.exec(String(code || '').trim())
+  if (!m) return null
+  const t = (await query(`${TICKET_ROW} WHERE t.serial = $1`, [m[1]])).rows[0]
+  const a = Buffer.from(m[2])
+  const b = Buffer.from(t?.secret || '')
+  return t && a.length === b.length && crypto.timingSafeEqual(a, b) ? t : null
+}
+
+/**
+ * The ticket with this printed number ("AST-K7M3Q9XP", or just "K7M3Q9XP") —
+ * for a QR code that won't scan. Proves nothing on its own: the number is in
+ * plain sight on the ticket, so whoever admits on it checks the holder.
+ */
+export async function ticketFromSerial(raw) {
+  const s = String(raw || '').toUpperCase().replace(/\s+/g, '')
+  const serial = /^AST-/.test(s) ? s : `AST-${s}`
+  if (!/^AST-[A-Z0-9]{8}$/.test(serial)) return null
+  return (await query(`${TICKET_ROW} WHERE t.serial = $1`, [serial])).rows[0] || null
+}
+
+/** Good at the door: issued, not voided, its booking still paid. */
+export const ticketIsValid = (t) => t.status === 'valid' && t.booking_status === 'paid'
+
+/** A ticket as the door and the admin see it. */
+export function ticketJson(t) {
+  return {
+    serial: t.serial,
+    status: t.status,
+    voidedAt: t.voided_at,
+    section: t.section,
+    row: t.row_label,
+    seat: t.seat_num,
+    standing: !t.seat_id,
+    label: t.seat_id ? `Row ${t.row_label} · Seat ${t.seat_num}` : t.section,
+    price: Number(t.price),
+    holder: t.full_name,
+    mobile: t.mobile,
+    bookingCode: t.booking_code,
+    paymentMethod: t.payment_method,
+    channel: t.channel,
+    paidAt: t.paid_at,
+    checkedInAt: t.checked_in_at,
+    checkedInGate: t.checked_in_gate || '',
+    event: { id: t.event_id, title: t.title, slug: t.slug, date: t.date, time: t.time, venue: t.venue, city: t.city },
+  }
+}
+
 /**
  * What a scanned code is: { result: 'valid' | 'void' | 'unknown', ticket? }.
  * 'unknown' covers anything we didn't issue — a stranger's QR code, a typo, a
  * forged serial — and says nothing more, so it can't be used to probe serials.
- * Read-only: admitting someone (and refusing the same code twice) is the door
- * portal's step, on top of this.
+ * Read-only: admitting someone is the door's step (door.js).
  */
 export async function verifyTicket(code) {
-  const m = QR_FORMAT.exec(String(code || '').trim())
-  if (!m) return { result: 'unknown' }
-  const { rows } = await query(
-    `SELECT t.*, b.code AS booking_code, b.full_name, b.mobile, b.status AS booking_status, b.payment_method,
-            b.channel, b.paid_at, e.title, e.slug, e.date, e.time, e.venue, e.city
-       FROM tickets t JOIN ticket_bookings b ON b.id = t.booking_id JOIN events e ON e.id = t.event_id
-      WHERE t.serial = $1`,
-    [m[1]],
-  )
-  const t = rows[0]
-  const a = Buffer.from(m[2])
-  const b = Buffer.from(t?.secret || '')
-  if (!t || a.length !== b.length || !crypto.timingSafeEqual(a, b)) return { result: 'unknown' }
-  return {
-    result: t.status === 'valid' && t.booking_status === 'paid' ? 'valid' : 'void',
-    ticket: {
-      serial: t.serial,
-      status: t.status,
-      voidedAt: t.voided_at,
-      section: t.section,
-      row: t.row_label,
-      seat: t.seat_num,
-      standing: !t.seat_id,
-      price: Number(t.price),
-      holder: t.full_name,
-      mobile: t.mobile,
-      bookingCode: t.booking_code,
-      paymentMethod: t.payment_method,
-      channel: t.channel,
-      paidAt: t.paid_at,
-      event: { id: t.event_id, title: t.title, slug: t.slug, date: t.date, time: t.time, venue: t.venue, city: t.city },
-    },
-  }
+  const t = await ticketFromCode(code)
+  if (!t) return { result: 'unknown' }
+  return { result: ticketIsValid(t) ? 'valid' : 'void', ticket: ticketJson(t) }
 }
 
 // ------------------------------------------------- the ticket's design ---
