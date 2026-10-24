@@ -33,13 +33,22 @@ const BODY = [
   '📍 {{4}}',
   '🎟️ {{5}}',
   '',
-  'Booking code: {{6}}. Your tickets are attached — show one QR code per person at the entrance, on your phone or printed. See you there!',
+  'Booking code: {{6}}. Your tickets are attached — show one QR code per person at the entrance, on your phone or printed.',
+  '',
+  // Fixed text, not parameters: these are Site Settings' ticketing and company
+  // WhatsApp numbers (2026-10-24). If either changes, submit a new version.
+  'Questions? WhatsApp AS Ticketing on +961 76 123 923, or AS Company on +961 70 123 923. See you there!',
 ].join('\n')
 const FOOTER = 'AS Ticketing · AS Company'
 const BUTTON = 'View my tickets'
 
+// An approved template's text can't change in place, so each wording is a new
+// name: tickets_confirmed (2026-10-24), then _v2 with the contact numbers.
+// Submit the new one, and switch WHATSAPP_TICKETS_TEMPLATE once it's approved.
+export const LATEST_TEMPLATE = 'tickets_confirmed_v2'
+
 /** What `npm run whatsapp:tickets-template` submits to Meta for approval. */
-export function ticketsTemplateDefinition({ headerHandle, name = TEMPLATE || 'tickets_confirmed' } = {}) {
+export function ticketsTemplateDefinition({ headerHandle, name = LATEST_TEMPLATE } = {}) {
   return {
     name,
     language: LANGUAGE,

@@ -785,7 +785,16 @@ the owner will refine the details.
     was just taken by someone else". The hub also re-reads the map every 20 s and drops a picked
     seat someone else booked. Standing areas are counted under the same lock.
   - **Prices are the server's**, from the layout at booking time, snapshotted into the booking
-    (`seats`/`zones`/`total`). Limits: 10 tickets per booking, 2 unpaid reservations per mobile per
+    (`seats`/`zones`/`total`).
+  - **Online booking fee** (since 2026-10-24, owner's call): `settings.booking_fee` (Site
+    Settings → Events, default **$1**, 0 = off) **per ticket**, on bookings made on the hub only —
+    never **Sell at counter**, never free tickets (a free booking stays free), never an event
+    priced in LBP. `createBooking` adds it inside `total` and snapshots it in
+    `ticket_bookings.fees`, like the store's delivery fee, so Whish and the cash counter collect
+    exactly what was shown and a changed setting never rewrites an existing booking. The hub
+    shows it before booking from `booking.feePerTicket` on the seat-map answer; the booking page,
+    the emails and the admin's Bookings list show it as **Fees**. Deploy the hub before an API
+    that charges a new fee — the hub only shows what the API reports. Limits: 10 tickets per booking, 2 unpaid reservations per mobile per
     event, 6 bookings per IP per 10 min, a honeypot field.
   - **Online payment reuses the store's Whish account**: `server/src/whish.js` is a deliberate
     copy of `as_store/server/src/whish.js` (keep in step), reading the same `WHISH_*` values from
@@ -876,8 +885,13 @@ the owner will refine the details.
     WABA `1028417589679650` "Absolute Solutions Store") with a never-expiring system-user token
     (`aswhatsappbot`) issued for the app **AS Company Automation** — the older app **WP1** is
     blocked by Meta (every call, even `/me`, answers code 200 "API access blocked"), so a token
-    from WP1 will never work. `tickets_confirmed` was submitted 2026-10-24; sending stays off
-    until it is approved and `WHATSAPP_TICKETS_TEMPLATE` is set on the VPS.
+    from WP1 will never work. `tickets_confirmed` was approved and is live (2026-10-24).
+  - **An approved template's wording can't change in place**, so each wording is a new name:
+    `LATEST_TEMPLATE` in ticketsWhatsApp.js (`tickets_confirmed_v2` adds "Questions? WhatsApp AS
+    Ticketing on +961 76 123 923, or AS Company on +961 70 123 923" as fixed text). Submit it,
+    keep sending the old one, and switch `WHATSAPP_TICKETS_TEMPLATE` on the VPS once it's
+    approved. The customer emails carry the same two numbers, read live from Site Settings
+    (`ticketing_whatsapp_number`, `whatsapp_number`) — change one there and resubmit the template.
 - **Sell at the counter** (the seat map editor's last tool): staff pick a walk-in customer's seats
   and standing places, type a name (mobile/email optional), and `POST /:id/counter-sale` makes a
   booking paid in cash on the spot (`ticket_bookings.channel = 'counter'`) whose PDF downloads to

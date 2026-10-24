@@ -164,6 +164,17 @@ export default async function BookingPage({ params, searchParams }) {
               <span className="text-as-charcoal/70">{money(z.price * z.qty, b.currency)}</span>
             </li>
           ))}
+          {b.fees > 0 && (
+            <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="font-semibold text-as-charcoal">
+                Fees
+                <span className="ml-2 font-normal text-as-charcoal/50">
+                  {money(b.fees / (b.quantity || 1), b.currency)} × {b.quantity}
+                </span>
+              </span>
+              <span className="text-as-charcoal/70">{money(b.fees, b.currency)}</span>
+            </li>
+          )}
           <li className="flex items-center justify-between gap-3 py-3 text-base font-extrabold text-as-charcoal">
             <span>Total</span>
             <span>{money(b.total, b.currency)}</span>

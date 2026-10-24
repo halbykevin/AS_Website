@@ -522,6 +522,14 @@ CREATE TABLE IF NOT EXISTS ticket_booking_seats (
 -- in person at AS Company by staff, from the seat map in the admin.
 ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'online';
 
+-- The online booking fee (src/bookings.js): settings.booking_fee is charged per
+-- ticket on online bookings of paid, USD-priced tickets (Site Settings →
+-- Events; 0 = off). Each booking snapshots what it was charged in
+-- ticket_bookings.fees — already inside its total — so changing the setting
+-- never rewrites a booking that exists.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_fee NUMERIC(8,2) NOT NULL DEFAULT 1;
+ALTER TABLE ticket_bookings ADD COLUMN IF NOT EXISTS fees NUMERIC(12,2) NOT NULL DEFAULT 0;
+
 -- The tickets sent on WhatsApp once paid (src/ticketsWhatsApp.js): the last
 -- attempt's outcome — '' never tried, 'sent' (accepted by WhatsApp) or
 -- 'failed' with Meta's reason — and the message id WhatsApp gave it.

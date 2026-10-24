@@ -263,6 +263,9 @@ export default function SeatMap({ event, whatsappNumber }) {
   // An event AS hosts is sold right here: picked seats are booked (held for
   // 24 hours) instead of asked about on WhatsApp. `booking` comes with the map.
   const bookable = Boolean(data?.booking)
+  // AS's online booking fee, per ticket, shown before anyone books — the
+  // server charges the same (server/src/bookings.js). Free tickets carry none.
+  const fees = bookable && total > 0 ? Math.round(count * (data.booking.feePerTicket || 0) * 100) / 100 : 0
   const [checkout, setCheckout] = useState(false)
   const [notice, setNotice] = useState('')
 
@@ -535,7 +538,8 @@ export default function SeatMap({ event, whatsappNumber }) {
                   {count} {count === 1 ? 'ticket' : 'tickets'}
                 </span>
                 {' · '}
-                {money(total, currency)}
+                {money(total + fees, currency)}
+                {fees > 0 && <span className="text-as-charcoal/50"> (incl. {money(fees, currency)} fees)</span>}
               </p>
               {bookable ? (
                 !checkout && (
@@ -570,6 +574,7 @@ export default function SeatMap({ event, whatsappNumber }) {
                 seats={seatsChosen}
                 zones={zonesChosen}
                 total={total}
+                fees={fees}
                 currency={currency}
                 onCancel={() => setCheckout(false)}
                 onConflict={(message) => {
@@ -801,13 +806,15 @@ function Seat({ seat, row, currency, picked, disabled, onClick }) {
  * re-checks every one and answers 409 if someone got there first, which sends
  * the visitor back to the map with that seat greyed out.
  */
-function BookingForm({ event, booking, seats, zones, total, currency, onCancel, onConflict }) {
+function BookingForm({ event, booking, seats, zones, total, fees = 0, currency, onCancel, onConflict }) {
   const router = useRouter()
   const [form, setForm] = useState({ name: '', mobile: '', email: '', website: '' })
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
   const free = total === 0
+  const count = seats.length + zones.reduce((n, z) => n + z.qty, 0)
+  const due = Math.round((total + fees) * 100) / 100
 
   async function submit(payment) {
     setBusy(payment)
@@ -877,6 +884,27 @@ function BookingForm({ event, booking, seats, zones, total, currency, onCancel, 
         aria-hidden="true"
       />
 
+      {fees > 0 && (
+        <dl className="space-y-1 rounded-xl bg-as-charcoal/[0.03] px-3 py-2.5 text-sm text-as-charcoal/70">
+          <div className="flex justify-between gap-3">
+            <dt>
+              {count} {count === 1 ? 'ticket' : 'tickets'}
+            </dt>
+            <dd>{money(total, currency)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>
+              Fees · {money(fees / count, currency)} × {count}
+            </dt>
+            <dd>{money(fees, currency)}</dd>
+          </div>
+          <div className="flex justify-between gap-3 border-t border-black/5 pt-1 font-bold text-as-charcoal">
+            <dt>Total</dt>
+            <dd>{money(due, currency)}</dd>
+          </div>
+        </dl>
+      )}
+
       {error && <p className="rounded-xl bg-as-red/10 px-3 py-2 text-sm font-semibold text-as-red">{error}</p>}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -898,7 +926,7 @@ function BookingForm({ event, booking, seats, zones, total, currency, onCancel, 
                 disabled={Boolean(busy)}
                 className="rounded-full bg-as-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-as-red-light disabled:opacity-60"
               >
-                {busy === 'whish' ? 'Opening payment…' : `Buy now · ${money(total, currency)}`}
+                {busy === 'whish' ? 'Opening payment…' : `Buy now · ${money(due, currency)}`}
               </button>
             )}
             <button

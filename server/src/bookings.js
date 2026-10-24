@@ -159,6 +159,17 @@ export async function expireBookings(run = query, eventId = null) {
   return rows.length
 }
 
+/**
+ * The online booking fee per ticket, from Site Settings (default $1, 0 = off).
+ * Charged on bookings made on the hub, for tickets that cost something and are
+ * priced in USD — never at the counter, and a free booking stays free.
+ */
+export async function feePerTicket(run = query) {
+  const { rows } = await run('SELECT booking_fee FROM settings WHERE id = 1')
+  const fee = Number(rows[0]?.booking_fee)
+  return Number.isFinite(fee) && fee > 0 ? fee : 0
+}
+
 // ------------------------------------------------------------- shaping ---
 
 async function loadBooking(where, params) {
@@ -185,6 +196,8 @@ function bookingJson(b) {
     seats: b.seats || [],
     zones: b.zones || [],
     quantity: b.quantity,
+    // The booking fee this booking was charged — already inside `total`.
+    fees: Number(b.fees || 0),
     total: Number(b.total),
     currency: b.currency,
     expiresAt: b.expires_at,
@@ -239,10 +252,17 @@ const ticketAttachment = (b) =>
       return []
     })
 
+// The numbers a customer can ask on: Site Settings' ticketing reservations
+// WhatsApp and the company's — the ones every page of the site offers.
+const contacts = () =>
+  query('SELECT whatsapp_number, ticketing_whatsapp_number FROM settings WHERE id = 1')
+    .then(({ rows }) => ({ ticketing: rows[0]?.ticketing_whatsapp_number || '', company: rows[0]?.whatsapp_number || '' }))
+    .catch(() => null)
+
 function mail(kind, b, { staff = false } = {}) {
   const payload = forEmail(b)
-  Promise.all([getShop().catch(() => null), kind === 'paid' ? ticketAttachment(b) : []])
-    .then(([shop, attachments]) => sendBookingEmail(kind, payload, shop, attachments))
+  Promise.all([getShop().catch(() => null), kind === 'paid' ? ticketAttachment(b) : [], contacts()])
+    .then(([shop, attachments, who]) => sendBookingEmail(kind, { ...payload, contacts: who }, shop, attachments))
     .catch((e) => console.error(`[bookings] ${kind} email for ${b.code}:`, e?.message || e))
   if (staff) {
     sendBookingStaffEmail(kind, payload).catch((e) =>
@@ -465,13 +485,20 @@ async function createBooking(ev, input, { counter = false } = {}) {
       }
     }
 
-    const total =
+    const tickets =
       Math.round(
         (seats.reduce((n, s) => n + s.price, 0) + zones.reduce((n, z) => n + z.price * z.qty, 0)) * 100,
       ) / 100
     const quantity = seats.length + zones.reduce((n, z) => n + z.qty, 0)
-    const free = total === 0
+    const free = tickets === 0
     const paidNow = free || counter
+    // The online booking fee, per ticket — inside the total, so what Whish or
+    // the counter collects is exactly what the customer was shown.
+    const fees =
+      !counter && !free && layout.currency === 'USD'
+        ? Math.round((await feePerTicket(db(client))) * quantity * 100) / 100
+        : 0
+    const total = Math.round((tickets + fees) * 100) / 100
 
     let code = newCode()
     for (let i = 0; i < 5; i++) {
@@ -482,14 +509,14 @@ async function createBooking(ev, input, { counter = false } = {}) {
     const ins = await client.query(
       `INSERT INTO ticket_bookings
          (code, token, event_id, full_name, mobile, email, seats, zones, quantity, total, currency,
-          status, payment_method, expires_at, paid_at, ip, channel)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now() + interval '${HOLD_HOURS} hours', $14, $15, $16)
+          status, payment_method, expires_at, paid_at, ip, channel, fees)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now() + interval '${HOLD_HOURS} hours', $14, $15, $16, $17)
        RETURNING *`,
       [
         code, newToken(), ev.id, input.name, input.mobile, input.email,
         JSON.stringify(seats), JSON.stringify(zones), quantity, total, layout.currency,
         paidNow ? 'paid' : 'reserved', free ? 'free' : counter ? 'cash' : input.payment, paidNow ? new Date() : null,
-        input.ip, counter ? 'counter' : 'online',
+        input.ip, counter ? 'counter' : 'online', fees,
       ],
     )
     const booking = ins.rows[0]

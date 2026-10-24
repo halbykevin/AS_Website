@@ -11,7 +11,7 @@ import express from 'express'
 import { query } from './db.js'
 import { revalidateHub } from './hubRevalidate.js'
 import { emptyLayout, publicSeatmap, rowLabels, sanitizeLayout, seatId, summarize } from './seatLayout.js'
-import { HOLD_HOURS, MAX_TICKETS, expireBookings, liveHolds, onlinePaymentReady } from './bookings.js'
+import { HOLD_HOURS, MAX_TICKETS, expireBookings, feePerTicket, liveHolds, onlinePaymentReady } from './bookings.js'
 import { ticketDesign } from './tickets.js'
 import { ticketsWhatsAppEnabled } from './ticketsWhatsApp.js'
 
@@ -26,9 +26,20 @@ export async function loadHostedSeatmap(eventId) {
   const { rows } = await query('SELECT layout FROM event_seatmaps WHERE event_id = $1 AND published', [eventId])
   if (!rows[0]) return null
   await expireBookings(query, eventId)
-  const data = publicSeatmap(sanitizeLayout(rows[0].layout), await liveHolds(eventId))
+  const layout = sanitizeLayout(rows[0].layout)
+  const data = publicSeatmap(layout, await liveHolds(eventId))
   if (!data.grid.seats.length && !data.zones.length) return null
-  return { ...data, booking: { holdHours: HOLD_HOURS, maxTickets: MAX_TICKETS, online: onlinePaymentReady() } }
+  return {
+    ...data,
+    booking: {
+      holdHours: HOLD_HOURS,
+      maxTickets: MAX_TICKETS,
+      online: onlinePaymentReady(),
+      // So the hub shows the total with fees before anyone books; the server
+      // still prices the booking itself (bookings.js).
+      feePerTicket: layout.currency === 'USD' ? await feePerTicket() : 0,
+    },
+  }
 }
 
 // ------------------------------------------------------------- admin routes ---

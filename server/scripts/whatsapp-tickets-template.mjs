@@ -2,24 +2,25 @@
 // and language. The template itself is defined in src/ticketsWhatsApp.js,
 // beside the code that sends it.
 //
-//   npm run whatsapp:tickets-template              submit it
-//   npm run whatsapp:tickets-template -- --status  how Meta's review is going
+//   npm run whatsapp:tickets-template              submit the latest version
+//   npm run whatsapp:tickets-template -- --status  how Meta's review of every version is going
 //   npm run whatsapp:tickets-template -- --dry-run print what would be sent
 //
 // Needs WHATSAPP_TOKEN (system user with whatsapp_business_management) and
-// WHATSAPP_WABA_ID in server/.env; the template's name is
-// WHATSAPP_TICKETS_TEMPLATE (default tickets_confirmed). A document header
-// must come with a sample document, uploaded through Meta's resumable upload
-// API on the token's own app — a watermarked sample ticket is rendered for it.
-// Once Meta approves, set WHATSAPP_TICKETS_TEMPLATE and restart the API.
+// WHATSAPP_WABA_ID in server/.env. It submits LATEST_TEMPLATE — an approved
+// wording can't be edited in place, so each new wording is a new name. A
+// document header must come with a sample document, uploaded through Meta's
+// resumable upload API on the token's own app — a watermarked sample ticket is
+// rendered for it. Once Meta approves, set WHATSAPP_TICKETS_TEMPLATE to that
+// name on the VPS and restart the API; until then the old version keeps sending.
 
 import 'dotenv/config'
 import { renderTickets } from '../src/ticketPdf.js'
-import { ticketsTemplateDefinition } from '../src/ticketsWhatsApp.js'
+import { LATEST_TEMPLATE, ticketsTemplateDefinition } from '../src/ticketsWhatsApp.js'
 
 const TOKEN = process.env.WHATSAPP_TOKEN || ''
 const WABA = process.env.WHATSAPP_WABA_ID || ''
-const NAME = process.env.WHATSAPP_TICKETS_TEMPLATE || 'tickets_confirmed'
+const NAME = LATEST_TEMPLATE
 const GRAPH = `https://graph.facebook.com/${process.env.WHATSAPP_GRAPH_VERSION || 'v21.0'}`
 const args = new Set(process.argv.slice(2))
 
@@ -45,9 +46,13 @@ if (!TOKEN || !WABA) {
 // From here on the exit code is set, never forced: process.exit() while fetch
 // is still closing its connection trips a libuv assertion on Windows.
 async function status() {
-  const { data } = await graph(`/${WABA}/message_templates?name=${NAME}&fields=name,language,status,category,rejected_reason`)
-  if (!data.length) console.log(`No template called ${NAME} on WABA ${WABA}.`)
-  for (const t of data) console.log(`${t.name} [${t.language}] ${t.category}: ${t.status}${t.rejected_reason && t.rejected_reason !== 'NONE' ? ` — ${t.rejected_reason}` : ''}`)
+  const { data } = await graph(`/${WABA}/message_templates?fields=name,language,status,category,rejected_reason&limit=100`)
+  const versions = data.filter((t) => t.name.startsWith('tickets_confirmed'))
+  if (!versions.length) console.log(`No tickets template on WABA ${WABA} yet.`)
+  for (const t of versions) {
+    console.log(`${t.name} [${t.language}] ${t.category}: ${t.status}${t.rejected_reason && t.rejected_reason !== 'NONE' ? ` — ${t.rejected_reason}` : ''}`)
+  }
+  console.log(`Sending now: ${process.env.WHATSAPP_TICKETS_TEMPLATE || '(not set here — check the VPS)'} · latest wording: ${LATEST_TEMPLATE}`)
 }
 
 async function submit() {

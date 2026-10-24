@@ -23,7 +23,7 @@ const empty = {
   eventsHeading: '', eventsIntro: '',
   contactHeading: '', contactSubheading: '',
   contactEmail: '', contactWhatsapp: '', contactInstagram: '', contactInstagramHandle: '',
-  whatsappNumber: '', ticketingWhatsappNumber: '',
+  whatsappNumber: '', ticketingWhatsappNumber: '', bookingFee: 1,
   storeTitle: '', storeEyebrow: '', storeDescription: '', storeUrl: '',
   ticketingUrl: '',
   appStoreUrl: '', playStoreUrl: '',
@@ -58,6 +58,7 @@ export default function SettingsEditor() {
           contactInstagram: s.contactInstagram || '', contactInstagramHandle: s.contactInstagramHandle || '',
           whatsappNumber: s.whatsappNumber || '',
           ticketingWhatsappNumber: s.ticketingWhatsappNumber || '',
+          bookingFee: s.bookingFee ?? 1,
           storeTitle: s.storeTitle || '', storeEyebrow: s.storeEyebrow || '',
           storeDescription: s.storeDescription || '', storeUrl: s.storeUrl || '',
           ticketingUrl: s.ticketingUrl || '',
@@ -265,6 +266,12 @@ export default function SettingsEditor() {
             hint="International format, digits only (e.g. 96176123923). The ticketing platform's Reserve buttons and seat requests, and the app's events, open a WhatsApp chat to this number pre-filled with the event. Leave empty to use the company WhatsApp number (Contact)."
           >
             <TextInput value={form.ticketingWhatsappNumber} onChange={set('ticketingWhatsappNumber')} placeholder="96176123923" />
+          </Field>
+          <Field
+            label="Online booking fee, per ticket ($)"
+            hint="Added to every booking made on the ticketing platform for an event AS Company hosts — this much per ticket, shown as “Fees” before booking and on the booking, the emails and the total paid. Walk-in sales at the counter and free tickets pay none; events priced in LBP have none. 0 = no fee."
+          >
+            <TextInput type="number" min="0" step="0.01" value={form.bookingFee} onChange={set('bookingFee')} />
           </Field>
         </div>
       </Card>

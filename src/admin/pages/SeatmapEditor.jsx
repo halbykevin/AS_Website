@@ -1791,6 +1791,7 @@ function Bookings({ bookings, whatsappOn, onChanged, onError }) {
                       {[
                         b.seats.map((s) => `${s.row}${s.num}`).join(', '),
                         ...b.zones.map((z) => `${z.qty} × ${z.name}`),
+                        b.fees > 0 ? `incl. ${formatMoney(b.fees, b.currency)} fees` : '',
                         bookingWhen(b),
                       ]
                         .filter(Boolean)

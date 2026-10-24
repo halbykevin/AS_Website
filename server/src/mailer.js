@@ -238,6 +238,9 @@ function ticketRows(b) {
   const rows = [
     ...(b.seats || []).map((s) => [`Row ${s.row} · Seat ${s.num}`, s.tier, price(s.price, b.currency)]),
     ...(b.zones || []).map((z) => [`${z.qty} × ${z.name}`, '', price(z.price * z.qty, b.currency)]),
+    ...(b.fees > 0
+      ? [['Fees', `${price(b.fees / (b.quantity || 1), b.currency)} × ${b.quantity} ticket${b.quantity > 1 ? 's' : ''}`, price(b.fees, b.currency)]]
+      : []),
   ]
   const cell = 'padding:7px 0;border-bottom:1px solid #f0f0f0'
   return `
@@ -278,6 +281,33 @@ const button = (href, label, bg = RED) => `
   <div style="text-align:center;margin:22px 0 6px">
     <a href="${esc(href)}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:999px">${esc(label)}</a>
   </div>`
+
+/** "96176123923" → "+961 76 123 923" — Lebanese numbers the way people say them. */
+function prettyPhone(digits) {
+  const d = String(digits || '').replace(/\D/g, '')
+  const local = d.startsWith('961') ? d.slice(3) : ''
+  if (local.length === 8) return `+961 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`
+  if (local.length === 7) return `+961 ${local.slice(0, 1)} ${local.slice(1, 4)} ${local.slice(4)}`
+  return d ? `+${d}` : ''
+}
+
+/**
+ * Who to ask: AS Ticketing's and AS Company's WhatsApp, from Site Settings
+ * (`contacts` = { ticketing, company }, digits). Nothing when neither is set.
+ */
+function contactBlock(contacts) {
+  const lines = [
+    ['AS Ticketing', contacts?.ticketing],
+    ['AS Company', contacts?.company],
+  ].filter(([, n]) => n)
+  if (!lines.length) return ''
+  const link = ([who, n]) =>
+    `<strong style="color:${INK}">${who}</strong> <a href="https://wa.me/${esc(n)}" style="color:${RED};text-decoration:none">${esc(prettyPhone(n))}</a>`
+  return `
+    <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;font-size:13px;line-height:1.7;color:${MUTED};text-align:center">
+      Questions? WhatsApp ${lines.map(link).join('<br>or ')}
+    </p>`
+}
 
 /** Where to pay in cash: the shop as the store admin describes it, or just its name. */
 function cashLine(shop) {
@@ -360,7 +390,7 @@ export async function sendBookingEmail(kind, b, shop = null, attachments = []) {
     to: b.email,
     replyTo: CONTACT_TO,
     subject,
-    html: emailShell(inner, 'AS Ticketing'),
+    html: emailShell(inner + contactBlock(b.contacts), 'AS Ticketing'),
     attachments,
   })
 }

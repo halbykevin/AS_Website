@@ -63,6 +63,9 @@ const settingsJson = (r) => ({
   whatsappNumber: r.whatsapp_number,
   // Where event reservations go; '' = whatsappNumber. See migrate.js.
   ticketingWhatsappNumber: r.ticketing_whatsapp_number || '',
+  // Per ticket, on online bookings of AS-hosted events (bookings.js). pg
+  // returns NUMERIC as a string.
+  bookingFee: Number(r.booking_fee ?? 0),
   contactInstagram: r.contact_instagram, contactInstagramHandle: r.contact_instagram_handle,
   storeTitle: r.store_title, storeEyebrow: r.store_eyebrow,
   storeDescription: r.store_description, storeUrl: r.store_url,
@@ -226,6 +229,7 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
        banner_height=$31, logo_size_desktop=$32, ticketing_url=$33,
        ticketing_whatsapp_number=COALESCE($34, ticketing_whatsapp_number),
        app_store_url=COALESCE($35, app_store_url), play_store_url=COALESCE($36, play_store_url),
+       booking_fee=COALESCE($37, booking_fee),
        updated_at=now()
      WHERE id = 1 RETURNING *`,
     [
@@ -249,6 +253,10 @@ app.put('/api/settings', requireAuth, ah(async (req, res) => {
       // Same rule for the app listings, which a stale admin tab would blank.
       b.appStoreUrl == null ? null : String(b.appStoreUrl).trim(),
       b.playStoreUrl == null ? null : String(b.playStoreUrl).trim(),
+      // And for the booking fee: absent or not a number = keep it.
+      b.bookingFee == null || b.bookingFee === '' || !Number.isFinite(Number(b.bookingFee))
+        ? null
+        : Math.min(1000, Math.max(0, Math.round(Number(b.bookingFee) * 100) / 100)),
     ]
   )
   res.json(settingsJson(rows[0]))
