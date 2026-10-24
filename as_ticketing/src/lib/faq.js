@@ -73,7 +73,8 @@ export function hubFaq({ settings = {}, categories = [], shop = null } = {}) {
             'in the meantime we will tell you.',
           'For events AS Company hosts itself, yes: booking holds your seats for 24 hours, and no one else can take ' +
             'them. Pay online right away, or in cash at AS Company with your booking code — a reservation that is ' +
-            'not paid in time is released automatically. Your booking code arrives by email.',
+            'not paid in time is released automatically. Your booking code is shown as soon as you book, and once ' +
+            'paid your tickets — each with its own QR code for the door — come on WhatsApp, and by email if you gave one.',
         ],
       },
     )

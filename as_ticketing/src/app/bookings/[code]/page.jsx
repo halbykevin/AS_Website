@@ -170,7 +170,7 @@ export default async function BookingPage({ params, searchParams }) {
           </li>
         </ul>
         <p className="text-xs text-as-charcoal/45">
-          Booked by {b.name} · {b.email}
+          Booked by {[b.name, b.email].filter(Boolean).join(' · ')}
           {b.status === 'paid' && b.paidAt
             ? ` · paid ${b.paymentMethod === 'whish' ? 'online' : b.paymentMethod === 'free' ? '(free)' : 'in cash'} ${beirut(b.paidAt)}`
             : ''}

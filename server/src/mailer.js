@@ -377,7 +377,7 @@ export async function sendBookingStaffEmail(kind, b) {
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px">
       ${row('Name', `<strong>${esc(b.name)}</strong>`)}
       ${row('Mobile', `+${esc(b.mobile)}`)}
-      ${row('Email', esc(b.email))}
+      ${row('Email', b.email ? esc(b.email) : '—')}
       ${kind === 'reserved' ? row('Held until', esc(when(b.expiresAt))) : ''}
     </table>
     ${ticketRows(b)}

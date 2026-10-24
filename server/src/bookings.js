@@ -549,12 +549,16 @@ bookingsRouter.post(
     if (String(b.website || '').trim()) return res.status(201).json({ ok: true }) // honeypot
     if (throttled(req.ip)) return res.status(429).json({ error: 'Too many bookings from here — please try again in a few minutes.' })
 
+    // Name and mobile are required — the tickets go to that number on
+    // WhatsApp. Email is optional: given, they go there too.
     const name = cleanName(b.name)
     const mobile = normalizeMobile(b.mobile)
-    const email = normalizeEmail(b.email)
+    const email = String(b.email || '').trim() ? normalizeEmail(b.email) : ''
     if (name.length < 2) return res.status(400).json({ error: 'Please enter your full name.' })
     if (!mobile) return res.status(400).json({ error: 'Please enter a valid mobile number.' })
-    if (!email) return res.status(400).json({ error: 'Please enter a valid email address — your tickets are sent there.' })
+    if (String(b.email || '').trim() && !email) {
+      return res.status(400).json({ error: 'That email address doesn’t look right — fix it or leave it empty.' })
+    }
 
     const { seats, zones, count } = parsePicks(b)
     if (!count) return res.status(400).json({ error: 'Pick at least one seat or ticket.' })

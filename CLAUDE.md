@@ -769,7 +769,9 @@ the owner will refine the details.
   for the partners. The hub's `GridHall` draws it; picks go to WhatsApp like any other.
 - **These are real bookings, not WhatsApp requests** (since 2026-10-21 —
   [server/src/bookings.js](server/src/bookings.js)). On an AS event the hub's seat map ends in
-  **Book these** → name, mobile, email → **Reserve for 24h · pay at AS Company** or
+  **Book these** → name and mobile (required — the tickets go there on WhatsApp), email
+  (optional since 2026-10-24: given, it gets every email; left out, the customer has the
+  on-screen booking page and WhatsApp) → **Reserve for 24h · pay at AS Company** or
   **Buy now** (Whish). Partner events keep the WhatsApp request flow — we can't hold their seats.
   - **A reservation holds its seats for 24 hours** (`ticket_bookings`, status `reserved`), then
     **expires on its own** and the seats go back on sale — swept every minute

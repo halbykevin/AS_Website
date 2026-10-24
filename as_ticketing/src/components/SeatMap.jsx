@@ -860,8 +860,10 @@ function BookingForm({ event, booking, seats, zones, total, currency, onCancel, 
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-as-charcoal/60">Email</span>
-          <input required type="email" autoComplete="email" value={form.email} onChange={set('email')} className={input} />
+          <span className="mb-1 block text-xs font-semibold text-as-charcoal/60">
+            Email <span className="font-normal text-as-charcoal/40">(optional)</span>
+          </span>
+          <input type="email" autoComplete="email" value={form.email} onChange={set('email')} className={input} />
         </label>
       </div>
       {/* A field people never see — bots fill it in and are quietly dropped. */}
@@ -923,7 +925,8 @@ function BookingForm({ event, booking, seats, zones, total, currency, onCancel, 
         </button>
       </div>
       <p className="text-[11px] leading-relaxed text-as-charcoal/45">
-        We email your booking code and use your details only for this booking.
+        Your tickets come on WhatsApp to this mobile once paid — and by email too if you add one. We use your details only
+        for this booking.
         {booking.online && !free ? ' Buy now takes you to Whish to pay securely.' : ''}
       </p>
     </form>
