@@ -42,14 +42,15 @@ if (!TOKEN || !WABA) {
   process.exit(1)
 }
 
-try {
-  if (args.has('--status')) {
-    const { data } = await graph(`/${WABA}/message_templates?name=${NAME}&fields=name,language,status,category,rejected_reason`)
-    if (!data.length) console.log(`No template called ${NAME} on WABA ${WABA}.`)
-    for (const t of data) console.log(`${t.name} [${t.language}] ${t.category}: ${t.status}${t.rejected_reason && t.rejected_reason !== 'NONE' ? ` — ${t.rejected_reason}` : ''}`)
-    process.exit(0)
-  }
+// From here on the exit code is set, never forced: process.exit() while fetch
+// is still closing its connection trips a libuv assertion on Windows.
+async function status() {
+  const { data } = await graph(`/${WABA}/message_templates?name=${NAME}&fields=name,language,status,category,rejected_reason`)
+  if (!data.length) console.log(`No template called ${NAME} on WABA ${WABA}.`)
+  for (const t of data) console.log(`${t.name} [${t.language}] ${t.category}: ${t.status}${t.rejected_reason && t.rejected_reason !== 'NONE' ? ` — ${t.rejected_reason}` : ''}`)
+}
 
+async function submit() {
   // The sample document Meta reviews the template with.
   const pdf = await renderTickets({
     website: 'ticketing.as.com.lb',
@@ -74,7 +75,11 @@ try {
   })
   console.log(`Submitted ${NAME}: ${created.status} (${created.category}, id ${created.id}).`)
   console.log('Check on it with --status; once APPROVED, set WHATSAPP_TICKETS_TEMPLATE and restart the API.')
+}
+
+try {
+  await (args.has('--status') ? status() : submit())
 } catch (err) {
   console.error(`Failed: ${err.message}`)
-  process.exit(1)
+  process.exitCode = 1
 }

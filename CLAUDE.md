@@ -833,10 +833,12 @@ the owner will refine the details.
     (`whatsapp_status` sent/failed + Meta's reason) and the admin's Bookings shows it with
     **Send / Resend on WhatsApp**. "Sent" means accepted by Meta, not delivered — delivery
     failures arrive on the webhook, which isn't wired to this yet.
-  - ⚠ **As of 2026-10-23 Meta answers every call with code 200 "API access blocked"** — both the
-    site's and the store's tokens, even `/me` — so nothing can send until the app's restriction
-    is lifted in Meta's dashboard (or a token comes from another app). The code is deployed and
-    tested against a stubbed Graph; the template has not been submitted.
+  - **Meta wiring (2026-10-24):** sends from **+961 79 123 272** (phone id `1220518127810205`,
+    WABA `1028417589679650` "Absolute Solutions Store") with a never-expiring system-user token
+    (`aswhatsappbot`) issued for the app **AS Company Automation** — the older app **WP1** is
+    blocked by Meta (every call, even `/me`, answers code 200 "API access blocked"), so a token
+    from WP1 will never work. `tickets_confirmed` was submitted 2026-10-24; sending stays off
+    until it is approved and `WHATSAPP_TICKETS_TEMPLATE` is set on the VPS.
 - **Sell at the counter** (the seat map editor's last tool): staff pick a walk-in customer's seats
   and standing places, type a name (mobile/email optional), and `POST /:id/counter-sale` makes a
   booking paid in cash on the spot (`ticket_bookings.channel = 'counter'`) whose PDF downloads to
