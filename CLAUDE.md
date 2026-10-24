@@ -727,6 +727,14 @@ the owner will refine the details.
   available, drag a stage / entrance / standing area, select an area to rename, move, resize,
   re-price or delete it, erase; Undo (Ctrl+Z). **Quick layout** generates a whole hall (rows ×
   seats, aisles, stage in front or behind, a door) to adjust from.
+- **Halls up to 200 columns × 150 rows and 12,000 seats** (since 2026-10-24; was 80 × 60). The
+  editor's `MAX_*` in [seatmapLayout.js](src/admin/components/seatmapLayout.js) and the server's
+  `LIMITS` in [seatLayout.js](server/src/seatLayout.js) must match; 12,000 seats keeps a saved map
+  under the API's 1 MB JSON limit, so the editor refuses more rather than letting the server drop
+  them. The map **zooms** (− / + / **Fit**, 4–48 px a cell, remembered per computer in
+  localStorage) and goes **full screen** with its own Save (portalled to `<body>` so the admin's
+  header can't sit over it; Esc leaves). Seat numbers hide below 16 px a cell and row letters
+  below 10 px. The hub needed nothing: it already fits a hall to the screen and zooms.
 - **Ticket types** (name, price, colour; USD or LBP) price every seat and standing area.
   Availability is per seat (`free` | `sold` | `held` — held is kept off sale) and, for a
   standing area, `capacity − sold`. The **Tickets** table totals sold, held, available and
@@ -736,7 +744,7 @@ the owner will refine the details.
   in `rowLabels()` in [server/src/hostedSeatmap.js](server/src/hostedSeatmap.js), mirrored in
   [seatmapLayout.js](src/admin/components/seatmapLayout.js) for the live preview — keep them in step.
 - **Stored in `event_seatmaps`** (one row per event, cascades with it: `published` + `layout`
-  JSONB). The server is the authority: `sanitizeLayout()` clamps the grid (≤ 80 × 60), drops
+  JSONB). The server is the authority: `sanitizeLayout()` clamps the grid (≤ 200 × 150, ≤ 12,000 seats), drops
   off-grid / duplicate seats, unknown ticket types and bad colours, and caps standing sales at
   capacity, on every save. A synced event refuses a map (409) — its hall is the partner's.
 - **An event made here starts as a draft** (`events.published = false`; existing and synced rows

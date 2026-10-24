@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
 import { adminApi, downloadBookingTickets, downloadTicketPreview } from '../../lib/api.js'
 import { Banner, Button, Card, Field, PageHeader, SaveBar, SegmentedControl, Select, TextInput, Toggle } from '../ui.jsx'
 import {
   COLORS,
+  MAX_COLS,
+  MAX_ROWS,
+  MAX_SEATS,
   cellKey,
   covers,
   generateHall,
@@ -23,7 +27,22 @@ import {
 // Staff also sell here, in person: the "Sell at counter" tool picks seats on
 // the map and issues their tickets as a PDF to print (bookings.js, tickets.js).
 
+// A grid cell's size on screen, in pixels: 26 at 100%. Zooming changes it,
+// and the choice is remembered on this computer — a big hall is easier to
+// see zoomed out, and easier to paint zoomed in. At the smallest the whole of
+// a 200-column hall fits a laptop screen, as an overview to zoom in from.
 const CELL = 26
+const MIN_CELL = 4
+const MAX_CELL = 48
+const ZOOM_KEY = 'as_seatmap_zoom'
+const clampCell = (n) => Math.max(MIN_CELL, Math.min(MAX_CELL, Math.round(n)))
+function savedZoom() {
+  try {
+    return clampCell(Number(localStorage.getItem(ZOOM_KEY)) || CELL)
+  } catch {
+    return CELL
+  }
+}
 const SOLD = '#BEBEBE'
 
 const TOOLS = [
@@ -71,6 +90,10 @@ export default function SeatmapEditor() {
   const [ticket, setTicket] = useState({ imageUrl: '', venueAr: '' })
   // Whether the server sends paid bookings their tickets on WhatsApp.
   const [whatsappOn, setWhatsappOn] = useState(false)
+  // How big the map is drawn, and whether it fills the whole screen.
+  const [cell, setCell] = useState(savedZoom)
+  const [fullScreen, setFullScreen] = useState(false)
+  const mapBoxRef = useRef(null)
   const gridRef = useRef(null)
   // The drag lives in a ref as well as in state: a quick click releases before
   // React has re-rendered with the press, and the release must still see it.
@@ -126,8 +149,13 @@ export default function SeatmapEditor() {
   }
 
   // Ctrl/Cmd+Z undoes; Delete removes the selected area — unless you're typing.
+  // Escape leaves full screen.
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key === 'Escape' && fullScreen) {
+        setFullScreen(false)
+        return
+      }
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
@@ -140,6 +168,24 @@ export default function SeatmapEditor() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ZOOM_KEY, String(cell))
+    } catch {
+      /* not remembered — still works */
+    }
+  }, [cell])
+
+  // Full screen covers the admin; the page underneath shouldn't scroll with it.
+  useEffect(() => {
+    if (!fullScreen) return
+    const before = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = before
+    }
+  }, [fullScreen])
 
   useEffect(() => {
     if (!dirty) return
@@ -201,25 +247,36 @@ export default function SeatmapEditor() {
     const box = gridRef.current.getBoundingClientRect()
     const clamp = (v, max) => Math.max(0, Math.min(max, v))
     return {
-      r: clamp(Math.floor((e.clientY - box.top) / CELL), layout.rows - 1),
-      c: clamp(Math.floor((e.clientX - box.left) / CELL), layout.cols - 1),
+      r: clamp(Math.floor((e.clientY - box.top) / cell), layout.rows - 1),
+      c: clamp(Math.floor((e.clientX - box.left) / cell), layout.cols - 1),
     }
+  }
+
+  const zoom = (factor) => setCell((c) => clampCell(c * factor))
+  // The whole hall on screen: as wide as the map's box allows — and, in full
+  // screen, as tall as the window below the tools.
+  const fit = () => {
+    const box = mapBoxRef.current
+    if (!box) return
+    const byWidth = (box.clientWidth - 34 - 30) / layout.cols
+    const byHeight = fullScreen ? (window.innerHeight - box.getBoundingClientRect().top - 40) / layout.rows : Infinity
+    setCell(clampCell(Math.min(byWidth, byHeight)))
   }
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return
     e.preventDefault()
     gridRef.current.setPointerCapture(e.pointerId)
-    const cell = cellAt(e)
-    dragRef.current = { from: cell, to: cell }
+    const at = cellAt(e)
+    dragRef.current = { from: at, to: at }
     setDrag(dragRef.current)
   }
   const onPointerMove = (e) => {
     const current = dragRef.current
     if (!current) return
-    const cell = cellAt(e)
-    if (cell.r === current.to.r && cell.c === current.to.c) return
-    dragRef.current = { ...current, to: cell }
+    const at = cellAt(e)
+    if (at.r === current.to.r && at.c === current.to.c) return
+    dragRef.current = { ...current, to: at }
     setDrag(dragRef.current)
   }
   const onPointerUp = () => {
@@ -281,6 +338,10 @@ export default function SeatmapEditor() {
           }
         }
       }
+      if (seats.size > MAX_SEATS) {
+        setMsg({ kind: 'warning', text: `A hall can have up to ${MAX_SEATS.toLocaleString()} seats — that would make ${seats.size.toLocaleString()}.` })
+        return
+      }
       change({ ...layout, seats: [...seats.values()] })
       return
     }
@@ -334,8 +395,8 @@ export default function SeatmapEditor() {
   const setSize = (key, value) => {
     const n = Math.round(Number(value))
     if (!Number.isFinite(n)) return
-    const cols = key === 'cols' ? Math.max(4, Math.min(80, n)) : layout.cols
-    const rows = key === 'rows' ? Math.max(4, Math.min(60, n)) : layout.rows
+    const cols = key === 'cols' ? Math.max(4, Math.min(MAX_COLS, n)) : layout.cols
+    const rows = key === 'rows' ? Math.max(4, Math.min(MAX_ROWS, n)) : layout.rows
     if (cols === layout.cols && rows === layout.rows) return
     change({
       ...layout,
@@ -454,6 +515,31 @@ export default function SeatmapEditor() {
     .filter((s) => sale.has(cellKey(s.r, s.c)) && !booked[cellKey(s.r, s.c)])
     .map((s) => ({ id: cellKey(s.r, s.c), r: s.r, row: labels.get(s.r), num: numbers.get(cellKey(s.r, s.c)), tier: s.tier, status: s.status }))
     .sort((a, b) => a.r - b.r || a.num - b.num)
+
+  // Shown under the map, in full screen too — selling is done from the map.
+  const counterSale = (
+    <CounterSale
+      eventId={id}
+      layout={layout}
+      picked={picked}
+      bookedZones={bookedZones}
+      dirty={dirty}
+      whatsappOn={whatsappOn}
+      onUnpick={(key) =>
+        setSale((prev) => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+      }
+      onSold={(text) => {
+        setSale(new Set())
+        setMsg({ kind: 'success', text })
+        refreshBookings().catch(() => {})
+      }}
+      onError={(text) => setMsg({ kind: 'error', text })}
+    />
+  )
 
   return (
     <div className="space-y-6">
@@ -590,13 +676,26 @@ export default function SeatmapEditor() {
             setMsg({ kind: 'warning', text: 'This map has bookings, so it can’t be replaced — adjust it on the map instead.' })
             return
           }
+          const hall = generateHall(opts)
+          if (hall.seats.length > MAX_SEATS) {
+            setMsg({ kind: 'warning', text: `That's ${hall.seats.length.toLocaleString()} seats — a hall can have up to ${MAX_SEATS.toLocaleString()}.` })
+            return
+          }
           if (!empty && !confirm('Replace the current map with a new layout? (Undo brings it back.)')) return
-          change({ ...layout, ...generateHall(opts), rowNames: {} })
+          change({ ...layout, ...hall, rowNames: {} })
           setSelected('')
         }}
       />
 
-      <Card title="Map">
+      <MapFrame
+        fullScreen={fullScreen}
+        title={event.title}
+        dirty={dirty}
+        saving={saving}
+        onSave={save}
+        onExit={() => setFullScreen(false)}
+        msg={msg}
+      >
         <div className="space-y-3">
           <SegmentedControl
             value={tool}
@@ -629,30 +728,48 @@ export default function SeatmapEditor() {
           )}
           {tool === 'status' && <SegmentedControl value={mark} onChange={setMark} options={MARKS} />}
 
-          <div className="flex flex-wrap items-center gap-4 text-sm text-as-charcoal/70">
-            <label className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-as-charcoal/70">
+            <label className="flex items-center gap-2" title={`Up to ${MAX_COLS}`}>
               Columns
-              <SizeInput value={layout.cols} min={4} max={80} onCommit={(v) => setSize('cols', v)} />
+              <SizeInput value={layout.cols} min={4} max={MAX_COLS} onCommit={(v) => setSize('cols', v)} />
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2" title={`Up to ${MAX_ROWS}`}>
               Rows
-              <SizeInput value={layout.rows} min={4} max={60} onCommit={(v) => setSize('rows', v)} />
+              <SizeInput value={layout.rows} min={4} max={MAX_ROWS} onCommit={(v) => setSize('rows', v)} />
             </label>
+            <div className="flex items-center gap-1">
+              <span className="mr-1">Zoom</span>
+              <MapButton onClick={() => zoom(0.8)} disabled={cell <= MIN_CELL} label="Zoom out">
+                −
+              </MapButton>
+              <span className="w-11 text-center text-xs font-semibold tabular-nums">{Math.round((cell / CELL) * 100)}%</span>
+              <MapButton onClick={() => zoom(1.25)} disabled={cell >= MAX_CELL} label="Zoom in">
+                +
+              </MapButton>
+              <MapButton onClick={fit} label="Fit the whole hall on screen">
+                Fit
+              </MapButton>
+              <MapButton onClick={() => setFullScreen((v) => !v)} label={fullScreen ? 'Exit full screen' : 'Full screen'}>
+                {fullScreen ? 'Exit full screen' : 'Full screen'}
+              </MapButton>
+            </div>
             <Legend />
           </div>
 
-          <div className="overflow-auto rounded-xl bg-as-charcoal/[0.02] p-3 ring-1 ring-black/10">
+          <div ref={mapBoxRef} className="overflow-auto rounded-xl bg-as-charcoal/[0.02] p-3 ring-1 ring-black/10">
             <div className="flex w-max">
               {/* Row letters, as the hall will number them. Click one to name it yourself. */}
               <div className="shrink-0" style={{ width: 34 }}>
                 {Array.from({ length: layout.rows }, (_, r) => (
-                  <div key={r} className="flex items-center justify-end pr-2" style={{ height: CELL }}>
-                    {labels.has(r) && (
+                  <div key={r} className="flex items-center justify-end pr-2" style={{ height: cell }}>
+                    {/* Below ~10 px a row the letters would sit on top of each other. */}
+                    {labels.has(r) && cell >= 10 && (
                       <button
                         type="button"
                         onClick={() => renameRow(r)}
                         title="Rename this row"
-                        className={`text-[11px] font-bold hover:text-as-red ${
+                        style={{ fontSize: Math.min(11, Math.max(7, Math.round(cell * 0.6))) }}
+                        className={`font-bold leading-none hover:text-as-red ${
                           layout.rowNames?.[r] ? 'text-as-red' : 'text-as-charcoal/50'
                         }`}
                       >
@@ -676,16 +793,16 @@ export default function SeatmapEditor() {
                 }}
                 className="relative cursor-crosshair select-none bg-white"
                 style={{
-                  width: layout.cols * CELL,
-                  height: layout.rows * CELL,
+                  width: layout.cols * cell,
+                  height: layout.rows * cell,
                   touchAction: 'none',
                   backgroundImage:
                     'linear-gradient(to right, rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.06) 1px, transparent 1px)',
-                  backgroundSize: `${CELL}px ${CELL}px`,
+                  backgroundSize: `${cell}px ${cell}px`,
                 }}
               >
                 {layout.areas.map((a) => (
-                  <AreaBox key={a.id} area={a} tier={tierById.get(a.tier)} selected={a.id === selected} currency={currency} />
+                  <AreaBox key={a.id} area={a} tier={tierById.get(a.tier)} selected={a.id === selected} currency={currency} cell={cell} />
                 ))}
                 {layout.seats.map((s) => (
                   <SeatDot
@@ -695,43 +812,23 @@ export default function SeatmapEditor() {
                     num={numbers.get(cellKey(s.r, s.c))}
                     booking={booked[cellKey(s.r, s.c)]}
                     picked={tool === 'sell' && sale.has(cellKey(s.r, s.c))}
+                    cell={cell}
                   />
                 ))}
                 {preview && (
                   <div
                     className="pointer-events-none absolute rounded-md border-2 border-dashed border-as-red bg-as-red/10"
-                    style={{ left: preview.c * CELL, top: preview.r * CELL, width: preview.w * CELL, height: preview.h * CELL }}
+                    style={{ left: preview.c * cell, top: preview.r * cell, width: preview.w * cell, height: preview.h * cell }}
                   />
                 )}
               </div>
             </div>
           </div>
+          {fullScreen && tool === 'sell' && counterSale}
         </div>
-      </Card>
+      </MapFrame>
 
-      {tool === 'sell' && (
-        <CounterSale
-          eventId={id}
-          layout={layout}
-          picked={picked}
-          bookedZones={bookedZones}
-          dirty={dirty}
-          whatsappOn={whatsappOn}
-          onUnpick={(key) =>
-            setSale((prev) => {
-              const next = new Set(prev)
-              next.delete(key)
-              return next
-            })
-          }
-          onSold={(text) => {
-            setSale(new Set())
-            setMsg({ kind: 'success', text })
-            refreshBookings().catch(() => {})
-          }}
-          onError={(text) => setMsg({ kind: 'error', text })}
-        />
-      )}
+      {!fullScreen && tool === 'sell' && counterSale}
 
       {area && (
         <AreaInspector
@@ -806,7 +903,7 @@ function formatMoney(amount, currency) {
 const RESERVED = '#F59E0B'
 const PAID = '#383F41'
 
-function SeatDot({ seat, tier, num, booking, picked }) {
+function SeatDot({ seat, tier, num, booking, picked, cell }) {
   const sold = !booking && seat.status === 'sold'
   const held = !booking && seat.status === 'held'
   const color = tier?.color || COLORS[0]
@@ -814,14 +911,16 @@ function SeatDot({ seat, tier, num, booking, picked }) {
   const state = booking === 'paid' ? ' · booked, paid' : booking ? ' · reserved, awaiting payment' : sold ? ' · sold' : held ? ' · held' : ''
   // Picked to sell at the counter: ringed, whatever its colour.
   const rings = [held && `inset 0 0 0 2px ${color}`, picked && '0 0 0 2px white, 0 0 0 4px #1C1C1C'].filter(Boolean)
+  const inset = Math.max(1, Math.round(cell * 0.12))
   return (
     <div
-      className="pointer-events-none absolute flex items-center justify-center rounded-[5px] text-[9px] font-bold leading-none"
+      className="pointer-events-none absolute flex items-center justify-center rounded-[5px] font-bold leading-none"
       style={{
-        left: seat.c * CELL + 3,
-        top: seat.r * CELL + 3,
-        width: CELL - 6,
-        height: CELL - 6,
+        left: seat.c * cell + inset,
+        top: seat.r * cell + inset,
+        width: cell - 2 * inset,
+        height: cell - 2 * inset,
+        fontSize: Math.round(cell * 0.35),
         background: fill,
         color: sold ? '#6B7280' : held ? color : 'white',
         boxShadow: rings.length ? rings.join(', ') : undefined,
@@ -829,18 +928,19 @@ function SeatDot({ seat, tier, num, booking, picked }) {
       }}
       title={`${tier?.name || ''} · seat ${num}${state}${picked ? ' · picked to sell' : ''}`}
     >
-      {sold ? '×' : num}
+      {/* Too small to read when zoomed far out — the colour says enough. */}
+      {cell >= 16 && (sold ? '×' : num)}
     </div>
   )
 }
 
-function AreaBox({ area, tier, selected, currency }) {
+function AreaBox({ area, tier, selected, currency, cell }) {
   const base = 'pointer-events-none absolute flex flex-col items-center justify-center overflow-hidden rounded-md text-center leading-tight'
   const box = {
-    left: area.c * CELL + 1,
-    top: area.r * CELL + 1,
-    width: area.w * CELL - 2,
-    height: area.h * CELL - 2,
+    left: area.c * cell + 1,
+    top: area.r * cell + 1,
+    width: area.w * cell - 2,
+    height: area.h * cell - 2,
     // A door down the side of the hall is one column wide: run its name down it.
     ...(area.h > area.w * 1.5 ? { writingMode: 'vertical-rl' } : {}),
   }
@@ -897,6 +997,57 @@ function Legend() {
         <span className="h-3 w-3 rounded-[3px]" style={{ background: PAID }} /> booked &amp; paid
       </span>
     </span>
+  )
+}
+
+/**
+ * The map's frame: the usual card, or — for a big hall — the whole screen,
+ * with its own Save so a long session of painting needn't leave it. Full
+ * screen is portalled to <body>: inside the page it would sit under the
+ * admin's header, whatever its z-index.
+ */
+function MapFrame({ fullScreen, title, dirty, saving, onSave, onExit, msg, children }) {
+  if (!fullScreen) return <Card title="Map">{children}</Card>
+  return createPortal(
+    <div className="fixed inset-0 z-[60] overflow-auto bg-white p-4 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-as-charcoal">Map</h2>
+          <p className="truncate text-sm text-as-charcoal/55">{title}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-as-charcoal/50">{dirty ? 'Unsaved changes' : 'Saved'}</span>
+          <Button onClick={onSave} disabled={saving || !dirty} className="px-4 py-2">
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button variant="ghost" onClick={onExit} className="px-4 py-2">
+            Exit full screen
+          </Button>
+        </div>
+      </div>
+      {msg && (
+        <div className="mb-3">
+          <Banner kind={msg.kind}>{msg.text}</Banner>
+        </div>
+      )}
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
+function MapButton({ onClick, disabled, label, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className="min-w-8 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-sm font-semibold text-as-charcoal transition hover:border-as-red/30 hover:text-as-red disabled:opacity-30"
+    >
+      {children}
+    </button>
   )
 }
 
@@ -994,9 +1145,9 @@ function QuickLayout({ tiers, defaultTier, onGenerate }) {
         Start from a whole hall — rows of seats, aisles, the stage and a door — then adjust it on the map.
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <Field label="Rows of seats"><TextInput type="number" min="1" max="40" value={opts.rows} onChange={set('rows')} /></Field>
-        <Field label="Seats per row"><TextInput type="number" min="1" max="60" value={opts.perRow} onChange={set('perRow')} /></Field>
-        <Field label="Aisle every … seats" hint="0 = no aisle."><TextInput type="number" min="0" max="60" value={opts.aisleEvery} onChange={set('aisleEvery')} /></Field>
+        <Field label="Rows of seats"><TextInput type="number" min="1" max={MAX_ROWS - 8} value={opts.rows} onChange={set('rows')} /></Field>
+        <Field label="Seats per row"><TextInput type="number" min="1" max={MAX_COLS - 2} value={opts.perRow} onChange={set('perRow')} /></Field>
+        <Field label="Aisle every … seats" hint="0 = no aisle."><TextInput type="number" min="0" max={MAX_COLS} value={opts.aisleEvery} onChange={set('aisleEvery')} /></Field>
         <Field label="Stage">
           <Select value={opts.stage} onChange={set('stage')}>
             <option value="top">In front (top)</option>

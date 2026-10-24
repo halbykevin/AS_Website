@@ -12,7 +12,10 @@
 // rowLabels() and summarize() are mirrored in the admin for its live preview
 // (src/admin/components/seatmapLayout.js) — keep them in step.
 
-const LIMITS = { cols: [4, 80], rows: [4, 60], tiers: 12, areas: 40, label: 40 }
+// The biggest hall there is. The editor stops at the same (MAX_* in
+// src/admin/components/seatmapLayout.js) — keep the two in step. 12,000 seats
+// keeps a saved map well under the API's 1 MB request limit.
+const LIMITS = { cols: [4, 200], rows: [4, 150], seats: 12000, tiers: 12, areas: 40, label: 40 }
 const AREA_KINDS = new Set(['stage', 'entrance', 'standing'])
 const SEAT_STATES = new Set(['free', 'sold', 'held'])
 const CURRENCIES = new Set(['USD', 'LBP'])
@@ -69,6 +72,7 @@ export function sanitizeLayout(input) {
   const taken = new Set()
   const seats = []
   for (const s of Array.isArray(src.seats) ? src.seats : []) {
+    if (seats.length >= LIMITS.seats) break
     const r = int(s?.r, 0, rows - 1, -1)
     const c = int(s?.c, 0, cols - 1, -1)
     if (r !== Math.round(Number(s?.r)) || c !== Math.round(Number(s?.c))) continue // off the grid

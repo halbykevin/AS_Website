@@ -8,6 +8,13 @@
 
 export const COLORS = ['#A41E22', '#2563EB', '#059669', '#D97706', '#7C3AED', '#DB2777']
 
+// The biggest hall the editor draws. The server enforces the same
+// (LIMITS in server/src/seatLayout.js) — keep the two in step. 12,000 seats
+// keeps a saved map well under the API's 1 MB request limit.
+export const MAX_COLS = 200
+export const MAX_ROWS = 150
+export const MAX_SEATS = 12000
+
 export const cellKey = (r, c) => `${r}-${c}`
 
 /** A, B … Z, AA, AB … */
@@ -100,12 +107,16 @@ export const newId = (prefix, taken) => {
  * than painting three hundred seats by hand.
  */
 export function generateHall({ rows, perRow, aisleEvery, stage, entrance, tier }) {
-  const nRows = Math.max(1, Math.min(40, Number(rows) || 1))
-  const nSeats = Math.max(1, Math.min(60, Number(perRow) || 1))
+  // Up to 8 rows go to the stage, the doors and the margins around them.
+  const nRows = Math.max(1, Math.min(MAX_ROWS - 8, Number(rows) || 1))
   const every = Math.max(0, Number(aisleEvery) || 0)
-  const aisles = every ? Math.floor((nSeats - 1) / every) : 0
+  const aislesFor = (n) => (every ? Math.floor((n - 1) / every) : 0)
+  // Seats plus their aisles, with a column's margin either side.
+  let nSeats = Math.max(1, Math.min(MAX_COLS - 2, Number(perRow) || 1))
+  while (nSeats > 1 && nSeats + aislesFor(nSeats) > MAX_COLS - 2) nSeats -= 1
+  const aisles = aislesFor(nSeats)
   const width = nSeats + aisles
-  const cols = Math.min(80, Math.max(width + 2, 8))
+  const cols = Math.min(MAX_COLS, Math.max(width + 2, 8))
   const left = Math.floor((cols - width) / 2)
 
   const STAGE_ROWS = 2
