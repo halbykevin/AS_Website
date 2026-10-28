@@ -198,6 +198,8 @@ export function mapEvent(e) {
     categorySlug: e.categorySlug || '',
     categoryName: e.categoryName || '',
     dates: Array.isArray(e.dates) ? e.dates : [],
+    // The sync's site key; '' = an event AS hosts (made in the admin).
+    source: e.source || '',
   }
 }
 
@@ -273,10 +275,12 @@ export function eventDateText(ev) {
 // admin-configured number, pre-filled with the event details so the visitor
 // just hits send. Returns '' when no number is set — and nothing falls back to
 // the partner's link then: no visitor is ever sent to the site we list from.
-// That is also why `ticketUrl` is not in the message: it is typed out on the
-// visitor's phone, one tap from buying there directly. Staff identify the event
-// by title, date and venue, and have the partner link in the admin.
-export function whatsappBookingUrl(number, event) {
+// The message does carry `link`, the event's direct link at its source — the
+// partner's own page for it, or the hub page for an event AS hosts (owner's
+// call, 2026-10-28) — so staff open the listing they buy from in one tap.
+// `source` is the source's name, which the ticketing hub passes and this site
+// doesn't (as.com.lb names no partners).
+export function whatsappBookingUrl(number, event, { source = '', link = '' } = {}) {
   const digits = String(number || '').replace(/\D/g, '')
   if (!digits || !event) return ''
   const location = [event.venue, event.city].filter(Boolean).join(', ')
@@ -284,6 +288,8 @@ export function whatsappBookingUrl(number, event) {
     event.title && `🎫 ${event.title}`,
     eventDateLabel(event) && `📅 ${eventDateLabel(event)}`,
     location && `📍 ${location}`,
+    source && `🏷️ Source: ${source}`,
+    link && `🔗 ${link}`,
   ].filter(Boolean)
   const message = [
     "Hello👋 I'd like more details about this event:",
@@ -296,9 +302,9 @@ export function whatsappBookingUrl(number, event) {
 }
 
 // The same chat, for one night of a run rather than the whole run.
-export function nightBookingUrl(number, event, night) {
+export function nightBookingUrl(number, event, night, refs) {
   if (!night?.date) return ''
-  return whatsappBookingUrl(number, { ...event, date: night.date, time: night.time, dates: [night] })
+  return whatsappBookingUrl(number, { ...event, date: night.date, time: night.time, dates: [night] }, refs)
 }
 
 // A banner can be "driven" by an event: it then borrows the event's image,
@@ -566,10 +572,18 @@ export async function loadSite() {
     // (the page then says "contact us"). Never the partner's ticket URL.
     // Cards, banners and the detail page all open these.
     const reserveNumber = content.ticketingWhatsappNumber || content.whatsappNumber
+    // The message carries the event's direct link at its source, as the hub's
+    // own Reserve message does (eventRefs() there): a partner event's own page
+    // (the night's, for one night), else its page on the ticketing hub.
+    const refsOf = (e, night) => {
+      const partner = e.source ? [night?.url, e.ticketUrl].find((u) => /^https?:\/\//i.test(u || '')) : ''
+      const hub = content.ticketingUrl && e.id ? `${content.ticketingUrl}/events/${encodeURIComponent(e.id)}` : ''
+      return { link: partner || hub }
+    }
     const mappedEvents = baseEvents.map((e) => ({
       ...e,
-      bookingUrl: whatsappBookingUrl(reserveNumber, e),
-      dates: (e.dates || []).map((d) => ({ ...d, bookingUrl: nightBookingUrl(reserveNumber, e, d) })),
+      bookingUrl: whatsappBookingUrl(reserveNumber, e, refsOf(e)),
+      dates: (e.dates || []).map((d) => ({ ...d, bookingUrl: nightBookingUrl(reserveNumber, e, d, refsOf(e, d)) })),
     }))
     content.banners = Array.isArray(banners)
       ? banners.map(mapBanner).map((b) => resolveBanner(b, mappedEvents)).filter((b) => b.active && b.image)

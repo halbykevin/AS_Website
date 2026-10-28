@@ -254,6 +254,7 @@ export default function SeatMap({ event, whatsappNumber }) {
 
   const reserve = whatsappSeatsUrl(whatsappNumber, {
     event,
+    night,
     date,
     seats: seatsChosen,
     zones: zonesChosen,

@@ -2,12 +2,18 @@ import { Pressable } from 'react-native';
 import { useThemedStyles } from '@/src/theme';
 import Text from './Text';
 
-export default function Chip({ label, selected = false, onPress, style }) {
+// `count`, when given, trails the label in a lighter weight ("Tick'it 62").
+export default function Chip({ label, count, selected = false, onPress, style }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, selected && styles.selected, pressed && { opacity: 0.85 }, style]}>
       <Text variant="callout" color={selected ? 'textOnPrimary' : 'text'} weight={selected ? 'semibold' : 'medium'}>
         {label}
+        {count != null ? (
+          <Text variant="callout" color={selected ? 'textOnInverseMuted' : 'textFaint'} weight="medium">
+            {`  ${count}`}
+          </Text>
+        ) : null}
       </Text>
     </Pressable>
   );

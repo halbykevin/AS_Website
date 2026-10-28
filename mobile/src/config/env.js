@@ -23,6 +23,13 @@ export const STORE_API_URL = stripSlash(process.env.EXPO_PUBLIC_STORE_API_URL ||
 // they can review.
 export const STORE_WEB_URL = stripSlash(process.env.EXPO_PUBLIC_STORE_WEB_URL || extra.storeWebUrl || 'https://store.as.com.lb');
 
+// The ticketing hub's *website* (ticketing.as.com.lb). Every WhatsApp
+// reservation links the event's page there, and an event AS hosts itself is
+// booked there — its seat map, 24-hour holds and Whish payment live on the hub.
+// Not in app.json → extra on purpose: under the fingerprint runtime policy that
+// would make this a native change, and it has to ship as an OTA update.
+export const TICKETING_WEB_URL = stripSlash(process.env.EXPO_PUBLIC_TICKETING_WEB_URL || extra.ticketingWebUrl || 'https://ticketing.as.com.lb');
+
 export const LEGAL_URLS = {
   privacy: `${STORE_WEB_URL}/pages/privacy`,
   warranty: `${STORE_WEB_URL}/pages/warranty`,
@@ -35,4 +42,4 @@ export const MAX_ITEM_QTY = 2; // store policy: at most 2 of any product per ord
 export const APP_NAME = 'AS Company';
 export const STORE_NAME = 'AS Store';
 
-export default { WEBSITE_API_URL, STORE_API_URL, STORE_WEB_URL, LEGAL_URLS, MAX_ITEM_QTY, APP_NAME, STORE_NAME };
+export default { WEBSITE_API_URL, STORE_API_URL, STORE_WEB_URL, TICKETING_WEB_URL, LEGAL_URLS, MAX_ITEM_QTY, APP_NAME, STORE_NAME };

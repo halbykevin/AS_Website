@@ -37,7 +37,7 @@ export async function GET() {
   if (phone) {
     out.push(
       `- Every event page has a Reserve button that opens a WhatsApp chat with AS Company (+${phone}), ` +
-        'pre-filled with the event, the date and the venue.',
+        'pre-filled with the event, the date, the venue and a link to the event.',
     )
     out.push(
       '- Where the venue publishes its seating, the page shows a live seat map: choose seats, a zone or a table, ' +

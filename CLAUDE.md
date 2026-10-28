@@ -5,17 +5,27 @@ Website for **AS Company (Absolute Solutions SAL)** — market leader in telecom
 > **No visitor is ever sent to a partner.** The sites we list from — Antoine Ticketing, Ticketing
 > Box Office, Tick'it, ihjoz — are where AS buys tickets; a visitor handed to one has been handed to
 > the competition. So `ticket_url` and each night's `dates[].url` are **internal**: staff read them in
-> the admin, the seat-map readers fetch from them, and `hasSeatmap()` reads their host — and nothing
-> ever renders them as a link or text. Concretely: the Reserve button is our WhatsApp or "contact
-> us", never the partner (hub `bookingUrl()`, site `whatsappBookingUrl`, app `eventBookingUrl`);
-> the pre-filled WhatsApp message carries title/date/venue but **not** the partner link (it is typed
-> on the visitor's phone, one tap from buying there); each night of a run gets "Reserve →" on our
+> the admin, the seat-map readers fetch from them, and `hasSeatmap()` reads their host — and no
+> page ever renders them as a link or text. Concretely: the Reserve button is our WhatsApp or
+> "contact us", never the partner (hub `bookingUrl()`, site `whatsappBookingUrl`, app
+> `eventBookingUrl`); each night of a run gets "Reserve →" on our
 > WhatsApp (`nightBookingUrl`), not "Tickets →" to the partner; the `Event` JSON-LD's
 > `offers.url` is **our own page** (Google renders it as a "Tickets" button in search); the
 > seat-map API's "empty" answer carries no `url`; and the events sync drops partner sales lines from
 > descriptions (`scrub_partners` in `WebScarping/event_sources/common.py` — "🎟️ tickit.co",
 > "Réservations à la Librairie Antoine"; it matches the businesses, never a bare "Antoine", which is a
-> first name). Still from the partners, by design or for now: event **images** are loaded from their
+> first name).
+>
+> **The one exception, the owner's call of 2026-10-28: the pre-filled WhatsApp message carries the
+> event's direct link at its source.** Under title/date/venue it adds `🏷️ Source: <name>` and
+> `🔗 <link>` (`eventRefs()` — hub `lib/events.js`, app `lib/whatsapp.js`, mirrored in the site's
+> `refsOf`): for a partner event the partner's own page for it (`dates[].url` for a message about
+> one night or a seat request on that night, else `ticket_url`), for an AS-hosted event — or a
+> partner row with no link — its page on the hub. It lets staff open the listing they buy from in
+> one tap, and it is knowingly the one place a visitor sees a partner's link (the message is typed
+> on their phone). Nothing *on a page* links the partner because of it.
+>
+> Still from the partners, by design or for now: event **images** are loaded from their
 > CDNs, and the public `/api/events` JSON still includes `ticketUrl` (the clients need its host).
 >
 > The site carries **no ticketing-partner branding**. The "Reservations powered by Ticketing Box
@@ -27,7 +37,9 @@ Website for **AS Company (Absolute Solutions SAL)** — market leader in telecom
 > **Exception since 2026-10-20 (owner's call): the ticketing hub names each event's source**, as
 > plain text — a pill on the card, a chip on the event page, and a *Source* filter on `/events`
 > (see *Where an event comes from* below). It is a name, never a link or a logo, and reserving is
-> still our WhatsApp. as.com.lb and the mobile app still show no partner names.
+> still our WhatsApp. **Since 2026-10-28 the mobile app names them too** (a pill on the card and
+> the event screen, a *Source* row on the Events tab — `mobile/src/lib/sources.js`, a copy of the
+> hub's list). as.com.lb still shows no partner names.
 
 > The old in-house reservation form was removed: the API endpoints, admin page, and on-site form are gone. The `reservations` table is retained in the DB (no longer read/written) in case the data is needed later.
 
@@ -135,12 +147,15 @@ Browser ──► Vercel (React static site, this repo root)          as.com.lb
   carry the category and `q` along (and vice versa). On a phone both rows become
   two dropdowns under "Filter by" ([FilterSelects.jsx](as_ticketing/src/components/FilterSelects.jsx)).
   [as_ticketing/src/lib/sources.js](as_ticketing/src/lib/sources.js) is the one
-  list: **AS Company** (`events.source = ''`, i.e. made by hand in the admin —
-  always shown in the filter, even at 0, as the slot for AS's own events), then
+  list: **AS Ticketing** (`events.source = ''`, i.e. made by hand in the admin —
+  always shown in the filter, even at 0, as the slot for AS's own events; it was
+  "AS Company" until 2026-10-28, and the old `?source=as-company` still resolves
+  as an alias of `as-ticketing`), then
   Ticketing Box Office, Antoine Ticketing, Tick'it, ihjoz. `sourceOf()` reads the
   API's `source` field (added to `eventJson` for this) and falls back to the
   `ticketUrl` host on an API without it. A fifth sync site needs a row there or
-  its events go unlabelled. A source view is `noindex, follow`, out of the
+  its events go unlabelled — there **and** in the app's copy,
+  [mobile/src/lib/sources.js](mobile/src/lib/sources.js). A source view is `noindex, follow`, out of the
   sitemap, with no structured data — the same events cut another way, and a page
   per partner would rank us for their names.
 - **Search is a feature here, not a chore** — it is how someone finds an event they
@@ -716,7 +731,7 @@ and [mobile/app/account/wallet.jsx](mobile/app/account/wallet.jsx) in the app. D
 ## AS-hosted events: seat maps & tickets (admin + API + hub)
 
 Events AS Company hosts itself — made by hand in `/admin/events`, `events.source = ''` (the
-"AS Company" source on the hub) — get a seat map, ticket prices and stock of their own. The
+"AS Ticketing" source on the hub) — get a seat map, ticket prices and stock of their own. The
 Events page opens on **Hosted by AS** (the synced ones are a second tab), and each hosted
 event has **Seat map & tickets** → `/admin/events/:id/seatmap`
 ([SeatmapEditor.jsx](src/admin/pages/SeatmapEditor.jsx)). First version, built 2026-10-20 —
@@ -817,8 +832,11 @@ the owner will refine the details.
     the API refuses a save that would remove a booked seat or standing area, and refuses a save
     from a page loaded before someone else's save (`baseUpdatedAt`), which is what stopped a stale
     tab from quietly un-selling seats.
-  - The mobile app's seat map does not draw AS halls yet (its `hasSeatmap()` is host-only), so it
-    shows the plain reserve button for them.
+  - The mobile app does not draw AS halls (its `hasSeatmap()` is host-only), so it sends them to
+    the hub instead (since 2026-10-28): an AS-hosted event's button is **Book on AS Ticketing**,
+    which opens the event's hub page in the phone's browser (`eventBookingUrl` in
+    [mobile/src/lib/whatsapp.js](mobile/src/lib/whatsapp.js)) — the browser, not an in-app sheet,
+    so the booking page a reservation ends on is still there after the customer leaves the app.
 - **A paid booking gets tickets; a reservation never does** (since 2026-10-23 —
   [server/src/tickets.js](server/src/tickets.js), drawn by [ticketPdf.js](server/src/ticketPdf.js)).
   One per seat or standing place, in the `tickets` table, issued the moment a booking is paid

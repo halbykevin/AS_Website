@@ -44,7 +44,8 @@ export function hubFaq({ settings = {}, categories = [], shop = null } = {}) {
           q: 'How do I reserve tickets?',
           a: [
             'Open the event and tap Reserve. A WhatsApp chat with AS Company opens, already filled in with the ' +
-              'event, the date and the venue — send it, and our team replies to confirm your reservation.',
+              'event, the date, the venue and a link to the event — send it, and our team replies to confirm ' +
+              'your reservation.',
           ],
         }
       : {

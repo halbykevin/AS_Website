@@ -151,7 +151,7 @@ function SeatMapInner({ event, whatsappNumber }) {
   // re-parses 60 KB of SVG. See paintSections for the whole reasoning.
   const xml = useMemo(() => (map ? svgDocument({ ...map, svg: paintSections(map.svg, map.sections) }) : ''), [map]);
 
-  const reserve = whatsappSeatsUrl(whatsappNumber, { event, date: night?.date, seats: seatsChosen, zones: zonesChosen, currency });
+  const reserve = whatsappSeatsUrl(whatsappNumber, { event, night, date: night?.date, seats: seatsChosen, zones: zonesChosen, currency });
 
   if (state.status === 'loading') {
     return (

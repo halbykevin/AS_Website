@@ -169,7 +169,7 @@ nothing else changes.
 | Online payment with **Whish**                   | `checkout` payment picker → hosted Whish page → `orders/[id]` confirms |
 | Accounts: email/WhatsApp code, Google           | `auth/login` + `auth/register` (OTP). Google prepared — see below      |
 | Orders + guest tracking, saved addresses        | `orders`, `orders/[id]` (track token), `account/addresses`             |
-| Events + pre‑filled WhatsApp reservation        | Events tab, `events/[id]` → opens WhatsApp                             |
+| Events + pre‑filled WhatsApp reservation        | Events tab (category + source filters), `events/[id]` → opens WhatsApp; an AS-hosted event → its ticketing hub page |
 | What We Do + solution pages                     | `what-we-do` + `what-we-do/[slug]`                                     |
 | Guess the Score predictor                       | `predictor` (3‑step: score → share → details)                          |
 | Shopping assistant (the site's chat bubble)     | `assistant` — sparkles button in the store header, same endpoint       |

@@ -11,10 +11,9 @@
 // amount of good copy substitutes for it. See eventJsonLd below.
 
 import { eventDateLabel, eventDays, reservationNumber } from './events.js'
+import { SITE_URL } from './site.js'
 
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://ticketing.as.com.lb'
-).replace(/\/$/, '')
+export { SITE_URL }
 
 export const SITE_NAME = 'AS Ticketing Hub'
 export const SITE_TAGLINE = 'Events in Lebanon — concerts, comedy, theatre & festivals'

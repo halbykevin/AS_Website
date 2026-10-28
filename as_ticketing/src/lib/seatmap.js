@@ -6,7 +6,7 @@
 // builder lives on its own rather than putting a function in the mirror that
 // the other side would never have.
 
-import { formatDate } from './events.js'
+import { eventRefs, formatDate } from './events.js'
 
 /** Where the live hall comes from — the marketing site's API, same as everything else. */
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
@@ -83,17 +83,22 @@ export function seatPlace(seat) {
  * is not a formality: nothing here holds a seat, so the reply has to be able to
  * be "that one just went, here is what's next to it".
  */
-export function whatsappSeatsUrl(number, { event, date, seats = [], zones = [], currency = 'USD' }) {
+export function whatsappSeatsUrl(number, { event, night, date, seats = [], zones = [], currency = 'USD' }) {
   const digits = String(number || '').replace(/\D/g, '')
   if (!digits || (!seats.length && !zones.length)) return ''
 
   const where = [event?.venue, event?.city].filter(Boolean).join(', ')
+  // The same source + direct link as the plain Reserve message (eventRefs()),
+  // for the night these seats are in.
+  const { source, link } = eventRefs(event, night)
   const lines = [
     "Hello 👋 I'd like to reserve these tickets:",
     '',
     event?.title && `🎫 ${event.title}`,
     date ? `📅 ${formatDate(date)}` : null,
     where && `📍 ${where}`,
+    source ? `🏷️ Source: ${source}` : null,
+    link ? `🔗 ${link}` : null,
     '',
   ].filter((l) => l !== null && l !== undefined && l !== false)
 

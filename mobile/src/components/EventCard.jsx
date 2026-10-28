@@ -1,5 +1,6 @@
-// Event card — tapping it opens the event detail. Mirrors the marketing site's
-// EventCard: image, category chip, title, date + venue, and a "past" dimming.
+// Event card — tapping it opens the event detail. Mirrors the ticketing hub's
+// EventCard: image, category chip, title, date + venue, the source it comes
+// from, and a "past" dimming.
 
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
@@ -9,6 +10,7 @@ import Text from '@/src/ui/Text';
 import Badge from '@/src/ui/Badge';
 import Icon from '@/src/ui/Icon';
 import RemoteImage from './RemoteImage';
+import SourcePill from './events/SourcePill';
 
 export default function EventCard({ event, wide = false }) {
   const theme = useTheme();
@@ -46,6 +48,7 @@ export default function EventCard({ event, wide = false }) {
             </Text>
           </View>
         ) : null}
+        <SourcePill event={event} style={styles.source} />
       </View>
     </Pressable>
   );
@@ -66,5 +69,6 @@ const makeStyles = t => ({
   cat: { position: 'absolute', left: t.spacing.md, top: t.spacing.md },
   pastOverlay: { position: 'absolute', right: t.spacing.md, top: t.spacing.md },
   body: { padding: t.spacing.lg, gap: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  source: { marginTop: 4 }
 });

@@ -1,12 +1,13 @@
 import { View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContent } from '@/src/content/ContentProvider';
-import { openUrl } from '@/src/lib/whatsapp';
+import { isHostedEvent, openUrl } from '@/src/lib/whatsapp';
 import { eventDateLabel, isEventPast } from '@/src/lib/format';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Header, Icon, Button, Badge, Card, Divider, EmptyState } from '@/src/ui';
 import RemoteImage from '@/src/components/RemoteImage';
 import SeatMap from '@/src/components/events/SeatMap';
+import SourcePill from '@/src/components/events/SourcePill';
 import { hasSeatmap } from '@/src/lib/seatmap';
 
 // Contain a crash in this screen: expo-router renders this instead of letting
@@ -34,8 +35,12 @@ export default function EventDetailScreen() {
   const past = isEventPast(event);
   const multiDay = Array.isArray(event.dates) && event.dates.length > 1;
 
-  // Our WhatsApp only. `ticketUrl` is the partner's page and is never opened:
-  // no one is sent to the site we list the event from.
+  // An event AS hosts is booked on its ticketing hub page (seat map, 24-hour
+  // hold, Whish) — `bookingUrl` is that page, opened in the phone's browser so
+  // the booking page it ends on is still there after leaving the app. Anything
+  // else is our WhatsApp. `ticketUrl` is the partner's page and is never
+  // opened: no one is sent to the site we list the event from.
+  const hosted = isHostedEvent(event);
   const reserve = () => {
     if (event.bookingUrl) openUrl(event.bookingUrl);
   };
@@ -46,7 +51,14 @@ export default function EventDetailScreen() {
       contentStyle={{ paddingHorizontal: 0 }}
       footer={
         <View style={{ padding: theme.layout.screenPadding, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background }}>
-          <Button label={past ? 'Event has ended' : 'Reserve on WhatsApp'} icon={past ? undefined : 'whatsapp'} onPress={reserve} disabled={past || !event.bookingUrl} fullWidth size="lg" />
+          <Button
+            label={past ? 'Event has ended' : hosted ? 'Book on AS Ticketing' : 'Reserve on WhatsApp'}
+            icon={past ? undefined : hosted ? 'ticket' : 'whatsapp'}
+            onPress={reserve}
+            disabled={past || !event.bookingUrl}
+            fullWidth
+            size="lg"
+          />
         </View>
       }
     >
@@ -54,9 +66,10 @@ export default function EventDetailScreen() {
       <RemoteImage uri={event.image} style={{ width: '100%', aspectRatio: 16 / 10 }} fallbackIcon="ticket" />
 
       <View style={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.lg, paddingTop: theme.spacing.lg }}>
-        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: theme.spacing.sm }}>
           {event.categoryName ? <Badge label={event.categoryName} tone="ink" /> : null}
           {past ? <Badge label="Past event" tone="neutral" /> : <Badge label="Open" tone="success" />}
+          <SourcePill event={event} />
         </View>
 
         <Text variant="h1">{event.title}</Text>

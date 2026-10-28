@@ -103,10 +103,13 @@ categories (`?source=<slug>`). All three ask `sourceOf()` in
 [`src/lib/sources.js`](src/lib/sources.js), so an event can't be labelled one
 thing and filed under another.
 
-- **The list is fixed, in this order:** AS Company, Ticketing Box Office,
-  Antoine Ticketing, Tick'it, ihjoz. **AS Company** is an event made by hand in
+- **The list is fixed, in this order:** AS Ticketing, Ticketing Box Office,
+  Antoine Ticketing, Tick'it, ihjoz. **AS Ticketing** is an event made by hand in
   the admin (`events.source = ''`); its chip is always there, even at 0, as the
-  slot for AS's own events. A partner's chip appears once the calendar has
+  slot for AS's own events. It was called "AS Company" until 2026-10-28; its
+  slug is now `as-ticketing`, and `as-company` is kept as an alias so links
+  shared before the rename still filter. The mobile app keeps a copy of the list
+  (`mobile/src/lib/sources.js`) — change both. A partner's chip appears once the calendar has
   something from it. A sync site this list doesn't name gets no label at all —
   better than a raw key on a card — so a new source needs a row here.
 - **It reads the API's `source` field**, the sync's site key. An API from before
@@ -124,6 +127,15 @@ thing and filed under another.
 - **A name, not a link.** The partner's page is still never shown or linked
   (see the repo's CLAUDE.md, *No visitor is ever sent to a partner*); Reserve is
   still our WhatsApp.
+- **The WhatsApp message carries it too** (since 2026-10-28, owner's call):
+  every Reserve message — the whole run, one night, or a seat request — ends its
+  details with `🏷️ Source: <name>` and `🔗 <link>`, from `eventRefs()` in
+  [`src/lib/events.js`](src/lib/events.js). The link is the event's **direct
+  link at its source**: the partner's own page for a partner event (that night's
+  page for a one-night message or a seat request, else `ticketUrl`), our
+  `/events/<slug>` for an AS-hosted event or a partner row with no link. Staff
+  open the listing they buy from in one tap. It is the one place a visitor sees
+  a partner's link, and it is deliberate; the page itself still never links one.
 - **Source views are `noindex, follow`**, self-canonical, out of the sitemap and
   without structured data: the same events cut another way, and a page per
   partner would only compete with the category pages and rank us for their names.
@@ -207,7 +219,7 @@ able to be three shapes without becoming three components:
 | ihjoz.com | an SVG of the room + a table of what is on sale in each block | their drawing; tap a **seated** block to open its numbered seats, tap a **table** to take it whole |
 | tickit.co | an SVG of the room + zones from their JSON API | their drawing and a priced zone list — see below |
 | antoineticketing.com | a Tixity seating plan (every seat's position, row, number, category, live status) + each night's categories with prices and free counts | numbered seats rebuilt as a grid like the box office's; free-seating categories as zones; Metro Al Madina's table zones as a drawing built from the plan's rectangles |
-| **AS Company** (events AS hosts) | a hall drawn in our own admin and stored in our database (`grid`, source `as`) | seats on a grid with the **stage, entrances and standing areas where they were drawn**; a standing area is a zone with its own count left |
+| **AS Ticketing** (events AS hosts) | a hall drawn in our own admin and stored in our database (`grid`, source `as`) | seats on a grid with the **stage, entrances and standing areas where they were drawn**; a standing area is a zone with its own count left |
 
 **AS's own halls** come from `/admin/events` → *Seat map & tickets* (see the
 repo's CLAUDE.md, *AS-hosted events*). The endpoint answers them from Postgres

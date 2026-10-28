@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { eventDateLabel, eventDays } from '@/lib/events'
-import { AS_COMPANY, sourceOf } from '@/lib/sources'
+import { AS_TICKETING, sourceOf } from '@/lib/sources'
 import SourceDot from './SourceDot'
 
 export default function EventCard({ event, priority = false }) {
@@ -61,7 +61,7 @@ export default function EventCard({ event, priority = false }) {
             <span
               title={`Source: ${source.name}`}
               className={`inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                source === AS_COMPANY ? 'bg-as-red/10 text-as-red' : 'bg-as-charcoal/[0.06] text-as-charcoal/65'
+                source === AS_TICKETING ? 'bg-as-red/10 text-as-red' : 'bg-as-charcoal/[0.06] text-as-charcoal/65'
               }`}
             >
               <SourceDot source={source} />

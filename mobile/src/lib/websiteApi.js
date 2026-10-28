@@ -5,7 +5,7 @@
 
 import { WEBSITE_API_URL } from '@/src/config/env';
 import { defaultWebsiteContent } from '@/src/content/websiteDefaults';
-import { whatsappBookingUrl } from './whatsapp';
+import { eventBookingUrl } from './whatsapp';
 import { eventDateLabel } from './format';
 import { mediaUrl } from './storeApi';
 
@@ -51,7 +51,11 @@ export function mapEvent(e) {
     description: e.description,
     categorySlug: e.categorySlug || '',
     categoryName: e.categoryName || '',
-    dates: Array.isArray(e.dates) ? e.dates : []
+    dates: Array.isArray(e.dates) ? e.dates : [],
+    // The sync's site key ('tickit', 'antoineticketing'…); '' = AS hosts it.
+    // Passed through as-is: an API too old to send it leaves it undefined, and
+    // sourceOf() then reads the ticket link's host instead.
+    source: e.source
   };
 }
 
@@ -174,7 +178,7 @@ export async function loadWebsiteContent() {
 
     const mappedEvents = (Array.isArray(events) ? events.map(mapEvent) : []).map(e => ({
       ...e,
-      bookingUrl: whatsappBookingUrl(content.whatsappNumber, e),
+      bookingUrl: eventBookingUrl(content.whatsappNumber, e),
       dateLabel: eventDateLabel(e)
     }));
 

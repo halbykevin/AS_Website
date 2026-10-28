@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { useContent } from '@/src/content/ContentProvider';
 import { isEventPast } from '@/src/lib/format';
+import { SOURCES, sourceOf } from '@/src/lib/sources';
 import { useTheme } from '@/src/theme';
 import { Screen, Text, Chip, EmptyState, useScrolled } from '@/src/ui';
 import AppHeader from '@/src/components/AppHeader';
@@ -27,21 +28,33 @@ export default function EventsScreen() {
   const theme = useTheme();
   const { events, content, loading, refresh } = useContent();
   const [category, setCategory] = useState('all');
+  // A source's slug, as on the hub's /events?source=<slug>.
+  const [source, setSource] = useState('all');
   const { scrolled, onScroll } = useScrolled();
 
   const categories = content.categories || [];
 
-  const { data, upcomingCount, pastCount } = useMemo(() => {
-    let list = events || [];
-    if (category !== 'all') list = list.filter(e => e.categorySlug === category);
+  const { data, upcomingCount, pastCount, sources, inCategoryCount } = useMemo(() => {
+    const all = events || [];
+    const inCategory = category === 'all' ? all : all.filter(e => e.categorySlug === category);
+    // The hub's Source row: every site the calendar has something from, plus
+    // AS Ticketing's own always (the slot for AS's events, even at 0) — each
+    // counted under the current category, so a chip says what tapping it shows.
+    const listed = new Set(all.map(sourceOf));
+    const sources = SOURCES.filter(s => !s.key || listed.has(s)).map(s => ({ ...s, count: inCategory.filter(e => sourceOf(e) === s).length }));
+    const list = source === 'all' ? inCategory : inCategory.filter(e => sourceOf(e)?.slug === source);
     const upcoming = list.filter(e => !isEventPast(e));
     const past = list.filter(e => isEventPast(e));
     return {
       data: [...upcoming, ...(past.length ? [HEADER] : []), ...past.map(e => ({ ...e, past: true }))],
       upcomingCount: upcoming.length,
-      pastCount: past.length
+      pastCount: past.length,
+      sources,
+      inCategoryCount: inCategory.length
     };
-  }, [events, category]);
+  }, [events, category, source]);
+
+  const filtered = category !== 'all' || source !== 'all';
 
   const renderItem = useCallback(
     ({ item }) =>
@@ -81,6 +94,21 @@ export default function EventsScreen() {
           ))}
         </ScrollView>
       ) : null}
+
+      {/* Source filter chips — where each event comes from, as on the hub. A
+          chip at 0 dims rather than disappears, so the row doesn't jump about
+          as the category changes. */}
+      {(events || []).length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -theme.layout.screenPadding, marginTop: -theme.spacing.md }} contentContainerStyle={{ paddingHorizontal: theme.layout.screenPadding, gap: theme.spacing.sm, alignItems: 'center' }}>
+          <Text variant="overline" faint>
+            SOURCE
+          </Text>
+          <Chip label="All sources" count={inCategoryCount} selected={source === 'all'} onPress={() => setSource('all')} />
+          {sources.map(s => (
+            <Chip key={s.slug} label={s.name} count={s.count} selected={source === s.slug} onPress={() => setSource(s.slug)} style={s.count || source === s.slug ? undefined : { opacity: 0.5 }} />
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 
@@ -100,7 +128,22 @@ export default function EventsScreen() {
           gap: theme.spacing.lg
         }}
         ListHeaderComponent={header}
-        ListEmptyComponent={upcomingCount + pastCount === 0 ? <EmptyState icon="calendar" title="No events" message="There are no events to show right now. Pull to refresh." /> : null}
+        ListEmptyComponent={
+          upcomingCount + pastCount > 0 ? null : filtered ? (
+            <EmptyState
+              icon="calendar"
+              title="Nothing here"
+              message="No events match these filters right now."
+              actionLabel="Show all events"
+              onAction={() => {
+                setCategory('all');
+                setSource('all');
+              }}
+            />
+          ) : (
+            <EmptyState icon="calendar" title="No events" message="There are no events to show right now. Pull to refresh." />
+          )
+        }
         initialNumToRender={4}
         maxToRenderPerBatch={6}
         windowSize={7}

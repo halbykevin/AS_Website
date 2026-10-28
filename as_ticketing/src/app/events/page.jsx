@@ -116,7 +116,7 @@ export default async function EventsPage({ searchParams }) {
   const shown = source ? matching.filter((e) => sourceOf(e) === source) : matching
   const activeName = categories.find((c) => c.slug === active)?.name
 
-  // Every site the calendar has something from, plus AS Company's own events
+  // Every site the calendar has something from, plus AS Ticketing's own events
   // always — each counted under the current category and search.
   const listed = new Set(events.map(sourceOf))
   const sources = SOURCES.filter((s) => !s.key || listed.has(s)).map((s) => ({
